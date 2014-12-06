@@ -103,7 +103,7 @@ impl<R: io::Reader> Scanner<R> {
 impl<R: io::Reader> Scanner<R> {
     // Advance the scanner only if the next char is in the 'any' set
     // after accept returns true self.curr() should return the matched char
-    fn accept(&mut self, any: &str) -> ScannerResult<bool> {
+    pub fn accept(&mut self, any: &str) -> ScannerResult<bool> {
         let next = try!(self.peek());
         if any.find(next).is_some() {
             assert!(self.next().is_ok());
@@ -114,7 +114,7 @@ impl<R: io::Reader> Scanner<R> {
 
     // Skip over the 'over' set, return if the scanner was advanced
     // after skip a call to self.curr() will return the last matching char
-    fn skip(&mut self, over: &str) -> ScannerResult<bool> {
+    pub fn skip(&mut self, over: &str) -> ScannerResult<bool> {
         let mut advanced = false;
         loop {
             match self.accept(over) {
@@ -128,7 +128,7 @@ impl<R: io::Reader> Scanner<R> {
 
     // Advance until a char in the 'find' set, return if advanced
     // after until a call to self.curr() should return the last non-matching char
-    fn until(&mut self, any: &str) -> ScannerResult<bool> {
+    pub fn until(&mut self, any: &str) -> ScannerResult<bool> {
         let mut advanced = false;
         loop {
             match self.peek() {
@@ -145,8 +145,8 @@ impl<R: io::Reader> Scanner<R> {
         }
     }
 
-    fn skip_ws(&mut self) -> ScannerResult<bool> { self.skip(WHITE) }
-    fn until_ws(&mut self) -> ScannerResult<bool> { self.until(WHITE) }
+    pub fn skip_ws(&mut self) -> ScannerResult<bool> { self.skip(WHITE) }
+    pub fn until_ws(&mut self) -> ScannerResult<bool> { self.until(WHITE) }
 }
 
 

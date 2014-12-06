@@ -2,16 +2,18 @@ extern crate tox;
 
 fn main() {
     use std::io;
-    let b = io::MemReader::new(b"just a test buffer".to_vec());
-    let mut s = tox::scanner::Scanner::new(b);
+    let b = io::MemReader::new(b"a buffer with some numbers 0234 234 0912".to_vec());
+    let mut m = tox::matchers::Matcher::new(b);
 
     loop {
-        match s.next() {
+        //assert!(m.skip_ws().is_ok());
+        match m.match_id() {
             Err(e) => {
                 println!("{}", e);
                 break;
             },
-            Ok(c) => print!("{}", c)
+            Ok(true) => println!("{}", m.extract()),
+            Ok(false) => println!("ignoring {}", m.next()),
         }
     }
 }

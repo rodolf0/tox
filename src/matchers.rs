@@ -1,8 +1,12 @@
 use std::io;
 use scanner;
 
+// Unwrap a ResultScanner's Ok value, or Panic if Error
+macro_rules! uop(
+    ($e: expr) => ($e.ok().unwrap())
+)
+
 pub type Matcher<R> = scanner::Scanner<R>;
-pub type MatcherResult<T> = Result<T, scanner::ScannerErr>;
 
 
 impl<R: io::Reader> Matcher<R> {
@@ -12,32 +16,32 @@ impl<R: io::Reader> Matcher<R> {
     }
 
     // Match an alfanumeric id which can't start with a number
-    pub fn match_id(&mut self) -> MatcherResult<bool> {
+    pub fn match_id(&mut self) -> Option<String> {
         let alfa = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
         let alnum = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
-        if try!(self.accept(alfa)) {
+        if uop!(self.accept(alfa)) {
             assert!(self.skip(alnum).is_ok());
-            return Ok(true);
+            return Some(self.extract());
         }
-        Ok(false)
+        None
     }
 
     // Match decimal numbers and base 16/8/2 integers
-    pub fn match_number(&mut self) -> MatcherResult<bool> {
+    pub fn match_number(&mut self) -> Option<String> {
         let mut digits = "0123456789";
         let mut base10 = true;
         let backtrack = self.pos;
 
         // optional sign
-        try!(self.accept("+-"));
+        assert!(self.accept("+-").is_ok());
         // check for other bases
-        if try!(self.accept("0")) {
+        if uop!(self.accept("0")) {
             base10 = false;
-            if try!(self.accept("xX")) {
+            if uop!(self.accept("xX")) {
                 digits = "0123456789aAbBcCdDeEfF";
-            } else if try!(self.accept("oO")) {
+            } else if uop!(self.accept("oO")) {
                 digits = "01234567";
-            } else if try!(self.accept("bB")) {
+            } else if uop!(self.accept("bB")) {
                 digits = "01";
             } else { // base 10 number starting with 0
                 base10 = true;
@@ -45,34 +49,34 @@ impl<R: io::Reader> Matcher<R> {
             }
         }
         // require integer part
-        if ! try!(self.skip(digits)) {
+        if ! uop!(self.skip(digits)) {
             self.pos = backtrack;
-            return Ok(false);
+            return None;
         }
         if ! base10 { // fraction/exponent only for base10
-            return Ok(true);
+            return Some(self.extract());
         }
         // check for fractional part
         let backtrack = self.pos;
-        if try!(self.accept(".")) {
+        if uop!(self.accept(".")) {
             // require fractional digits
-            if ! try!(self.skip(digits)) {
+            if ! uop!(self.skip(digits)) {
                 self.pos = backtrack;
-                return Ok(true); // found an integer
+                return Some(self.extract()); // found an integer
             }
         }
         // check for exponent part
         let backtrack = self.pos;
-        if try!(self.accept("eE")) { // can't parse exponents for bases-16
-            try!(self.accept("+-")); // optional exponent sign
+        if uop!(self.accept("eE")) { // can't parse exponents for bases-16
+            assert!(self.accept("+-").is_ok()); // optional exponent sign
             // require exponent digits
-            if ! try!(self.skip(digits)) {
+            if ! uop!(self.skip(digits)) {
                 self.pos = backtrack;
-                return Ok(true); // found a number without exponent
+                return Some(self.extract()); // found a number without exponent
             }
         }
-        try!(self.accept("i")); // accept imaginary numbers
-        Ok(false)
+        assert!(self.accept("i").is_ok()); // accept imaginary numbers
+        Some(self.extract())
     }
 }
 

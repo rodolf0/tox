@@ -1,5 +1,6 @@
 extern crate tox;
 
+#[cfg(not(test))]
 fn main() {
     use std::io;
     let b = io::MemReader::new(b"a buffer with some numbers 0234 234 0912".to_vec());

@@ -17,7 +17,7 @@ pub type ScannerResult<T> = Result<T, ScannerErr>;
 pub struct Scanner<R: io::Reader> {
     rdr: io::BufferedReader<R>,
     buf: Vec<char>,
-    pos: int
+    pub pos: int //TODO: don't make this public
 }
 
 

@@ -6,7 +6,6 @@ fn main() {
     let mut m = tox::matchers::Matcher::new(b);
 
     loop {
-        //assert!(m.skip_ws().is_ok());
         match m.match_id() {
             Err(e) => {
                 println!("{}", e);

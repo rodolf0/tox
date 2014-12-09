@@ -26,6 +26,7 @@ impl<R: io::Reader> Scanner<R> {
     pub fn next(&mut self) -> Option<char> {
         self.pos += 1;
         let pos = self.pos as uint;
+        // reached end of buffer, fetch more chars
         if pos >= self.buf.len() {
             match self.rdr.read_char() {
                 Err(ref e) if e.kind == io::EndOfFile => {
@@ -99,15 +100,15 @@ impl<R: io::Reader> Scanner<R> {
 impl<R: io::Reader> Scanner<R> {
     // Advance the scanner only if the next char is in the 'any' set
     // after accept returns true self.curr() should return the matched char
-    pub fn accept(&mut self, any: &str) -> bool {
+    pub fn accept(&mut self, any: &str) -> Option<char> {
         match self.peek() {
-            None => return false,
+            None => None,
             Some(next) => {
-                if any.find(next).is_some() {
+                if let Some(idx) = any.find(next) {
                     assert!(self.next().is_some());
-                    return true;
+                    return Some(any.char_at(idx));
                 }
-                return false;
+                None
             }
         }
     }
@@ -116,7 +117,7 @@ impl<R: io::Reader> Scanner<R> {
     // after skip a call to self.curr() will return the last matching char
     pub fn skip(&mut self, over: &str) -> bool {
         let mut advanced = false;
-        while self.accept(over) {
+        while self.accept(over).is_some() {
             advanced = true;
         }
         return advanced;
@@ -172,13 +173,13 @@ mod test {
         let mut s = super::Scanner::new(b);
         assert!(!s.skip_ws());
         assert_eq!(s.prev(), None);
-        assert!(s.accept("h"));
+        assert_eq!(s.accept("he"), Some('h'));
         assert_eq!(s.curr(), Some('h'));
-        assert!(s.accept("e"));
+        assert_eq!(s.accept("he"), Some('e'));
         assert_eq!(s.curr(), Some('e'));
-        assert!(s.accept("e"));
-        assert!(!s.accept("e"));
-        assert!(s.accept("y"));
+        assert_eq!(s.accept("hye"), Some('e'));
+        assert_eq!(s.accept("e"), None);
+        assert_eq!(s.accept("hey"), Some('y'));
         assert!(s.skip_ws());
         assert!(!s.skip_ws());
         assert_eq!(s.curr(), Some(' '));
@@ -191,14 +192,14 @@ mod test {
     fn test_skips() {
         let b = io::MemReader::new(b"heey  you!".to_vec());
         let mut s = super::Scanner::new(b);
-        assert!(s.accept("h"));
+        assert_eq!(s.accept("h"), Some('h'));
         assert!(s.skip("hey"));
         assert!(!s.skip("hey"));
         assert_eq!(s.curr(), Some('y'));
         assert!(!s.skip("you"));
         assert!(s.skip(" oy"));
         assert_eq!(s.next(), Some('u'));
-        assert!(s.accept("!"));
+        assert_eq!(s.accept("!"), Some('!'));
         assert_eq!(s.next(), None);
         assert_eq!(s.curr(), None);
         assert!(s.eof());

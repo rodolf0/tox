@@ -14,7 +14,7 @@ impl<R: io::Reader> Matcher<R> {
     pub fn match_id(&mut self) -> Option<String> {
         let alfa = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
         let alnum = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
-        if self.accept(alfa) {
+        if self.accept(alfa).is_some() {
             self.skip(alnum);
             return Some(self.extract());
         }
@@ -24,7 +24,7 @@ impl<R: io::Reader> Matcher<R> {
     // match exotic base integer
     pub fn match_exint(&mut self) -> Option<String> {
         let backtrack = self.pos;
-        if self.accept("0") && self.accept("xXoObB") {
+        if self.accept("0").is_some() && self.accept("xXoObB").is_some() {
             let digits = match self.curr().unwrap() {
                 'x' | 'X' => "0123456789aAbBcCdDeEfF",
                 'o' | 'O' => "01234567",
@@ -52,13 +52,13 @@ impl<R: io::Reader> Matcher<R> {
         }
         // check for fractional part, else it's just an integer
         let backtrack = self.pos;
-        if self.accept(".") && !self.skip(digits) {
+        if self.accept(".").is_some() && !self.skip(digits) {
             self.pos = backtrack;
             return Some(self.extract()); // integer
         }
         // check for exponent part
         let backtrack = self.pos;
-        if self.accept("eE") { // can't parse exponents for bases-16
+        if self.accept("eE").is_some() { // can't parse exponents for bases-16
             self.accept("+-"); // exponent sign is optional
             if !self.skip(digits) {
                 self.pos = backtrack;

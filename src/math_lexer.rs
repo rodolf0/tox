@@ -1,0 +1,139 @@
+use std::io;
+use matchers;
+
+#[deriving(PartialEq)]
+pub enum LexComp {
+    Unknown,
+    Number,
+    Variable,
+    Function,
+    OParen,
+    CParen,
+    Comma,
+    Plus,
+    Minus,
+    Times,
+    Divide,
+    Modulo,
+    Power,
+    UMinus,
+    Factorial,
+}
+
+pub struct MathToken {
+    lexeme: String,
+    lexcomp: LexComp
+}
+
+pub struct MathLexer<R: io::Reader> {
+    m: matchers::Matcher<R>,
+    buf: Vec<MathToken>,
+    pos: int
+}
+
+
+// check if a '-' minus is unary based on the preceding token
+fn makes_unary_minus(prev: &MathToken) -> bool {
+    match prev.lexcomp {
+        LexComp::Number | LexComp::Variable | LexComp::CParen => false,
+        _ => true
+    }
+}
+
+
+impl<R: io::Reader> MathLexer<R> {
+    // Build a MathLexer
+    pub fn new(r: R) -> MathLexer<R> {
+        MathLexer{
+            m: matchers::Matcher::new(r),
+            buf: Vec::new(),
+            pos: -1
+        }
+    }
+
+    // read a token from the underlying scanner, classify it and add it to our buffer
+    fn read_token(&mut self) -> Option<MathToken> {
+        self.m.ignore_ws();
+        // try variables / function names
+        if let Some(name) = self.m.match_id() {
+            self.m.ignore_ws();
+            if self.m.accept("(").is_some() {
+                return Some(MathToken{lexeme: name + "(", lexcomp: LexComp::Variable})
+            } else {
+                return Some(MathToken{lexeme: name, lexcomp: LexComp::Variable})
+            }
+        }
+        // try operators
+        if let Some(op) = self.m.accept("+-*/%^!(),") {
+            match op {
+                '+' => return Some(MathToken{lexeme: String::from_str("+"), lexcomp: LexComp::Plus}),
+                '-' => {
+                    let prevpos = (self.pos - 1) as uint;
+                    if self.pos < 1 || makes_unary_minus(&self.buf[prevpos]) {
+                        return Some(MathToken{lexeme: String::from_str("-"), lexcomp: LexComp::UMinus});
+                    }
+                    return Some(MathToken{lexeme: String::from_str("-"), lexcomp: LexComp::Minus});
+                },
+                '*' => return Some(MathToken{lexeme: String::from_str("*"), lexcomp: LexComp::Times}),
+                '/' => return Some(MathToken{lexeme: String::from_str("/"), lexcomp: LexComp::Divide}),
+                '%' => return Some(MathToken{lexeme: String::from_str("%"), lexcomp: LexComp::Modulo}),
+                '^' => return Some(MathToken{lexeme: String::from_str("^"), lexcomp: LexComp::Power}),
+                '!' => return Some(MathToken{lexeme: String::from_str("!"), lexcomp: LexComp::Factorial}),
+                '(' => return Some(MathToken{lexeme: String::from_str("("), lexcomp: LexComp::OParen}),
+                ')' => return Some(MathToken{lexeme: String::from_str(")"), lexcomp: LexComp::CParen}),
+                ',' => return Some(MathToken{lexeme: String::from_str(","), lexcomp: LexComp::Comma}),
+                _ => panic!("MathLexer::read_token: unknown operator [{}]", op)
+            }
+        }
+        // try exotic integers
+        if let Some(exint) = self.m.match_exint() {
+            return Some(MathToken{lexeme: exint, lexcomp: LexComp::Number});
+        }
+        // try numbers
+        if let Some(number) = self.m.match_number() {
+            return Some(MathToken{lexeme: number, lexcomp: LexComp::Number});
+        }
+        // unkown lex-component
+        if self.m.peek().is_some() {
+            assert!(self.m.until_ws());
+            return Some(MathToken{lexeme: self.m.extract(), lexcomp: LexComp::Unknown});
+        }
+        // if didn't match even the unknown arm we must be at EOF
+        assert!(self.m.eof());
+        None
+    }
+
+    // get the next token
+    pub fn next(&mut self) -> Option<&MathToken> {
+        self.pos += 1;
+        let pos = self.pos as uint;
+        // reached end of buffer, fetch more tokens
+        if pos >= self.buf.len() {
+            match self.read_token() {
+                None => {
+                    self.pos = self.buf.len() as int;
+                    return None;
+                },
+                Some(tok) => {
+                    if tok.lexcomp == LexComp::Unknown {
+                        panic!("MathLexer::next: unknown token [{}]", tok.lexeme);
+                    }
+                    self.buf.push(tok);
+                }
+            }
+        }
+        self.curr()
+    }
+
+    // get the token the lexer is on
+    pub fn curr(&self) -> Option<&MathToken> {
+        if self.pos < 0 {
+            return None;
+        }
+        let pos = self.pos as uint;
+        if pos >= self.buf.len() {
+            return None;
+        }
+        Some(&self.buf[pos])
+    }
+}

@@ -20,7 +20,7 @@ fn main() {
     for exnum in expect.iter() {
         m.ignore_ws();
         match m.match_number() {
-            None => fail!("Error parsing {}", *exnum),
+            None => panic!("Error parsing {}", *exnum),
             Some(n) => println!("Parsed [{}] for [{}]", n, *exnum)
         }
     }

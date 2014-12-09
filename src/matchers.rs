@@ -130,7 +130,7 @@ mod test {
                 "number" => assert_eq!(m.match_number().unwrap().as_slice(), tok),
                 "exint" => assert_eq!(m.match_exint().unwrap().as_slice(), tok),
                 "id" => assert_eq!(m.match_id().unwrap().as_slice(), tok),
-                _ => fail!("non-reachable")
+                _ => panic!("non-reachable")
             }
         }
         assert!(m.eof());

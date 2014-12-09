@@ -29,12 +29,12 @@ impl<R: io::Reader> Scanner<R> {
         // reached end of buffer, fetch more chars
         if pos >= self.buf.len() {
             match self.rdr.read_char() {
+                Ok(c) => self.buf.push(c),
                 Err(ref e) if e.kind == io::EndOfFile => {
                     self.pos = self.buf.len() as int;
                     return None;
                 },
-                Err(e) => fail!("Scanner::next failed: {}", e),
-                Ok(c) => self.buf.push(c)
+                Err(e) => panic!("Scanner::next failed: {}", e)
             }
         }
         self.curr()
@@ -123,10 +123,26 @@ impl<R: io::Reader> Scanner<R> {
         return advanced;
     }
 
-    // Skip over white-space
-    pub fn skip_ws(&mut self) -> bool {
-      self.skip(WHITE)
+    // Advance the scanner until we find a char in the 'any' set or
+    // we reach EOF. Returns true if the scanner was advanced.
+    // After until a call to self.curr() returns the last non-matching char
+    pub fn until(&mut self, any: &str) -> bool {
+        let mut advanced = false;
+        while let Some(next) = self.peek() {
+            if any.find(next).is_some() {
+                break;
+            }
+            assert!(self.next().is_some());
+            advanced = true;
+        }
+        return advanced;
     }
+
+    // Advance until WHITE or EOF
+    pub fn until_ws(&mut self) -> bool { self.until(WHITE) }
+
+    // Skip over white-space
+    pub fn skip_ws(&mut self) -> bool { self.skip(WHITE) }
 
     // After skipping over-white space, drop the current window
     pub fn ignore_ws(&mut self) {
@@ -196,9 +212,8 @@ mod test {
         assert!(s.skip("hey"));
         assert!(!s.skip("hey"));
         assert_eq!(s.curr(), Some('y'));
-        assert!(!s.skip("you"));
-        assert!(s.skip(" oy"));
-        assert_eq!(s.next(), Some('u'));
+        assert!(s.until("!"));
+        assert!(!s.until("!"));
         assert_eq!(s.accept("!"), Some('!'));
         assert_eq!(s.next(), None);
         assert_eq!(s.curr(), None);

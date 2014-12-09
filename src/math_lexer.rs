@@ -1,7 +1,7 @@
 use std::io;
 use matchers;
 
-#[deriving(PartialEq)]
+#[deriving(PartialEq, Show)]
 pub enum LexComp {
     Unknown,
     Number,
@@ -20,6 +20,7 @@ pub enum LexComp {
     Factorial,
 }
 
+#[deriving(PartialEq, Show)]
 pub struct MathToken {
     lexeme: String,
     lexcomp: LexComp
@@ -41,6 +42,15 @@ fn makes_unary_minus(prev: &MathToken) -> bool {
 }
 
 
+impl MathLexer<io::MemReader> {
+    // Build a MathLexer reading from a string
+    pub fn from_str(e: &str) -> MathLexer<io::MemReader> {
+        let b = io::MemReader::new(e.as_bytes().to_vec());
+        MathLexer::new(b)
+    }
+}
+
+
 impl<R: io::Reader> MathLexer<R> {
     // Build a MathLexer
     pub fn new(r: R) -> MathLexer<R> {
@@ -58,7 +68,7 @@ impl<R: io::Reader> MathLexer<R> {
         if let Some(name) = self.m.match_id() {
             self.m.ignore_ws();
             if self.m.accept("(").is_some() {
-                return Some(MathToken{lexeme: name + "(", lexcomp: LexComp::Variable})
+                return Some(MathToken{lexeme: name + "(", lexcomp: LexComp::Function})
             } else {
                 return Some(MathToken{lexeme: name, lexcomp: LexComp::Variable})
             }
@@ -135,5 +145,122 @@ impl<R: io::Reader> MathLexer<R> {
             return None;
         }
         Some(&self.buf[pos])
+    }
+}
+
+
+
+#[cfg(test)]
+mod test {
+    use super::{MathLexer, LexComp, MathToken};
+
+    #[test]
+    fn test1() {
+        let mut ml = MathLexer::from_str("3+4*2/-(1-5)^2^3");
+        let expect = [
+            ("3", LexComp::Number),
+            ("+", LexComp::Plus),
+            ("4", LexComp::Number),
+            ("*", LexComp::Times),
+            ("2", LexComp::Number),
+            ("/", LexComp::Divide),
+            ("-", LexComp::UMinus),
+            ("(", LexComp::OParen),
+            ("1", LexComp::Number),
+            ("-", LexComp::Minus),
+            ("5", LexComp::Number),
+            (")", LexComp::CParen),
+            ("^", LexComp::Power),
+            ("2", LexComp::Number),
+            ("^", LexComp::Power),
+            ("3", LexComp::Number),
+        ];
+        for &(lexeme, lexcomp) in expect.iter() {
+            let &MathToken{lexeme: ref lx, lexcomp: ref lc} = ml.next().unwrap();
+            assert_eq!(*lx, lexeme);
+            assert_eq!(*lc, lexcomp);
+        }
+        assert_eq!(ml.next(), None);
+    }
+
+    #[test]
+    fn test2() {
+        let mut ml = MathLexer::from_str("3.4e-2 * sin(x)/(7! % -4) * max(2, x)");
+        let expect = [
+            ("3.4e-2", LexComp::Number),
+            ("*", LexComp::Times),
+            ("sin(", LexComp::Function),
+            ("x", LexComp::Variable),
+            (")", LexComp::CParen),
+            ("/", LexComp::Divide),
+            ("(", LexComp::OParen),
+            ("7", LexComp::Number),
+            ("!", LexComp::Factorial),
+            ("%", LexComp::Modulo),
+            ("-", LexComp::UMinus),
+            ("4", LexComp::Number),
+            (")", LexComp::CParen),
+            ("*", LexComp::Times),
+            ("max(", LexComp::Function),
+            ("2", LexComp::Number),
+            (",", LexComp::Comma),
+            ("x", LexComp::Variable),
+            (")", LexComp::CParen),
+        ];
+        for &(lexeme, lexcomp) in expect.iter() {
+            let &MathToken{lexeme: ref lx, lexcomp: ref lc} = ml.next().unwrap();
+            assert_eq!(*lx, lexeme);
+            assert_eq!(*lc, lexcomp);
+        }
+        assert_eq!(ml.next(), None);
+    }
+
+    #[test]
+    fn test3() {
+        let mut ml = MathLexer::from_str("sqrt(-(1i-x^2) / (1 + x^2))");
+        let expect = [
+            ("sqrt(", LexComp::Function),
+            ("-", LexComp::UMinus),
+            ("(", LexComp::OParen),
+            ("1i", LexComp::Number),
+            ("-", LexComp::Minus),
+            ("x", LexComp::Variable),
+            ("^", LexComp::Power),
+            ("2", LexComp::Number),
+            (")", LexComp::CParen),
+            ("/", LexComp::Divide),
+            ("(", LexComp::OParen),
+            ("1", LexComp::Number),
+            ("+", LexComp::Plus),
+            ("x", LexComp::Variable),
+            ("^", LexComp::Power),
+            ("2", LexComp::Number),
+            (")", LexComp::CParen),
+            (")", LexComp::CParen),
+        ];
+        for &(lexeme, lexcomp) in expect.iter() {
+            let &MathToken{lexeme: ref lx, lexcomp: ref lc} = ml.next().unwrap();
+            assert_eq!(*lx, lexeme);
+            assert_eq!(*lc, lexcomp);
+        }
+        assert_eq!(ml.next(), None);
+    }
+
+    #[test]
+    fn test4() {
+        let mut ml = MathLexer::from_str("x---y");
+        let expect = [
+            ("x", LexComp::Variable),
+            ("-", LexComp::Minus),
+            ("-", LexComp::UMinus),
+            ("-", LexComp::UMinus),
+            ("y", LexComp::Variable),
+        ];
+        for &(lexeme, lexcomp) in expect.iter() {
+            let &MathToken{lexeme: ref lx, lexcomp: ref lc} = ml.next().unwrap();
+            assert_eq!(*lx, lexeme);
+            assert_eq!(*lc, lexcomp);
+        }
+        assert_eq!(ml.next(), None);
     }
 }

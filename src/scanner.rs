@@ -2,15 +2,6 @@ use std::io;
 
 static WHITE: &'static str = " \n\r\t";
 
-#[deriving(Show, PartialEq)]
-pub enum ScannerErr {
-    BOF,
-    EOF,
-    Other(io::IoError)
-}
-
-pub type ScannerResult<T> = Result<T, ScannerErr>;
-
 // A Scanner reads chars into a growing window,
 // once enough chars have been read to take action
 // a string can be extracted and the window collapsed
@@ -32,16 +23,16 @@ impl<R: io::Reader> Scanner<R> {
     }
 
     //Read the next char
-    pub fn next(&mut self) -> ScannerResult<char> {
+    pub fn next(&mut self) -> Option<char> {
         self.pos += 1;
         let pos = self.pos as uint;
         if pos >= self.buf.len() {
             match self.rdr.read_char() {
                 Err(ref e) if e.kind == io::EndOfFile => {
                     self.pos = self.buf.len() as int;
-                    return Err(EOF);
+                    return None;
                 },
-                Err(e) => return Err(Other(e)),
+                Err(e) => fail!("Scanner::next failed: {}", e),
                 Ok(c) => self.buf.push(c)
             }
         }
@@ -49,19 +40,19 @@ impl<R: io::Reader> Scanner<R> {
     }
 
     // Current char the scanner is on
-    pub fn curr(&self) -> ScannerResult<char> {
+    pub fn curr(&self) -> Option<char> {
         if self.pos < 0 {
-            return Err(BOF);
+            return None;
         }
         let pos = self.pos as uint;
         if pos >= self.buf.len() {
-            return Err(EOF);
+            return None;
         }
-        Ok(self.buf[pos])
+        Some(self.buf[pos])
     }
 
     // Read the prev char
-    pub fn prev(&mut self) -> ScannerResult<char> {
+    pub fn prev(&mut self) -> Option<char> {
         if self.pos >= 0 {
             self.pos -= 1;
         }
@@ -69,11 +60,16 @@ impl<R: io::Reader> Scanner<R> {
     }
 
     // Take a look at the next char without advancing
-    pub fn peek(&mut self) -> ScannerResult<char> {
-        let pos = self.pos;
-        let ret = self.next();
-        self.pos = pos;
-        return ret;
+    pub fn peek(&mut self) -> Option<char> {
+        let backtrack = self.pos;
+        let peeked = self.next();
+        self.pos = backtrack;
+        peeked
+    }
+
+    // Check if the scanner reached EOF
+    pub fn eof(&self) -> bool {
+        self.pos as uint >= self.buf.len()
     }
 
     // Take a peep at what the scanner is currently holding
@@ -103,52 +99,40 @@ impl<R: io::Reader> Scanner<R> {
 impl<R: io::Reader> Scanner<R> {
     // Advance the scanner only if the next char is in the 'any' set
     // after accept returns true self.curr() should return the matched char
-    pub fn accept(&mut self, any: &str) -> ScannerResult<bool> {
-        let next = try!(self.peek());
-        if any.find(next).is_some() {
-            assert!(self.next().is_ok());
-            return Ok(true);
+    pub fn accept(&mut self, any: &str) -> bool {
+        match self.peek() {
+            None => return false,
+            Some(next) => {
+                if any.find(next).is_some() {
+                    assert!(self.next().is_some());
+                    return true;
+                }
+                return false;
+            }
         }
-        Ok(false)
     }
 
     // Skip over the 'over' set, return if the scanner was advanced
     // after skip a call to self.curr() will return the last matching char
-    pub fn skip(&mut self, over: &str) -> ScannerResult<bool> {
+    pub fn skip(&mut self, over: &str) -> bool {
         let mut advanced = false;
-        loop {
-            match self.accept(over) {
-                Ok(true) => advanced = true,
-                Ok(false) => return Ok(advanced),
-                Err(EOF) if advanced => return Ok(true),
-                Err(e) => return Err(e)
-            }
+        while self.accept(over) {
+            advanced = true;
         }
+        return advanced;
     }
 
-    // Advance until a char in the 'find' set, return if advanced
-    // after until a call to self.curr() should return the last non-matching char
-    pub fn until(&mut self, any: &str) -> ScannerResult<bool> {
-        let mut advanced = false;
-        loop {
-            match self.peek() {
-                Ok(next) => {
-                    if any.find(next).is_some() {
-                        return Ok(advanced);
-                    }
-                    assert!(self.next().is_ok());
-                    advanced = true;
-                },
-                Err(EOF) if advanced => return Ok(true),
-                Err(e) => return Err(e)
-            }
-        }
+    // Skip over white-space
+    pub fn skip_ws(&mut self) -> bool {
+      self.skip(WHITE)
     }
 
-    pub fn skip_ws(&mut self) -> ScannerResult<bool> { self.skip(WHITE) }
-    pub fn until_ws(&mut self) -> ScannerResult<bool> { self.until(WHITE) }
+    // After skipping over-white space, drop the current window
+    pub fn ignore_ws(&mut self) {
+        self.skip_ws();
+        self.ignore();
+    }
 }
-
 
 
 #[cfg(test)]
@@ -159,64 +143,64 @@ mod test {
     fn test_extremes() {
         let b = io::MemReader::new(b"just a test buffer@".to_vec());
         let mut s = super::Scanner::new(b);
-
-        assert_eq!(s.prev(), Err(super::BOF));
-        while s.next() != Ok('@') {}
-        assert_eq!(s.curr(), Ok('@'));
-        assert_eq!(s.next(), Err(super::EOF));
+        assert_eq!(s.prev(), None);
+        assert_eq!(s.next(), Some('j'));
+        assert_eq!(s.prev(), None);
+        while s.next() != Some('@') {}
+        assert_eq!(s.curr(), Some('@'));
+        assert_eq!(s.prev(), Some('r'));
+        assert_eq!(s.prev(), Some('e'));
+        assert_eq!(s.next(), Some('r'));
+        assert_eq!(s.next(), Some('@'));
+        assert_eq!(s.next(), None);
+        assert!(s.eof());
     }
 
     #[test]
     fn test_extract() {
         let b = io::MemReader::new(b"just a test buffer@".to_vec());
         let mut s = super::Scanner::new(b);
-
-        for _ in range(0u, 4) {
-            assert!(s.next().is_ok());
-        }
-        assert_eq!(s.extract(), "just".to_string());
-        assert_eq!(s.peek(), Ok(' '));
-        assert_eq!(s.prev(), Err(super::BOF));
+        for _ in range(0u, 4) { assert!(s.next().is_some()); }
+        assert_eq!(s.extract().as_slice(), "just");
+        assert_eq!(s.peek(), Some(' '));
+        assert_eq!(s.prev(), None);
     }
 
     #[test]
     fn test_accept() {
         let b = io::MemReader::new(b"heey  you!".to_vec());
         let mut s = super::Scanner::new(b);
-
-        assert_eq!(s.skip_ws(), Ok(false));
-        assert_eq!(s.accept("h"), Ok(true));
-        assert_eq!(s.accept("e"), Ok(true));
-        assert_eq!(s.accept("e"), Ok(true));
-        assert_eq!(s.accept("e"), Ok(false));
-        assert_eq!(s.accept("y"), Ok(true));
-        assert_eq!(s.skip_ws(), Ok(true));
-        assert_eq!(s.skip_ws(), Ok(false));
-        assert_eq!(s.curr(), Ok(' '));
-        assert_eq!(s.peek(), Ok('y'));
-        assert_eq!(s.until("uoy"), Ok(false)); // won't advance because next is 'y'
-        assert_eq!(s.until("uo"), Ok(true));   // advance up to prev-'o'
-        assert_eq!(s.curr(), Ok('y'));
-        assert_eq!(s.until("!"), Ok(true));   // advance up to prev-'u'
-        assert_eq!(s.curr(), Ok('u'));
-        assert_eq!(s.accept("!"), Ok(true));
-
-        assert_eq!(s.skip_ws(), Err(super::EOF));
-        assert_eq!(s.until_ws(), Err(super::EOF));
+        assert!(!s.skip_ws());
+        assert_eq!(s.prev(), None);
+        assert!(s.accept("h"));
+        assert_eq!(s.curr(), Some('h'));
+        assert!(s.accept("e"));
+        assert_eq!(s.curr(), Some('e'));
+        assert!(s.accept("e"));
+        assert!(!s.accept("e"));
+        assert!(s.accept("y"));
+        assert!(s.skip_ws());
+        assert!(!s.skip_ws());
+        assert_eq!(s.curr(), Some(' '));
+        assert_eq!(s.peek(), Some('y'));
+        assert_eq!(s.next(), Some('y'));
+        assert_eq!(s.next(), Some('o'));
     }
 
     #[test]
     fn test_skips() {
         let b = io::MemReader::new(b"heey  you!".to_vec());
         let mut s = super::Scanner::new(b);
-        assert_eq!(s.accept("h"), Ok(true));
-        assert_eq!(s.until("@"), Ok(true));
-        assert_eq!(s.until("@"), Err(super::EOF));
-
-        let b = io::MemReader::new(b"heey  you!".to_vec());
-        let mut s = super::Scanner::new(b);
-        assert_eq!(s.accept("h"), Ok(true));
-        assert_eq!(s.skip("heyou !"), Ok(true));
-        assert_eq!(s.skip("heyou !"), Err(super::EOF));
+        assert!(s.accept("h"));
+        assert!(s.skip("hey"));
+        assert!(!s.skip("hey"));
+        assert_eq!(s.curr(), Some('y'));
+        assert!(!s.skip("you"));
+        assert!(s.skip(" oy"));
+        assert_eq!(s.next(), Some('u'));
+        assert!(s.accept("!"));
+        assert_eq!(s.next(), None);
+        assert_eq!(s.curr(), None);
+        assert!(s.eof());
     }
 }

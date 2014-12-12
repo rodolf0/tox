@@ -12,6 +12,14 @@ pub struct Scanner<R: io::Reader> {
 }
 
 
+impl Scanner<io::MemReader> {
+    // Build a MathLexer reading from a string
+    pub fn from_str(e: &str) -> Scanner<io::MemReader> {
+        let b = io::MemReader::new(e.as_bytes().to_vec());
+        Scanner::new(b)
+    }
+}
+
 impl<R: io::Reader> Scanner<R> {
     // Build Scanner from generic reader
     pub fn new(r: R) -> Scanner<R> {
@@ -154,12 +162,9 @@ impl<R: io::Reader> Scanner<R> {
 
 #[cfg(test)]
 mod test {
-    use std::io;
-
     #[test]
     fn test_extremes() {
-        let b = io::MemReader::new(b"just a test buffer@".to_vec());
-        let mut s = super::Scanner::new(b);
+        let mut s = super::Scanner::from_str("just a test buffer@");
         assert_eq!(s.prev(), None);
         assert_eq!(s.next(), Some('j'));
         assert_eq!(s.prev(), None);
@@ -175,8 +180,7 @@ mod test {
 
     #[test]
     fn test_extract() {
-        let b = io::MemReader::new(b"just a test buffer@".to_vec());
-        let mut s = super::Scanner::new(b);
+        let mut s = super::Scanner::from_str("just a test buffer@");
         for _ in range(0u, 4) { assert!(s.next().is_some()); }
         assert_eq!(s.extract().as_slice(), "just");
         assert_eq!(s.peek(), Some(' '));
@@ -185,8 +189,7 @@ mod test {
 
     #[test]
     fn test_accept() {
-        let b = io::MemReader::new(b"heey  you!".to_vec());
-        let mut s = super::Scanner::new(b);
+        let mut s = super::Scanner::from_str("heey  you!");
         assert!(!s.skip_ws());
         assert_eq!(s.prev(), None);
         assert_eq!(s.accept("he"), Some('h'));
@@ -206,8 +209,7 @@ mod test {
 
     #[test]
     fn test_skips() {
-        let b = io::MemReader::new(b"heey  you!".to_vec());
-        let mut s = super::Scanner::new(b);
+        let mut s = super::Scanner::from_str("heey  you!");
         assert_eq!(s.accept("h"), Some('h'));
         assert!(s.skip("hey"));
         assert!(!s.skip("hey"));

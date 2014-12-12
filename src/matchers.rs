@@ -4,6 +4,14 @@ use scanner;
 pub type Matcher<R> = scanner::Scanner<R>;
 
 
+impl Matcher<io::MemReader> {
+    // Build a MathLexer reading from a string
+    pub fn from_str(e: &str) -> Matcher<io::MemReader> {
+        let b = io::MemReader::new(e.as_bytes().to_vec());
+        Matcher::new(b)
+    }
+}
+
 impl<R: io::Reader> Matcher<R> {
 
     pub fn new(r: R) -> Matcher<R> {
@@ -24,15 +32,17 @@ impl<R: io::Reader> Matcher<R> {
     // match exotic base integer
     pub fn match_exint(&mut self) -> Option<String> {
         let backtrack = self.pos;
-        if self.accept("0").is_some() && self.accept("xXoObB").is_some() {
-            let digits = match self.curr().unwrap() {
-                'x' | 'X' => "0123456789aAbBcCdDeEfF",
-                'o' | 'O' => "01234567",
-                'b' | 'B' => "01",
-                _ => "non-reachable!"
-            };
-            if self.skip(digits) {
-                return Some(self.extract());
+        if self.accept("0").is_some() {
+            if self.accept("xXoObB").is_some() {
+                let digits = match self.curr().unwrap() {
+                    'x' | 'X' => "0123456789aAbBcCdDeEfF",
+                    'o' | 'O' => "01234567",
+                    'b' | 'B' => "01",
+                    _ => panic!("non-reachable")
+                };
+                if self.skip(digits) {
+                    return Some(self.extract());
+                }
             }
             self.pos = backtrack; // was not an ex-int
         }
@@ -74,8 +84,6 @@ impl<R: io::Reader> Matcher<R> {
 
 #[cfg(test)]
 mod test {
-    use std::io;
-
     #[test]
     fn test_nums() {
         let nums = concat!(
@@ -87,9 +95,7 @@ mod test {
             "2.65i", "9i", "8.2e-3i",
             "1.234e2", "-3.4523e+1", "256E-2", "354e-4", "-3487.23e-1", "0.001e+5", "-9e-2",
         ];
-
-        let b = io::MemReader::new(nums.into_string().into_bytes());
-        let mut m = super::Matcher::new(b);
+        let mut m = super::Matcher::from_str(nums);
         for exnum in expect.iter() {
             m.ignore_ws();
             let num = m.match_number();
@@ -103,8 +109,7 @@ mod test {
     fn test_exnums() {
         let nums = "0x0 0x10 0x20 0xff 0xabcdEf 0b0101";
         let expect = ["0x0", "0x10", "0x20", "0xff", "0xabcdEf", "0b0101"];
-        let b = io::MemReader::new(nums.into_string().into_bytes());
-        let mut m = super::Matcher::new(b);
+        let mut m = super::Matcher::from_str(nums);
         for exnum in expect.iter() {
             m.ignore_ws();
             let num = m.match_exint();
@@ -121,8 +126,7 @@ mod test {
                       ("-7", "number"), ("word", "id"), ("-10", "number"), ("987654321", "number"),
                       ("0.34", "number"), ("test", "id"), ("-2.14", "number"), ("2e3", "number"),
                       ("-3e1", "number"), ("0x34", "exint"), ("5.3E2", "number")];
-        let b = io::MemReader::new(mixed.into_string().into_bytes());
-        let mut m = super::Matcher::new(b);
+        let mut m = super::Matcher::from_str(mixed);
 
         for &(tok, typ) in expect.iter() {
             m.ignore_ws();
@@ -130,6 +134,26 @@ mod test {
                 "number" => assert_eq!(m.match_number().unwrap().as_slice(), tok),
                 "exint" => assert_eq!(m.match_exint().unwrap().as_slice(), tok),
                 "id" => assert_eq!(m.match_id().unwrap().as_slice(), tok),
+                _ => panic!("non-reachable")
+            }
+        }
+        assert!(m.eof());
+    }
+
+    #[test]
+    fn test_misc() {
+        let mixed = "0,0b10|_id -0 -7+word -10*987654321,";
+        let expect = [("0", "number"), (",", "?"), ("0b10", "exint"), ("|", "?"), ("_id", "id"),
+                      ("-0", "number"), ("-7", "number"), ("+", "?"), ("word", "id"), ("-10", "number"),
+                      ("*", "?"), ("987654321", "number")];
+        let mut m = super::Matcher::from_str(mixed);
+        for &(tok, typ) in expect.iter() {
+            m.ignore_ws();
+            match typ {
+                "number" => assert_eq!(m.match_number().unwrap().as_slice(), tok),
+                "exint" => assert_eq!(m.match_exint().unwrap().as_slice(), tok),
+                "id" => assert_eq!(m.match_id().unwrap().as_slice(), tok),
+                "?" => assert_eq!(m.next().unwrap(), tok.char_at(0)),
                 _ => panic!("non-reachable")
             }
         }

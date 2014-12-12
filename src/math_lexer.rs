@@ -1,7 +1,7 @@
 use std::io;
 use matchers;
 
-#[deriving(PartialEq, Show)]
+#[deriving(PartialEq, Show, Clone)]
 pub enum LexComp {
     Unknown,
     Number,
@@ -20,10 +20,11 @@ pub enum LexComp {
     Factorial,
 }
 
-#[deriving(PartialEq, Show)]
+
+#[deriving(PartialEq, Show, Clone)]
 pub struct MathToken {
-    lexeme: String,
-    lexcomp: LexComp
+    pub lexeme: String,
+    pub lexcomp: LexComp
 }
 
 pub struct MathLexer<R: io::Reader> {
@@ -114,7 +115,7 @@ impl<R: io::Reader> MathLexer<R> {
     }
 
     // get the next token
-    pub fn next(&mut self) -> Option<&MathToken> {
+    pub fn next(&mut self) -> Option<MathToken> {
         self.pos += 1;
         let pos = self.pos as uint;
         // reached end of buffer, fetch more tokens
@@ -136,7 +137,7 @@ impl<R: io::Reader> MathLexer<R> {
     }
 
     // get the token the lexer is on
-    pub fn curr(&self) -> Option<&MathToken> {
+    pub fn curr(&self) -> Option<MathToken> {
         if self.pos < 0 {
             return None;
         }
@@ -144,7 +145,7 @@ impl<R: io::Reader> MathLexer<R> {
         if pos >= self.buf.len() {
             return None;
         }
-        Some(&self.buf[pos])
+        Some(self.buf[pos].clone())
     }
 }
 
@@ -176,9 +177,9 @@ mod test {
             ("3", LexComp::Number),
         ];
         for &(lexeme, lexcomp) in expect.iter() {
-            let &MathToken{lexeme: ref lx, lexcomp: ref lc} = ml.next().unwrap();
-            assert_eq!(*lx, lexeme);
-            assert_eq!(*lc, lexcomp);
+            let MathToken{lexeme: lx, lexcomp: lc} = ml.next().unwrap();
+            assert_eq!(lx, lexeme);
+            assert_eq!(lc, lexcomp);
         }
         assert_eq!(ml.next(), None);
     }
@@ -208,9 +209,9 @@ mod test {
             (")", LexComp::CParen),
         ];
         for &(lexeme, lexcomp) in expect.iter() {
-            let &MathToken{lexeme: ref lx, lexcomp: ref lc} = ml.next().unwrap();
-            assert_eq!(*lx, lexeme);
-            assert_eq!(*lc, lexcomp);
+            let MathToken{lexeme: lx, lexcomp: lc} = ml.next().unwrap();
+            assert_eq!(lx, lexeme);
+            assert_eq!(lc, lexcomp);
         }
         assert_eq!(ml.next(), None);
     }
@@ -239,9 +240,9 @@ mod test {
             (")", LexComp::CParen),
         ];
         for &(lexeme, lexcomp) in expect.iter() {
-            let &MathToken{lexeme: ref lx, lexcomp: ref lc} = ml.next().unwrap();
-            assert_eq!(*lx, lexeme);
-            assert_eq!(*lc, lexcomp);
+            let MathToken{lexeme: lx, lexcomp: lc} = ml.next().unwrap();
+            assert_eq!(lx, lexeme);
+            assert_eq!(lc, lexcomp);
         }
         assert_eq!(ml.next(), None);
     }
@@ -257,9 +258,29 @@ mod test {
             ("y", LexComp::Variable),
         ];
         for &(lexeme, lexcomp) in expect.iter() {
-            let &MathToken{lexeme: ref lx, lexcomp: ref lc} = ml.next().unwrap();
-            assert_eq!(*lx, lexeme);
-            assert_eq!(*lc, lexcomp);
+            let MathToken{lexeme: lx, lexcomp: lc} = ml.next().unwrap();
+            assert_eq!(lx, lexeme);
+            assert_eq!(lc, lexcomp);
+        }
+        assert_eq!(ml.next(), None);
+    }
+
+    #[test]
+    fn test5() {
+        let mut ml = MathLexer::from_str("max(0, 1, 3)");
+        let expect = [
+            ("max(", LexComp::Function),
+            ("0", LexComp::Number),
+            (",", LexComp::Comma),
+            ("1", LexComp::Number),
+            (",", LexComp::Comma),
+            ("3", LexComp::Number),
+            (")", LexComp::CParen),
+        ];
+        for &(lexeme, lexcomp) in expect.iter() {
+            let MathToken{lexeme: lx, lexcomp: lc} = ml.next().unwrap();
+            assert_eq!(lx, lexeme);
+            assert_eq!(lc, lexcomp);
         }
         assert_eq!(ml.next(), None);
     }

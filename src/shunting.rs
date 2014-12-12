@@ -25,8 +25,8 @@ fn precedence(lc: &LexComp) -> (uint, Assoc) {
 // A parser token
 #[deriving(Show, PartialEq)]
 struct Token {
-    lxtok: MathToken,
-    arity: uint // number of function parameters
+    pub lxtok: MathToken,
+    pub arity: uint // number of function parameters
 }
 
 // The type of a parsed expression turned into RPN
@@ -122,13 +122,6 @@ pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
     }
     Ok(out)
 }
-
-/*
-// Evaluate a RPN expression
-pub fn eval(rpn: &RPNExpr) -> f64 {
-    0.0
-}
-*/
 
 
 

@@ -4,7 +4,11 @@ extern crate tox;
 fn main() {
     use tox::shunting::parse;
     use tox::rpneval::eval;
+    use std::collections::HashMap;
 
-    let rpn = parse("3+4*2/-(1-5)^2^3").ok().unwrap();
-    println!("{}", eval(&rpn).unwrap());
+    let mut cx = HashMap::new();
+    cx.insert(String::from_str("x"), 3.4);
+
+    let rpn = parse("3!+x").ok().unwrap();
+    println!("{}", eval(&rpn, Some(cx)).unwrap());
 }

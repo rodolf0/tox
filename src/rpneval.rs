@@ -3,20 +3,42 @@ use std::num::FloatMath;
 use std::num::Float;
 use math_lexer::LexComp;
 use shunting::RPNExpr;
+use std::dynamic_lib::DynamicLibrary;
+use std::mem;
 
-// temporal workaround until gamma is reachable in the library
-extern {
-    fn tgamma(x: f64) -> f64;
+
+fn link_fn(fname: &str) -> Result<fn(f64) -> f64, String> {
+    // http://doc.rust-lang.org/std/dynamic_lib/struct.DynamicLibrary.html
+    match DynamicLibrary::open::<&str>(None) { // open self
+        Err(e) => return Err(e),
+        Ok(lib) => {
+            let func = unsafe {
+                // a very generic pointer: '*mut u8'
+                match lib.symbol(fname) {
+                    Err(e) => return Err(e),
+                    Ok(f) => mem::transmute::<*mut u8, fn(f64) -> f64>(f)
+                }
+            };
+            return Ok(func);
+        }
+    }
 }
 
+// Evaluate some functions
 fn eval_fn(fname: &str, params: &[f64]) -> f64 {
     match fname {
         "sin(" => params.last().unwrap().sin(),
-        "cos(" => params.last().unwrap().cos(),
-        "tan(" => params.last().unwrap().cos(),
-        _ => panic!("rpneval: undefined function [{}]", fname)
+        _ => {
+            let strip_paren = fname.slice_to(fname.len()-1);
+            if let Ok(func) = link_fn(strip_paren) {
+                let p = params.last().unwrap();
+                return func(*p);
+            }
+            panic!("quack! rpneval::eval_fn");
+        }
     }
 }
+
 
 pub type Context = HashMap<String, f64>;
 
@@ -69,7 +91,9 @@ pub fn eval(rpn: &RPNExpr, cx: Option<Context>) -> Option<f64> {
 
             LexComp::Factorial => {
                 let l = stack.pop().unwrap();
-                stack.push(unsafe { tgamma(l + 1.0) });
+                if let Ok(func) = link_fn("tgamma") {
+                    stack.push(func(l + 1.0));
+                }
             },
 
             LexComp::Function => {

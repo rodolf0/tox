@@ -1,0 +1,9 @@
+=== References
+* http://en.wikipedia.org/wiki/Operator-precedence_grammar
+* http://en.wikipedia.org/wiki/Operator-precedence_parser
+* http://en.wikipedia.org/wiki/Shunting-yard_algorithm
+* http://wcipeg.com/wiki/Shunting_yard_algorithm
+* http://en.wikipedia.org/wiki/Operator_associativity
+* http://www.haskell.org/pipermail/haskell-prime/2010-July/003229.html
+* http://en.wikipedia.org/wiki/Algebraic_expression
+* http://h14s.p5r.org/2014/10/shiftreduce-expression-parsing-by-douglas-gregor.html

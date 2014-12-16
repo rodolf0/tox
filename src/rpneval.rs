@@ -42,7 +42,7 @@ fn eval_fn(fname: &str, params: &[f64]) -> f64 {
 pub type Context = HashMap<String, f64>;
 
 // Evaluate a RPN expression
-pub fn eval(rpn: &RPNExpr, cx: Option<Context>) -> Option<f64> {
+pub fn eval(rpn: &RPNExpr, cx: Option<&Context>) -> Option<f64> {
     let mut stack = Vec::new();
 
     for tok in rpn.iter() {
@@ -107,7 +107,7 @@ pub fn eval(rpn: &RPNExpr, cx: Option<Context>) -> Option<f64> {
 
             LexComp::Variable => {
                 let vname = tok.lxtok.lexeme.as_slice();
-                if let Some(ref context) = cx {
+                if let Some(context) = cx {
                     if let Some(v) = context.get(vname) {
                         stack.push(*v);
                     } else {

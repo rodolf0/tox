@@ -6,7 +6,15 @@ use shunting::RPNExpr;
 use std::dynamic_lib::DynamicLibrary;
 use std::mem;
 
+#[deriving(Show)]
+pub enum EvalErr {
+    UnknownVariable(String),
+    NoContextProvided,
+    LinkError(String),
+    WrongNumberOfArgs,
+}
 
+// Use dynamic linker to get hold of math library functions
 fn link_fn(fname: &str) -> Result<fn(f64) -> f64, String> {
     // http://doc.rust-lang.org/std/dynamic_lib/struct.DynamicLibrary.html
     match DynamicLibrary::open::<&str>(None) { // open self
@@ -24,16 +32,18 @@ fn link_fn(fname: &str) -> Result<fn(f64) -> f64, String> {
     }
 }
 
-// Evaluate some functions
-fn eval_fn(fname: &str, params: &[f64]) -> f64 {
+// Evaluate known functions, fallback to math-library
+fn eval_fn(fname: &str, params: &[f64]) -> Result<f64, EvalErr> {
     match fname {
-        "sin" => params.last().unwrap().sin(),
+        "sin" => return Ok(params.last().unwrap().sin()),
         _ => {
-            if let Ok(func) = link_fn(fname) {
-                let p = params.last().unwrap();
-                return func(*p);
+            match link_fn(fname) {
+                Ok(func) => {
+                    let p = params.last().unwrap();
+                    return Ok(func(*p));
+                },
+                Err(e) => return Err(EvalErr::LinkError(e))
             }
-            panic!("quack! rpneval::eval_fn");
         }
     }
 }
@@ -42,7 +52,7 @@ fn eval_fn(fname: &str, params: &[f64]) -> f64 {
 pub type Context = HashMap<String, f64>;
 
 // Evaluate a RPN expression
-pub fn eval(rpn: &RPNExpr, cx: Option<&Context>) -> Option<f64> {
+pub fn eval(rpn: &RPNExpr, cx: Option<&Context>) -> Result<f64, EvalErr> {
     let mut stack = Vec::new();
 
     for tok in rpn.iter() {
@@ -90,17 +100,25 @@ pub fn eval(rpn: &RPNExpr, cx: Option<&Context>) -> Option<f64> {
 
             LexComp::Factorial => {
                 let l = stack.pop().unwrap();
-                if let Ok(func) = link_fn("tgamma") {
-                    stack.push(func(l + 1.0));
+                match link_fn("tgamma") {
+                    Ok(func) => stack.push(func(l + 1.0)),
+                    Err(e) => return Err(EvalErr::LinkError(e))
                 }
             },
 
             LexComp::Function => {
                 let mut r: f64;
                 let midp = stack.len() - tok.arity;
-                {   let args = stack.slice_from(midp);
+                if tok.arity > stack.len() {
+                    return Err(EvalErr::WrongNumberOfArgs);
+                } else {
+                    let args = stack.slice_from(midp);
                     let fname = tok.lxtok.lexeme.as_slice();
-                    r = eval_fn(fname, args); } // limit lifetime of args
+                    match eval_fn(fname, args) {
+                        Ok(evaled) => r = evaled,
+                        Err(e) => return Err(e)
+                    }
+                }
                 stack.truncate(midp);
                 stack.push(r);
             },
@@ -111,16 +129,19 @@ pub fn eval(rpn: &RPNExpr, cx: Option<&Context>) -> Option<f64> {
                     if let Some(v) = context.get(vname) {
                         stack.push(*v);
                     } else {
-                        panic!("Unknown variable [{}]", vname);
+                        return Err(EvalErr::UnknownVariable(String::from_str(vname)));
                     }
                 } else {
-                    panic!("rpneval::eval: No context provided");
+                    return Err(EvalErr::NoContextProvided);
                 }
             },
 
             LexComp::Unknown | LexComp::OParen |
-            LexComp::CParen | LexComp::Comma => panic!("rpneval::eval: non-reachable")
+            LexComp::CParen | LexComp::Comma => panic!("rpneval::eval: parser error")
         }
     }
-    stack.pop()
+    if let Some(res) = stack.pop() {
+        return Ok(res);
+    }
+    panic!("rpneval::eval: parser error 2");
 }

@@ -48,6 +48,14 @@ fn eval_fn(fname: &str, params: &[f64]) -> Result<f64, EvalErr> {
     }
 }
 
+fn pop2(stack: &mut Vec<f64>) -> Result<(f64, f64), EvalErr> {
+    let r = stack.pop();
+    let l = stack.pop();
+    if r.is_none() || l.is_none() {
+        return Err(EvalErr::WrongNumberOfArgs);
+    }
+    Ok((r.unwrap(), l.unwrap()))
+}
 
 pub type Context = HashMap<String, f64>;
 
@@ -63,46 +71,29 @@ pub fn eval(rpn: &RPNExpr, cx: Option<&Context>) -> Result<f64, EvalErr> {
                 stack.push(n);
             },
 
-            LexComp::Plus => {
-                let (r, l) = (stack.pop().unwrap(), stack.pop().unwrap());
-                stack.push(l + r);
-            },
-
-            LexComp::Minus => {
-                let (r, l) = (stack.pop().unwrap(), stack.pop().unwrap());
-                stack.push(l - r);
-            },
-
-            LexComp::Times => {
-                let (r, l) = (stack.pop().unwrap(), stack.pop().unwrap());
-                stack.push(l * r);
-            },
-
-            LexComp::Divide => {
-                let (r, l) = (stack.pop().unwrap(), stack.pop().unwrap());
-                stack.push(l / r);
-            },
-
-            LexComp::Modulo => {
-                let (r, l) = (stack.pop().unwrap(), stack.pop().unwrap());
-                stack.push(l.rem(&r));
-            },
-
-            LexComp::Power => {
-                let (r, l) = (stack.pop().unwrap(), stack.pop().unwrap());
-                stack.push(l.powf(r));
-            },
+            LexComp::Plus => { let (r, l) = try!(pop2(&mut stack)); stack.push(l + r); },
+            LexComp::Minus => { let (r, l) = try!(pop2(&mut stack)); stack.push(l - r); },
+            LexComp::Times => { let (r, l) = try!(pop2(&mut stack)); stack.push(l * r); },
+            LexComp::Divide => { let (r, l) = try!(pop2(&mut stack)); stack.push(l / r); },
+            LexComp::Modulo => { let (r, l) = try!(pop2(&mut stack)); stack.push(l.rem(&r)); },
+            LexComp::Power => { let (r, l) = try!(pop2(&mut stack)); stack.push(l.powf(r)); },
 
             LexComp::UMinus => {
-                let r = stack.pop().unwrap();
-                stack.push(-r);
+                if let Some(r) = stack.pop() {
+                    stack.push(-r);
+                } else {
+                    return Err(EvalErr::WrongNumberOfArgs);
+                }
             },
 
             LexComp::Factorial => {
-                let l = stack.pop().unwrap();
-                match link_fn("tgamma") {
-                    Ok(func) => stack.push(func(l + 1.0)),
-                    Err(e) => return Err(EvalErr::LinkError(e))
+                if let Some(l) = stack.pop() {
+                    match link_fn("tgamma") {
+                        Ok(func) => stack.push(func(l + 1.0)),
+                        Err(e) => return Err(EvalErr::LinkError(e))
+                    }
+                } else {
+                    return Err(EvalErr::WrongNumberOfArgs);
                 }
             },
 

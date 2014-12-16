@@ -70,13 +70,11 @@ pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
                 // track n-arguments for function calls. If cannot unwrap => bad parens
                 if let Some(a) = arity.last_mut() { *a += 1; }
                 while let Some(top) = stack.pop() {
-                    match top.lxtok.lexcomp {
-                        LexComp::OParen => {
-                          // restore the top of the stack
-                          stack.push(top);
-                          continue 'next_token;
-                        },
-                        _ => out.push(top)
+                    if top.lxtok.lexcomp != LexComp::OParen {
+                        out.push(top);
+                    } else {
+                        stack.push(top);
+                        continue 'next_token;
                     }
                 }
                 return Err(ParseError::MisplacedComma);
@@ -85,21 +83,20 @@ pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
             // End-of-grouping token
             LexComp::CParen => {
                 while let Some(top) = stack.pop() {
-                    match top.lxtok.lexcomp {
-                        LexComp::OParen => {
-                            // check if this OParen is part of a function call
-                            if let Some(mut func) = stack.pop() {
-                                if func.lxtok.lexcomp == LexComp::Function {
-                                    // adjust the function arity based on seen arguments
-                                    func.arity = arity.pop().unwrap();
-                                    out.push(func);
-                                } else {
-                                    stack.push(func);
-                                }
+                    if top.lxtok.lexcomp != LexComp::OParen {
+                        out.push(top);
+                    } else {
+                        // found OParen, check if it's a function call
+                        if let Some(mut func) = stack.pop() {
+                            if func.lxtok.lexcomp == LexComp::Function {
+                                // adjust the function arity based on seen arguments
+                                func.arity = arity.pop().unwrap();
+                                out.push(func);
+                            } else {
+                                stack.push(func); // nope! return token
                             }
-                            continue 'next_token;
-                        },
-                        _ => out.push(top)
+                        }
+                        continue 'next_token;
                     }
                 }
                 return Err(ParseError::MissingOParen);
@@ -124,10 +121,10 @@ pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
         }
     }
     while let Some(top) = stack.pop() {
-        match top.lxtok.lexcomp {
-            LexComp::OParen => return Err(ParseError::MissingCParen),
-            _ => out.push(top)
+        if top.lxtok.lexcomp == LexComp::OParen {
+            return Err(ParseError::MissingCParen);
         }
+        out.push(top);
     }
     Ok(out)
 }

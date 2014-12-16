@@ -93,7 +93,7 @@ impl<R: io::Reader> MathLexer<R> {
                 '(' => return Some(MathToken{lexeme: String::from_str("("), lexcomp: LexComp::OParen}),
                 ')' => return Some(MathToken{lexeme: String::from_str(")"), lexcomp: LexComp::CParen}),
                 ',' => return Some(MathToken{lexeme: String::from_str(","), lexcomp: LexComp::Comma}),
-                _ => panic!("MathLexer::read_token: unknown operator [{}]", op)
+                _ => return Some(MathToken{lexeme: String::from_char(1, op), lexcomp: LexComp::Unknown})
             }
         }
         // try exotic integers
@@ -126,9 +126,6 @@ impl<R: io::Reader> MathLexer<R> {
                     return None;
                 },
                 Some(tok) => {
-                    if tok.lexcomp == LexComp::Unknown {
-                        panic!("MathLexer::next: unknown token [{}]", tok.lexeme);
-                    }
                     self.buf.push(tok);
                 }
             }

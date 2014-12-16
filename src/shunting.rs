@@ -39,7 +39,7 @@ pub enum ParseError {
     MissingCParen,
     MisplacedComma,
     NonAssociative,
-    UnknownToken
+    UnknownToken(String)
 }
 
 
@@ -53,7 +53,7 @@ pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
 
     'next_token: while let Some(mltok) = ml.next() {
         match mltok.lexcomp {
-            LexComp::Unknown => return Err(ParseError::UnknownToken),
+            LexComp::Unknown => return Err(ParseError::UnknownToken(mltok.lexeme)),
 
             LexComp::Number | LexComp::Variable => out.push(Token{lxtok: mltok, arity: 0}),
 

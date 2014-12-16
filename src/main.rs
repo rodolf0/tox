@@ -1,31 +1,39 @@
-extern crate tox;
+#![cfg(not(test))]
+
 extern crate linenoise;
+extern crate tox;
 
-#[cfg(not(test))]
+fn parse_n_eval(input: &str, cx: Option<&tox::rpneval::Context>) {
+    match tox::shunting::parse(input) {
+        Err(e) => println!("Parse error: {}", e),
+        Ok(expr) => {
+            match tox::rpneval::eval(&expr, cx) {
+                Err(e) => println!("Eval error: {}", e),
+                Ok(result) => println!("{}", result)
+            }
+        }
+    }
+}
+
 fn main() {
-    use tox::shunting::parse;
-    use tox::rpneval::eval;
     use std::collections::HashMap;
-    use std::f64;
-
+    use std::{os, f64};
+    // init a context...
     let mut cx = HashMap::new();
     cx.insert(String::from_str("pi"), f64::consts::PI);
     cx.insert(String::from_str("e"), f64::consts::E);
 
-    loop {
-        let inopt = linenoise::input(">> ");
-        match inopt {
-            None => break,
-            Some(input) => {
-                linenoise::history_add(input.as_slice());
-                match parse(input.as_slice()) {
-                    Ok(expr) => {
-                        match eval(&expr, Some(&cx)) {
-                            Ok(result) => println!("{}", result),
-                            Err(e) => println!("Eval error: {}", e)
-                        }
-                    },
-                    Err(e) => println!("Parse error: {}", e)
+    if os::args().len() > 1 {
+        let input = os::args().tail().connect(" ");
+        parse_n_eval(input.as_slice(), Some(&cx));
+    } else {
+        loop {
+            let inopt = linenoise::input(">> ");
+            match inopt {
+                None => break,
+                Some(input) => {
+                    linenoise::history_add(input.as_slice());
+                    parse_n_eval(input.as_slice(), Some(&cx));
                 }
             }
         }

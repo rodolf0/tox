@@ -44,6 +44,7 @@ pub enum ParseError {
 
 
 // Parse expression with shunting yard algorithm
+// http://en.wikipedia.org/wiki/Shunting-yard_algorithm
 pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
     let mut out = Vec::new();
     let mut stack = Vec::new();
@@ -56,12 +57,13 @@ pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
 
             LexComp::Number | LexComp::Variable => out.push(Token{lxtok: mltok, arity: 0}),
 
-            // Start-of-grouping token
-            LexComp::OParen => stack.push(Token{lxtok: mltok, arity: 0}),
             LexComp::Function => {
                 stack.push(Token{lxtok: mltok, arity: 0});
                 arity.push(1u);
             },
+
+            // Start-of-grouping token
+            LexComp::OParen => stack.push(Token{lxtok: mltok, arity: 0}),
 
             // function-argument/group-element separator
             LexComp::Comma => {
@@ -69,7 +71,7 @@ pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
                 if let Some(a) = arity.last_mut() { *a += 1; }
                 while let Some(top) = stack.pop() {
                     match top.lxtok.lexcomp {
-                        LexComp::OParen | LexComp::Function => {
+                        LexComp::OParen => {
                           // restore the top of the stack
                           stack.push(top);
                           continue 'next_token;
@@ -82,12 +84,19 @@ pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
 
             // End-of-grouping token
             LexComp::CParen => {
-                while let Some(mut top) = stack.pop() {
+                while let Some(top) = stack.pop() {
                     match top.lxtok.lexcomp {
-                        LexComp::OParen => continue 'next_token, // don't restore '('
-                        LexComp::Function => {
-                            top.arity = arity.pop().unwrap();
-                            out.push(top);
+                        LexComp::OParen => {
+                            // check if this OParen is part of a function call
+                            if let Some(mut func) = stack.pop() {
+                                if func.lxtok.lexcomp == LexComp::Function {
+                                    // adjust the function arity based on seen arguments
+                                    func.arity = arity.pop().unwrap();
+                                    out.push(func);
+                                } else {
+                                    stack.push(func);
+                                }
+                            }
                             continue 'next_token;
                         },
                         _ => out.push(top)
@@ -116,7 +125,7 @@ pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
     }
     while let Some(top) = stack.pop() {
         match top.lxtok.lexcomp {
-            LexComp::OParen | LexComp::Function => return Err(ParseError::MissingCParen),
+            LexComp::OParen => return Err(ParseError::MissingCParen),
             _ => out.push(top)
         }
     }
@@ -162,7 +171,7 @@ mod test {
         let expect = [
             ("3.4e-2", LexComp::Number),
             ("x", LexComp::Variable),
-            ("sin(", LexComp::Function),
+            ("sin", LexComp::Function),
             ("*", LexComp::Times),
             ("7", LexComp::Number),
             ("!", LexComp::Factorial),
@@ -172,7 +181,7 @@ mod test {
             ("/", LexComp::Divide),
             ("2", LexComp::Number),
             ("x", LexComp::Variable),
-            ("max(", LexComp::Function),
+            ("max", LexComp::Function),
             ("*", LexComp::Times),
         ];
         for (i, &(lexeme, lexcomp)) in expect.iter().enumerate() {
@@ -198,7 +207,7 @@ mod test {
             ("^", LexComp::Power),
             ("+", LexComp::Plus),
             ("/", LexComp::Divide),
-            ("sqrt(", LexComp::Function),
+            ("sqrt", LexComp::Function),
         ];
         for (i, &(lexeme, lexcomp)) in expect.iter().enumerate() {
             let Token{lxtok: MathToken{lexeme: ref lx, lexcomp: ref lc }, arity: _} = rpn[i];
@@ -225,11 +234,11 @@ mod test {
         let rpn = parse("sin(1)+(max(2, gamma(3.5), gcd(24, 8))+sum(i,0,10))");
         let mut rpn = rpn.ok().unwrap();
         let mut expect = HashMap::new();
-        expect.insert("sin(", 1u);
-        expect.insert("max(", 3u);
-        expect.insert("gamma(", 1u);
-        expect.insert("gcd(", 2u);
-        expect.insert("sum(", 3u);
+        expect.insert("sin", 1u);
+        expect.insert("max", 3u);
+        expect.insert("gamma", 1u);
+        expect.insert("gcd", 2u);
+        expect.insert("sum", 3u);
 
         while let Some(tok) = rpn.pop() {
             if tok.lxtok.lexcomp == LexComp::Function {

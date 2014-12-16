@@ -68,8 +68,8 @@ impl<R: io::Reader> MathLexer<R> {
         // try variables / function names
         if let Some(name) = self.m.match_id() {
             self.m.ignore_ws();
-            if self.m.accept("(").is_some() {
-                return Some(MathToken{lexeme: name + "(", lexcomp: LexComp::Function})
+            if self.m.peek() == Some('(') {
+                return Some(MathToken{lexeme: name, lexcomp: LexComp::Function})
             } else {
                 return Some(MathToken{lexeme: name, lexcomp: LexComp::Variable})
             }
@@ -190,7 +190,8 @@ mod test {
         let expect = [
             ("3.4e-2", LexComp::Number),
             ("*", LexComp::Times),
-            ("sin(", LexComp::Function),
+            ("sin", LexComp::Function),
+            ("(", LexComp::OParen),
             ("x", LexComp::Variable),
             (")", LexComp::CParen),
             ("/", LexComp::Divide),
@@ -202,7 +203,8 @@ mod test {
             ("4", LexComp::Number),
             (")", LexComp::CParen),
             ("*", LexComp::Times),
-            ("max(", LexComp::Function),
+            ("max", LexComp::Function),
+            ("(", LexComp::OParen),
             ("2", LexComp::Number),
             (",", LexComp::Comma),
             ("x", LexComp::Variable),
@@ -220,7 +222,8 @@ mod test {
     fn test3() {
         let mut ml = MathLexer::from_str("sqrt(-(1i-x^2) / (1 + x^2))");
         let expect = [
-            ("sqrt(", LexComp::Function),
+            ("sqrt", LexComp::Function),
+            ("(", LexComp::OParen),
             ("-", LexComp::UMinus),
             ("(", LexComp::OParen),
             ("1i", LexComp::Number),
@@ -269,7 +272,8 @@ mod test {
     fn test5() {
         let mut ml = MathLexer::from_str("max(0, 1, 3)");
         let expect = [
-            ("max(", LexComp::Function),
+            ("max", LexComp::Function),
+            ("(", LexComp::OParen),
             ("0", LexComp::Number),
             (",", LexComp::Comma),
             ("1", LexComp::Number),

@@ -27,10 +27,9 @@ fn link_fn(fname: &str) -> Result<fn(f64) -> f64, String> {
 // Evaluate some functions
 fn eval_fn(fname: &str, params: &[f64]) -> f64 {
     match fname {
-        "sin(" => params.last().unwrap().sin(),
+        "sin" => params.last().unwrap().sin(),
         _ => {
-            let strip_paren = fname.slice_to(fname.len()-1);
-            if let Ok(func) = link_fn(strip_paren) {
+            if let Ok(func) = link_fn(fname) {
                 let p = params.last().unwrap();
                 return func(*p);
             }

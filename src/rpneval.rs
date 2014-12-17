@@ -127,7 +127,7 @@ pub fn eval(rpn: &RPNExpr, cx: Option<&Context>) -> Result<f64, EvalErr> {
                 }
             },
 
-            LexComp::Unknown | LexComp::OParen |
+            LexComp::Unknown | LexComp::OParen | LexComp::Assign |
             LexComp::CParen | LexComp::Comma => panic!("rpneval::eval: parser error")
         }
     }

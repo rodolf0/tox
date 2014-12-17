@@ -1,3 +1,4 @@
+use std::io;
 use math_lexer::{MathLexer, MathToken, LexComp};
 
 #[deriving(Show, PartialEq)]
@@ -42,19 +43,20 @@ pub enum ParseError {
     UnknownToken(String)
 }
 
+pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
+    let mut ml = MathLexer::from_str(expr);
+    mlparse(&mut ml)
+}
 
 // Parse expression with shunting yard algorithm
 // http://en.wikipedia.org/wiki/Shunting-yard_algorithm
-pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
+pub fn mlparse<R: io::Reader>(ml: &mut MathLexer<R>) -> Result<RPNExpr, ParseError> {
     let mut out = Vec::new();
     let mut stack = Vec::new();
-    let mut ml = MathLexer::from_str(expr);
     let mut arity = Vec::new();
 
     'next_token: while let Some(mltok) = ml.next() {
         match mltok.lexcomp {
-            LexComp::Unknown => return Err(ParseError::UnknownToken(mltok.lexeme)),
-
             LexComp::Number | LexComp::Variable => out.push(Token{lxtok: mltok, arity: 0}),
 
             LexComp::Function => {
@@ -117,7 +119,9 @@ pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
                     }
                 }
                 stack.push(Token{lxtok: mltok, arity: 2}); // only care about arity for Function
-            }
+            },
+
+            _ => return Err(ParseError::UnknownToken(mltok.lexeme))
         }
     }
     while let Some(top) = stack.pop() {

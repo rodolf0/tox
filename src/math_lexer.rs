@@ -18,6 +18,7 @@ pub enum LexComp {
     Power,
     UMinus,
     Factorial,
+    Assign,
 }
 
 
@@ -30,7 +31,7 @@ pub struct MathToken {
 pub struct MathLexer<R: io::Reader> {
     m: matchers::Matcher<R>,
     buf: Vec<MathToken>,
-    pos: int
+    pub pos: int // TODO: this shouldn't be public
 }
 
 
@@ -75,7 +76,7 @@ impl<R: io::Reader> MathLexer<R> {
             }
         }
         // try operators
-        if let Some(op) = self.m.accept("+-*/%^!(),") {
+        if let Some(op) = self.m.accept("+-*/%^!(),=") {
             match op {
                 '+' => return Some(MathToken{lexeme: String::from_str("+"), lexcomp: LexComp::Plus}),
                 '-' => {
@@ -93,7 +94,8 @@ impl<R: io::Reader> MathLexer<R> {
                 '(' => return Some(MathToken{lexeme: String::from_str("("), lexcomp: LexComp::OParen}),
                 ')' => return Some(MathToken{lexeme: String::from_str(")"), lexcomp: LexComp::CParen}),
                 ',' => return Some(MathToken{lexeme: String::from_str(","), lexcomp: LexComp::Comma}),
-                _ => return Some(MathToken{lexeme: String::from_char(1, op), lexcomp: LexComp::Unknown})
+                '=' => return Some(MathToken{lexeme: String::from_str("="), lexcomp: LexComp::Assign}),
+                _ => panic!("math_lexer::read_token: unreachable!")
             }
         }
         // try exotic integers

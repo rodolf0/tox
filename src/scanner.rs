@@ -8,7 +8,7 @@ static WHITE: &'static str = " \n\r\t";
 pub struct Scanner<R: io::Reader> {
     rdr: io::BufferedReader<R>,
     buf: Vec<char>,
-    pub pos: int //TODO: don't make this public
+    pub pos: isize //TODO: don't make this public
 }
 
 
@@ -33,13 +33,13 @@ impl<R: io::Reader> Scanner<R> {
     //Read the next char
     pub fn next(&mut self) -> Option<char> {
         self.pos += 1;
-        let pos = self.pos as uint;
+        let pos = self.pos as usize;
         // reached end of buffer, fetch more chars
         if pos >= self.buf.len() {
             match self.rdr.read_char() {
                 Ok(c) => self.buf.push(c),
                 Err(ref e) if e.kind == io::EndOfFile => {
-                    self.pos = self.buf.len() as int;
+                    self.pos = self.buf.len() as isize;
                     return None;
                 },
                 Err(e) => panic!("Scanner::next failed: {}", e)
@@ -53,7 +53,7 @@ impl<R: io::Reader> Scanner<R> {
         if self.pos < 0 {
             return None;
         }
-        let pos = self.pos as uint;
+        let pos = self.pos as usize;
         if pos >= self.buf.len() {
             return None;
         }
@@ -78,18 +78,18 @@ impl<R: io::Reader> Scanner<R> {
 
     // Check if the scanner reached EOF
     pub fn eof(&self) -> bool {
-        self.pos as uint >= self.buf.len()
+        self.pos as usize >= self.buf.len()
     }
 
     // Take a peep at what the scanner is currently holding
     pub fn view(&self) -> &[char] {
-        let n = self.pos as uint + 1;
+        let n = self.pos as usize + 1;
         self.buf.slice_to(n)
     }
 
     // Extract the current buffer and reset the scanner
     pub fn extract(&mut self) -> String {
-        let ret = String::from_chars(self.view());
+        let ret = self.view().iter().cloned().collect();
         self.ignore();
         return ret;
     }
@@ -97,7 +97,7 @@ impl<R: io::Reader> Scanner<R> {
     // Ignore current view
     pub fn ignore(&mut self) {
         if self.pos >= 0 {
-            let n = self.pos as uint + 1;
+            let n = self.pos as usize + 1;
             self.buf = self.buf.slice_from(n).to_vec();
         }
         self.pos = -1;

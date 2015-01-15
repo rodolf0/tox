@@ -1,7 +1,7 @@
 use std::io;
 use matchers;
 
-#[deriving(PartialEq, Show, Clone)]
+#[derive(PartialEq, Show, Clone)]
 pub enum LexComp {
     Unknown,
     Number,
@@ -22,7 +22,7 @@ pub enum LexComp {
 }
 
 
-#[deriving(PartialEq, Show, Clone)]
+#[derive(PartialEq, Show, Clone)]
 pub struct MathToken {
     pub lexeme: String,
     pub lexcomp: LexComp
@@ -31,7 +31,7 @@ pub struct MathToken {
 pub struct MathLexer<R: io::Reader> {
     m: matchers::Matcher<R>,
     buf: Vec<MathToken>,
-    pub pos: int // TODO: this shouldn't be public
+    pub pos: isize // TODO: this shouldn't be public
 }
 
 
@@ -80,7 +80,7 @@ impl<R: io::Reader> MathLexer<R> {
             match op {
                 '+' => return Some(MathToken{lexeme: String::from_str("+"), lexcomp: LexComp::Plus}),
                 '-' => {
-                    let prevpos = (self.pos - 1) as uint;
+                    let prevpos = (self.pos - 1) as usize;
                     if self.pos < 1 || makes_unary_minus(&self.buf[prevpos]) {
                         return Some(MathToken{lexeme: String::from_str("-"), lexcomp: LexComp::UMinus});
                     }
@@ -119,12 +119,12 @@ impl<R: io::Reader> MathLexer<R> {
     // get the next token
     pub fn next(&mut self) -> Option<MathToken> {
         self.pos += 1;
-        let pos = self.pos as uint;
+        let pos = self.pos as usize;
         // reached end of buffer, fetch more tokens
         if pos >= self.buf.len() {
             match self.read_token() {
                 None => {
-                    self.pos = self.buf.len() as int;
+                    self.pos = self.buf.len() as isize;
                     return None;
                 },
                 Some(tok) => {
@@ -140,7 +140,7 @@ impl<R: io::Reader> MathLexer<R> {
         if self.pos < 0 {
             return None;
         }
-        let pos = self.pos as uint;
+        let pos = self.pos as usize;
         if pos >= self.buf.len() {
             return None;
         }

@@ -10,7 +10,7 @@ mod repl {
     use tox::shunting::{ParseError};
     use tox::{shunting, rpneval};
 
-    #[deriving(Show)]
+    #[derive(Show)]
     enum REPLErr {
         ParseErr(ParseError),
         EvalErr(EvalErr),
@@ -18,9 +18,9 @@ mod repl {
 
     pub fn evalexpr(input: &str, context: Option<&Context>) {
         match shunting::parse(input) {
-            Err(e) => println!("Parse error: {}", e),
+            Err(e) => println!("Parse error: {:?}", e),
             Ok(expr) => match rpneval::eval(&expr, context) {
-                Err(e) => println!("Eval error: {}", e),
+                Err(e) => println!("Eval error: {:?}", e),
                 Ok(result) => println!("{}", result)
             }
         };
@@ -48,7 +48,7 @@ mod repl {
                     return;
                 }
                 let result = match parse_n_eval_expression(&mut ml, context.as_ref().map(|cx| &**cx)) {
-                    Err(e) => { println!("Assign error: {}", e); return; }
+                    Err(e) => { println!("Assign error: {:?}", e); return; }
                     Ok(result) => result
                 };
                 context.unwrap().insert(var.lexeme, result);
@@ -59,7 +59,7 @@ mod repl {
         ml.pos = backtrack;
         // that crazy map is doing Option<&mut T> -> Option<&T>
         match parse_n_eval_expression(&mut ml, context.as_ref().map(|cx| &**cx)) {
-            Err(e) => println!("Error: {}", e),
+            Err(e) => println!("Error: {:?}", e),
             Ok(result) => println!("{}", result)
         };
     }

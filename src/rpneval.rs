@@ -1,23 +1,23 @@
-use std::collections::HashMap;
-use std::num::FloatMath;
-use std::num::Float;
 use math_lexer::LexComp;
 use shunting::RPNExpr;
+use std::collections::HashMap;
 use std::dynamic_lib::DynamicLibrary;
+use std::num::Float;
+use std::num;
 use std::mem;
 
-#[deriving(Show)]
+#[derive(Show)]
 pub enum EvalErr {
     UnknownVariable(String),
     NoContextProvided,
     LinkError(String),
     WrongNumberOfArgs,
+    BadNumber,
 }
 
 // Use dynamic linker to get hold of math library functions
 fn link_fn(fname: &str) -> Result<fn(f64) -> f64, String> {
-    // http://doc.rust-lang.org/std/dynamic_lib/struct.DynamicLibrary.html
-    match DynamicLibrary::open::<&str>(None) { // open self
+    match DynamicLibrary::open(None) { // open self
         Err(e) => return Err(e),
         Ok(lib) => {
             let func = unsafe {
@@ -67,15 +67,18 @@ pub fn eval(rpn: &RPNExpr, cx: Option<&Context>) -> Result<f64, EvalErr> {
         match tok.lxtok.lexcomp {
             LexComp::Number => {
                 let s = tok.lxtok.lexeme.as_slice();
-                let n = from_str::<f64>(s).unwrap();
-                stack.push(n);
+                if let Some(n) = num::from_str_radix(s, 10) {
+                    stack.push(n);
+                } else {
+                    return Err(EvalErr::BadNumber);
+                }
             },
 
             LexComp::Plus => { let (r, l) = try!(pop2(&mut stack)); stack.push(l + r); },
             LexComp::Minus => { let (r, l) = try!(pop2(&mut stack)); stack.push(l - r); },
             LexComp::Times => { let (r, l) = try!(pop2(&mut stack)); stack.push(l * r); },
             LexComp::Divide => { let (r, l) = try!(pop2(&mut stack)); stack.push(l / r); },
-            LexComp::Modulo => { let (r, l) = try!(pop2(&mut stack)); stack.push(l.rem(&r)); },
+            LexComp::Modulo => { let (r, l) = try!(pop2(&mut stack)); stack.push(l % r); },
             LexComp::Power => { let (r, l) = try!(pop2(&mut stack)); stack.push(l.powf(r)); },
 
             LexComp::UMinus => {

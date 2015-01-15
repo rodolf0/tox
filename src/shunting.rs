@@ -1,7 +1,8 @@
 use std::io;
+use std::cmp::Ordering;
 use math_lexer::{MathLexer, MathToken, LexComp};
 
-#[deriving(Show, PartialEq)]
+#[derive(Show, PartialEq)]
 enum Assoc {
     Left,
     Right,
@@ -9,7 +10,7 @@ enum Assoc {
 }
 
 // Get operator precedence and associativity
-fn precedence(lc: &LexComp) -> (uint, Assoc) {
+fn precedence(lc: &LexComp) -> (usize, Assoc) {
     match *lc {
         // need OParen/Function because they can be pushed onto the stack
         LexComp::OParen | LexComp::Function => (1, Assoc::Left),
@@ -24,23 +25,23 @@ fn precedence(lc: &LexComp) -> (uint, Assoc) {
 
 
 // A parser token
-#[deriving(Show, PartialEq)]
+#[derive(Show, PartialEq)]
 struct Token {
     pub lxtok: MathToken,
-    pub arity: uint // number of function parameters
+    pub arity: usize // number of function parameters
 }
 
 // The type of a parsed expression turned into RPN
 pub type RPNExpr = Vec<Token>;
 
 // Errors that can arise while parsing
-#[deriving(Show, PartialEq)]
+#[derive(Show, PartialEq)]
 pub enum ParseError {
     MissingOParen,
     MissingCParen,
     MisplacedComma,
     NonAssociative,
-    UnknownToken(String)
+    UnknownToken(String),
 }
 
 pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
@@ -61,7 +62,7 @@ pub fn mlparse<R: io::Reader>(ml: &mut MathLexer<R>) -> Result<RPNExpr, ParseErr
 
             LexComp::Function => {
                 stack.push(Token{lxtok: mltok, arity: 0});
-                arity.push(1u);
+                arity.push(1);
             },
 
             // Start-of-grouping token
@@ -112,9 +113,9 @@ pub fn mlparse<R: io::Reader>(ml: &mut MathLexer<R>) -> Result<RPNExpr, ParseErr
                 while let Some(top) = stack.pop() {
                     let (top_prec, _) = precedence(&top.lxtok.lexcomp);
                     match buf_prec.cmp(&top_prec) {
-                        Greater => { stack.push(top); break; }, // return top to stack
-                        Equal if buf_assoc == Assoc::Right => { stack.push(top); break; },
-                        Equal if buf_assoc == Assoc::None => return Err(ParseError::NonAssociative),
+                        Ordering::Greater => { stack.push(top); break; }, // return top to stack
+                        Ordering::Equal if buf_assoc == Assoc::Right => { stack.push(top); break; },
+                        Ordering::Equal if buf_assoc == Assoc::None => return Err(ParseError::NonAssociative),
                         _ => out.push(top)
                     }
                 }
@@ -220,13 +221,13 @@ mod test {
     #[test]
     fn bad_parse() {
         let rpn = parse("sqrt(-(1i-x^2) / (1 + x^2)");
-        assert_eq!(rpn, Err(ParseError::MissingCParen))
+        assert_eq!(rpn, Err(ParseError::MissingCParen));
 
         let rpn = parse("-(1i-x^2) / (1 + x^2))");
-        assert_eq!(rpn, Err(ParseError::MissingOParen))
+        assert_eq!(rpn, Err(ParseError::MissingOParen));
 
         let rpn = parse("max 4, 6, 4)");
-        assert_eq!(rpn, Err(ParseError::MisplacedComma))
+        assert_eq!(rpn, Err(ParseError::MisplacedComma));
     }
 
     #[test]

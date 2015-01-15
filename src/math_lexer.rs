@@ -175,10 +175,10 @@ mod test {
             ("^", LexComp::Power),
             ("3", LexComp::Number),
         ];
-        for &(lexeme, lexcomp) in expect.iter() {
+        for &(ref lexeme, ref lexcomp) in expect.iter() {
             let MathToken{lexeme: lx, lexcomp: lc} = ml.next().unwrap();
-            assert_eq!(lx, lexeme);
-            assert_eq!(lc, lexcomp);
+            assert_eq!(lx, *lexeme);
+            assert_eq!(lc, *lexcomp);
         }
         assert_eq!(ml.next(), None);
     }
@@ -209,10 +209,10 @@ mod test {
             ("x", LexComp::Variable),
             (")", LexComp::CParen),
         ];
-        for &(lexeme, lexcomp) in expect.iter() {
+        for &(ref lexeme, ref lexcomp) in expect.iter() {
             let MathToken{lexeme: lx, lexcomp: lc} = ml.next().unwrap();
-            assert_eq!(lx, lexeme);
-            assert_eq!(lc, lexcomp);
+            assert_eq!(lx, *lexeme);
+            assert_eq!(lc, *lexcomp);
         }
         assert_eq!(ml.next(), None);
     }
@@ -241,10 +241,10 @@ mod test {
             (")", LexComp::CParen),
             (")", LexComp::CParen),
         ];
-        for &(lexeme, lexcomp) in expect.iter() {
+        for &(ref lexeme, ref lexcomp) in expect.iter() {
             let MathToken{lexeme: lx, lexcomp: lc} = ml.next().unwrap();
-            assert_eq!(lx, lexeme);
-            assert_eq!(lc, lexcomp);
+            assert_eq!(lx, *lexeme);
+            assert_eq!(lc, *lexcomp);
         }
         assert_eq!(ml.next(), None);
     }
@@ -259,10 +259,10 @@ mod test {
             ("-", LexComp::UMinus),
             ("y", LexComp::Variable),
         ];
-        for &(lexeme, lexcomp) in expect.iter() {
+        for &(ref lexeme, ref lexcomp) in expect.iter() {
             let MathToken{lexeme: lx, lexcomp: lc} = ml.next().unwrap();
-            assert_eq!(lx, lexeme);
-            assert_eq!(lc, lexcomp);
+            assert_eq!(lx, *lexeme);
+            assert_eq!(lc, *lexcomp);
         }
         assert_eq!(ml.next(), None);
     }
@@ -280,10 +280,10 @@ mod test {
             ("3", LexComp::Number),
             (")", LexComp::CParen),
         ];
-        for &(lexeme, lexcomp) in expect.iter() {
+        for &(ref lexeme, ref lexcomp) in expect.iter() {
             let MathToken{lexeme: lx, lexcomp: lc} = ml.next().unwrap();
-            assert_eq!(lx, lexeme);
-            assert_eq!(lc, lexcomp);
+            assert_eq!(lx, *lexeme);
+            assert_eq!(lc, *lexcomp);
         }
         assert_eq!(ml.next(), None);
     }

@@ -160,10 +160,10 @@ mod test {
             ("/", LexComp::Divide),
             ("+", LexComp::Plus),
         ];
-        for (i, &(lexeme, lexcomp)) in expect.iter().enumerate() {
+        for (i, &(ref lexeme, ref lexcomp)) in expect.iter().enumerate() {
             let Token{lxtok: MathToken{lexeme: ref lx, lexcomp: ref lc }, arity: _} = rpn[i];
-            assert_eq!(lexcomp, *lc);
-            assert_eq!(lexeme, *lx);
+            assert_eq!(*lexcomp, *lc);
+            assert_eq!(*lexeme, *lx);
         }
     }
 
@@ -186,10 +186,10 @@ mod test {
             ("max", LexComp::Function),
             ("*", LexComp::Times),
         ];
-        for (i, &(lexeme, lexcomp)) in expect.iter().enumerate() {
+        for (i, &(ref lexeme, ref lexcomp)) in expect.iter().enumerate() {
             let Token{lxtok: MathToken{lexeme: ref lx, lexcomp: ref lc }, arity: _} = rpn[i];
-            assert_eq!(lexcomp, *lc);
-            assert_eq!(lexeme, *lx);
+            assert_eq!(*lexcomp, *lc);
+            assert_eq!(*lexeme, *lx);
         }
     }
 
@@ -211,10 +211,10 @@ mod test {
             ("/", LexComp::Divide),
             ("sqrt", LexComp::Function),
         ];
-        for (i, &(lexeme, lexcomp)) in expect.iter().enumerate() {
+        for (i, &(ref lexeme, ref lexcomp)) in expect.iter().enumerate() {
             let Token{lxtok: MathToken{lexeme: ref lx, lexcomp: ref lc }, arity: _} = rpn[i];
-            assert_eq!(lexcomp, *lc);
-            assert_eq!(lexeme, *lx);
+            assert_eq!(*lexcomp, *lc);
+            assert_eq!(*lexeme, *lx);
         }
     }
 
@@ -236,11 +236,11 @@ mod test {
         let rpn = parse("sin(1)+(max(2, gamma(3.5), gcd(24, 8))+sum(i,0,10))");
         let mut rpn = rpn.ok().unwrap();
         let mut expect = HashMap::new();
-        expect.insert("sin", 1u);
-        expect.insert("max", 3u);
-        expect.insert("gamma", 1u);
-        expect.insert("gcd", 2u);
-        expect.insert("sum", 3u);
+        expect.insert("sin", 1);
+        expect.insert("max", 3);
+        expect.insert("gamma", 1);
+        expect.insert("gcd", 2);
+        expect.insert("sum", 3);
 
         while let Some(tok) = rpn.pop() {
             if tok.lxtok.lexcomp == LexComp::Function {

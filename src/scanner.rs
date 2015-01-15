@@ -181,7 +181,7 @@ mod test {
     #[test]
     fn test_extract() {
         let mut s = super::Scanner::from_str("just a test buffer@");
-        for _ in range(0u, 4) { assert!(s.next().is_some()); }
+        for _ in range(0, 4) { assert!(s.next().is_some()); }
         assert_eq!(s.extract().as_slice(), "just");
         assert_eq!(s.peek(), Some(' '));
         assert_eq!(s.prev(), None);

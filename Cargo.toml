@@ -5,5 +5,4 @@ authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 
 
 [dependencies.linenoise-rust]
-# linenoise-rust = "0.1.2"
-git = "https://github.com/octplane/rust-linenoise.git"
+linenoise-rust = "0.1.2"

@@ -23,23 +23,26 @@ impl<T: Clone> Scanner<T> {
         Some(self.buf[pos].clone())
     }
 
-    // get more tokens and fill the buffer
-    fn check_buffer(&mut self) -> bool {
-        if ((self.pos + 1) as usize) < self.buf.len() {
-            return true;
-        }
+    // try to get enough elements in the buffer for self.pos
+    fn prep_buffer(&mut self) {
         if let Some(ref mut nexter) = self.src {
-            if let Some(tok) = nexter.next() {
-                self.buf.push(tok);
-                return true;
+            while self.pos >= (self.buf.len() as isize) {
+                if let Some(tok) = nexter.next() {
+                    self.buf.push(tok);
+                } else {
+                    break;
+                }
             }
         }
-        false
     }
 
     pub fn next(&mut self) -> Option<T> {
-        if !self.check_buffer() { return None; }
         self.pos += 1;
+        self.prep_buffer();
+        let blen = self.buf.len() as isize;
+        if self.pos >= blen {
+            self.pos = blen;
+        }
         self.curr()
     }
 
@@ -75,19 +78,48 @@ impl<T: Clone> Scanner<T> {
     }
 }
 
-//impl<T: Clone> Scanner<T> {
-    //// Advance the scanner only if the next char is in the 'any' set
-    //// self.curr() will return the matched char if accept matched any
-    //pub fn accept(&mut self, any: &[T]) -> Option<T> {
-        //if let Some(next) = self.peek() {
-            //if let Some(idx) = any.find(next) {
-                //return Some(any[idx]);
-            //}
-        //}
-        //None
-    //}
-//}
+use std::collections::HashSet;
+use std::hash::Hash;
 
+impl<T: Clone + Hash + Eq> Scanner<T> {
+    // Advance the scanner only if the next char is in the 'any' set,
+    // self.curr() will return the matched char if accept matched any
+    pub fn accept(&mut self, any: &HashSet<T>) -> Option<T> {
+        if let Some(next) = self.peek() {
+            if any.contains(&next) {
+                self.next();
+                return Some(next);
+            }
+        }
+        None
+    }
+
+    // Skip over the 'over' set, result is if the scanner was advanced,
+    // after skip a call to self.curr() will return the last matching char
+    pub fn skip(&mut self, over: &HashSet<T>) -> bool {
+        let mut advanced = false;
+        while self.accept(over).is_some() {
+            advanced = true;
+        }
+        return advanced;
+    }
+
+    // Find an element in the 'any' set or EOF, return if the scanner advanced,
+    // After until a call to self.curr() returns the last non-matching char
+    pub fn until(&mut self, any: &HashSet<T>) -> bool {
+        let mut advanced = false;
+        while let Some(next) = self.peek() {
+            if any.contains(&next) {
+                break;
+            }
+            self.next();
+            advanced = true;
+        }
+        return advanced;
+    }
+}
+
+static WHITE: &'static str = " \n\r\t";
 
 impl Scanner<char> {
     pub fn from_str(source: &str) -> Scanner<char> {
@@ -98,5 +130,29 @@ impl Scanner<char> {
         let tokens = self.view().iter().cloned().collect::<String>();
         self.ignore();
         tokens
+    }
+
+    pub fn accept_chars(&mut self, any: &str) -> Option<char> {
+        let a: HashSet<_> = any.chars().collect();
+        self.accept(&a)
+    }
+
+    pub fn skip_chars(&mut self, over: &str) -> bool {
+        let o: HashSet<_> = over.chars().collect();
+        self.skip(&o)
+    }
+
+    pub fn skip_ws(&mut self) -> bool {
+        self.skip_chars(WHITE)
+    }
+
+    pub fn ignore_ws(&mut self) {
+        self.skip_chars(WHITE);
+        self.ignore();
+    }
+
+    pub fn until_chars(&mut self, any: &str) -> bool {
+        let a: HashSet<_> = any.chars().collect();
+        self.until(&a)
     }
 }

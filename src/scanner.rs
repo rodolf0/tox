@@ -15,6 +15,14 @@ impl<T: Clone> Scanner<T> {
 
     pub fn pos(&self) -> isize { self.pos }
 
+    pub fn set_pos(&mut self, pos: isize) -> bool {
+        if pos < 0 || pos >= (self.buf.len() as isize) {
+            return false;
+        }
+        self.pos = pos;
+        true
+    }
+
     pub fn curr(&self) -> Option<T> {
         let pos = self.pos as usize;
         if self.pos < 0 || pos >= self.buf.len() {

@@ -1,162 +1,66 @@
-use std::io;
 use scanner;
 
-pub type Matcher<R> = scanner::Scanner<R>;
+pub type Matcher = scanner::Scanner<char>;
 
-
-impl Matcher<io::MemReader> {
-    // Build a MathLexer reading from a string
-    pub fn from_str(e: &str) -> Matcher<io::MemReader> {
-        let b = io::MemReader::new(e.as_bytes().to_vec());
-        Matcher::new(b)
-    }
-}
-
-impl<R: io::Reader> Matcher<R> {
-
-    pub fn new(r: R) -> Matcher<R> {
-        scanner::Scanner::new(r)
-    }
-
-    // Match an alfanumeric id which can't start with a number
+impl Matcher {
     pub fn match_id(&mut self) -> Option<String> {
-        let alfa = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
-        let alnum = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
-        if self.accept(alfa).is_some() {
-            self.skip(alnum);
-            return Some(self.extract());
+        let alfa = concat!("abcdefghijklmnopqrstuvwxyz",
+                           "ABCDEFGHIJKLMNOPQRSTUVWXYZ_");
+        let alnum = concat!("0123456789",
+                            "abcdefghijklmnopqrstuvwxyz",
+                            "ABCDEFGHIJKLMNOPQRSTUVWXYZ_");
+        if self.accept_chars(alfa).is_some() {
+            self.skip_chars(alnum);
+            return Some(self.extract_string());
         }
         None
     }
 
-    // match exotic base integer
-    pub fn match_exint(&mut self) -> Option<String> {
-        let backtrack = self.pos;
-        if self.accept("0").is_some() {
-            if self.accept("xXoObB").is_some() {
+    pub fn match_exotic_int(&mut self) -> Option<String> {
+        let backtrack = self.pos();
+        if self.accept_chars("0").is_some() {
+            if self.accept_chars("xXoObB").is_some() {
                 let digits = match self.curr().unwrap() {
                     'x' | 'X' => "0123456789aAbBcCdDeEfF",
                     'o' | 'O' => "01234567",
                     'b' | 'B' => "01",
-                    _ => panic!("non-reachable")
+                    _ => unreachable!()
                 };
-                if self.skip(digits) {
-                    return Some(self.extract());
+                if self.skip_chars(digits) {
+                    return Some(self.extract_string());
                 }
             }
-            self.pos = backtrack; // was not an ex-int
+            self.set_pos(backtrack); // was not an ex-int
         }
         None
     }
 
-    // Match numbers with fractional part and exponent
     pub fn match_number(&mut self) -> Option<String> {
-        let backtrack = self.pos;
+        let backtrack = self.pos();
         let digits = "0123456789";
         // optional sign
-        self.accept("+-");
+        self.accept_chars("+-");
         // require integer part
-        if !self.skip(digits) {
-            self.pos = backtrack;
+        if !self.skip_chars(digits) {
+            self.set_pos(backtrack);
             return None;
         }
         // check for fractional part, else it's just an integer
-        let backtrack = self.pos;
-        if self.accept(".").is_some() && !self.skip(digits) {
-            self.pos = backtrack;
-            return Some(self.extract()); // integer
+        let backtrack = self.pos();
+        if self.accept_chars(".").is_some() && !self.skip_chars(digits) {
+            self.set_pos(backtrack);
+            return Some(self.extract_string()); // integer
         }
         // check for exponent part
-        let backtrack = self.pos;
-        if self.accept("eE").is_some() { // can't parse exponents for bases-16
-            self.accept("+-"); // exponent sign is optional
-            if !self.skip(digits) {
-                self.pos = backtrack;
-                return Some(self.extract()); // number without exponent
+        let backtrack = self.pos();
+        if self.accept_chars("eE").is_some() { // can't parse exponents for bases-16
+            self.accept_chars("+-"); // exponent sign is optional
+            if !self.skip_chars(digits) {
+                self.set_pos(backtrack);
+                return Some(self.extract_string()); // number without exponent
             }
         }
-        self.accept("i"); // accept imaginary numbers
-        Some(self.extract())
-    }
-}
-
-
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn test_nums() {
-        let nums = concat!(
-            "0 10 -0 -7 -10 987654321 0.34 -2.14 2e3 -3e1 5.3E2 ",
-            "2.65i 9i 8.2e-3i ",
-            "1.234e2 -3.4523e+1 256E-2 354e-4 -3487.23e-1 0.001e+5 -9e-2");
-        let expect = [
-            "0", "10", "-0", "-7", "-10", "987654321", "0.34", "-2.14", "2e3", "-3e1", "5.3E2",
-            "2.65i", "9i", "8.2e-3i",
-            "1.234e2", "-3.4523e+1", "256E-2", "354e-4", "-3487.23e-1", "0.001e+5", "-9e-2",
-        ];
-        let mut m = super::Matcher::from_str(nums);
-        for exnum in expect.iter() {
-            m.ignore_ws();
-            let num = m.match_number();
-            assert_eq!(num.unwrap().as_slice(), *exnum);
-        }
-        m.ignore_ws();
-        assert!(m.eof());
-    }
-
-    #[test]
-    fn test_exnums() {
-        let nums = "0x0 0x10 0x20 0xff 0xabcdEf 0b0101";
-        let expect = ["0x0", "0x10", "0x20", "0xff", "0xabcdEf", "0b0101"];
-        let mut m = super::Matcher::from_str(nums);
-        for exnum in expect.iter() {
-            m.ignore_ws();
-            let num = m.match_exint();
-            assert_eq!(num.unwrap().as_slice(), *exnum);
-        }
-        m.ignore_ws();
-        assert!(m.eof());
-    }
-
-    #[test]
-    fn test_mixed() {
-        let mixed = "0 0b10 _id -0 -7 word -10 987654321 0.34 test -2.14 2e3 -3e1 0x34 5.3E2";
-        let expect = [("0", "number"), ("0b10", "exint"), ("_id", "id"), ("-0", "number"),
-                      ("-7", "number"), ("word", "id"), ("-10", "number"), ("987654321", "number"),
-                      ("0.34", "number"), ("test", "id"), ("-2.14", "number"), ("2e3", "number"),
-                      ("-3e1", "number"), ("0x34", "exint"), ("5.3E2", "number")];
-        let mut m = super::Matcher::from_str(mixed);
-
-        for &(tok, typ) in expect.iter() {
-            m.ignore_ws();
-            match typ {
-                "number" => assert_eq!(m.match_number().unwrap().as_slice(), tok),
-                "exint" => assert_eq!(m.match_exint().unwrap().as_slice(), tok),
-                "id" => assert_eq!(m.match_id().unwrap().as_slice(), tok),
-                _ => panic!("non-reachable")
-            }
-        }
-        assert!(m.eof());
-    }
-
-    #[test]
-    fn test_misc() {
-        let mixed = "0,0b10|_id -0 -7+word -10*987654321,";
-        let expect = [("0", "number"), (",", "?"), ("0b10", "exint"), ("|", "?"), ("_id", "id"),
-                      ("-0", "number"), ("-7", "number"), ("+", "?"), ("word", "id"), ("-10", "number"),
-                      ("*", "?"), ("987654321", "number")];
-        let mut m = super::Matcher::from_str(mixed);
-        for &(tok, typ) in expect.iter() {
-            m.ignore_ws();
-            match typ {
-                "number" => assert_eq!(m.match_number().unwrap().as_slice(), tok),
-                "exint" => assert_eq!(m.match_exint().unwrap().as_slice(), tok),
-                "id" => assert_eq!(m.match_id().unwrap().as_slice(), tok),
-                "?" => assert_eq!(m.next().unwrap(), tok.char_at(0)),
-                _ => panic!("non-reachable")
-            }
-        }
-        assert!(m.eof());
+        self.accept_chars("i"); // accept imaginary numbers
+        Some(self.extract_string())
     }
 }

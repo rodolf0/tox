@@ -1,5 +1,5 @@
 pub trait Nexter<T> {
-    fn next(&mut self) -> Option<T>;
+    fn get_item(&mut self) -> Option<T>;
 }
 
 pub struct Scanner<T: Clone> {
@@ -16,7 +16,7 @@ impl<T: Clone> Scanner<T> {
     pub fn pos(&self) -> isize { self.pos }
 
     pub fn set_pos(&mut self, pos: isize) -> bool {
-        if pos < 0 || pos >= (self.buf.len() as isize) {
+        if pos < -1 || pos > (self.buf.len() as isize) {
             return false;
         }
         self.pos = pos;
@@ -35,7 +35,7 @@ impl<T: Clone> Scanner<T> {
     fn prep_buffer(&mut self) {
         if let Some(ref mut nexter) = self.src {
             while self.pos >= (self.buf.len() as isize) {
-                if let Some(tok) = nexter.next() {
+                if let Some(tok) = nexter.get_item() {
                     self.buf.push(tok);
                 } else {
                     break;
@@ -62,6 +62,13 @@ impl<T: Clone> Scanner<T> {
     pub fn peek(&mut self) -> Option<T> {
         let backtrack = self.pos;
         let peeked = self.next();
+        self.pos = backtrack;
+        peeked
+    }
+
+    pub fn peek_prev(&mut self) -> Option<T> {
+        let backtrack = self.pos;
+        let peeked = self.prev();
         self.pos = backtrack;
         peeked
     }

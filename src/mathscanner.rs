@@ -1,9 +1,9 @@
-use scanner;
+use scanner::Scanner;
 
-pub type Matcher = scanner::Scanner<char>;
+pub type MathScanner = Scanner<char>;
 
-impl Matcher {
-    pub fn match_id(&mut self) -> Option<String> {
+impl MathScanner {
+    pub fn scan_id(&mut self) -> Option<String> {
         let alfa = concat!("abcdefghijklmnopqrstuvwxyz",
                            "ABCDEFGHIJKLMNOPQRSTUVWXYZ_");
         let alnum = concat!("0123456789",
@@ -16,7 +16,7 @@ impl Matcher {
         None
     }
 
-    pub fn match_exotic_int(&mut self) -> Option<String> {
+    pub fn scan_exotic_int(&mut self) -> Option<String> {
         let backtrack = self.pos();
         if self.accept_chars("0").is_some() {
             if self.accept_chars("xXoObB").is_some() {
@@ -35,7 +35,7 @@ impl Matcher {
         None
     }
 
-    pub fn match_number(&mut self) -> Option<String> {
+    pub fn scan_number(&mut self) -> Option<String> {
         let backtrack = self.pos();
         let digits = "0123456789";
         // optional sign

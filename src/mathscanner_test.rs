@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use matchers::Matcher;
+use mathscanner::MathScanner;
 
 #[test]
 fn test_numbers() {
@@ -11,10 +11,10 @@ fn test_numbers() {
     ];
     let nums = expect.connect(" ");
 
-    let mut m = Matcher::from_str(&nums);
+    let mut m = MathScanner::from_str(&nums);
     for exnum in expect.iter() {
         m.ignore_ws();
-        let num = m.match_number().unwrap();
+        let num = m.scan_number().unwrap();
         assert_eq!(num, *exnum);
     }
     m.ignore_ws();
@@ -25,10 +25,10 @@ fn test_numbers() {
 fn test_exnums() {
     let expect = ["0x0", "0x10", "0x20", "0xff", "0xabcdEf", "0b0101"];
     let nums = expect.connect(" ");
-    let mut m = Matcher::from_str(&nums);
+    let mut m = MathScanner::from_str(&nums);
     for exnum in expect.iter() {
         m.ignore_ws();
-        let num = m.match_exotic_int().unwrap();
+        let num = m.scan_exotic_int().unwrap();
         assert_eq!(num, *exnum);
     }
     m.ignore_ws();
@@ -55,13 +55,13 @@ fn test_mixed() {
     let mixed = expect.iter().map(|&(num, _)| num)
                       .collect::<Vec<&str>>().connect(" ");
 
-    let mut m = Matcher::from_str(&mixed);
+    let mut m = MathScanner::from_str(&mixed);
     for &(tok, typ) in expect.iter() {
         m.ignore_ws();
         match typ {
-            "number" => assert_eq!(m.match_number().unwrap(), tok),
-            "exint" => assert_eq!(m.match_exotic_int().unwrap(), tok),
-            "id" => assert_eq!(m.match_id().unwrap(), tok),
+            "number" => assert_eq!(m.scan_number().unwrap(), tok),
+            "exint" => assert_eq!(m.scan_exotic_int().unwrap(), tok),
+            "id" => assert_eq!(m.scan_id().unwrap(), tok),
             _ => unreachable!()
         }
     }
@@ -84,13 +84,13 @@ fn test_misc() {
                   ("987654321", "number")];
     let mixed = "0,0b10|_id -0 -7+word -10*987654321,";
 
-    let mut m = Matcher::from_str(&mixed);
+    let mut m = MathScanner::from_str(&mixed);
     for &(tok, typ) in expect.iter() {
         m.ignore_ws();
         match typ {
-            "number" => assert_eq!(m.match_number().unwrap(), tok),
-            "exint" => assert_eq!(m.match_exotic_int().unwrap(), tok),
-            "id" => assert_eq!(m.match_id().unwrap(), tok),
+            "number" => assert_eq!(m.scan_number().unwrap(), tok),
+            "exint" => assert_eq!(m.scan_exotic_int().unwrap(), tok),
+            "id" => assert_eq!(m.scan_id().unwrap(), tok),
             "?" => assert_eq!(m.next().unwrap(), tok.chars().next().unwrap()),
             _ => unreachable!()
         }

@@ -1,9 +1,11 @@
 pub mod scanner;
 mod scanner_test;
 
-pub mod matchers;
-mod matchers_test;
+pub mod mathscanner;
+mod mathscanner_test;
 
-//pub mod math_lexer;
+pub mod lexer;
+mod lexer_test;
+
 //pub mod shunting;
 //pub mod rpneval;

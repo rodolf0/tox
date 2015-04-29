@@ -1,24 +1,4 @@
 use lexer::{MathLexer, MathToken, LexComp};
-use std::cmp::Ordering;
-
-#[derive(PartialEq, Debug)]
-enum Assoc {
-    Left,
-    Right,
-    None
-}
-
-#[derive(PartialEq, Debug)]
-pub struct Token {
-    pub lxtoken: MathToken, // TODO: make priv
-    pub arity: usize
-}
-
-impl Token {
-    pub fn is(&self, lexcomp: &LexComp) -> bool {
-        self.lxtoken.lexcomp == *lexcomp
-    }
-}
 
 #[derive(PartialEq, Debug)]
 pub enum ParseError {
@@ -29,122 +9,138 @@ pub enum ParseError {
     UnknownToken(String),
 }
 
+#[derive(PartialEq, Debug)]
+enum Assoc {
+    Left,
+    Right,
+    None
+}
+
+#[derive(PartialEq, Debug)]
+pub struct Token {
+    pub lxtoken: MathToken,
+    pub arity: usize
+}
+
+impl Token {
+    pub fn is(&self, lexcomp: &LexComp) -> bool {
+        self.lxtoken.lexcomp == *lexcomp
+    }
+}
+
 pub type RPNExpr = Vec<Token>;
 
-fn precedence(lc: &LexComp) -> (usize, Assoc) {
-    match *lc {
-        // need OParen/Function because they can be pushed onto the stack
-        LexComp::OParen |
-        LexComp::Function => (1, Assoc::Left),
-        LexComp::Plus |
-        LexComp::Minus => (2, Assoc::Left),
-        LexComp::Times |
-        LexComp::Divide |
-        LexComp::Modulo => (3, Assoc::Left),
-        LexComp::UMinus => (4, Assoc::Right),
-        LexComp::Power => (5, Assoc::Right),
-        LexComp::Factorial => (6, Assoc::Left),
-        _ => (100, Assoc::None)
-    }
-}
+pub struct MathParser;
 
-pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
-    let mut lx = MathLexer::lex_str(expr);
-    _parse(&mut lx)
-}
-
-
-
-// http://en.wikipedia.org/wiki/Shunting-yard_algorithm
-pub fn _parse(lexer: &mut MathLexer) -> Result<RPNExpr, ParseError> {
-    let mut out = Vec::new();
-    let mut stack = Vec::new();
-    let mut arity = Vec::new();
-
-    while let Some(lextok) = lexer.next() {
-        match lextok.lexcomp {
-            LexComp::Number |
-            LexComp::Variable => out.push(Token{lxtoken: lextok, arity: 0}),
-
-            LexComp::Function => {
-                stack.push(Token{lxtoken: lextok, arity: 0});
-                arity.push(1);
-            },
-
-            // Start-of-grouping token
-            LexComp::OParen => stack.push(Token{lxtoken: lextok, arity: 0}),
-
-            // function-argument/group-element separator
-            LexComp::Comma => {
-                // track n-arguments for function calls. If cannot unwrap => bad parens
-
-                while stack.last().is_some() &&
-                    !stack.last().unwrap().is(&LexComp::OParen) {
-                    out.push(stack.pop().unwrap());
-                }
-
-                if stack.len() == 0 {
-                    return Err(ParseError::MisplacedComma);
-                }
-
-                if let Some(a) = arity.last_mut() { *a += 1; }
-
-            },
-
-            // End-of-grouping token
-            LexComp::CParen => {
-
-                //while stack.last().some_and(|&t| !t.is(&LexComp::OParen)) {
-                while stack.last().is_some() &&
-                    !stack.last().unwrap().is(&LexComp::OParen) {
-                    out.push(stack.pop().unwrap());
-                }
-
-                if stack.len() == 0 {
-                    return Err(ParseError::MissingOParen);
-                } else {
-                    stack.pop(); // remove paren
-                    if stack.last().is_some() &&
-                       stack.last().unwrap().is(&LexComp::Function) {
-                        // adjust the function arity based on seen arguments
-                        let mut func = stack.pop().unwrap();
-                        func.arity = arity.pop().unwrap();
-                        out.push(func);
-                    }
-
-                }
-            },
-
-            // Operators
-            LexComp::Plus   |
-            LexComp::Minus  |
-            LexComp::Times  |
+impl MathParser {
+    fn precedence(lc: &LexComp) -> (usize, Assoc) {
+        match *lc {
+            // need OParen/Function because they can be pushed onto the stack
+            LexComp::OParen |
+            LexComp::Function => (1, Assoc::Left),
+            LexComp::Plus |
+            LexComp::Minus => (2, Assoc::Left),
+            LexComp::Times |
             LexComp::Divide |
-            LexComp::Modulo |
-            LexComp::UMinus |
-            LexComp::Power  |
-            LexComp::Factorial => {
-                let (buf_prec, buf_assoc) = precedence(&lextok.lexcomp);
-                while let Some(top) = stack.pop() {
-                    let (top_prec, _) = precedence(&top.lxtoken.lexcomp);
-                    match buf_prec.cmp(&top_prec) {
-                        Ordering::Greater => { stack.push(top); break; }, // return top to stack
-                        Ordering::Equal if buf_assoc == Assoc::Right => { stack.push(top); break; },
-                        Ordering::Equal if buf_assoc == Assoc::None => return Err(ParseError::NonAssociative),
-                        _ => out.push(top)
-                    }
-                }
-                stack.push(Token{lxtoken: lextok, arity: 2}); // only care about arity for Function
-            },
+            LexComp::Modulo => (3, Assoc::Left),
+            LexComp::UMinus => (4, Assoc::Right),
+            LexComp::Power => (5, Assoc::Right),
+            LexComp::Factorial => (6, Assoc::Left),
+            _ => (100, Assoc::None)
+        }
+    }
 
-            _ => return Err(ParseError::UnknownToken(lextok.lexeme))
-        }
+    fn some(t: &Option<&Token>, lc: &LexComp) -> bool {
+        t.is_some() && t.unwrap().is(lc)
     }
-    while let Some(top) = stack.pop() {
-        if top.is(&LexComp::OParen) {
-            return Err(ParseError::MissingCParen);
-        }
-        out.push(top);
+
+    fn some_not(t: &Option<&Token>, lc: &LexComp) -> bool {
+        t.is_some() && !t.unwrap().is(lc)
     }
-    Ok(out)
+
+    fn none_ornot(t: &Option<&Token>, lc: &LexComp) -> bool {
+        t.is_none() || !t.unwrap().is(lc)
+    }
+
+    pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
+        let mut lx = MathLexer::lex_str(expr);
+        Self::_parse(&mut lx)
+    }
+
+    // http://en.wikipedia.org/wiki/Shunting-yard_algorithm
+    pub fn _parse(lexer: &mut MathLexer) -> Result<RPNExpr, ParseError> {
+        let mut out = Vec::new();
+        let mut stack = Vec::new();
+        let mut arity = Vec::<usize>::new();
+
+        while let Some(lextok) = lexer.next() {
+            match lextok.lexcomp {
+                LexComp::Number |
+                LexComp::Variable => out.push(Token{lxtoken: lextok, arity: 0}),
+                LexComp::OParen => stack.push(Token{lxtoken: lextok, arity: 0}),
+                LexComp::Comma => {
+                    while Self::some_not(&stack.last(), &LexComp::OParen) {
+                        out.push(stack.pop().unwrap());
+                    }
+                    if Self::none_ornot(&stack.last(), &LexComp::OParen) {
+                        return Err(ParseError::MisplacedComma);
+                    }
+                    if let Some(a) = arity.last_mut() { *a += 1; }
+                },
+                LexComp::CParen => {
+                    while Self::some_not(&stack.last(), &LexComp::OParen) {
+                        out.push(stack.pop().unwrap());
+                    }
+                    if Self::none_ornot(&stack.pop().as_ref(), &LexComp::OParen) {
+                        return Err(ParseError::MissingOParen);
+                    }
+                    if Self::some(&stack.last(), &LexComp::Function) {
+                        stack.last_mut().unwrap().arity = arity.pop().unwrap();
+                        out.push(stack.pop().unwrap());
+                    }
+                },
+                LexComp::Function => {
+                    stack.push(Token{lxtoken: lextok, arity: 0});
+                    arity.push(1);
+                },
+                LexComp::Plus   |
+                LexComp::Minus  |
+                LexComp::Times  |
+                LexComp::Divide |
+                LexComp::Modulo |
+                LexComp::UMinus |
+                LexComp::Power  |
+                LexComp::Factorial => {
+                    let (prec_rhs, assoc_rhs) = Self::precedence(&lextok.lexcomp);
+                    while stack.len() > 0 {
+                        let (prec_lhs, _) = {
+                            let top = stack.last().unwrap();
+                            Self::precedence(&top.lxtoken.lexcomp)
+                        };
+                        if prec_rhs > prec_lhs {
+                            break;
+                        } else if prec_rhs < prec_lhs {
+                            out.push(stack.pop().unwrap())
+                        } else {
+                            match assoc_rhs {
+                                Assoc::Right => break,
+                                Assoc::None => return Err(ParseError::NonAssociative),
+                                Assoc::Left => out.push(stack.pop().unwrap())
+                            }
+                        }
+                    }
+                    stack.push(Token{lxtoken: lextok, arity: 0});
+                },
+
+                _ => return Err(ParseError::UnknownToken(lextok.lexeme))
+            }
+        }
+        while let Some(top) = stack.pop() {
+            if top.is(&LexComp::OParen) {
+                return Err(ParseError::MissingCParen);
+            }
+            out.push(top);
+        }
+        Ok(out)
+    }
 }

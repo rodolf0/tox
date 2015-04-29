@@ -36,7 +36,7 @@ struct TokenReader {
 
 impl MathLexer {
     pub fn lex_str(input: &str) -> MathLexer {
-        MathLexer::new(Box::new(
+        Self::new(Box::new(
             TokenReader{src: MathScanner::from_str(input),
                         prev: None}))
     }

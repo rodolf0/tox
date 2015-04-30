@@ -10,4 +10,5 @@ mod lexer_test;
 pub mod shunting;
 mod shunting_test;
 
-//pub mod rpneval;
+pub mod rpneval;
+//pub mod mathlink;

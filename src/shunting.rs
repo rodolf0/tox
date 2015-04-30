@@ -33,6 +33,11 @@ pub type RPNExpr = Vec<Token>;
 pub struct MathParser;
 
 impl MathParser {
+    pub fn parse_str(expr: &str) -> Result<RPNExpr, ParseError> {
+        let mut lx = MathLexer::lex_str(expr);
+        Self::parse(&mut lx)
+    }
+
     fn precedence(lc: &LexComp) -> (usize, Assoc) {
         match *lc {
             // need OParen/Function because they can be pushed onto the stack
@@ -62,13 +67,8 @@ impl MathParser {
         t.is_none() || !t.unwrap().is(lc)
     }
 
-    pub fn parse(expr: &str) -> Result<RPNExpr, ParseError> {
-        let mut lx = MathLexer::lex_str(expr);
-        Self::_parse(&mut lx)
-    }
-
     // http://en.wikipedia.org/wiki/Shunting-yard_algorithm
-    pub fn _parse(lexer: &mut MathLexer) -> Result<RPNExpr, ParseError> {
+    pub fn parse(lexer: &mut MathLexer) -> Result<RPNExpr, ParseError> {
         let mut out = Vec::new();
         let mut stack = Vec::new();
         let mut arity = Vec::<usize>::new();

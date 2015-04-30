@@ -1,19 +1,17 @@
 use lexer::LexComp;
-use shunting::RPNExpr;
+use shunting::{RPNExpr, Token};
 use std::collections::HashMap;
 use std::str::FromStr;
 
-
 #[derive(Debug)]
 pub enum EvalErr {
-    UnknownVariable(String),
-    NoContextProvided,
+    UnknownVar(String),
     LinkError(String),
     WrongNumberOfArgs,
     BadNumber,
+    BadToken(String),
 }
 
-// Evaluate known functions, fallback to math-library
 fn eval_fn(fname: &str, params: &[f64]) -> Result<f64, EvalErr> {
     match fname {
         "sin" => return Ok(params.last().unwrap().sin()),
@@ -30,95 +28,83 @@ fn eval_fn(fname: &str, params: &[f64]) -> Result<f64, EvalErr> {
     }
 }
 
-fn pop2(stack: &mut Vec<f64>) -> Result<(f64, f64), EvalErr> {
-    let r = stack.pop();
-    let l = stack.pop();
-    if r.is_none() || l.is_none() {
-        return Err(EvalErr::WrongNumberOfArgs);
-    }
-    Ok((r.unwrap(), l.unwrap()))
+pub struct MathContext {
+    context: HashMap<String, f64>
 }
 
-pub type Context = HashMap<String, f64>;
+impl MathContext {
+    pub fn new() -> MathContext {
+        let mut cx = HashMap::new();
+        //cx.insert("pi".to_string(), std::f64::consts::PI);
+        //cx.insert("e".to_string(), std::f64::consts::E);
+        MathContext{context: cx}
+    }
 
-// Evaluate a RPN expression
-pub fn eval(rpn: &RPNExpr, cx: Option<&Context>) -> Result<f64, EvalErr> {
-    let mut stack = Vec::new();
+    pub fn eval(&self, rpn: &RPNExpr) -> Result<f64, EvalErr> {
+        let mut operands = Vec::new();
+        for &Token{lxtoken: ref token, arity: arity} in rpn.iter() {
 
-    for tok in rpn.iter() {
-        match tok.lxtoken.lexcomp {
-            LexComp::Number => {
-                let s = &tok.lxtoken.lexeme[..];
-                if let Ok(n) = f64::from_str(s) {
-                    stack.push(n);
-                } else {
-                    return Err(EvalErr::BadNumber);
-                }
-            },
-
-            LexComp::Plus => { let (r, l) = try!(pop2(&mut stack)); stack.push(l + r); },
-            LexComp::Minus => { let (r, l) = try!(pop2(&mut stack)); stack.push(l - r); },
-            LexComp::Times => { let (r, l) = try!(pop2(&mut stack)); stack.push(l * r); },
-            LexComp::Divide => { let (r, l) = try!(pop2(&mut stack)); stack.push(l / r); },
-            LexComp::Modulo => { let (r, l) = try!(pop2(&mut stack)); stack.push(l % r); },
-            LexComp::Power => { let (r, l) = try!(pop2(&mut stack)); stack.push(l.powf(r)); },
-
-            LexComp::UMinus => {
-                if let Some(r) = stack.pop() {
-                    stack.push(-r);
-                } else {
-                    return Err(EvalErr::WrongNumberOfArgs);
-                }
-            },
-
-            //LexComp::Factorial => {
-                //if let Some(l) = stack.pop() {
-                    //match mathlink::link_fn("tgamma") {
-                        //Ok(func) => stack.push(func(l + 1.0)),
-                        //Err(e) => return Err(EvalErr::LinkError(e))
-                    //}
-                //} else {
-                    //return Err(EvalErr::WrongNumberOfArgs);
-                //}
-            //},
-
-            LexComp::Function => {
-                let mut r: f64;
-                let midp = stack.len() - tok.arity;
-                if tok.arity > stack.len() {
-                    return Err(EvalErr::WrongNumberOfArgs);
-                } else {
-                    let args = &stack[midp..];
-                    let fname = &tok.lxtoken.lexeme[..];
-                    match eval_fn(fname, args) {
-                        Ok(evaled) => r = evaled,
-                        Err(e) => return Err(e)
+            match token.lexcomp {
+                LexComp::Number => {
+                    match f64::from_str(&token.lexeme[..]) {
+                        Ok(n) => operands.push(n),
+                        Err(e) => return Err(EvalErr::BadNumber)
                     }
-                }
-                stack.truncate(midp);
-                stack.push(r);
-            },
+                },
+                LexComp::Variable => {
+                    let var = &token.lexeme[..];
+                    match self.context.get(var) {
+                        Some(value) => operands.push(*value),
+                        None => return Err(EvalErr::UnknownVar(var.to_string()))
+                    }
+                },
+                LexComp::Plus | LexComp::Minus |
+                LexComp::Times  | LexComp::Divide |
+                LexComp::Modulo  | LexComp::Power => {
+                    let r = try!(operands.pop().ok_or(EvalErr::WrongNumberOfArgs));
+                    let l = try!(operands.pop().ok_or(EvalErr::WrongNumberOfArgs));
+                    match token.lexcomp {
+                        LexComp::Plus => operands.push(l + r),
+                        LexComp::Minus => operands.push(l - r),
+                        LexComp::Times => operands.push(l * r),
+                        LexComp::Divide => operands.push(l / r),
+                        LexComp::Modulo => operands.push(l % r),
+                        LexComp::Power => operands.push(l.powf(r)),
+                        _ => unreachable!()
+                    }
+                },
+                LexComp::UMinus => {
+                    let o = try!(operands.pop().ok_or(EvalErr::WrongNumberOfArgs));
+                    operands.push(-o);
+                },
+                LexComp::Factorial => {
+                    let o = try!(operands.pop().ok_or(EvalErr::WrongNumberOfArgs));
+                    // gamma(o + 1.0);
+                    return Err(EvalErr::LinkError("couldn't link tgamma".to_string()));
+                },
 
-            LexComp::Variable => {
-                let vname = &tok.lxtoken.lexeme[..];
-                if let Some(context) = cx {
-                    if let Some(v) = context.get(vname) {
-                        stack.push(*v);
+                /*
+                LexComp::Function => {
+                    let mut r: f64;
+                    let midp = stack.len() - tok.arity;
+                    if tok.arity > stack.len() {
+                        return Err(EvalErr::WrongNumberOfArgs);
                     } else {
-                        return Err(EvalErr::UnknownVariable(vname.to_string()));
+                        let args = &stack[midp..];
+                        let fname = &tok.lxtoken.lexeme[..];
+                        match eval_fn(fname, args) {
+                            Ok(evaled) => r = evaled,
+                            Err(e) => return Err(e)
+                        }
                     }
-                } else {
-                    return Err(EvalErr::NoContextProvided);
-                }
-            },
+                    stack.truncate(midp);
+                    stack.push(r);
+                },
+                */
 
-            LexComp::Factorial | // TODO: allow factorial
-            LexComp::Unknown | LexComp::OParen | LexComp::Assign |
-            LexComp::CParen | LexComp::Comma => panic!("rpneval::eval: parser error")
+                _ => return Err(EvalErr::BadToken(token.lexeme.clone()))
+            }
         }
+        operands.pop().ok_or(EvalErr::WrongNumberOfArgs)
     }
-    if let Some(res) = stack.pop() {
-        return Ok(res);
-    }
-    panic!("rpneval::eval: parser error 2");
 }

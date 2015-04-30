@@ -5,7 +5,7 @@ extern crate tox;
 mod repl {
     use std::io;
     use tox::lexer::{MathLexer, LexComp};
-    use tox::rpneval::{EvalErr, Context, eval};
+    use tox::rpneval::{EvalErr, MathContext};
     use tox::shunting::{ParseError, MathParser};
     use tox::{shunting, rpneval};
 
@@ -15,12 +15,15 @@ mod repl {
         EvalErr(EvalErr),
     }
 
-    pub fn evalexpr(input: &str, context: Option<&Context>) {
-        match MathParser::parse(input) {
+    pub fn evalexpr(input: &str) {
+        match MathParser::parse_str(input) {
             Err(e) => println!("Parse error: {:?}", e),
-            Ok(expr) => match rpneval::eval(&expr, context) {
-                Err(e) => println!("Eval error: {:?}", e),
-                Ok(result) => println!("{}", result)
+            Ok(expr) => {
+                let mc = MathContext::new();
+                match mc.eval(&expr) {
+                    Err(e) => println!("Eval error: {:?}", e),
+                    Ok(result) => println!("{}", result)
+                }
             }
         };
     }
@@ -67,15 +70,10 @@ mod repl {
 
 #[cfg(not(test))]
 fn main() {
-    use std::collections::HashMap;
-    // init a context...
-    let mut cx = HashMap::new();
-    cx.insert("pi".to_string(), std::f64::consts::PI);
-    cx.insert("e".to_string(), std::f64::consts::E);
-
     if std::env::args().len() > 1 {
-        let input = std::env::args().skip(1).collect::<Vec<String>>().connect(" ");
-        repl::evalexpr(&input[..], Some(&cx));
+        let input = std::env::args().skip(1).
+            collect::<Vec<String>>().connect(" ");
+        repl::evalexpr(&input[..]);
     //} else {
         //loop {
             //let inopt = linenoise::input(">> ");

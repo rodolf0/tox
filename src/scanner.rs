@@ -81,7 +81,11 @@ impl<T: Clone> Scanner<T> {
     pub fn ignore(&mut self) {
         if self.pos >= 0 {
             let n = self.pos as usize + 1;
-            self.buf = self.buf[n..].to_vec();
+            self.buf = if self.buf.len() > n {
+                self.buf[n..].to_vec()
+            } else {
+                Vec::new()
+            }
         }
         self.pos = -1;
     }

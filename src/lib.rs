@@ -1,3 +1,4 @@
+#![feature(std_misc)] // for std::dynamic_lib ONLY!
 pub mod scanner;
 mod scanner_test;
 
@@ -11,4 +12,4 @@ pub mod shunting;
 mod shunting_test;
 
 pub mod rpneval;
-//pub mod mathlink;
+pub mod mathlink;

@@ -5,7 +5,7 @@ use shunting::MathParser;
 
 #[test]
 fn test_parse1() {
-    let rpn = MathParser::parse("3+4*2/-(1-5)^2^3").ok().unwrap();
+    let rpn = MathParser::parse_str("3+4*2/-(1-5)^2^3").ok().unwrap();
     let expect = [
         ("3", LexComp::Number),
         ("4", LexComp::Number),
@@ -31,7 +31,7 @@ fn test_parse1() {
 
 #[test]
 fn test_parse2() {
-    let rpn = MathParser::parse("3.4e-2 * sin(x)/(7! % -4) * max(2, x)").ok().unwrap();
+    let rpn = MathParser::parse_str("3.4e-2 * sin(x)/(7! % -4) * max(2, x)").ok().unwrap();
     let expect = [
         ("3.4e-2", LexComp::Number),
         ("x", LexComp::Variable),
@@ -57,7 +57,7 @@ fn test_parse2() {
 
 #[test]
 fn test_parse3() {
-    let rpn = MathParser::parse("sqrt(-(1i-x^2) / (1 + x^2))").ok().unwrap();
+    let rpn = MathParser::parse_str("sqrt(-(1i-x^2) / (1 + x^2))").ok().unwrap();
     let expect = [
         ("1i", LexComp::Number),
         ("x", LexComp::Variable),
@@ -82,20 +82,20 @@ fn test_parse3() {
 
 #[test]
 fn bad_parse() {
-    let rpn = MathParser::parse("sqrt(-(1i-x^2) / (1 + x^2)");
+    let rpn = MathParser::parse_str("sqrt(-(1i-x^2) / (1 + x^2)");
     assert_eq!(rpn, Err(ParseError::MissingCParen));
 
-    let rpn = MathParser::parse("-(1i-x^2) / (1 + x^2))");
+    let rpn = MathParser::parse_str("-(1i-x^2) / (1 + x^2))");
     assert_eq!(rpn, Err(ParseError::MissingOParen));
 
-    let rpn = MathParser::parse("max 4, 6, 4)");
+    let rpn = MathParser::parse_str("max 4, 6, 4)");
     assert_eq!(rpn, Err(ParseError::MisplacedComma));
 }
 
 #[test]
 fn check_arity() {
     use std::collections::HashMap;
-    let rpn = MathParser::parse("sin(1)+(max(2, gamma(3.5), gcd(24, 8))+sum(i,0,10))");
+    let rpn = MathParser::parse_str("sin(1)+(max(2, gamma(3.5), gcd(24, 8))+sum(i,0,10))");
     let mut rpn = rpn.ok().unwrap();
     let mut expect = HashMap::new();
     expect.insert("sin", 1);

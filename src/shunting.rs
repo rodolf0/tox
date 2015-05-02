@@ -5,7 +5,7 @@ pub enum ParseError {
     MissingOParen,
     MissingCParen,
     MisplacedComma,
-    NonAssociative,
+    NonAssoc,
     UnknownToken(String),
 }
 
@@ -124,7 +124,7 @@ impl MathParser {
                         } else {
                             match assoc_rhs {
                                 Assoc::Right => break,
-                                Assoc::None => return Err(ParseError::NonAssociative),
+                                Assoc::None => return Err(ParseError::NonAssoc),
                                 Assoc::Left => out.push(stack.pop().unwrap())
                             }
                         }

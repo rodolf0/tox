@@ -3,5 +3,6 @@ name = "tox"
 version = "0.0.2"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 
-[dependencies.linenoise-rust]
-linenoise-rust = "0.1.11"
+[dependencies]
+linenoise-rust = "*"
+rand = "*"

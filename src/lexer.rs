@@ -27,6 +27,12 @@ pub struct MathToken {
     pub lexcomp: LexComp
 }
 
+impl MathToken {
+    pub fn is(&self, lexcomp: &LexComp) -> bool {
+        self.lexcomp == *lexcomp
+    }
+}
+
 pub type MathLexer = Scanner<MathToken>;
 
 struct TokenReader {

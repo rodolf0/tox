@@ -24,7 +24,7 @@ pub struct Token {
 
 impl Token {
     pub fn is(&self, lexcomp: &LexComp) -> bool {
-        self.lxtoken.lexcomp == *lexcomp
+        self.lxtoken.is(lexcomp)
     }
 }
 

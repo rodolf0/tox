@@ -42,7 +42,6 @@ impl MathContext {
     pub fn eval(&self, rpn: &RPNExpr) -> Result<f64, EvalErr> {
         let mut operands = Vec::new();
         for &Token{lxtoken: ref token, arity} in rpn.iter() {
-
             match token.lexcomp {
                 LexComp::Number => {
                     match f64::from_str(&token.lexeme[..]) {
@@ -88,9 +87,9 @@ impl MathContext {
                         return Err(EvalErr::WrongNumberOfArgs);
                     }
                     let fname = &token.lexeme[..];
-                    let args = operands.iter().cloned().take(arity).collect::<Vec<f64>>();
-                    let ndrop = operands.len() - arity;
-                    operands.truncate(ndrop);
+                    let start = operands.len() - arity;
+                    let args = operands[start..].iter().cloned().collect::<Vec<f64>>();
+                    operands.truncate(start);
                     match Self::eval_fn(fname, args) {
                         Ok(n) => operands.push(n),
                         Err(e) => return Err(e)
@@ -105,7 +104,7 @@ impl MathContext {
 
     fn eval_fn(fname: &str, args: Vec<f64>) -> Result<f64, EvalErr> {
         match fname {
-            "sin" => nargs!(args.len() == 1, Ok(args[0].cos())),
+            "sin" => nargs!(args.len() == 1, Ok(args[0].sin())),
             "cos" => nargs!(args.len() == 1, Ok(args[0].cos())),
             "atan2" => nargs!(args.len() == 2, Ok(args[0].atan2(args[1]))),
             "max" => nargs!(args.len() > 0,

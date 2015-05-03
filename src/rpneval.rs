@@ -4,7 +4,6 @@ use std::str::FromStr;
 
 use lexer::LexComp;
 use shunting::{RPNExpr, Token};
-use mathlink;
 
 #[derive(Debug)]
 pub enum EvalErr {
@@ -118,5 +117,30 @@ impl MathContext {
                 Err(e) => Err(EvalErr::LinkError(e))
             }
         }
+    }
+}
+
+#[cfg(feature="dynlink-eval")]
+mod mathlink {
+    use std::dynamic_lib::DynamicLibrary;
+    use std::mem;
+
+    pub fn link_fn(fname: &str) -> Result<fn(f64) -> f64, String> {
+        match DynamicLibrary::open(None) {
+            Ok(lib) => unsafe {
+                match lib.symbol(fname) {
+                    Ok(f) => Ok(mem::transmute::<*mut u8, fn(f64) -> f64>(f)),
+                    Err(e) => Err(e)
+                }
+            },
+            Err(e) => Err(e)
+        }
+    }
+}
+
+#[cfg(not(feature="dynlink-eval"))]
+mod mathlink {
+    pub fn link_fn(fname: &str) -> Result<fn(f64) -> f64, String> {
+        Err(format!("Dynamic linking not enabled, unknown function: {}", fname))
     }
 }

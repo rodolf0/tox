@@ -1,4 +1,4 @@
-#![feature(std_misc)] // for std::dynamic_lib ONLY!
+#![cfg_attr(feature="dynlink-eval", feature(std_misc))]
 pub mod scanner;
 mod scanner_test;
 
@@ -12,4 +12,3 @@ pub mod shunting;
 mod shunting_test;
 
 pub mod rpneval;
-pub mod mathlink;

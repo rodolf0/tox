@@ -1,3 +1,4 @@
+use std::ops;
 use lexer::{MathLexer, MathToken, LexComp};
 
 #[derive(PartialEq, Debug)]
@@ -28,7 +29,16 @@ impl Token {
     }
 }
 
-pub type RPNExpr = Vec<Token>;
+pub struct RPNExpr {
+    expr: Vec<Token>
+}
+
+impl ops::Deref for RPNExpr {
+    type Target = Vec<Token>;
+    fn deref<'a>(&'a self) -> &'a Vec<Token> {
+        &self.expr
+    }
+}
 
 pub struct MathParser;
 
@@ -141,6 +151,6 @@ impl MathParser {
             }
             out.push(top);
         }
-        Ok(out)
+        Ok(RPNExpr{expr: out})
     }
 }

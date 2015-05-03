@@ -111,7 +111,7 @@ impl MathContext {
             "min" => nargs!(args.len() > 0,
                             Ok(args[1..].iter().fold(args[0], |a, &item| a.min(item)))),
             "abs" => nargs!(args.len() == 1, Ok(f64::abs(args[0]))),
-            "rand" => nargs!(args.len() == 1, Ok(rand::random::<f64>())),
+            "rand" => nargs!(args.len() == 1, Ok(args[0] * rand::random::<f64>())),
             _ => match mathlink::link_fn(fname) {
                 Ok(func) => nargs!(args.len() == 1, Ok(func(args[0]))),
                 Err(e) => Err(EvalErr::LinkError(e))

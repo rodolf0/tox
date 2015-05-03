@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 use lexer::{LexComp, MathToken, MathLexer};
 
 #[test]

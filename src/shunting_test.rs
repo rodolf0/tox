@@ -1,11 +1,10 @@
-#![cfg(test)]
 use lexer::{LexComp, MathToken};
 use shunting::{Token, ParseError};
 use shunting::MathParser;
 
 #[test]
 fn test_parse1() {
-    let rpn = MathParser::parse_str("3+4*2/-(1-5)^2^3").ok().unwrap();
+    let rpn = MathParser::parse_str("3+4*2/-(1-5)^2^3").unwrap();
     let expect = [
         ("3", LexComp::Number),
         ("4", LexComp::Number),
@@ -31,7 +30,7 @@ fn test_parse1() {
 
 #[test]
 fn test_parse2() {
-    let rpn = MathParser::parse_str("3.4e-2 * sin(x)/(7! % -4) * max(2, x)").ok().unwrap();
+    let rpn = MathParser::parse_str("3.4e-2 * sin(x)/(7! % -4) * max(2, x)").unwrap();
     let expect = [
         ("3.4e-2", LexComp::Number),
         ("x", LexComp::Variable),
@@ -57,7 +56,7 @@ fn test_parse2() {
 
 #[test]
 fn test_parse3() {
-    let rpn = MathParser::parse_str("sqrt(-(1i-x^2) / (1 + x^2))").ok().unwrap();
+    let rpn = MathParser::parse_str("sqrt(-(1i-x^2) / (1 + x^2))").unwrap();
     let expect = [
         ("1i", LexComp::Number),
         ("x", LexComp::Variable),
@@ -96,7 +95,7 @@ fn bad_parse() {
 fn check_arity() {
     use std::collections::HashMap;
     let rpn = MathParser::parse_str("sin(1)+(max(2, gamma(3.5), gcd(24, 8))+sum(i,0,10))");
-    let mut rpn = rpn.ok().unwrap();
+    let rpn = rpn.unwrap();
     let mut expect = HashMap::new();
     expect.insert("sin", 1);
     expect.insert("max", 3);
@@ -104,9 +103,9 @@ fn check_arity() {
     expect.insert("gcd", 2);
     expect.insert("sum", 3);
 
-    while let Some(tok) = rpn.pop() {
-        if tok.lxtoken.lexcomp == LexComp::Function {
-            let expected_arity = expect.get(&tok.lxtoken.lexeme[..]);
+    for tok in rpn.iter() {
+        if tok.is(&LexComp::Function) {
+            let expected_arity = expect.get(&tok.lexeme[..]);
             assert_eq!(*expected_arity.unwrap(), tok.arity);
         }
     }

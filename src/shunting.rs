@@ -11,7 +11,7 @@ pub enum ParseError {
 }
 
 #[derive(PartialEq, Debug)]
-enum Assoc {
+pub enum Assoc {
     Left,
     Right,
     None
@@ -27,8 +27,20 @@ impl Token {
     pub fn is(&self, lexcomp: &LexComp) -> bool {
         self.lxtoken.is(lexcomp)
     }
+
+    pub fn precedence(&self) -> (usize, Assoc) {
+        MathParser::precedence(&self.lxtoken.lexcomp)
+    }
 }
 
+impl ops::Deref for Token {
+    type Target = MathToken;
+    fn deref<'a>(&'a self) -> &'a MathToken {
+        &self.lxtoken
+    }
+}
+
+#[derive(PartialEq, Debug)]
 pub struct RPNExpr {
     expr: Vec<Token>
 }

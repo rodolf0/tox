@@ -8,6 +8,19 @@ pub struct Scanner<T: Clone> {
     pos: isize,
 }
 
+impl<T: Clone> Iterator for Scanner<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.pos += 1;
+        self.prep_buffer();
+        let blen = self.buf.len() as isize;
+        if self.pos >= blen {
+            self.pos = blen;
+        }
+        self.curr()
+    }
+}
+
 impl<T: Clone> Scanner<T> {
     pub fn new(source: Box<Nexter<T>>) -> Scanner<T> {
         Scanner{src: Some(source), buf: Vec::new(), pos: -1}
@@ -42,16 +55,6 @@ impl<T: Clone> Scanner<T> {
                 }
             }
         }
-    }
-
-    pub fn next(&mut self) -> Option<T> {
-        self.pos += 1;
-        self.prep_buffer();
-        let blen = self.buf.len() as isize;
-        if self.pos >= blen {
-            self.pos = blen;
-        }
-        self.curr()
     }
 
     pub fn prev(&mut self) -> Option<T> {

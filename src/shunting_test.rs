@@ -1,5 +1,5 @@
-use lexer::{LexComp, MathToken};
-use shunting::{Token, ParseError};
+use lexer::LexComp;
+use shunting::ParseError;
 use shunting::MathParser;
 
 #[test]
@@ -22,9 +22,8 @@ fn test_parse1() {
         ("+", LexComp::Plus),
     ];
     for (i, &(ref lexeme, ref lexcomp)) in expect.iter().enumerate() {
-        let Token{lxtoken: MathToken{lexeme: ref lx, lexcomp: ref lc }, arity: _} = rpn[i];
-        assert_eq!(*lexcomp, *lc);
-        assert_eq!(*lexeme, *lx);
+        assert!(rpn[i].is(lexcomp));
+        assert_eq!(rpn[i].lexeme, *lexeme);
     }
 }
 
@@ -48,9 +47,8 @@ fn test_parse2() {
         ("*", LexComp::Times),
     ];
     for (i, &(ref lexeme, ref lexcomp)) in expect.iter().enumerate() {
-        let Token{lxtoken: MathToken{lexeme: ref lx, lexcomp: ref lc }, arity: _} = rpn[i];
-        assert_eq!(*lexcomp, *lc);
-        assert_eq!(*lexeme, *lx);
+        assert!(rpn[i].is(lexcomp));
+        assert_eq!(rpn[i].lexeme, *lexeme);
     }
 }
 
@@ -73,9 +71,8 @@ fn test_parse3() {
         ("sqrt", LexComp::Function),
     ];
     for (i, &(ref lexeme, ref lexcomp)) in expect.iter().enumerate() {
-        let Token{lxtoken: MathToken{lexeme: ref lx, lexcomp: ref lc }, arity: _} = rpn[i];
-        assert_eq!(*lexcomp, *lc);
-        assert_eq!(*lexeme, *lx);
+        assert!(rpn[i].is(lexcomp));
+        assert_eq!(rpn[i].lexeme, *lexeme);
     }
 }
 

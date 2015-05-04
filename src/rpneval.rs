@@ -40,7 +40,7 @@ impl MathContext {
 
     pub fn eval(&self, rpn: &RPNExpr) -> Result<f64, EvalErr> {
         let mut operands = Vec::new();
-        for &Token{lxtoken: ref token, arity} in rpn.iter() {
+        for &Token{mtoken: ref token, arity} in rpn.iter() {
             match token.lexcomp {
                 LexComp::Number => {
                     match f64::from_str(&token.lexeme[..]) {

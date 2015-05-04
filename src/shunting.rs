@@ -17,26 +17,26 @@ pub enum Assoc {
     None
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Token {
-    pub lxtoken: MathToken,
+    pub mtoken: MathToken,
     pub arity: usize
 }
 
 impl Token {
     pub fn is(&self, lexcomp: &LexComp) -> bool {
-        self.lxtoken.is(lexcomp)
+        self.mtoken.is(lexcomp)
     }
 
     pub fn precedence(&self) -> (usize, Assoc) {
-        MathParser::precedence(&self.lxtoken.lexcomp)
+        MathParser::precedence(&self.mtoken.lexcomp)
     }
 }
 
 impl ops::Deref for Token {
     type Target = MathToken;
     fn deref<'a>(&'a self) -> &'a MathToken {
-        &self.lxtoken
+        &self.mtoken
     }
 }
 
@@ -98,8 +98,8 @@ impl MathParser {
         while let Some(lextok) = lexer.next() {
             match lextok.lexcomp {
                 LexComp::Number |
-                LexComp::Variable => out.push(Token{lxtoken: lextok, arity: 0}),
-                LexComp::OParen => stack.push(Token{lxtoken: lextok, arity: 0}),
+                LexComp::Variable => out.push(Token{mtoken: lextok, arity: 0}),
+                LexComp::OParen => stack.push(Token{mtoken: lextok, arity: 0}),
                 LexComp::Comma => {
                     while Self::some_not(&stack.last(), &LexComp::OParen) {
                         out.push(stack.pop().unwrap());
@@ -122,7 +122,7 @@ impl MathParser {
                     }
                 },
                 LexComp::Function => {
-                    stack.push(Token{lxtoken: lextok, arity: 0});
+                    stack.push(Token{mtoken: lextok, arity: 0});
                     arity.push(1);
                 },
                 LexComp::Plus   |
@@ -137,7 +137,7 @@ impl MathParser {
                     while stack.len() > 0 {
                         let (prec_lhs, _) = {
                             let top = stack.last().unwrap();
-                            Self::precedence(&top.lxtoken.lexcomp)
+                            Self::precedence(&top.mtoken.lexcomp)
                         };
                         if prec_rhs > prec_lhs {
                             break;
@@ -151,7 +151,7 @@ impl MathParser {
                             }
                         }
                     }
-                    stack.push(Token{lxtoken: lextok, arity: 0});
+                    stack.push(Token{mtoken: lextok, arity: 0});
                 },
 
                 _ => return Err(ParseError::UnknownToken(lextok.lexeme))

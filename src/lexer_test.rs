@@ -1,4 +1,4 @@
-use lexer::{LexComp, MathToken, MathLexer};
+use lexer::{LexComp, MathLexer};
 
 #[test]
 fn test1() {
@@ -22,9 +22,9 @@ fn test1() {
         ("3", LexComp::Number),
     ];
     for &(ref lexeme, ref lexcomp) in expect.iter() {
-        let MathToken{lexeme: lx, lexcomp: lc} = ml.next().unwrap();
-        assert_eq!(lx, *lexeme);
-        assert_eq!(lc, *lexcomp);
+        let tok = ml.next().unwrap();
+        assert!(tok.is(lexcomp));
+        assert_eq!(tok.lexeme, *lexeme);
     }
     assert_eq!(ml.next(), None);
 }
@@ -56,9 +56,9 @@ fn test2() {
         (")", LexComp::CParen),
     ];
     for &(ref lexeme, ref lexcomp) in expect.iter() {
-        let MathToken{lexeme: lx, lexcomp: lc} = ml.next().unwrap();
-        assert_eq!(lx, *lexeme);
-        assert_eq!(lc, *lexcomp);
+        let tok = ml.next().unwrap();
+        assert!(tok.is(lexcomp));
+        assert_eq!(tok.lexeme, *lexeme);
     }
     assert_eq!(ml.next(), None);
 }
@@ -88,9 +88,9 @@ fn test3() {
         (")", LexComp::CParen),
     ];
     for &(ref lexeme, ref lexcomp) in expect.iter() {
-        let MathToken{lexeme: lx, lexcomp: lc} = ml.next().unwrap();
-        assert_eq!(lx, *lexeme);
-        assert_eq!(lc, *lexcomp);
+        let tok = ml.next().unwrap();
+        assert!(tok.is(lexcomp));
+        assert_eq!(tok.lexeme, *lexeme);
     }
     assert_eq!(ml.next(), None);
 }
@@ -106,9 +106,9 @@ fn test4() {
         ("y", LexComp::Variable),
     ];
     for &(ref lexeme, ref lexcomp) in expect.iter() {
-        let MathToken{lexeme: lx, lexcomp: lc} = ml.next().unwrap();
-        assert_eq!(lx, *lexeme);
-        assert_eq!(lc, *lexcomp);
+        let tok = ml.next().unwrap();
+        assert!(tok.is(lexcomp));
+        assert_eq!(tok.lexeme, *lexeme);
     }
     assert_eq!(ml.next(), None);
 }
@@ -127,9 +127,9 @@ fn test5() {
         (")", LexComp::CParen),
     ];
     for &(ref lexeme, ref lexcomp) in expect.iter() {
-        let MathToken{lexeme: lx, lexcomp: lc} = ml.next().unwrap();
-        assert_eq!(lx, *lexeme);
-        assert_eq!(lc, *lexcomp);
+        let tok = ml.next().unwrap();
+        assert!(tok.is(lexcomp));
+        assert_eq!(tok.lexeme, *lexeme);
     }
     assert_eq!(ml.next(), None);
 }

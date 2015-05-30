@@ -1,135 +1,130 @@
-use lexer::{LexComp, MathLexer};
+use lexer::{Lexer, Token};
 
 #[test]
 fn test1() {
-    let mut ml = MathLexer::lex_str("3+4*2/-(1-5)^2^3");
+    let mut lx = Lexer::from_str("3+4*2/-(1-5)^2^3");
     let expect = [
-        ("3", LexComp::Number),
-        ("+", LexComp::Plus),
-        ("4", LexComp::Number),
-        ("*", LexComp::Times),
-        ("2", LexComp::Number),
-        ("/", LexComp::Divide),
-        ("-", LexComp::UMinus),
-        ("(", LexComp::OParen),
-        ("1", LexComp::Number),
-        ("-", LexComp::Minus),
-        ("5", LexComp::Number),
-        (")", LexComp::CParen),
-        ("^", LexComp::Power),
-        ("2", LexComp::Number),
-        ("^", LexComp::Power),
-        ("3", LexComp::Number),
+        Token::Number(3.0),
+        Token::BinaryOp("+".to_string()),
+        Token::Number(4.0),
+        Token::BinaryOp("*".to_string()),
+        Token::Number(2.0),
+        Token::BinaryOp("/".to_string()),
+        Token::UnaryOp("-".to_string()),
+        Token::OParen,
+        Token::Number(1.0),
+        Token::BinaryOp("-".to_string()),
+        Token::Number(5.0),
+        Token::CParen,
+        Token::BinaryOp("^".to_string()),
+        Token::Number(2.0),
+        Token::BinaryOp("^".to_string()),
+        Token::Number(3.0),
     ];
-    for &(ref lexeme, ref lexcomp) in expect.iter() {
-        let tok = ml.next().unwrap();
-        assert!(tok.is(lexcomp));
-        assert_eq!(tok.lexeme, *lexeme);
+    for exp_token in expect.iter() {
+        let token = lx.next().unwrap();
+        assert_eq!(*exp_token, token);
     }
-    assert_eq!(ml.next(), None);
+    assert_eq!(lx.next(), None);
 }
 
 #[test]
 fn test2() {
-    let mut ml = MathLexer::lex_str("3.4e-2 * sin(x)/(7! % -4) * max(2, x)");
+    let mut lx = Lexer::from_str("3.4e-2 * sin(x)/(7! % -4) * max(2, x)");
     let expect = [
-        ("3.4e-2", LexComp::Number),
-        ("*", LexComp::Times),
-        ("sin", LexComp::Function),
-        ("(", LexComp::OParen),
-        ("x", LexComp::Variable),
-        (")", LexComp::CParen),
-        ("/", LexComp::Divide),
-        ("(", LexComp::OParen),
-        ("7", LexComp::Number),
-        ("!", LexComp::Factorial),
-        ("%", LexComp::Modulo),
-        ("-", LexComp::UMinus),
-        ("4", LexComp::Number),
-        (")", LexComp::CParen),
-        ("*", LexComp::Times),
-        ("max", LexComp::Function),
-        ("(", LexComp::OParen),
-        ("2", LexComp::Number),
-        (",", LexComp::Comma),
-        ("x", LexComp::Variable),
-        (")", LexComp::CParen),
+        Token::Number(3.4e-2),
+        Token::BinaryOp("*".to_string()),
+        Token::Function("sin".to_string()),
+        Token::OParen,
+        Token::Variable("x".to_string()),
+        Token::CParen,
+        Token::BinaryOp("/".to_string()),
+        Token::OParen,
+        Token::Number(7.0),
+        Token::UnaryOp("!".to_string()),
+        Token::BinaryOp("%".to_string()),
+        Token::UnaryOp("-".to_string()),
+        Token::Number(4.0),
+        Token::CParen,
+        Token::BinaryOp("*".to_string()),
+        Token::Function("max".to_string()),
+        Token::OParen,
+        Token::Number(2.0),
+        Token::Comma,
+        Token::Variable("x".to_string()),
+        Token::CParen,
     ];
-    for &(ref lexeme, ref lexcomp) in expect.iter() {
-        let tok = ml.next().unwrap();
-        assert!(tok.is(lexcomp));
-        assert_eq!(tok.lexeme, *lexeme);
+    for exp_token in expect.iter() {
+        let token = lx.next().unwrap();
+        assert_eq!(*exp_token, token);
     }
-    assert_eq!(ml.next(), None);
+    assert_eq!(lx.next(), None);
 }
 
 #[test]
 fn test3() {
-    let mut ml = MathLexer::lex_str("sqrt(-(1i-x^2) / (1 + x^2))");
+    let mut lx = Lexer::from_str("sqrt(-(1-x^2) / (1 + x^2))");
     let expect = [
-        ("sqrt", LexComp::Function),
-        ("(", LexComp::OParen),
-        ("-", LexComp::UMinus),
-        ("(", LexComp::OParen),
-        ("1i", LexComp::Number),
-        ("-", LexComp::Minus),
-        ("x", LexComp::Variable),
-        ("^", LexComp::Power),
-        ("2", LexComp::Number),
-        (")", LexComp::CParen),
-        ("/", LexComp::Divide),
-        ("(", LexComp::OParen),
-        ("1", LexComp::Number),
-        ("+", LexComp::Plus),
-        ("x", LexComp::Variable),
-        ("^", LexComp::Power),
-        ("2", LexComp::Number),
-        (")", LexComp::CParen),
-        (")", LexComp::CParen),
+        Token::Function("sqrt".to_string()),
+        Token::OParen,
+        Token::UnaryOp("-".to_string()),
+        Token::OParen,
+        Token::Number(1.0),
+        Token::BinaryOp("-".to_string()),
+        Token::Variable("x".to_string()),
+        Token::BinaryOp("^".to_string()),
+        Token::Number(2.0),
+        Token::CParen,
+        Token::BinaryOp("/".to_string()),
+        Token::OParen,
+        Token::Number(1.0),
+        Token::BinaryOp("+".to_string()),
+        Token::Variable("x".to_string()),
+        Token::BinaryOp("^".to_string()),
+        Token::Number(2.0),
+        Token::CParen,
+        Token::CParen,
     ];
-    for &(ref lexeme, ref lexcomp) in expect.iter() {
-        let tok = ml.next().unwrap();
-        assert!(tok.is(lexcomp));
-        assert_eq!(tok.lexeme, *lexeme);
+    for exp_token in expect.iter() {
+        let token = lx.next().unwrap();
+        assert_eq!(*exp_token, token);
     }
-    assert_eq!(ml.next(), None);
+    assert_eq!(lx.next(), None);
 }
 
 #[test]
 fn test4() {
-    let mut ml = MathLexer::lex_str("x---y");
+    let mut lx = Lexer::from_str("x---y");
     let expect = [
-        ("x", LexComp::Variable),
-        ("-", LexComp::Minus),
-        ("-", LexComp::UMinus),
-        ("-", LexComp::UMinus),
-        ("y", LexComp::Variable),
+        Token::Variable("x".to_string()),
+        Token::BinaryOp("-".to_string()),
+        Token::UnaryOp("-".to_string()),
+        Token::UnaryOp("-".to_string()),
+        Token::Variable("y".to_string()),
     ];
-    for &(ref lexeme, ref lexcomp) in expect.iter() {
-        let tok = ml.next().unwrap();
-        assert!(tok.is(lexcomp));
-        assert_eq!(tok.lexeme, *lexeme);
+    for exp_token in expect.iter() {
+        let token = lx.next().unwrap();
+        assert_eq!(*exp_token, token);
     }
-    assert_eq!(ml.next(), None);
+    assert_eq!(lx.next(), None);
 }
 
 #[test]
 fn test5() {
-    let mut ml = MathLexer::lex_str("max(0, 1, 3)");
+    let mut lx = Lexer::from_str("max(0, 1, 3)");
     let expect = [
-        ("max", LexComp::Function),
-        ("(", LexComp::OParen),
-        ("0", LexComp::Number),
-        (",", LexComp::Comma),
-        ("1", LexComp::Number),
-        (",", LexComp::Comma),
-        ("3", LexComp::Number),
-        (")", LexComp::CParen),
+        Token::Function("max".to_string()),
+        Token::OParen,
+        Token::Number(0.0),
+        Token::Comma,
+        Token::Number(1.0),
+        Token::Comma,
+        Token::Number(3.0),
+        Token::CParen,
     ];
-    for &(ref lexeme, ref lexcomp) in expect.iter() {
-        let tok = ml.next().unwrap();
-        assert!(tok.is(lexcomp));
-        assert_eq!(tok.lexeme, *lexeme);
+    for exp_token in expect.iter() {
+        let token = lx.next().unwrap();
+        assert_eq!(*exp_token, token);
     }
-    assert_eq!(ml.next(), None);
+    assert_eq!(lx.next(), None);
 }

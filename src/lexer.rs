@@ -1,130 +1,159 @@
-use mathscanner::MathScanner;
 use scanner::{Scanner, Nexter};
+use std::ops::{Deref, DerefMut};
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum LexComp {
-    Unknown,
-    Number,
-    Variable,
-    Function,
+pub enum Token {
+    Unknown(String),
+    Number(f64),
+    Variable(String),
+    Function(String),
     OParen,
     CParen,
     Comma,
-    Plus,
-    Minus,
-    Times,
-    Divide,
-    Modulo,
-    Power,
-    UMinus,
-    Factorial,
-    Assign,
+    BinaryOp(String),
+    UnaryOp(String),
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub struct MathToken {
-    pub lexeme: String,
-    pub lexcomp: LexComp
+struct Tokenizer {
+    src: Scanner<char>,
+    prev: Option<Token>
 }
 
-impl MathToken {
-    pub fn is(&self, lexcomp: &LexComp) -> bool {
-        self.lexcomp == *lexcomp
+pub struct Lexer {
+    output: Scanner<Token>,
+}
+
+impl Deref for Lexer {
+    type Target = Scanner<Token>;
+    fn deref<'a>(&'a self) -> &'a Scanner<Token> {
+        &self.output
+    }
+}
+impl DerefMut for Lexer {
+    fn deref_mut<'a>(&'a mut self) -> &'a mut Scanner<Token> {
+        &mut self.output
     }
 }
 
-pub type MathLexer = Scanner<MathToken>;
-
-struct TokenReader {
-    src: MathScanner,
-    prev: Option<MathToken>
-}
-
-impl MathLexer {
-    pub fn lex_str(input: &str) -> MathLexer {
-        Self::new(Box::new(
-            TokenReader{src: MathScanner::from_str(input),
-                        prev: None}))
+impl Lexer {
+    pub fn from_str(source: &str) -> Lexer {
+        let tokenizer = Box::new(
+            Tokenizer{src: Scanner::from_str(source), prev: None});
+        Lexer{output: Scanner::new(tokenizer)}
     }
 }
 
-impl TokenReader {
-    fn lex_varfunc(&mut self) -> Option<MathToken> {
-        match self.src.scan_id() {
-            Some(name) => if self.src.peek() == Some('(') {
-                Some(MathToken{lexeme: name,
-                               lexcomp: LexComp::Function})
-            } else {
-                Some(MathToken{lexeme: name,
-                               lexcomp: LexComp::Variable})
-            },
-            _ => None
-        }
-    }
-
-    // when would a minus be unary? we need to know the prev token
-    fn makes_unary_minus(prev: &Option<MathToken>) -> bool {
-        if let Some(ref mtok) = *prev {
-            match mtok.lexcomp {
-                LexComp::Number => false,
-                LexComp::Variable => false,
-                LexComp::CParen => false,
-                _ => true
-            }
-        } else {
-            true // if prev is None '-' is at begining of buffer
-        }
-    }
-
-    fn lex_operator(&mut self) -> Option<MathToken> {
-        let tok = match self.src.accept_chars("+-*/%^!(),=") {
-            None => return None,
-            Some('+') => MathToken{lexeme: "+".to_string(), lexcomp: LexComp::Plus},
-            Some('-') => if TokenReader::makes_unary_minus(&self.prev) {
-                MathToken{lexeme: "-".to_string(), lexcomp: LexComp::UMinus}
-            } else {
-                MathToken{lexeme: "-".to_string(), lexcomp: LexComp::Minus}
-            },
-            Some('*') => MathToken{lexeme: "*".to_string(), lexcomp: LexComp::Times},
-            Some('/') => MathToken{lexeme: "/".to_string(), lexcomp: LexComp::Divide},
-            Some('%') => MathToken{lexeme: "%".to_string(), lexcomp: LexComp::Modulo},
-            Some('^') => MathToken{lexeme: "^".to_string(), lexcomp: LexComp::Power},
-            Some('!') => MathToken{lexeme: "!".to_string(), lexcomp: LexComp::Factorial},
-            Some('(') => MathToken{lexeme: "(".to_string(), lexcomp: LexComp::OParen},
-            Some(')') => MathToken{lexeme: ")".to_string(), lexcomp: LexComp::CParen},
-            Some(',') => MathToken{lexeme: ",".to_string(), lexcomp: LexComp::Comma},
-            Some('=') => MathToken{lexeme: "=".to_string(), lexcomp: LexComp::Assign},
-            _ => unreachable!()
-        };
-        Some(tok)
-    }
-
-    fn lex_number(&mut self) -> Option<MathToken> {
-        if let Some(number) = self.src.scan_exotic_int() {
-            Some(MathToken{lexeme: number,
-                           lexcomp: LexComp::Number})
-        } else if let Some(number) = self.src.scan_number() {
-            Some(MathToken{lexeme: number,
-                           lexcomp: LexComp::Number})
-        } else {
-            None
-        }
-    }
-}
-
-impl Nexter<MathToken> for TokenReader {
-    fn get_item(&mut self) -> Option<MathToken> {
+impl Nexter<Token> for Tokenizer {
+    fn get_item(&mut self) -> Option<Token> {
         self.src.ignore_ws();
-        let mathtok = self.lex_varfunc().
-            or_else(|| self.lex_operator()).
-            or_else(|| self.lex_number()).
-            or_else(|| if let Some(_) = self.src.next() {
-                Some(MathToken{lexeme: self.src.extract_string(),
-                               lexcomp: LexComp::Unknown})
+        let token = self.match_varfunc().
+            or_else(|| self.match_operator()).
+            or_else(|| self.match_number()).
+            or_else(|| if self.src.next().is_some() {
+                Some(Token::Unknown(self.src.extract_string()))
             } else {
                 None
             });
-        self.prev = mathtok.clone();
-        mathtok
+        self.prev = token.clone();
+        token
+    }
+}
+
+impl Tokenizer {
+    fn match_varfunc(&mut self) -> Option<Token> {
+        let alfa = concat!("abcdefghijklmnopqrstuvwxyz",
+                           "ABCDEFGHIJKLMNOPQRSTUVWXYZ_");
+        let alnum = concat!("0123456789",
+                            "abcdefghijklmnopqrstuvwxyz",
+                            "ABCDEFGHIJKLMNOPQRSTUVWXYZ_");
+        if self.src.accept_chars(alfa).is_some() {
+            self.src.skip_chars(alnum);
+            if self.src.peek() == Some('(') {
+                return Some(Token::Function(self.src.extract_string()));
+            }
+            return Some(Token::Variable(self.src.extract_string()));
+        }
+        None
+    }
+
+    fn match_number(&mut self) -> Option<Token> {
+        use std::str::FromStr;
+        if let Some(num) = self._match_number() {
+            if let Some(fnum) = f64::from_str(&num).ok() {
+                return Some(Token::Number(fnum));
+            }
+        }
+        None
+    }
+
+    fn _match_numeric(&mut self) -> Option<String> {
+        let backtrack = self.src.pos();
+        if self.src.accept_chars("0").is_some() {
+            if self.src.accept_chars("xob").is_some() {
+                let digits = match self.src.curr().unwrap() {
+                    'x' => "0123456789ABCDEF",
+                    'o' => "01234567",
+                    'b' => "01",
+                    _ => unreachable!()
+                };
+                if self.src.skip_chars(digits) {
+                    return Some(self.src.extract_string());
+                }
+            }
+            self.src.set_pos(backtrack); // was not an ex-int
+        }
+        None
+    }
+
+    fn _match_number(&mut self) -> Option<String> {
+        let backtrack = self.src.pos();
+        let digits = "0123456789";
+        // optional sign
+        self.src.accept_chars("+-");
+        // require integer part
+        if !self.src.skip_chars(digits) {
+            self.src.set_pos(backtrack);
+            return None;
+        }
+        // check for fractional part, else it's just an integer
+        let backtrack = self.src.pos();
+        if self.src.accept_chars(".").is_some() && !self.src.skip_chars(digits) {
+            self.src.set_pos(backtrack);
+            return Some(self.src.extract_string()); // integer
+        }
+        // check for exponent part
+        let backtrack = self.src.pos();
+        if self.src.accept_chars("e").is_some() {
+            self.src.accept_chars("+-"); // exponent sign is optional
+            if !self.src.skip_chars(digits) {
+                self.src.set_pos(backtrack);
+                return Some(self.src.extract_string()); //float
+            }
+        }
+        self.src.accept_chars("i"); // accept imaginary numbers
+        Some(self.src.extract_string())
+    }
+
+    fn match_operator(&mut self) -> Option<Token> {
+        let token = match self.src.accept_chars("+-*/%^!(),=") {
+            Some('(') => Token::OParen,
+            Some(')') => Token::CParen,
+            Some(',') => Token::Comma,
+            Some('!') => Token::UnaryOp('!'.to_string()),
+            Some('-') if Self::_makes_unary(&self.prev) => Token::UnaryOp('-'.to_string()),
+            Some(bop) => Token::BinaryOp(bop.to_string()),
+            None => return None
+        };
+        Some(token)
+    }
+
+    // when would a minus be unary? we need to know the prev token
+    fn _makes_unary(prev: &Option<Token>) -> bool {
+        match *prev {
+            Some(Token::Number(_)) => false,
+            Some(Token::Variable(_)) => false,
+            Some(Token::CParen) => false,
+            _ => true
+        }
     }
 }

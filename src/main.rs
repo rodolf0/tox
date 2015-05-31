@@ -3,12 +3,12 @@ extern crate tox;
 
 #[cfg(not(test))]
 mod repl {
-    use tox::lexer::{MathLexer, LexComp};
-    use tox::shunting::MathParser;
+    use tox::lexer::{Lexer, Token};
+    use tox::parser::ShuntingParser;
     use tox::rpneval::MathContext;
 
     pub fn evalexpr(input: &str) {
-        match MathParser::parse_str(input) {
+        match ShuntingParser::parse_str(input) {
             Err(e) => println!("Parse error: {:?}", e),
             Ok(expr) => match MathContext::new().eval(&expr) {
                 Err(e) => println!("Eval error: {:?}", e),
@@ -18,23 +18,23 @@ mod repl {
     }
 
     pub fn parse_statement(cx: &mut MathContext, input: &str) {
-        let mut ml = MathLexer::lex_str(input);
+        let mut ml = Lexer::from_str(input);
         let backtrack = ml.pos();
-        if let (Some(var), Some(assig)) = (ml.next(), ml.next()) {
-            if var.is(&LexComp::Variable) && assig.is(&LexComp::Assign) {
-                match MathParser::parse(&mut ml) {
+        if let (Some(Token::Variable(var)), Some(assig)) = (ml.next(), ml.next()) {
+            if assig.is_op("=", 2) {
+                match ShuntingParser::parse(&mut ml) {
                     Err(e) => println!("Parse error: {:?}", e),
                     Ok(rpn) => match cx.eval(&rpn) {
                         Err(e) => println!("Eval error: {:?}", e),
-                        Ok(result) => cx.setvar(&var.lexeme[..], result)
+                        Ok(result) => cx.setvar(&var[..], result)
                     }
-                };
+                }
                 return;
             }
         }
         // wasn't assignment... try evaluating expression
         ml.set_pos(backtrack);
-        match MathParser::parse(&mut ml) {
+        match ShuntingParser::parse(&mut ml) {
             Err(e) => println!("Parse error: {:?}", e),
             Ok(rpn) => match cx.eval(&rpn) {
                 Err(e) => println!("Eval error: {:?}", e),

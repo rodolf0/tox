@@ -36,6 +36,13 @@ impl Token {
             _                               => (99, Assoc::None)
         }
     }
+
+    pub fn is_op(&self, opstr: &str, arity: usize) -> bool {
+        if let Token::Op(ref op, ar) = *self {
+            return op == opstr && arity == ar;
+        }
+        false
+    }
 }
 
 struct Tokenizer {

@@ -13,3 +13,5 @@ pub mod parser;
 mod parser_test;
 
 pub mod rpneval;
+#[cfg(test)]
+mod rpneval_test;

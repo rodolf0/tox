@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use lexer::Token;
 use parser::RPNExpr;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum EvalErr {
     UnknownVar(String),
     LinkError(String),

@@ -9,3 +9,4 @@ dynlink-eval = []
 [dependencies]
 linenoise-rust = "*"
 rand = "*"
+num = "*"

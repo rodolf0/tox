@@ -6,12 +6,10 @@ pub enum Token {
     Unknown(String),
     Number(f64),
     Variable(String),
-    Function(String),
+    Op(String, usize),
     OParen,
     CParen,
     Comma,
-    BinaryOp(String),
-    UnaryOp(String),
 }
 
 struct Tokenizer {
@@ -69,7 +67,7 @@ impl Tokenizer {
         if self.src.accept_chars(alfa).is_some() {
             self.src.skip_chars(alnum);
             if self.src.peek() == Some('(') {
-                return Some(Token::Function(self.src.extract_string()));
+                return Some(Token::Op(self.src.extract_string(), 0));
             }
             return Some(Token::Variable(self.src.extract_string()));
         }
@@ -139,9 +137,9 @@ impl Tokenizer {
             Some('(') => Token::OParen,
             Some(')') => Token::CParen,
             Some(',') => Token::Comma,
-            Some('!') => Token::UnaryOp('!'.to_string()),
-            Some('-') if Self::_makes_unary(&self.prev) => Token::UnaryOp('-'.to_string()),
-            Some(bop) => Token::BinaryOp(bop.to_string()),
+            Some('!') => Token::Op('!'.to_string(), 1),
+            Some('-') if Self::_makes_unary(&self.prev) => Token::Op('-'.to_string(), 1),
+            Some(bop) => Token::Op(bop.to_string(), 2),
             None => return None
         };
         Some(token)

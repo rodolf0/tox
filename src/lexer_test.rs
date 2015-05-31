@@ -34,7 +34,7 @@ fn test2() {
     let expect = [
         Token::Number(3.4e-2),
         Token::Op("*".to_string(), 2),
-        Token::Op("sin".to_string(), 0),
+        Token::Function("sin".to_string(), 0),
         Token::OParen,
         Token::Variable("x".to_string()),
         Token::CParen,
@@ -47,7 +47,7 @@ fn test2() {
         Token::Number(4.0),
         Token::CParen,
         Token::Op("*".to_string(), 2),
-        Token::Op("max".to_string(), 0),
+        Token::Function("max".to_string(), 0),
         Token::OParen,
         Token::Number(2.0),
         Token::Comma,
@@ -65,7 +65,7 @@ fn test2() {
 fn test3() {
     let mut lx = Lexer::from_str("sqrt(-(1-x^2) / (1 + x^2))");
     let expect = [
-        Token::Op("sqrt".to_string(), 0),
+        Token::Function("sqrt".to_string(), 0),
         Token::OParen,
         Token::Op("-".to_string(), 1),
         Token::OParen,
@@ -113,7 +113,7 @@ fn test4() {
 fn test5() {
     let mut lx = Lexer::from_str("max(0, 1, 3)");
     let expect = [
-        Token::Op("max".to_string(), 0),
+        Token::Function("max".to_string(), 0),
         Token::OParen,
         Token::Number(0.0),
         Token::Comma,

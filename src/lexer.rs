@@ -1,15 +1,41 @@
 use scanner::{Scanner, Nexter};
 use std::ops::{Deref, DerefMut};
 
+#[derive(PartialEq, Debug)]
+pub enum Assoc {
+    Left,
+    Right,
+    None
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum Token {
     Unknown(String),
     Number(f64),
     Variable(String),
+    Function(String, usize),
     Op(String, usize),
     OParen,
     CParen,
     Comma,
+}
+
+impl Token {
+    pub fn precedence(&self) -> (usize, Assoc) {
+        match *self {
+            Token::Op(ref o, 2) if o == "+" => (2, Assoc::Left),
+            Token::Op(ref o, 2) if o == "-" => (2, Assoc::Left),
+            Token::Op(ref o, 2) if o == "*" => (3, Assoc::Left),
+            Token::Op(ref o, 2) if o == "/" => (3, Assoc::Left),
+            Token::Op(ref o, 2) if o == "%" => (3, Assoc::Left),
+            Token::Op(ref o, 1) if o == "-" => (4, Assoc::Right), // unary minus
+            Token::Op(ref o, 2) if o == "^" => (5, Assoc::Right),
+            Token::Op(ref o, 1) if o == "!" => (6, Assoc::Left),  // factorial
+            Token::Function(_, _) |
+            Token::OParen                   => (1, Assoc::Left),  // grouping/fn
+            _                               => (99, Assoc::None)
+        }
+    }
 }
 
 struct Tokenizer {
@@ -23,14 +49,11 @@ pub struct Lexer {
 
 impl Deref for Lexer {
     type Target = Scanner<Token>;
-    fn deref<'a>(&'a self) -> &'a Scanner<Token> {
-        &self.output
-    }
+    fn deref<'a>(&'a self) -> &'a Scanner<Token> { &self.output }
 }
+
 impl DerefMut for Lexer {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut Scanner<Token> {
-        &mut self.output
-    }
+    fn deref_mut<'a>(&'a mut self) -> &'a mut Scanner<Token> { &mut self.output }
 }
 
 impl Lexer {
@@ -67,7 +90,7 @@ impl Tokenizer {
         if self.src.accept_chars(alfa).is_some() {
             self.src.skip_chars(alnum);
             if self.src.peek() == Some('(') {
-                return Some(Token::Op(self.src.extract_string(), 0));
+                return Some(Token::Function(self.src.extract_string(), 0));
             }
             return Some(Token::Variable(self.src.extract_string()));
         }
@@ -77,8 +100,9 @@ impl Tokenizer {
     fn match_number(&mut self) -> Option<Token> {
         use std::str::FromStr;
         if let Some(num) = self._match_number() {
-            if let Some(fnum) = f64::from_str(&num).ok() {
-                return Some(Token::Number(fnum));
+            return match f64::from_str(&num) {
+                Ok(fnum) => Some(Token::Number(fnum)),
+                Err(_) => Some(Token::Unknown(num)),
             }
         }
         None

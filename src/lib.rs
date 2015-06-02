@@ -15,3 +15,7 @@ mod parser_test;
 pub mod rpneval;
 #[cfg(test)]
 mod rpneval_test;
+
+pub mod lisp;
+#[cfg(test)]
+mod lisp_test;

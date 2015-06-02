@@ -28,8 +28,8 @@ impl MathContext {
     pub fn new() -> MathContext {
         use std::f64::consts;
         let mut cx = HashMap::new();
-        cx.insert("pi".to_string(), consts::PI);
-        cx.insert("e".to_string(), consts::E);
+        cx.insert(format!("pi"), consts::PI);
+        cx.insert(format!("e"), consts::E);
         MathContext{context: cx}
     }
 

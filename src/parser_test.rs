@@ -8,17 +8,17 @@ fn test_parse1() {
         Token::Number(3.0),
         Token::Number(4.0),
         Token::Number(2.0),
-        Token::Op("*".to_string(), 2),
+        Token::Op(format!("*"), 2),
         Token::Number(1.0),
         Token::Number(5.0),
-        Token::Op("-".to_string(), 2),
+        Token::Op(format!("-"), 2),
         Token::Number(2.0),
         Token::Number(3.0),
-        Token::Op("^".to_string(), 2),
-        Token::Op("^".to_string(), 2),
-        Token::Op("-".to_string(), 1),
-        Token::Op("/".to_string(), 2),
-        Token::Op("+".to_string(), 2),
+        Token::Op(format!("^"), 2),
+        Token::Op(format!("^"), 2),
+        Token::Op(format!("-"), 1),
+        Token::Op(format!("/"), 2),
+        Token::Op(format!("+"), 2),
     ];
     for (i, token) in expect.iter().enumerate() {
         assert_eq!(rpn[i], *token);
@@ -29,19 +29,19 @@ fn test_parse2() {
     let rpn = ShuntingParser::parse_str("3.4e-2 * sin(x)/(7! % -4) * max(2, x)").unwrap();
     let expect = [
         Token::Number(3.4e-2),
-        Token::Variable("x".to_string()),
-        Token::Function("sin".to_string(), 1),
-        Token::Op("*".to_string(), 2),
+        Token::Variable(format!("x")),
+        Token::Function(format!("sin"), 1),
+        Token::Op(format!("*"), 2),
         Token::Number(7.0),
-        Token::Op("!".to_string(), 1),
+        Token::Op(format!("!"), 1),
         Token::Number(4.0),
-        Token::Op("-".to_string(), 1),
-        Token::Op("%".to_string(), 2),
-        Token::Op("/".to_string(), 2),
+        Token::Op(format!("-"), 1),
+        Token::Op(format!("%"), 2),
+        Token::Op(format!("/"), 2),
         Token::Number(2.0),
-        Token::Variable("x".to_string()),
-        Token::Function("max".to_string(), 2),
-        Token::Op("*".to_string(), 2),
+        Token::Variable(format!("x")),
+        Token::Function(format!("max"), 2),
+        Token::Op(format!("*"), 2),
     ];
     for (i, token) in expect.iter().enumerate() {
         assert_eq!(rpn[i], *token);
@@ -53,18 +53,18 @@ fn test_parse3() {
     let rpn = ShuntingParser::parse_str("sqrt(-(1-x^2) / (1 + x^2))").unwrap();
     let expect = [
         Token::Number(1.0),
-        Token::Variable("x".to_string()),
+        Token::Variable(format!("x")),
         Token::Number(2.0),
-        Token::Op("^".to_string(), 2),
-        Token::Op("-".to_string(), 2),
-        Token::Op("-".to_string(), 1),
+        Token::Op(format!("^"), 2),
+        Token::Op(format!("-"), 2),
+        Token::Op(format!("-"), 1),
         Token::Number(1.0),
-        Token::Variable("x".to_string()),
+        Token::Variable(format!("x")),
         Token::Number(2.0),
-        Token::Op("^".to_string(), 2),
-        Token::Op("+".to_string(), 2),
-        Token::Op("/".to_string(), 2),
-        Token::Function("sqrt".to_string(), 1),
+        Token::Op(format!("^"), 2),
+        Token::Op(format!("+"), 2),
+        Token::Op(format!("/"), 2),
+        Token::Function(format!("sqrt"), 1),
     ];
     for (i, token) in expect.iter().enumerate() {
         assert_eq!(rpn[i], *token);

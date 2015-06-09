@@ -1,20 +1,18 @@
 use scanner::{Scanner, Nexter};
 use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
-
-#[derive(Clone, PartialEq, Debug)]
-pub enum Atom {
-    Symbol(String),
-    Number(f64),
-}
+use std::string;
+use std::ops;
+use std::cmp;
 
 #[derive(Clone, PartialEq, Debug)]
 enum Token {
-    OParen,
-    CParen,
-    Quote,
-    Atom(Atom),
+    OParen, CParen,
+    Quote, QuasiQuote, UnQuote, UnQSplice,
+    True, False,
+    Symbol(String),
+    Number(f64),
+    String(String),
 }
 
 struct Tokenizer {
@@ -23,18 +21,34 @@ struct Tokenizer {
 
 impl Nexter<Token> for Tokenizer {
     fn get_item(&mut self) -> Option<Token> {
-        self.src.ignore_ws();
+        self.src.ignore_ws(); // side-effect of ignoring past
         match self.src.next() {
             Some('(')  => Some(Token::OParen),
             Some(')')  => Some(Token::CParen),
+
             Some('\'') => Some(Token::Quote),
+            Some('`')  => Some(Token::QuasiQuote),
+            Some(',')  => match self.src.peek() {
+                Some('@') => { self.src.next(); Some(Token::UnQSplice) },
+                _ => Some(Token::UnQuote),
+            },
+            Some('"')  => {
+                self.src.until_chars("\"");
+                let token = self.src.extract();
+                Some(Token::String(token.iter()
+                     .take(token.len() - 2).skip(1).cloned().collect()))
+            },
             Some(_) => {
-                self.src.until_chars(" \n\r\t'()");
+                self.src.until_chars(" \n\r\t");
                 let token = self.src.extract_string();
-                match f64::from_str(&token) {
-                    Ok(num) => Some(Token::Atom(Atom::Number(num))),
-                    Err(_)  => Some(Token::Atom(Atom::Symbol(token)))
-                }
+                match &token[..] {
+                    "#t" => Some(Token::True),
+                    "#f" => Some(Token::False),
+                    _    => None,
+                }.or(match f64::from_str(&token) {
+                    Ok(num) => Some(Token::Number(num)),
+                    Err(_)  => Some(Token::Symbol(token))
+                })
             },
             None => None
         }
@@ -45,12 +59,12 @@ struct Lexer {
     output: Scanner<Token>,
 }
 
-impl Deref for Lexer {
+impl ops::Deref for Lexer {
     type Target = Scanner<Token>;
     fn deref<'a>(&'a self) -> &'a Scanner<Token> { &self.output }
 }
 
-impl DerefMut for Lexer {
+impl ops::DerefMut for Lexer {
     fn deref_mut<'a>(&'a mut self) -> &'a mut Scanner<Token> { &mut self.output }
 }
 
@@ -73,7 +87,39 @@ pub struct Parser;
 #[derive(Clone, PartialEq, Debug)]
 pub enum LispExpr {
     List(Vec<LispExpr>),
-    Atom(Atom),
+    String(String),
+    Symbol(String),
+    Number(f64),
+    True, False,
+    Quote(Box<LispExpr>),
+    QuasiQuote(Box<LispExpr>),
+    UnQuote(Box<LispExpr>),
+    UnQSplice(Box<LispExpr>),
+}
+
+impl string::ToString for LispExpr {
+    fn to_string(&self) -> String {
+        match self {
+            &LispExpr::Symbol(ref s) => s.clone(),
+            &LispExpr::String(ref s) => s.clone(),
+            &LispExpr::Number(n) => format!("{}", n),
+            &LispExpr::List(ref v) => {
+                let base = match v.first() {
+                    Some(expr) => expr.to_string(),
+                    None => String::new()
+                };
+                format!("({})", v.iter().skip(1)
+                    .fold(base, |a, ref it|
+                          format!("{} {}", a, it.to_string())))
+            },
+            &LispExpr::True  => format!("#t"),
+            &LispExpr::False => format!("#f"),
+            &LispExpr::Quote(ref e) => format!("'{}", e.to_string()),
+            &LispExpr::QuasiQuote(ref e) => format!("`{}", e.to_string()),
+            &LispExpr::UnQuote(ref e) => format!(",{}", e.to_string()),
+            &LispExpr::UnQSplice(ref e) => format!(",@{}", e.to_string()),
+        }
+    }
 }
 
 impl Parser {
@@ -85,8 +131,11 @@ impl Parser {
         match lex.next() {
             None                    => Err(ParseError::UnexpectedEOF),
             Some(Token::CParen)     => Err(ParseError::UnexpectedCParen),
-            Some(Token::Quote)      => Err(ParseError::NotImplemented),
-            Some(Token::Atom(atom)) => Ok(LispExpr::Atom(atom)),
+            Some(Token::True)       => Ok(LispExpr::True),
+            Some(Token::False)      => Ok(LispExpr::False),
+            Some(Token::String(n))  => Ok(LispExpr::String(n)),
+            Some(Token::Number(n))  => Ok(LispExpr::Number(n)),
+            Some(Token::Symbol(s))  => Ok(LispExpr::Symbol(s)),
             Some(Token::OParen)     => {
                 let mut list = Vec::new();
                 while lex.peek() != Some(Token::CParen) { // even != None
@@ -98,95 +147,134 @@ impl Parser {
                 lex.next(); // get over that CParen
                 Ok(LispExpr::List(list))
             },
+            Some(Token::Quote)      => Err(ParseError::NotImplemented),
+            Some(Token::QuasiQuote) => Err(ParseError::NotImplemented),
+            Some(Token::UnQuote)    => Err(ParseError::NotImplemented),
+            Some(Token::UnQSplice)  => Err(ParseError::NotImplemented),
         }
     }
 }
 
 #[derive(PartialEq, Debug)]
 pub enum EvalErr {
-    UnknownVar,
-    UnknownFunction,
+    UnknownVar(String),
+    UnknownFunction(String),
+    NotCallable,
     InvalidExpr,
-    WrongArgs,
-    WrongNumberOfArgs,
+    NotImplemented,
 }
 
 pub struct LispContext {
     vars: HashMap<String, LispExpr>,
-    funcs: HashMap<String, fn(LispExpr) -> LispExpr>,
+    procs: HashMap<String, Box<Fn(Vec<LispExpr>) -> Result<LispExpr, EvalErr>>>,
     outer: Option<Box<LispContext>>,
+}
+
+struct Procedure {
+    params: Vec<LispExpr>,
+    body: LispExpr,
+    env: LispContext,
+}
+
+//impl<Args> ops::FnOnce<(Args,)> for Procedure {
+    //type Output = LispExpr;
+    //extern "rust-call" fn call_once(&self, args: Args) -> LispExpr {
+        //LispExpr::Number(0.0)
+    //}
+//}
+
+
+fn foldop<T>(op: T, args: Vec<LispExpr>) -> Result<LispExpr, EvalErr>
+        where T: Fn(f64, f64) -> f64 {
+    let base = match args.first() {
+        Some(&LispExpr::Number(n)) => n,
+        _ => return Err(EvalErr::InvalidExpr)
+    };
+    let mut rest = Vec::new();
+    for arg in args.iter().skip(1) {
+        match arg {
+            &LispExpr::Number(n) => rest.push(n),
+            _ => return Err(EvalErr::InvalidExpr)
+        }
+    }
+    Ok(LispExpr::Number(rest.iter().fold(base, |ac, &item| op(ac, item))))
 }
 
 impl LispContext {
     pub fn new() -> LispContext {
-        let mut funcs = HashMap::new();
-        //funcs.insert(format!("+"),
-            //|args: Vec<LispExpr>| LispExpr::Atom(Atom::Number(
-                //args.iter().fold(0.0, |a, &item| a + item)
-            //)));
-        LispContext{vars: HashMap::new(), funcs: funcs, outer: None}
+        let mut procs: HashMap<String, Box<Fn(Vec<LispExpr>) -> Result<LispExpr, EvalErr>>> = HashMap::new();
+        procs.insert(format!("+"), Box::new(|args| foldop(ops::Add::add, args)));
+        procs.insert(format!("-"), Box::new(|args| foldop(ops::Sub::sub, args)));
+        procs.insert(format!("*"), Box::new(|args| foldop(ops::Mul::mul, args)));
+        procs.insert(format!("/"), Box::new(|args| foldop(ops::Div::div, args)));
+        procs.insert(format!("%"), Box::new(|args| foldop(ops::Rem::rem, args)));
+        //procs.insert(format!("<"), Box::new(|args| (args[0] as f64) < (args[1] as f64)));
+        //procs.insert(format!("first"), Box::new(|args| args[0]));
+        //procs.insert(format!("tail"), Box::new(|args| args[1..]));
+        let mut vars = HashMap::new();
+        //vars.insert(format!("#f"), false);
+        LispContext{vars: vars, procs: procs, outer: None}
     }
 
-    pub fn eval(&mut self, expr: &str) -> Result<LispExpr, EvalErr> {
+    pub fn eval_str(&mut self, expr: &str) -> Result<LispExpr, EvalErr> {
         let e = Parser::parse_str(expr);
-        Self::_eval(&e.unwrap(), self)
+        Self::eval(&e.unwrap(), self)
     }
 
-    // TODO: return <&LispExpr, EvalErr>
-    fn _eval(expr: &LispExpr, ctx: &mut LispContext) -> Result<LispExpr, EvalErr> {
+    pub fn eval(expr: &LispExpr, ctx: &mut LispContext) -> Result<LispExpr, EvalErr> {
         match expr {
-            &LispExpr::Atom(ref atom) => match atom {
-                &Atom::Number(_) => Ok(LispExpr::Atom(atom.clone())),
-                &Atom::Symbol(ref sym) => match ctx.vars.get(sym) {
-                    Some(value) => Ok(value.clone()),
-                    None => Err(EvalErr::UnknownVar)
-                }
+            &LispExpr::True => Ok(LispExpr::True),
+            &LispExpr::False => Ok(LispExpr::False),
+            &LispExpr::String(ref s) => Ok(LispExpr::String(s.clone())),
+            &LispExpr::Number(num) => Ok(LispExpr::Number(num)),
+            &LispExpr::Symbol(ref sym) => match ctx.vars.get(sym) {
+                Some(value) => Ok(value.clone()),
+                None => Err(EvalErr::UnknownVar(sym.clone()))
             },
+
+            &LispExpr::Quote(_) => Err(EvalErr::NotImplemented),
+            &LispExpr::QuasiQuote(_) => Err(EvalErr::NotImplemented),
+            &LispExpr::UnQuote(_) => Err(EvalErr::NotImplemented),
+            &LispExpr::UnQSplice(_) => Err(EvalErr::NotImplemented),
+
             &LispExpr::List(ref list) => match list.first() {
-                Some(&LispExpr::Atom(Atom::Symbol(ref first))) => match &(*first)[..] {
-                    "quote" if list.len() > 1   => Ok(LispExpr::List(list[1..].to_vec())),
-                    "if"    if list.len() == 4  => {
+                Some(&LispExpr::Symbol(ref pname)) => match (&(*pname)[..], list.len()) {
+                    ("quote", 2)  => Ok(list[1].clone()),
+                    ("if", 4)     => {
                         let (test, conseq, alt) = (&list[1], &list[2], &list[3]);
-                        match Self::_eval(test, ctx) {
+                        match Self::eval(test, ctx) {
                             Err(err) => Err(err),
-                            Ok(ref res) if true  => Self::_eval(conseq, ctx), // TODO num != 0 || list != []
-                            Ok(ref res) if false => Self::_eval(alt, ctx),
-                            _ => unreachable!()
+                            Ok(LispExpr::Symbol(ref s)) if s == "#f "=> Self::eval(alt, ctx),
+                            Ok(_) => Self::eval(conseq, ctx),
                         }
                     },
-                    "define" if list.len() == 3 => {
-                        if let (&LispExpr::Atom(Atom::Symbol(ref sym)), exp) = (&list[1], &list[2]) {
-                            match Self::_eval(exp, ctx) {
-                                Ok(res) => { ctx.vars.insert(sym.clone(), res.clone()); Ok(res) }, // TODO check type to insert in proper struct
+                    ("define", 3) => {
+                        match (&list[1], &list[2]) {
+                            (&LispExpr::Symbol(ref var), val) => match Self::eval(val, ctx) {
+                                Ok(expr) => { ctx.vars.insert(var.clone(), expr.clone()); Ok(expr) }, // TODO check type to insert in proper struct
                                 Err(err) => Err(err)
+                            },
+                            _ => Err(EvalErr::InvalidExpr)
+                        }
+                    },
+                    (_, _) => {
+                        let mut args = Vec::new();
+                        for arg in list.iter().skip(1) {
+                            match Self::eval(arg, ctx) {
+                                Err(err) => return Err(err),
+                                Ok(expr) => args.push(expr)
                             }
-                        } else {
-                            Err(EvalErr::WrongArgs)
+                        }
+                        match ctx.procs.get(pname) {
+                            Some(procedure) => procedure(args),
+                            None => Err(EvalErr::UnknownFunction(pname.clone()))
                         }
                     },
-                    "quote" | "if" | "define" => Err(EvalErr::WrongNumberOfArgs),
-                    _ if list.len() > 1 => {
-                        match Self::_eval(&list[0], ctx) {
-                            Ok(LispExpr::Atom(Atom::Symbol(fsym))) => {
-                                //let args = list[1..].iter().map(|arg| Self::_eval(arg, ctx)).collect::<Vec<Result<LispExpr, EvalErr>>>();
-                                //if let Some(err) = args.iter().filter(|arg| arg.is_err()).next() {
-                                    //return Err(err.unwrap_err());
-                                //}
-                                //let args = LispExpr::List(args.iter().map(|arg| arg.unwrap()).collect());
-                                let args = LispExpr::List(list[1..].iter().map(|arg| Self::_eval(arg, ctx).unwrap()).collect());
-                                match ctx.funcs.get(&fsym) {
-                                    Some(func) => Ok(func(args)),
-                                    None => Err(EvalErr::UnknownFunction)
-                                }
-                            }, // TODO check if num or procedure
-                            Ok(_)    => Err(EvalErr::InvalidExpr), // expected symbol
-                            Err(err) => Err(err),
-                        }
-                    },
-                    _ => Err(EvalErr::WrongNumberOfArgs),
                 },
-                _ => Err(EvalErr::InvalidExpr) // () | ((x) ...) | (3 ...)
-            },
+                Some(&LispExpr::List(_)) => { Err(EvalErr::NotImplemented) },
+                _ => Err(EvalErr::NotCallable) // list.first is None or LispExpr::Number
+
+            }
         }
     }
 }

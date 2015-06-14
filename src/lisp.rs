@@ -8,7 +8,7 @@ use std::cmp;
 #[derive(Clone, PartialEq, Debug)]
 enum Token {
     OParen, CParen,
-    Quote, QuasiQuote, UnQuote, UnQSplice,
+    //Quote(String), QuasiQuote, UnQuote, UnQSplice,
     True, False,
     Symbol(String),
     Number(f64),
@@ -21,37 +21,47 @@ struct Tokenizer {
 
 impl Nexter<Token> for Tokenizer {
     fn get_item(&mut self) -> Option<Token> {
-        self.src.ignore_ws(); // side-effect of ignoring past
-        match self.src.next() {
-            Some('(')  => Some(Token::OParen),
-            Some(')')  => Some(Token::CParen),
+        self.src.ignore_ws();
+        let token = match self.src.next() {
+            Some('(')  => Token::OParen,
+            Some(')')  => Token::CParen,
 
-            Some('\'') => Some(Token::Quote),
-            Some('`')  => Some(Token::QuasiQuote),
-            Some(',')  => match self.src.peek() {
-                Some('@') => { self.src.next(); Some(Token::UnQSplice) },
-                _ => Some(Token::UnQuote),
-            },
+            // TODO parse quoted expr
+            //Some('\'') => Token::Quote,
+            //Some('`')  => Token::QuasiQuote,
+            //Some(',')  => match self.src.peek() {
+                //Some('@') => { self.src.next(); Token::UnQSplice },
+                //_ => Token::UnQuote,
+            //},
+
             Some('"')  => {
                 self.src.until_chars("\"");
-                let token = self.src.extract();
-                Some(Token::String(token.iter()
-                     .take(token.len() - 2).skip(1).cloned().collect()))
+                if self.src.next() != Some('"') { // consume closing quote
+                    self.src.ignore();
+                    return None; // drop partial string, parse as unexpected EOF
+                } else {
+                    let token = self.src.extract();
+                    Token::String(token.iter()
+                                  .take(token.len() - 2)
+                                  .skip(1).cloned().collect())
+                }
             },
             Some(_) => {
-                self.src.until_chars(" \n\r\t");
+                self.src.until_chars(" \n\r\t)");
                 let token = self.src.extract_string();
                 match &token[..] {
-                    "#t" => Some(Token::True),
-                    "#f" => Some(Token::False),
-                    _    => None,
-                }.or(match f64::from_str(&token) {
-                    Ok(num) => Some(Token::Number(num)),
-                    Err(_)  => Some(Token::Symbol(token))
-                })
+                    "#t" => Token::True,
+                    "#f" => Token::False,
+                    num  => match f64::from_str(num) {
+                        Ok(n) => Token::Number(n),
+                        Err(_)  => Token::Symbol(token.clone())
+                    }
+                }
             },
-            None => None
-        }
+            None => return None
+        };
+        self.src.ignore();
+        Some(token)
     }
 }
 
@@ -91,10 +101,10 @@ pub enum LispExpr {
     Symbol(String),
     Number(f64),
     True, False,
-    Quote(Box<LispExpr>),
-    QuasiQuote(Box<LispExpr>),
-    UnQuote(Box<LispExpr>),
-    UnQSplice(Box<LispExpr>),
+    //Quote(Box<LispExpr>),
+    //QuasiQuote(Box<LispExpr>),
+    //UnQuote(Box<LispExpr>),
+    //UnQSplice(Box<LispExpr>),
 }
 
 impl string::ToString for LispExpr {
@@ -114,10 +124,10 @@ impl string::ToString for LispExpr {
             },
             &LispExpr::True  => format!("#t"),
             &LispExpr::False => format!("#f"),
-            &LispExpr::Quote(ref e) => format!("'{}", e.to_string()),
-            &LispExpr::QuasiQuote(ref e) => format!("`{}", e.to_string()),
-            &LispExpr::UnQuote(ref e) => format!(",{}", e.to_string()),
-            &LispExpr::UnQSplice(ref e) => format!(",@{}", e.to_string()),
+            //&LispExpr::Quote(ref e) => format!("'{}", e.to_string()),
+            //&LispExpr::QuasiQuote(ref e) => format!("`{}", e.to_string()),
+            //&LispExpr::UnQuote(ref e) => format!(",{}", e.to_string()),
+            //&LispExpr::UnQSplice(ref e) => format!(",@{}", e.to_string()),
         }
     }
 }
@@ -147,10 +157,10 @@ impl Parser {
                 lex.next(); // get over that CParen
                 Ok(LispExpr::List(list))
             },
-            Some(Token::Quote)      => Err(ParseError::NotImplemented),
-            Some(Token::QuasiQuote) => Err(ParseError::NotImplemented),
-            Some(Token::UnQuote)    => Err(ParseError::NotImplemented),
-            Some(Token::UnQSplice)  => Err(ParseError::NotImplemented),
+            //Some(Token::Quote)      => Err(ParseError::NotImplemented),
+            //Some(Token::QuasiQuote) => Err(ParseError::NotImplemented),
+            //Some(Token::UnQuote)    => Err(ParseError::NotImplemented),
+            //Some(Token::UnQSplice)  => Err(ParseError::NotImplemented),
         }
     }
 }
@@ -170,19 +180,22 @@ pub struct LispContext {
     outer: Option<Box<LispContext>>,
 }
 
-struct Procedure {
-    params: Vec<LispExpr>,
-    body: LispExpr,
-    env: LispContext,
-}
-
-//impl<Args> ops::FnOnce<(Args,)> for Procedure {
-    //type Output = LispExpr;
-    //extern "rust-call" fn call_once(&self, args: Args) -> LispExpr {
-        //LispExpr::Number(0.0)
-    //}
+//struct Procedure {
+    //params: Vec<LispExpr>,
+    //body: LispExpr,
+    //env: LispContext,
 //}
 
+//impl Procedure{
+    //fn new(params: Vec<LispExpr>, body: LispExpr, env: LispContext) -> Procedure{
+        //Procedure{params: params, body: body, env: env}
+    //}
+
+    //fn call(&self, args: Vec<LispExpr>) -> LispExpr {
+        ////args
+        //self.env.eval(self.body, self.env)
+    //}
+//}
 
 fn foldop<T>(op: T, args: Vec<LispExpr>) -> Result<LispExpr, EvalErr>
         where T: Fn(f64, f64) -> f64 {
@@ -232,10 +245,10 @@ impl LispContext {
                 None => Err(EvalErr::UnknownVar(sym.clone()))
             },
 
-            &LispExpr::Quote(_) => Err(EvalErr::NotImplemented),
-            &LispExpr::QuasiQuote(_) => Err(EvalErr::NotImplemented),
-            &LispExpr::UnQuote(_) => Err(EvalErr::NotImplemented),
-            &LispExpr::UnQSplice(_) => Err(EvalErr::NotImplemented),
+            //&LispExpr::Quote(_) => Err(EvalErr::NotImplemented),
+            //&LispExpr::QuasiQuote(_) => Err(EvalErr::NotImplemented),
+            //&LispExpr::UnQuote(_) => Err(EvalErr::NotImplemented),
+            //&LispExpr::UnQSplice(_) => Err(EvalErr::NotImplemented),
 
             &LispExpr::List(ref list) => match list.first() {
                 Some(&LispExpr::Symbol(ref pname)) => match (&(*pname)[..], list.len()) {

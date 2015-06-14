@@ -173,6 +173,7 @@ impl Tokenizer {
             Some(bop) => Token::Op(bop.to_string(), 2),
             None => return None
         };
+        self.src.ignore();
         Some(token)
     }
 

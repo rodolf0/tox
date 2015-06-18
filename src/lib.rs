@@ -17,5 +17,6 @@ pub mod rpneval;
 mod rpneval_test;
 
 pub mod lisp;
+mod lispenv;
 #[cfg(test)]
 mod lisp_test;

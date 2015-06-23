@@ -1,4 +1,4 @@
-use lexer::{Lexer, Token};
+use shunting::{Lexer, Token};
 
 #[test]
 fn test1() {

@@ -3,9 +3,7 @@ extern crate tox;
 
 #[cfg(not(test))]
 mod repl {
-    use tox::lexer::{Lexer, Token};
-    use tox::parser::ShuntingParser;
-    use tox::rpneval::MathContext;
+    use tox::shunting::{Lexer, Token, ShuntingParser, MathContext};
 
     pub fn evalexpr(input: &str) {
         match ShuntingParser::parse_str(input) {
@@ -51,7 +49,7 @@ fn main() {
             collect::<Vec<String>>().connect(" ");
         repl::evalexpr(&input[..]);
     } else {
-        use tox::rpneval::MathContext;
+        use tox::shunting::MathContext;
         let mut cx = MathContext::new();
         while let Some(input) = linenoise::input(">> ") {
             linenoise::history_add(&input[..]);

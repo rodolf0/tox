@@ -1,6 +1,7 @@
 use scanner::{Scanner, Nexter};
 use lispenv;
 use std::collections::HashMap;
+use std::iter::FromIterator;
 use std::str::FromStr;
 use std::string;
 use std::ops;
@@ -105,6 +106,7 @@ pub enum LispExpr {
     //QuasiQuote(Box<LispExpr>),
     //UnQuote(Box<LispExpr>),
     //UnQSplice(Box<LispExpr>),
+    Proc(Procedure),
 }
 
 impl string::ToString for LispExpr {
@@ -124,6 +126,7 @@ impl string::ToString for LispExpr {
             },
             &LispExpr::True  => format!("#t"),
             &LispExpr::False => format!("#f"),
+            _ => format!("%unknown%")
             //&LispExpr::Quote(ref e) => format!("'{}", e.to_string()),
             //&LispExpr::QuasiQuote(ref e) => format!("`{}", e.to_string()),
             //&LispExpr::UnQuote(ref e) => format!(",{}", e.to_string()),
@@ -174,33 +177,47 @@ pub enum EvalErr {
     NotImplemented,
 }
 
+#[derive(Clone)]
 pub struct LispContext {
     vars: HashMap<String, LispExpr>,
     procs: lispenv::Procs,
     outer: Option<Box<LispContext>>,
 }
 
-//struct Procedure {
-    //params: Vec<LispExpr>,
-    //body: LispExpr,
-    //env: LispContext,
-//}
+#[derive(PartialOrd, PartialEq, Clone, Debug)]
+struct Procedure {
+    params: Vec<String>,
+    body: Box<LispExpr>,
+    env: LispContext,
+}
 
-//impl Procedure{
-    //fn new(params: Vec<LispExpr>, body: LispExpr, env: LispContext) -> Procedure{
-        //Procedure{params: params, body: body, env: env}
-    //}
+impl Procedure{
+    fn new(params: Vec<String>, body: LispExpr, env: LispContext) -> Procedure {
+        Procedure{params: params, body: Box::new(body), env: env}
+    }
 
-    //fn call(&self, args: Vec<LispExpr>) -> LispExpr {
-        ////args
-        //self.env.eval(self.body, self.env)
-    //}
-//}
+    fn call(&self, args: Vec<LispExpr>) -> Result<LispExpr, EvalErr> {
+        //let mut env = LispContext::nested(&self.params, &args, Some(Box::new(self.env.clone())));
+        let mut env = LispContext::nested(&self.params, &args, None);
+        LispContext::eval(&self.body, &mut env)
+    }
+}
 
 impl LispContext {
     pub fn new() -> LispContext {
         let vars = HashMap::new();
         LispContext{vars: vars, procs: lispenv::ctx_globals(), outer: None}
+    }
+
+    fn nested(params: &Vec<String>,
+              args: &Vec<LispExpr>,
+              outer: Option<Box<LispContext>>) -> LispContext {
+        let vars = HashMap::from_iter(params.iter().cloned().zip(args.iter().cloned()));
+        LispContext{
+            vars: vars.clone(),
+            procs: lispenv::ctx_globals(),
+            outer: outer
+        }
     }
 
     pub fn eval_str(&mut self, expr: &str) -> Result<LispExpr, EvalErr> {
@@ -243,6 +260,19 @@ impl LispContext {
                             },
                             _ => Err(EvalErr::InvalidExpr)
                         }
+                    },
+                    ("lambda", 3) => {
+                        let body = &list[2];
+                        let mut vars = Vec::new();
+                        if let LispExpr::List(ref vs) = list[1] {
+                            for v in vs.iter() {
+                                match &v {
+
+                                }
+                            }
+                        }
+
+                        Ok(LispExpr::Proc(Procedure::new(vars, body.clone(), ctx.clone())))
                     },
                     (_, _) => {
                         let mut args = Vec::new();

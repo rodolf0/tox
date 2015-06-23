@@ -1,5 +1,5 @@
-use parser::{ShuntingParser, ParseError};
-use lexer::Token;
+use shunting::{ShuntingParser, ParseError};
+use shunting::Token;
 
 #[test]
 fn test_parse1() {

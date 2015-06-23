@@ -1,6 +1,6 @@
 extern crate num;
-use parser::ShuntingParser;
-use rpneval::MathContext;
+use shunting::ShuntingParser;
+use shunting::MathContext;
 
 macro_rules! fuzzy_eq {
     ($lhs:expr, $rhs:expr) => { num::abs($lhs - $rhs) < 1.0e-10 }

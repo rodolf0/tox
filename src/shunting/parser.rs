@@ -1,4 +1,4 @@
-use lexer::{Lexer, Token, Assoc};
+use shunting::{Lexer, Token, Assoc};
 use std::ops::Deref;
 
 #[derive(PartialEq, Debug)]

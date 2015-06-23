@@ -1,8 +1,8 @@
 extern crate rand;
 use std::collections::HashMap;
 
-use lexer::Token;
-use parser::RPNExpr;
+use shunting::Token;
+use shunting::RPNExpr;
 
 #[derive(Debug, PartialEq)]
 pub enum EvalErr {

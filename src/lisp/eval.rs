@@ -1,99 +1,10 @@
-use scanner::{Scanner, Nexter};
-use lispenv;
+use lisp::{Lexer, Token, Parser};
+use lisp::{Procs, ctx_globals};
+
 use std::collections::HashMap;
 use std::iter::FromIterator;
-use std::str::FromStr;
 use std::string;
-use std::ops;
 
-#[derive(Clone, PartialEq, Debug)]
-enum Token {
-    OParen, CParen,
-    //Quote(String), QuasiQuote, UnQuote, UnQSplice,
-    True, False,
-    Symbol(String),
-    Number(f64),
-    String(String),
-}
-
-struct Tokenizer {
-    src: Scanner<char>,
-}
-
-impl Nexter<Token> for Tokenizer {
-    fn get_item(&mut self) -> Option<Token> {
-        self.src.ignore_ws();
-        let token = match self.src.next() {
-            Some('(')  => Token::OParen,
-            Some(')')  => Token::CParen,
-
-            // TODO parse quoted expr
-            //Some('\'') => Token::Quote,
-            //Some('`')  => Token::QuasiQuote,
-            //Some(',')  => match self.src.peek() {
-                //Some('@') => { self.src.next(); Token::UnQSplice },
-                //_ => Token::UnQuote,
-            //},
-
-            Some('"')  => {
-                self.src.until_chars("\"");
-                if self.src.next() != Some('"') { // consume closing quote
-                    self.src.ignore();
-                    return None; // drop partial string, parse as unexpected EOF
-                } else {
-                    let token = self.src.extract();
-                    Token::String(token.iter()
-                                  .take(token.len() - 2)
-                                  .skip(1).cloned().collect())
-                }
-            },
-            Some(_) => {
-                self.src.until_chars(" \n\r\t)");
-                let token = self.src.extract_string();
-                match &token[..] {
-                    "#t" => Token::True,
-                    "#f" => Token::False,
-                    num  => match f64::from_str(num) {
-                        Ok(n) => Token::Number(n),
-                        Err(_)  => Token::Symbol(token.clone())
-                    }
-                }
-            },
-            None => return None
-        };
-        self.src.ignore();
-        Some(token)
-    }
-}
-
-struct Lexer {
-    output: Scanner<Token>,
-}
-
-impl ops::Deref for Lexer {
-    type Target = Scanner<Token>;
-    fn deref<'a>(&'a self) -> &'a Scanner<Token> { &self.output }
-}
-
-impl ops::DerefMut for Lexer {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut Scanner<Token> { &mut self.output }
-}
-
-impl Lexer {
-    fn from_str(source: &str) -> Lexer {
-        let tokenizer = Box::new(Tokenizer{src: Scanner::from_str(source)});
-        Lexer{output: Scanner::new(tokenizer)}
-    }
-}
-
-#[derive(PartialEq, Debug)]
-pub enum ParseError {
-    UnexpectedCParen,
-    UnexpectedEOF,
-    NotImplemented,
-}
-
-pub struct Parser;
 
 #[derive(Clone, PartialEq, PartialOrd, Debug)]
 pub enum LispExpr {
@@ -135,39 +46,6 @@ impl string::ToString for LispExpr {
     }
 }
 
-impl Parser {
-    pub fn parse_str(expr: &str) -> Result<LispExpr, ParseError> {
-        Self::parse(&mut Lexer::from_str(expr))
-    }
-
-    fn parse(lex: &mut Lexer) -> Result<LispExpr, ParseError> {
-        match lex.next() {
-            None                    => Err(ParseError::UnexpectedEOF),
-            Some(Token::CParen)     => Err(ParseError::UnexpectedCParen),
-            Some(Token::True)       => Ok(LispExpr::True),
-            Some(Token::False)      => Ok(LispExpr::False),
-            Some(Token::String(n))  => Ok(LispExpr::String(n)),
-            Some(Token::Number(n))  => Ok(LispExpr::Number(n)),
-            Some(Token::Symbol(s))  => Ok(LispExpr::Symbol(s)),
-            Some(Token::OParen)     => {
-                let mut list = Vec::new();
-                while lex.peek() != Some(Token::CParen) { // even != None
-                    match Parser::parse(lex) {
-                        Err(err) => return Err(err),
-                        Ok(expr) => list.push(expr),
-                    }
-                }
-                lex.next(); // get over that CParen
-                Ok(LispExpr::List(list))
-            },
-            //Some(Token::Quote)      => Err(ParseError::NotImplemented),
-            //Some(Token::QuasiQuote) => Err(ParseError::NotImplemented),
-            //Some(Token::UnQuote)    => Err(ParseError::NotImplemented),
-            //Some(Token::UnQSplice)  => Err(ParseError::NotImplemented),
-        }
-    }
-}
-
 #[derive(PartialEq, Debug)]
 pub enum EvalErr {
     UnknownVar(String),
@@ -180,7 +58,7 @@ pub enum EvalErr {
 #[derive(Clone)]
 pub struct LispContext {
     vars: HashMap<String, LispExpr>,
-    procs: lispenv::Procs,
+    procs: Procs,
     outer: Option<Box<LispContext>>,
 }
 
@@ -206,7 +84,7 @@ impl Procedure{
 impl LispContext {
     pub fn new() -> LispContext {
         let vars = HashMap::new();
-        LispContext{vars: vars, procs: lispenv::ctx_globals(), outer: None}
+        LispContext{vars: vars, procs: ctx_globals(), outer: None}
     }
 
     fn nested(params: &Vec<String>,
@@ -215,7 +93,7 @@ impl LispContext {
         let vars = HashMap::from_iter(params.iter().cloned().zip(args.iter().cloned()));
         LispContext{
             vars: vars.clone(),
-            procs: lispenv::ctx_globals(),
+            procs: ctx_globals(),
             outer: outer
         }
     }

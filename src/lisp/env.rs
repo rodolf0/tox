@@ -59,10 +59,10 @@ fn cons(args: &Vec<LispExpr>) -> Result<LispExpr, EvalErr> {
 }
 
 
-pub type Procs = HashMap<String, Box<Fn(Vec<LispExpr>) -> Result<LispExpr, EvalErr>>>;
+pub type Fp = Box<Fn(Vec<LispExpr>) -> Result<LispExpr, EvalErr>>;
 
-pub fn ctx_globals() -> Procs {
-    let mut procs: Procs = HashMap::new();
+pub fn ctx_globals() -> HashMap<String, Fp> {
+    let mut procs: HashMap<String, Fp> = HashMap::new();
     procs.insert(format!("+"), Box::new(|args| foldop(ops::Add::add, &args)));
     procs.insert(format!("-"), Box::new(|args| match args.len() {
         1 => match args.first() { // special handling of negation op

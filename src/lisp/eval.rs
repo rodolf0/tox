@@ -1,50 +1,9 @@
-use lisp::{Lexer, Token, Parser};
-use lisp::{Procs, ctx_globals};
+use lisp::{Lexer, Token, Parser, LispExpr, Procedure};
+use lisp::{Fp, ctx_globals};
 
 use std::collections::HashMap;
 use std::iter::FromIterator;
-use std::string;
-
-
-#[derive(Clone, PartialEq, PartialOrd, Debug)]
-pub enum LispExpr {
-    List(Vec<LispExpr>),
-    String(String),
-    Symbol(String),
-    Number(f64),
-    True, False,
-    //Quote(Box<LispExpr>),
-    //QuasiQuote(Box<LispExpr>),
-    //UnQuote(Box<LispExpr>),
-    //UnQSplice(Box<LispExpr>),
-    Proc(Procedure),
-}
-
-impl string::ToString for LispExpr {
-    fn to_string(&self) -> String {
-        match self {
-            &LispExpr::Symbol(ref s) => s.clone(),
-            &LispExpr::String(ref s) => s.clone(),
-            &LispExpr::Number(n) => format!("{}", n),
-            &LispExpr::List(ref v) => {
-                let base = match v.first() {
-                    Some(expr) => expr.to_string(),
-                    None => String::new()
-                };
-                format!("({})", v.iter().skip(1)
-                    .fold(base, |a, ref it|
-                          format!("{} {}", a, it.to_string())))
-            },
-            &LispExpr::True  => format!("#t"),
-            &LispExpr::False => format!("#f"),
-            _ => format!("%unknown%")
-            //&LispExpr::Quote(ref e) => format!("'{}", e.to_string()),
-            //&LispExpr::QuasiQuote(ref e) => format!("`{}", e.to_string()),
-            //&LispExpr::UnQuote(ref e) => format!(",{}", e.to_string()),
-            //&LispExpr::UnQSplice(ref e) => format!(",@{}", e.to_string()),
-        }
-    }
-}
+use std::rc::Rc;
 
 #[derive(PartialEq, Debug)]
 pub enum EvalErr {
@@ -58,42 +17,21 @@ pub enum EvalErr {
 #[derive(Clone)]
 pub struct LispContext {
     vars: HashMap<String, LispExpr>,
-    procs: Procs,
-    outer: Option<Box<LispContext>>,
-}
-
-#[derive(PartialOrd, PartialEq, Clone, Debug)]
-struct Procedure {
-    params: Vec<String>,
-    body: Box<LispExpr>,
-    env: LispContext,
-}
-
-impl Procedure{
-    fn new(params: Vec<String>, body: LispExpr, env: LispContext) -> Procedure {
-        Procedure{params: params, body: Box::new(body), env: env}
-    }
-
-    fn call(&self, args: Vec<LispExpr>) -> Result<LispExpr, EvalErr> {
-        //let mut env = LispContext::nested(&self.params, &args, Some(Box::new(self.env.clone())));
-        let mut env = LispContext::nested(&self.params, &args, None);
-        LispContext::eval(&self.body, &mut env)
-    }
+    outer: Option<Rc<LispContext>>,
 }
 
 impl LispContext {
     pub fn new() -> LispContext {
         let vars = HashMap::new();
-        LispContext{vars: vars, procs: ctx_globals(), outer: None}
+        LispContext{vars: vars, outer: None}
     }
 
-    fn nested(params: &Vec<String>,
+    pub fn nested(params: &Vec<String>,
               args: &Vec<LispExpr>,
-              outer: Option<Box<LispContext>>) -> LispContext {
+              outer: Option<Rc<LispContext>>) -> LispContext {
         let vars = HashMap::from_iter(params.iter().cloned().zip(args.iter().cloned()));
         LispContext{
             vars: vars.clone(),
-            procs: ctx_globals(),
             outer: outer
         }
     }
@@ -109,7 +47,8 @@ impl LispContext {
             &LispExpr::False => Ok(LispExpr::False),
             &LispExpr::String(ref s) => Ok(LispExpr::String(s.clone())),
             &LispExpr::Number(num) => Ok(LispExpr::Number(num)),
-            &LispExpr::Symbol(ref sym) => match ctx.vars.get(sym) {
+            &LispExpr::Proc(ref p) => Ok(LispExpr::Proc(p.clone())),
+            &LispExpr::Symbol(ref sym) => match ctx.vars.get(sym) { // TODO: env.find
                 Some(value) => Ok(value.clone()),
                 None => Err(EvalErr::UnknownVar(sym.clone()))
             },
@@ -126,7 +65,7 @@ impl LispContext {
                         let (test, conseq, alt) = (&list[1], &list[2], &list[3]);
                         match Self::eval(test, ctx) {
                             Err(err) => Err(err),
-                            Ok(LispExpr::Symbol(ref s)) if s == "#f "=> Self::eval(alt, ctx),
+                            Ok(LispExpr::False) => Self::eval(alt, ctx),
                             Ok(_) => Self::eval(conseq, ctx),
                         }
                     },
@@ -144,13 +83,13 @@ impl LispContext {
                         let mut vars = Vec::new();
                         if let LispExpr::List(ref vs) = list[1] {
                             for v in vs.iter() {
-                                match &v {
-
+                                match v {
+                                    &LispExpr::Symbol(ref x) => vars.push(x.clone()),
+                                    _ => return Err(EvalErr::InvalidExpr)
                                 }
                             }
                         }
-
-                        Ok(LispExpr::Proc(Procedure::new(vars, body.clone(), ctx.clone())))
+                        Ok(LispExpr::Proc(Box::new(Procedure::new(vars, body.clone(), Rc::new(ctx.clone())))))
                     },
                     (_, _) => {
                         let mut args = Vec::new();
@@ -160,9 +99,9 @@ impl LispContext {
                                 Ok(expr) => args.push(expr)
                             }
                         }
-                        match ctx.procs.get(pname) {
-                            Some(procedure) => procedure(args),
-                            None => Err(EvalErr::UnknownFunction(pname.clone()))
+                        match ctx.vars.get(pname) {
+                            Some(&LispExpr::Proc(ref pr)) => pr.call(&args),
+                            _ => Err(EvalErr::UnknownFunction(pname.clone()))
                         }
                     },
                 },

@@ -1,5 +1,5 @@
-use lisp::{Lexer, Token, Parser, LispExpr, Procedure};
-use lisp::{Fp, ctx_globals};
+use lisp::{Lexer, Token, Parser, LispExpr, Procedure, ParseError};
+use lisp::builtins;
 
 use std::collections::HashMap;
 use std::iter::FromIterator;
@@ -9,6 +9,7 @@ use std::rc::Rc;
 pub enum EvalErr {
     UnknownVar(String),
     UnknownFunction(String),
+    ParseError(ParseError),
     NotCallable,
     InvalidExpr,
     NotImplemented,
@@ -22,23 +23,20 @@ pub struct LispContext {
 
 impl LispContext {
     pub fn new() -> LispContext {
-        let vars = HashMap::new();
-        LispContext{vars: vars, outer: None}
+        LispContext{vars: builtins(), outer: None}
     }
 
-    pub fn nested(params: &Vec<String>,
-              args: &Vec<LispExpr>,
-              outer: Option<Rc<LispContext>>) -> LispContext {
+    pub fn nested(params: Vec<String>, args: &Vec<LispExpr>,
+                  outer: Option<Rc<LispContext>>) -> LispContext {
         let vars = HashMap::from_iter(params.iter().cloned().zip(args.iter().cloned()));
-        LispContext{
-            vars: vars.clone(),
-            outer: outer
-        }
+        LispContext{vars: vars, outer: outer}
     }
 
     pub fn eval_str(&mut self, expr: &str) -> Result<LispExpr, EvalErr> {
-        let e = Parser::parse_str(expr);
-        Self::eval(&e.unwrap(), self)
+        match Parser::parse_str(expr) {
+            Ok(ref expr) => Self::eval(expr, self),
+            Err(err) => Err(EvalErr::ParseError(err))
+        }
     }
 
     pub fn eval(expr: &LispExpr, ctx: &mut LispContext) -> Result<LispExpr, EvalErr> {
@@ -72,7 +70,7 @@ impl LispContext {
                     ("define", 3) => {
                         match (&list[1], &list[2]) {
                             (&LispExpr::Symbol(ref var), val) => match Self::eval(val, ctx) {
-                                Ok(expr) => { ctx.vars.insert(var.clone(), expr.clone()); Ok(expr) }, // TODO check type to insert in proper struct
+                                Ok(expr) => { ctx.vars.insert(var.clone(), expr.clone()); Ok(expr) },
                                 Err(err) => Err(err)
                             },
                             _ => Err(EvalErr::InvalidExpr)
@@ -88,6 +86,8 @@ impl LispContext {
                                     _ => return Err(EvalErr::InvalidExpr)
                                 }
                             }
+                        } else {
+                            return Err(EvalErr::InvalidExpr); // arg list should be a list
                         }
                         Ok(LispExpr::Proc(Box::new(Procedure::new(vars, body.clone(), Rc::new(ctx.clone())))))
                     },

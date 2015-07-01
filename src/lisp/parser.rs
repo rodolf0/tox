@@ -1,5 +1,5 @@
 use lisp::{Lexer, Token};
-use lisp::Procedure;
+use lisp::{Fp, Procedure};
 use std::string;
 
 #[derive(PartialEq, Debug)]
@@ -9,6 +9,7 @@ pub enum ParseError {
     NotImplemented,
 }
 
+
 #[derive(Clone, PartialEq, PartialOrd, Debug)]
 pub enum LispExpr {
     List(Vec<LispExpr>),
@@ -16,7 +17,7 @@ pub enum LispExpr {
     Symbol(String),
     Number(f64),
     True, False,
-    Proc(Box<Procedure>)
+    Proc(Box<Procedure>),
     //Quote(Box<LispExpr>),
     //QuasiQuote(Box<LispExpr>),
     //UnQuote(Box<LispExpr>),
@@ -48,6 +49,7 @@ impl string::ToString for LispExpr {
         }
     }
 }
+
 
 pub struct Parser;
 

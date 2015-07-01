@@ -14,10 +14,10 @@ mod parser_test;
 pub use self::eval::EvalErr;
 pub use self::eval::LispContext;
 pub use self::procedure::Procedure;
+pub use self::procedure::Fp;
 
-pub use self::env::Fp;
-pub use self::env::ctx_globals;
+pub use self::builtin::builtins;
 
 mod eval;
 mod procedure;
-mod env;
+mod builtin;

@@ -1,12 +1,20 @@
 use lisp::{EvalErr, LispExpr, LispContext};
-use std::{fmt, cmp, clone};
+use std::{fmt, cmp};
 use std::rc::Rc;
+
+pub type Fp = Rc<Fn(&Vec<LispExpr>) -> Result<LispExpr, EvalErr>>;
+
+#[derive(Clone)]
+enum Body {
+    Lisp(LispExpr),
+    Builtin(Fp),
+}
 
 #[derive(Clone)]
 pub struct Procedure {
     params: Vec<String>,
-    body: LispExpr,
-    env: Rc<LispContext>,
+    body: Body,
+    env: Option<Rc<LispContext>>,
 }
 
 impl cmp::PartialEq for Procedure {
@@ -19,30 +27,26 @@ impl cmp::PartialOrd for Procedure {
 
 impl fmt::Debug for Procedure {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "lambda ({:?})", self.params)
+        write!(f, "(lambda ({:?}) ...)", self.params)
     }
 }
-
-// TODO: needed?
-//impl clone::Clone for Procedure {
-    //fn clone(&self) -> Self {
-        //Procedure{
-            //params: self.params.clone(),
-            //body: self.body.clone(),
-            //env: self.env.clone()
-        //}
-    //}
-//}
 
 impl Procedure {
     pub fn new(params: Vec<String>, body: LispExpr, env: Rc<LispContext>) -> Procedure {
-        Procedure{params: params, body: body, env: env}
+        Procedure{params: params, body: Body::Lisp(body), env: Some(env)}
+    }
+
+    pub fn builtin(fp: Fp) -> Procedure {
+        Procedure{params: Vec::new(), body: Body::Builtin(fp), env: None}
     }
 
     pub fn call(&self, args: &Vec<LispExpr>) -> Result<LispExpr, EvalErr> {
-        //let mut env = LispContext::nested(&self.params, &args, Some(Box::new(self.env.clone())));
-        let mut env = LispContext::nested(&self.params, args, None);
-        LispContext::eval(&self.body, &mut env)
+        match self.body {
+            Body::Builtin(ref fp) => fp(args),
+            Body::Lisp(ref expr) => {
+                let mut env = LispContext::nested(self.params.clone(), args, self.env.clone());
+                LispContext::eval(expr, &mut env)
+            }
+        }
     }
 }
-

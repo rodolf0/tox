@@ -1,0 +1,7 @@
+- try! equivalent macro that extracts a lispexpr or InvalidExpression
+- check visibility (pub)
+- check builtins
+- all cloning should be done on the caller if necesary
+- remove all cloning -> see were we can move / refer
+- implement quoting
+- Check for NotImplemented / TODOs

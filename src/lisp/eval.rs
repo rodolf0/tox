@@ -32,6 +32,16 @@ impl LispContext {
         LispContext{vars: vars, outer: outer}
     }
 
+    pub fn lookup(&self, var: &str) -> Option<&LispContext> {
+        if self.vars.contains_key(var) {
+            Some(self)
+        } else if let Some(ref o) = self.outer {
+            o.lookup(var)
+        } else {
+            None
+        }
+    }
+
     pub fn eval_str(&mut self, expr: &str) -> Result<LispExpr, EvalErr> {
         match Parser::parse_str(expr) {
             Ok(ref expr) => Self::eval(expr, self),
@@ -40,14 +50,15 @@ impl LispContext {
     }
 
     pub fn eval(expr: &LispExpr, ctx: &mut LispContext) -> Result<LispExpr, EvalErr> {
+        println!("{:?}", ctx.vars);
         match expr {
             &LispExpr::True => Ok(LispExpr::True),
             &LispExpr::False => Ok(LispExpr::False),
             &LispExpr::String(ref s) => Ok(LispExpr::String(s.clone())),
             &LispExpr::Number(num) => Ok(LispExpr::Number(num)),
             &LispExpr::Proc(ref p) => Ok(LispExpr::Proc(p.clone())),
-            &LispExpr::Symbol(ref sym) => match ctx.vars.get(sym) { // TODO: env.find
-                Some(value) => Ok(value.clone()),
+            &LispExpr::Symbol(ref sym) => match ctx.lookup(sym) {
+                Some(cx) => Ok(cx.vars.get(sym).unwrap().clone()),
                 None => Err(EvalErr::UnknownVar(sym.clone()))
             },
 
@@ -99,9 +110,12 @@ impl LispContext {
                                 Ok(expr) => args.push(expr)
                             }
                         }
-                        match ctx.vars.get(pname) {
-                            Some(&LispExpr::Proc(ref pr)) => pr.call(&args),
-                            _ => Err(EvalErr::UnknownFunction(pname.clone()))
+                        match ctx.lookup(pname) {
+                            Some(cx) => match cx.vars.get(pname) {
+                                Some(&LispExpr::Proc(ref pr)) => pr.call(&args), // TODO: eval arg-0
+                                _ => Err(EvalErr::UnknownFunction(pname.clone()))
+                            },
+                            None => Err(EvalErr::UnknownFunction(pname.clone()))
                         }
                     },
                 },

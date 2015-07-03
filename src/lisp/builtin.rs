@@ -1,4 +1,4 @@
-use lisp::{LispExpr, EvalErr, Fp, Procedure};
+use lisp::{LispExpr, EvalErr, Procedure};
 use std::collections::HashMap;
 use std::ops;
 use std::cmp;

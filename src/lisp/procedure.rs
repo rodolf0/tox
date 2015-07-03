@@ -18,11 +18,11 @@ pub struct Procedure {
 }
 
 impl cmp::PartialEq for Procedure {
-    fn eq(&self, other: &Procedure) -> bool { false }
+    fn eq(&self, _other: &Procedure) -> bool { false }
 }
 
 impl cmp::PartialOrd for Procedure {
-    fn partial_cmp(&self, other: &Procedure) -> Option<cmp::Ordering> { None }
+    fn partial_cmp(&self, _other: &Procedure) -> Option<cmp::Ordering> { None }
 }
 
 impl fmt::Debug for Procedure {
@@ -40,9 +40,9 @@ impl Procedure {
         Procedure{params: Vec::new(), body: Body::Builtin(fp), env: None}
     }
 
-    pub fn call(&self, args: &Vec<LispExpr>) -> Result<LispExpr, EvalErr> {
+    pub fn call(&self, args: Vec<LispExpr>) -> Result<LispExpr, EvalErr> {
         match self.body {
-            Body::Builtin(ref fp) => fp(args),
+            Body::Builtin(ref fp) => fp(&args),
             Body::Lisp(ref expr) => {
                 let mut env = LispContext::nested(self.params.clone(), args, self.env.clone());
                 LispContext::eval(expr, &mut env)

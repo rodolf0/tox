@@ -1,4 +1,4 @@
-use lisp::{Lexer, Token, Parser, LispExpr, Procedure, ParseError};
+use lisp::{Parser, ParseError, LispExpr, Procedure};
 use lisp::builtins;
 
 use std::collections::HashMap;
@@ -7,9 +7,9 @@ use std::rc::Rc;
 
 #[derive(PartialEq, Debug)]
 pub enum EvalErr {
+    ParseError(ParseError),
     UnknownVar(String),
     UnknownFunction(String),
-    ParseError(ParseError),
     NotCallable,
     InvalidExpr,
     NotImplemented,
@@ -17,26 +17,28 @@ pub enum EvalErr {
 
 #[derive(Clone)]
 pub struct LispContext {
-    vars: HashMap<String, LispExpr>,
+    syms: HashMap<String, LispExpr>,
     outer: Option<Rc<LispContext>>,
 }
 
 impl LispContext {
     pub fn new() -> LispContext {
-        LispContext{vars: builtins(), outer: None}
+        LispContext{syms: builtins(), outer: None}
     }
 
-    pub fn nested(params: Vec<String>, args: &Vec<LispExpr>,
+    pub fn nested(params: Vec<String>, args: Vec<LispExpr>,
                   outer: Option<Rc<LispContext>>) -> LispContext {
-        let vars = HashMap::from_iter(params.iter().cloned().zip(args.iter().cloned()));
-        LispContext{vars: vars, outer: outer}
+        LispContext{
+            syms: HashMap::from_iter(params.into_iter().zip(args.into_iter())),
+            outer: outer
+        }
     }
 
-    pub fn lookup(&self, var: &str) -> Option<&LispContext> {
-        if self.vars.contains_key(var) {
+    pub fn lookup(&self, sym: &str) -> Option<&LispContext> {
+        if self.syms.contains_key(sym) {
             Some(self)
-        } else if let Some(ref o) = self.outer {
-            o.lookup(var)
+        } else if let Some(ref octx) = self.outer {
+            octx.lookup(sym)
         } else {
             None
         }
@@ -50,7 +52,6 @@ impl LispContext {
     }
 
     pub fn eval(expr: &LispExpr, ctx: &mut LispContext) -> Result<LispExpr, EvalErr> {
-        println!("{:?}", ctx.vars);
         match expr {
             &LispExpr::True => Ok(LispExpr::True),
             &LispExpr::False => Ok(LispExpr::False),
@@ -58,7 +59,7 @@ impl LispContext {
             &LispExpr::Number(num) => Ok(LispExpr::Number(num)),
             &LispExpr::Proc(ref p) => Ok(LispExpr::Proc(p.clone())),
             &LispExpr::Symbol(ref sym) => match ctx.lookup(sym) {
-                Some(cx) => Ok(cx.vars.get(sym).unwrap().clone()),
+                Some(cx) => Ok(cx.syms.get(sym).unwrap().clone()),
                 None => Err(EvalErr::UnknownVar(sym.clone()))
             },
 
@@ -81,7 +82,7 @@ impl LispContext {
                     ("define", 3) => {
                         match (&list[1], &list[2]) {
                             (&LispExpr::Symbol(ref var), val) => match Self::eval(val, ctx) {
-                                Ok(expr) => { ctx.vars.insert(var.clone(), expr.clone()); Ok(expr) },
+                                Ok(expr) => { ctx.syms.insert(var.clone(), expr.clone()); Ok(expr) },
                                 Err(err) => Err(err)
                             },
                             _ => Err(EvalErr::InvalidExpr)
@@ -93,7 +94,7 @@ impl LispContext {
                         if let LispExpr::List(ref vs) = list[1] {
                             for v in vs.iter() {
                                 match v {
-                                    &LispExpr::Symbol(ref x) => vars.push(x.clone()),
+                                    &LispExpr::Symbol(ref x) => syms.push(x.clone()),
                                     _ => return Err(EvalErr::InvalidExpr)
                                 }
                             }
@@ -111,8 +112,8 @@ impl LispContext {
                             }
                         }
                         match ctx.lookup(pname) {
-                            Some(cx) => match cx.vars.get(pname) {
-                                Some(&LispExpr::Proc(ref pr)) => pr.call(&args), // TODO: eval arg-0
+                            Some(cx) => match cx.syms.get(pname) {
+                                Some(&LispExpr::Proc(ref pr)) => pr.call(args), // TODO: eval arg-0
                                 _ => Err(EvalErr::UnknownFunction(pname.clone()))
                             },
                             None => Err(EvalErr::UnknownFunction(pname.clone()))

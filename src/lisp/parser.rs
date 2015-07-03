@@ -1,5 +1,4 @@
-use lisp::{Lexer, Token};
-use lisp::{Fp, Procedure};
+use lisp::{Token, Lexer, Procedure};
 use std::string;
 
 #[derive(PartialEq, Debug)]

@@ -1,8 +1,13 @@
 use lisp::{LispExpr, EvalErr, Procedure};
 use std::collections::HashMap;
-use std::ops;
-use std::cmp;
+use std::{ops, cmp};
 use std::rc::Rc;
+
+macro_rules! builtin {
+    ($fnexpr:expr) => {
+        LispExpr::Proc(Rc::new(Procedure::builtin(Rc::new($fnexpr))))
+    }
+}
 
 fn foldop<T>(op: T, args: &Vec<LispExpr>) -> Result<LispExpr, EvalErr>
         where T: Fn(f64, f64) -> f64 {
@@ -62,31 +67,28 @@ fn cons(args: &Vec<LispExpr>) -> Result<LispExpr, EvalErr> {
 }
 
 pub fn builtins() -> HashMap<String, LispExpr> {
-    let mut procs: HashMap<String, LispExpr> = HashMap::new();
+    let mut builtins: HashMap<String, LispExpr> = HashMap::new();
 
-    let p = Procedure::builtin(Rc::new(|args| foldop(ops::Add::add, &args)));
-    procs.insert(format!("+"), LispExpr::Proc(Rc::new(p)));
-
-    //procs.insert(format!("+"), Box::new(|args| foldop(ops::Add::add, &args)));
-    //procs.insert(format!("-"), Box::new(|args| match args.len() {
-        //1 => match args.first() { // special handling of negation op
-            //Some(&LispExpr::Number(n)) => Ok(LispExpr::Number(-n)),
-            //_ => Err(EvalErr::InvalidExpr)
-        //},
-        //_ => foldop(ops::Sub::sub, &args)
-    //}));
-    //procs.insert(format!("*"), Box::new(|args| foldop(ops::Mul::mul, &args)));
-    //procs.insert(format!("/"), Box::new(|args| foldop(ops::Div::div, &args)));
-    //procs.insert(format!("%"), Box::new(|args| foldop(ops::Rem::rem, &args)));
-    //procs.insert(format!("<"), Box::new(|args| foldcmp(cmp::PartialOrd::lt, &args)));
-    //procs.insert(format!("<="), Box::new(|args| foldcmp(cmp::PartialOrd::le, &args)));
-    //procs.insert(format!(">"), Box::new(|args| foldcmp(cmp::PartialOrd::gt, &args)));
-    //procs.insert(format!(">="), Box::new(|args| foldcmp(cmp::PartialOrd::ge, &args)));
-    //procs.insert(format!("="), Box::new(|args| foldcmp(cmp::PartialEq::eq, &args)));
-    //procs.insert(format!("!="), Box::new(|args| foldcmp(cmp::PartialEq::ne, &args)));
-    //procs.insert(format!("first"), Box::new(|args| first(&args)));
-    //procs.insert(format!("tail"), Box::new(|args| tail(&args)));
-    //procs.insert(format!("cons"), Box::new(|args| cons(&args)));
-    //procs.insert(format!("list"), Box::new(|args| Ok(LispExpr::List(args.clone()))));
-    procs
+    builtins.insert(format!("+"), builtin!(|args| foldop(ops::Add::add, &args)));
+    builtins.insert(format!("-"), builtin!(|args| match args.len() {
+        1 => match args.first() { // special handling of negation op
+            Some(&LispExpr::Number(n)) => Ok(LispExpr::Number(-n)),
+            _ => Err(EvalErr::InvalidExpr)
+        },
+        _ => foldop(ops::Sub::sub, &args)
+    }));
+    builtins.insert(format!("*"), builtin!(|args| foldop(ops::Mul::mul, &args)));
+    builtins.insert(format!("/"), builtin!(|args| foldop(ops::Div::div, &args)));
+    builtins.insert(format!("%"), builtin!(|args| foldop(ops::Rem::rem, &args)));
+    builtins.insert(format!("<"), builtin!(|args| foldcmp(cmp::PartialOrd::lt, &args)));
+    builtins.insert(format!("<="), builtin!(|args| foldcmp(cmp::PartialOrd::le, &args)));
+    builtins.insert(format!(">"), builtin!(|args| foldcmp(cmp::PartialOrd::gt, &args)));
+    builtins.insert(format!(">="), builtin!(|args| foldcmp(cmp::PartialOrd::ge, &args)));
+    builtins.insert(format!("="), builtin!(|args| foldcmp(cmp::PartialEq::eq, &args)));
+    builtins.insert(format!("!="), builtin!(|args| foldcmp(cmp::PartialEq::ne, &args)));
+    builtins.insert(format!("first"), builtin!(|args| first(&args)));
+    builtins.insert(format!("tail"), builtin!(|args| tail(&args)));
+    builtins.insert(format!("cons"), builtin!(|args| cons(&args)));
+    builtins.insert(format!("list"), builtin!(|args| Ok(LispExpr::List(args.clone()))));
+    builtins
 }

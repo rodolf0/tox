@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::rc::Rc;
 
-// a shorthand for checking number of arguments before eval_fn
 macro_rules! check {
     ($argcheck:expr, $err:expr) => {
         if ! $argcheck { return Err($err); }

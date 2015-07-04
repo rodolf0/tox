@@ -36,27 +36,25 @@ fn foldcmp<T>(op: T, args: &Vec<LispExpr>) -> Result<LispExpr, EvalErr>
     }
 }
 
-// TODO: revise
-
 fn first(args: &Vec<LispExpr>) -> Result<LispExpr, EvalErr> {
     match args.first() {
-        Some(&LispExpr::List(ref l)) if l.len() > 0 => Ok(l.first().unwrap().clone()),
+        Some(&LispExpr::List(ref l)) if l.len() > 0 =>
+            Ok(l.first().unwrap().clone()),
         _ => Err(EvalErr::InvalidExpr)
     }
 }
 
 fn tail(args: &Vec<LispExpr>) -> Result<LispExpr, EvalErr> {
     match args.first() {
-        Some(&LispExpr::List(ref l)) => Ok(LispExpr::List(l.iter().skip(1).cloned().collect())),
+        Some(&LispExpr::List(ref l)) =>
+            Ok(LispExpr::List(l.iter().skip(1).cloned().collect())),
         _ => Err(EvalErr::InvalidExpr)
     }
 }
 
 fn cons(args: &Vec<LispExpr>) -> Result<LispExpr, EvalErr> {
-    if args.len() != 2 {
-        return Err(EvalErr::InvalidExpr);
-    }
-    match args[1] { // TODO: what about empty lists, they should be cleared
+    if args.len() != 2 { return Err(EvalErr::InvalidExpr); }
+    match args[1] {
         LispExpr::List(ref b) => {
             let mut a = vec![args[0].clone()];
             a.extend(b.clone());
@@ -90,5 +88,25 @@ pub fn builtins() -> HashMap<String, LispExpr> {
     builtins.insert(format!("tail"), builtin!(|args| tail(&args)));
     builtins.insert(format!("cons"), builtin!(|args| cons(&args)));
     builtins.insert(format!("list"), builtin!(|args| Ok(LispExpr::List(args.clone()))));
+    builtins.insert(format!("length"), builtin!(|args| match args.first() {
+        Some(&LispExpr::List(ref list)) => Ok(LispExpr::Number(list.len() as f64)),
+        _ => Err(EvalErr::InvalidExpr)
+    }));
+    builtins.insert(format!("number?"), builtin!(|args| match args.first() {
+        Some(&LispExpr::Number(_)) => Ok(LispExpr::True), _ => Ok(LispExpr::False)
+    }));
+    builtins.insert(format!("list?"), builtin!(|args| match args.first() {
+        Some(&LispExpr::List(_)) => Ok(LispExpr::True), _ => Ok(LispExpr::False)
+    }));
+    builtins.insert(format!("symbol?"), builtin!(|args| match args.first() {
+        Some(&LispExpr::Symbol(_)) => Ok(LispExpr::True), _ => Ok(LispExpr::False)
+    }));
+    builtins.insert(format!("procedure?"), builtin!(|args| match args.first() {
+        Some(&LispExpr::Proc(_)) => Ok(LispExpr::True), _ => Ok(LispExpr::False)
+    }));
+    builtins.insert(format!("null?"), builtin!(|args| match args.first() {
+        Some(&LispExpr::List(ref list)) if list.len() == 0 => Ok(LispExpr::True),
+        _ => Ok(LispExpr::False)
+    }));
     builtins
 }

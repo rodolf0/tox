@@ -1,4 +1,3 @@
-- try! equivalent macro that extracts a lispexpr or InvalidExpression
 - check visibility (pub)
 - check builtins
 - all cloning should be done on the caller if necesary

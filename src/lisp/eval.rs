@@ -153,6 +153,7 @@ impl LispContext {
                     }
                     first.call(args)
                 },
+                None => Ok(LispExpr::List(Vec::new())),
                 _ => Err(EvalErr::InvalidExpr)
             }
         }

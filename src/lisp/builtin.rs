@@ -65,7 +65,7 @@ pub fn builtins() -> HashMap<String, LispExpr> {
     let mut procs: HashMap<String, LispExpr> = HashMap::new();
 
     let p = Procedure::builtin(Rc::new(|args| foldop(ops::Add::add, &args)));
-    procs.insert(format!("+"), LispExpr::Proc(Box::new(p)));
+    procs.insert(format!("+"), LispExpr::Proc(Rc::new(p)));
 
     //procs.insert(format!("+"), Box::new(|args| foldop(ops::Add::add, &args)));
     //procs.insert(format!("-"), Box::new(|args| match args.len() {

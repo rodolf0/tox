@@ -5,10 +5,17 @@ use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::rc::Rc;
 
+// a shorthand for checking number of arguments before eval_fn
+macro_rules! check {
+    ($argcheck:expr, $err:expr) => {
+        if ! $argcheck { return Err($err); }
+    }
+}
+
 #[derive(PartialEq, Debug)]
 pub enum EvalErr {
     ParseError(ParseError),
-    UnknownVar(String),
+    UnknownSym(String),
     UnknownFunction(String),
     NotCallable,
     InvalidExpr,
@@ -60,7 +67,7 @@ impl LispContext {
             &LispExpr::Proc(ref p) => Ok(LispExpr::Proc(p.clone())),
             &LispExpr::Symbol(ref sym) => match ctx.lookup(sym) {
                 Some(cx) => Ok(cx.syms.get(sym).unwrap().clone()),
-                None => Err(EvalErr::UnknownVar(sym.clone()))
+                None => Err(EvalErr::UnknownSym(sym.clone()))
             },
 
             //&LispExpr::Quote(_) => Err(EvalErr::NotImplemented),
@@ -69,60 +76,85 @@ impl LispContext {
             //&LispExpr::UnQSplice(_) => Err(EvalErr::NotImplemented),
 
             &LispExpr::List(ref list) => match list.first() {
-                Some(&LispExpr::Symbol(ref pname)) => match (&(*pname)[..], list.len()) {
-                    ("quote", 2)  => Ok(list[1].clone()),
-                    ("if", 4)     => {
-                        let (test, conseq, alt) = (&list[1], &list[2], &list[3]);
-                        match Self::eval(test, ctx) {
-                            Err(err) => Err(err),
-                            Ok(LispExpr::False) => Self::eval(alt, ctx),
-                            Ok(_) => Self::eval(conseq, ctx),
-                        }
-                    },
-                    ("define", 3) => {
-                        match (&list[1], &list[2]) {
-                            (&LispExpr::Symbol(ref var), val) => match Self::eval(val, ctx) {
-                                Ok(expr) => { ctx.syms.insert(var.clone(), expr.clone()); Ok(expr) },
+                Some(&LispExpr::Symbol(ref first)) => {
+                    match &first[..] {
+                        "quote" => {
+                            check!(list.len() == 2, EvalErr::InvalidExpr);
+                            Ok(list[1].clone())
+                        },
+                        "if" => {
+                            check!(list.len() == 4, EvalErr::InvalidExpr);
+                            let (test, conseq, alt) = (&list[1], &list[2], &list[3]);
+                            match Self::eval(test, ctx) {
+                                Ok(LispExpr::False) => Self::eval(alt, ctx),
+                                Ok(_) => Self::eval(conseq, ctx),
                                 Err(err) => Err(err)
-                            },
-                            _ => Err(EvalErr::InvalidExpr)
-                        }
-                    },
-                    ("lambda", 3) => {
-                        let body = &list[2];
-                        let mut vars = Vec::new();
-                        if let LispExpr::List(ref vs) = list[1] {
-                            for v in vs.iter() {
-                                match v {
-                                    &LispExpr::Symbol(ref x) => syms.push(x.clone()),
-                                    _ => return Err(EvalErr::InvalidExpr)
+                            }
+                        },
+                        "define" => {
+                            check!(list.len() == 3, EvalErr::InvalidExpr);
+                            match (&list[1], &list[2]) {
+                                (&LispExpr::Symbol(ref var), expr) => match Self::eval(expr, ctx) {
+                                    Ok(value) => { ctx.syms.insert(var.clone(), value.clone()); Ok(value) },
+                                    Err(err) => Err(err)
+                                },
+                                _ => Err(EvalErr::InvalidExpr)
+                            }
+                        },
+                        "lambda" => {
+                            check!(list.len() == 3, EvalErr::InvalidExpr);
+                            let mut vars = Vec::new();
+                            match list[1] {
+                                LispExpr::List(ref varlist) => for var in varlist.iter() {
+                                    match var {
+                                        &LispExpr::Symbol(ref v) => vars.push(v.clone()),
+                                        _ => return Err(EvalErr::InvalidExpr)
+                                    }
+                                },
+                                _ => return Err(EvalErr::InvalidExpr)
+                            };
+                            let body = &list[2];
+                            Ok(LispExpr::Proc(Rc::new(
+                                Procedure::new(vars, body.clone(), Rc::new(ctx.clone())))))
+                        },
+                        _ => {
+                            let mut args = Vec::new();
+                            for arg in list.iter().skip(1) {
+                                match Self::eval(arg, ctx) {
+                                    Err(err) => return Err(err),
+                                    Ok(expr) => args.push(expr)
                                 }
                             }
-                        } else {
-                            return Err(EvalErr::InvalidExpr); // arg list should be a list
-                        }
-                        Ok(LispExpr::Proc(Box::new(Procedure::new(vars, body.clone(), Rc::new(ctx.clone())))))
-                    },
-                    (_, _) => {
-                        let mut args = Vec::new();
-                        for arg in list.iter().skip(1) {
-                            match Self::eval(arg, ctx) {
-                                Err(err) => return Err(err),
-                                Ok(expr) => args.push(expr)
+                            let cx = match ctx.lookup(first) {
+                                Some(cx) => cx,
+                                None => return Err(EvalErr::UnknownFunction(first.clone()))
+                            };
+                            match cx.syms.get(first) {
+                                Some(&LispExpr::Proc(ref pr)) => pr.call(args),
+                                _ => Err(EvalErr::UnknownFunction(first.clone()))
                             }
                         }
-                        match ctx.lookup(pname) {
-                            Some(cx) => match cx.syms.get(pname) {
-                                Some(&LispExpr::Proc(ref pr)) => pr.call(args), // TODO: eval arg-0
-                                _ => Err(EvalErr::UnknownFunction(pname.clone()))
-                            },
-                            None => Err(EvalErr::UnknownFunction(pname.clone()))
-                        }
-                    },
+                    }
                 },
-                Some(&LispExpr::List(_)) => { Err(EvalErr::NotImplemented) },
-                _ => Err(EvalErr::NotCallable) // list.first is None or LispExpr::Number
-
+                Some(&LispExpr::List(ref first)) => {
+                    let mut expr = match Self::eval(&LispExpr::List(first.clone()), ctx) {
+                        Err(err) => return Err(err),
+                        Ok(sym) => vec![sym]
+                    };
+                    expr.extend(list.iter().skip(1).cloned());
+                    Self::eval(&LispExpr::List(expr), ctx)
+                },
+                Some(&LispExpr::Proc(ref first)) => {
+                    let mut args = Vec::new();
+                    for arg in list.iter().skip(1) {
+                        match Self::eval(arg, ctx) {
+                            Err(err) => return Err(err),
+                            Ok(expr) => args.push(expr)
+                        }
+                    }
+                    first.call(args)
+                },
+                _ => Err(EvalErr::InvalidExpr)
             }
         }
     }

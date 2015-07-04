@@ -4,13 +4,11 @@ use std::rc::Rc;
 
 pub type Fp = Rc<Fn(&Vec<LispExpr>) -> Result<LispExpr, EvalErr>>;
 
-#[derive(Clone)]
 enum Body {
     Lisp(LispExpr),
     Builtin(Fp),
 }
 
-#[derive(Clone)]
 pub struct Procedure {
     params: Vec<String>,
     body: Body,

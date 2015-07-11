@@ -53,14 +53,14 @@ impl LispContext {
         }
     }
 
-    pub fn eval_str(&mut self, expr: &str) -> Result<LispExpr, EvalErr> {
+    pub fn eval_str(expr: &str) -> Result<LispExpr, EvalErr> {
         match Parser::parse_str(expr) {
-            Ok(ref expr) => Self::eval(expr, self),
+            Ok(ref expr) => Self::eval(expr, &Rc::new(LispContext::new())),
             Err(err) => Err(EvalErr::ParseError(err))
         }
     }
 
-    pub fn eval(expr: &LispExpr, ctx: &mut LispContext) -> Result<LispExpr, EvalErr> {
+    pub fn eval(expr: &LispExpr, ctx: &Rc<LispContext>) -> Result<LispExpr, EvalErr> {
         match expr {
             &LispExpr::True => Ok(LispExpr::True),
             &LispExpr::False => Ok(LispExpr::False),
@@ -137,8 +137,7 @@ impl LispContext {
                                 _ => return Err(EvalErr::InvalidExpr)
                             };
                             let body = &list[2];
-                            Ok(LispExpr::Proc(Rc::new(
-                                Procedure::new(vars, body.clone(), Rc::new(ctx.clone()))))) // TODO: don't clone ctx
+                            Ok(LispExpr::Proc(Rc::new(Procedure::new(vars, body.clone(), ctx.clone()))))
                         },
                         _ => {
                             let mut args = Vec::new();

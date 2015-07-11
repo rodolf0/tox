@@ -42,8 +42,8 @@ impl Procedure {
         match self.body {
             Body::Builtin(ref fp) => fp(&args),
             Body::Lisp(ref expr) => {
-                let mut env = LispContext::nested(self.params.clone(), args, self.env.clone());
-                LispContext::eval(expr, &mut env)
+                let env = LispContext::nested(self.params.clone(), args, self.env.clone());
+                LispContext::eval(expr, &Rc::new(env))
             }
         }
     }

@@ -3,6 +3,7 @@ use lisp::builtins;
 
 use std::collections::HashMap;
 use std::iter::FromIterator;
+use std::cell::RefCell;
 use std::rc::Rc;
 
 macro_rules! check {
@@ -23,28 +24,30 @@ pub enum EvalErr {
 
 #[derive(Clone)]
 pub struct LispContext {
-    syms: HashMap<String, LispExpr>,
+    syms: RefCell<HashMap<String, LispExpr>>,
     outer: Option<Rc<LispContext>>,
 }
 
 impl LispContext {
     pub fn new() -> LispContext {
-        LispContext{syms: builtins(), outer: None}
+        LispContext{syms: RefCell::new(builtins()), outer: None}
     }
 
     pub fn nested(params: Vec<String>, args: Vec<LispExpr>,
                   outer: Option<Rc<LispContext>>) -> LispContext {
         LispContext{
-            syms: HashMap::from_iter(params.into_iter().zip(args.into_iter())),
+            syms: RefCell::new(
+                    HashMap::from_iter(
+                        params.into_iter().zip(args.into_iter()))),
             outer: outer
         }
     }
 
     pub fn lookup(&self, sym: &str) -> Option<&LispContext> {
-        if self.syms.contains_key(sym) {
+        if self.syms.borrow().contains_key(sym) {
             Some(self)
-        } else if let Some(ref octx) = self.outer {
-            octx.lookup(sym)
+        } else if let Some(ref otx) = self.outer {
+            otx.lookup(sym)
         } else {
             None
         }
@@ -65,7 +68,7 @@ impl LispContext {
             &LispExpr::Number(num) => Ok(LispExpr::Number(num)),
             &LispExpr::Proc(ref p) => Ok(LispExpr::Proc(p.clone())),
             &LispExpr::Symbol(ref sym) => match ctx.lookup(sym) {
-                Some(cx) => Ok(cx.syms.get(sym).unwrap().clone()),
+                Some(cx) => Ok(cx.syms.borrow().get(sym).unwrap().clone()),
                 None => Err(EvalErr::UnknownSym(sym.clone()))
             },
 
@@ -94,7 +97,28 @@ impl LispContext {
                             check!(list.len() == 3, EvalErr::InvalidExpr);
                             match (&list[1], &list[2]) {
                                 (&LispExpr::Symbol(ref var), expr) => match Self::eval(expr, ctx) {
-                                    Ok(value) => { ctx.syms.insert(var.clone(), value.clone()); Ok(value) },
+                                    Ok(value) => {
+                                        ctx.syms.borrow_mut().insert(var.clone(), value);
+                                        // TODO: should return None
+                                        Ok(LispExpr::True)
+                                    },
+                                    Err(err) => Err(err)
+                                },
+                                _ => Err(EvalErr::InvalidExpr)
+                            }
+                        },
+                        "set!" => {
+                            check!(list.len() == 3, EvalErr::InvalidExpr);
+                            match (&list[1], &list[2]) {
+                                (&LispExpr::Symbol(ref var), expr) => match Self::eval(expr, ctx) {
+                                    Ok(value) => {
+                                        match ctx.lookup(var) {
+                                            Some(cx) => cx.syms.borrow_mut().insert(var.clone(), value),
+                                            None => return Err(EvalErr::UnknownSym(var.clone()))
+                                        };
+                                        // TODO: should return None
+                                        Ok(LispExpr::True)
+                                    },
                                     Err(err) => Err(err)
                                 },
                                 _ => Err(EvalErr::InvalidExpr)
@@ -114,7 +138,7 @@ impl LispContext {
                             };
                             let body = &list[2];
                             Ok(LispExpr::Proc(Rc::new(
-                                Procedure::new(vars, body.clone(), Rc::new(ctx.clone())))))
+                                Procedure::new(vars, body.clone(), Rc::new(ctx.clone()))))) // TODO: don't clone ctx
                         },
                         _ => {
                             let mut args = Vec::new();
@@ -124,12 +148,12 @@ impl LispContext {
                                     Ok(expr) => args.push(expr)
                                 }
                             }
-                            let cx = match ctx.lookup(first) {
-                                Some(cx) => cx,
+                            let opfirst = match ctx.lookup(first) {
+                                Some(cx) => cx.syms.borrow().get(first).cloned(),
                                 None => return Err(EvalErr::UnknownFunction(first.clone()))
                             };
-                            match cx.syms.get(first) {
-                                Some(&LispExpr::Proc(ref pr)) => pr.call(args),
+                            match opfirst {
+                                Some(LispExpr::Proc(pr)) => pr.call(args),
                                 _ => Err(EvalErr::UnknownFunction(first.clone()))
                             }
                         }

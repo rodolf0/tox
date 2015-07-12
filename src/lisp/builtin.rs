@@ -108,5 +108,9 @@ pub fn builtins() -> HashMap<String, LispExpr> {
         Some(&LispExpr::List(ref list)) if list.len() == 0 => Ok(LispExpr::True),
         _ => Ok(LispExpr::False)
     }));
+    builtins.insert(format!("begin"), builtin!(|args| match args.last() {
+        Some(expr) => Ok(expr.clone()),
+        _ => Err(EvalErr::InvalidExpr)
+    }));
     builtins
 }

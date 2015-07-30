@@ -20,3 +20,4 @@ pub use self::rpneval::MathContext;
 pub mod rpneval;
 #[cfg(test)]
 mod rpneval_test;
+pub mod rpnprint;

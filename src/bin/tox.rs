@@ -10,7 +10,7 @@ mod repl {
             Err(e) => println!("Parse error: {:?}", e),
             Ok(expr) => match MathContext::new().eval(&expr) {
                 Err(e) => println!("Eval error: {:?}", e),
-                Ok(result) => println!("{}", result)
+                Ok(result) => println!("{} = {}", expr, result)
             }
         };
     }

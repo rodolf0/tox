@@ -29,7 +29,7 @@ impl Token {
             Token::Op(ref o, 2) if o == "/" => (3, Assoc::Left),
             Token::Op(ref o, 2) if o == "%" => (3, Assoc::Left),
             Token::Op(ref o, 1) if o == "-" => (4, Assoc::Right), // unary minus
-            Token::Op(ref o, 2) if o == "^" => (5, Assoc::Right),
+            Token::Op(ref o, 2) if o == "^" => (4, Assoc::Right),
             Token::Op(ref o, 1) if o == "!" => (6, Assoc::Left),  // factorial
             Token::Function(_, _) |
             Token::OParen                   => (1, Assoc::Left),  // grouping/fn

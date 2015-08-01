@@ -3,7 +3,7 @@ use shunting::ShuntingParser;
 use shunting::MathContext;
 
 macro_rules! fuzzy_eq {
-    ($lhs:expr, $rhs:expr) => { num::abs($lhs - $rhs) < 1.0e-10 }
+    ($lhs:expr, $rhs:expr) => { assert!(num::abs($lhs - $rhs) < 1.0e-10) }
 }
 
 #[test]
@@ -14,8 +14,8 @@ fn test_eval1() {
 
 #[test]
 fn test_eval2() {
-    let expr = ShuntingParser::parse_str("3.4e-2 * sin(pi/3)/(540 % -4) * max(2, -7)").unwrap();
-    fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), -0.000286429);
+    let expr = ShuntingParser::parse_str("3.4e-2 * sin(pi/3)/(541 % -4) * max(2, -7)").unwrap();
+    fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), 0.058889727457341);
 }
 
 #[test]
@@ -46,4 +46,16 @@ fn test_eval6() {
 fn test_eval7() {
     let expr = ShuntingParser::parse_str("(3+4)*3").unwrap();
     fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), 21.0);
+}
+
+#[test]
+fn test_eval8() {
+    let expr = ShuntingParser::parse_str("2^3").unwrap();
+    fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), 8.0);
+    let expr = ShuntingParser::parse_str("2^-3").unwrap();
+    fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), 0.125);
+    let expr = ShuntingParser::parse_str("-2^3").unwrap();
+    fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), -8.0);
+    let expr = ShuntingParser::parse_str("-2^-3").unwrap();
+    fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), -0.125);
 }

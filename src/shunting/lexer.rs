@@ -22,17 +22,26 @@ pub enum Token {
 
 impl Token {
     pub fn precedence(&self) -> (usize, Assoc) {
+        // You can play with the relation between exponentiation an unary - by
+        // a. switching order in which the lexer tokenizes, if it tries
+        // operators first then '-' will never be the negative part of number,
+        // else if numbers are tried before operators, - can only be unary
+        // for non-numeric tokens (eg: -(3)).
+        // b. changing the precedence of '-' respect to '^'
+        // If '-' has lower precedence then 2^-3 will fail to evaluate if the
+        // '-' isn't part of the number because ^ will only find 1 operator
         match *self {
+            Token::OParen                   => (1, Assoc::Left),  // keep at bottom
             Token::Op(ref o, 2) if o == "+" => (2, Assoc::Left),
             Token::Op(ref o, 2) if o == "-" => (2, Assoc::Left),
             Token::Op(ref o, 2) if o == "*" => (3, Assoc::Left),
             Token::Op(ref o, 2) if o == "/" => (3, Assoc::Left),
             Token::Op(ref o, 2) if o == "%" => (3, Assoc::Left),
-            Token::Op(ref o, 1) if o == "-" => (4, Assoc::Right), // unary minus
-            Token::Op(ref o, 2) if o == "^" => (4, Assoc::Right),
+            Token::Op(ref o, 1) if o == "-" => (5, Assoc::Right), // unary minus
+            Token::Op(ref o, 2) if o == "^" => (5, Assoc::Right),
             Token::Op(ref o, 1) if o == "!" => (6, Assoc::Left),  // factorial
-            Token::Function(_, _) |
-            Token::OParen                   => (1, Assoc::Left),  // grouping/fn
+            // Func: could keep at bottom like OParen but '(' is already split
+            Token::Function(_, _)           => (7, Assoc::Left),
             _                               => (99, Assoc::None)
         }
     }
@@ -74,8 +83,8 @@ impl Lexer {
 impl Nexter<Token> for Tokenizer {
     fn get_item(&mut self) -> Option<Token> {
         self.src.ignore_ws();
-        let token = self.match_varfunc().
-            or_else(|| self.match_operator()).
+        let token = self.match_operator().
+            or_else(|| self.match_varfunc()).
             or_else(|| self.match_number()).
             or_else(|| if self.src.next().is_some() {
                 Some(Token::Unknown(self.src.extract_string()))

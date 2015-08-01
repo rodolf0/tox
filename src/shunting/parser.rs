@@ -62,15 +62,15 @@ impl ShuntingParser {
                     let (prec_rhs, assoc_rhs) = token.precedence();
                     while !stack.is_empty() {
                         let (prec_lhs, _) = stack.last().unwrap().precedence();
-                        if prec_rhs > prec_lhs {
+                        if prec_lhs < prec_rhs {
                             break;
-                        } else if prec_rhs < prec_lhs {
+                        } else if prec_lhs > prec_rhs {
                             out.push(stack.pop().unwrap());
                         } else {
                             match assoc_rhs {
-                                Assoc::Right => break,
+                                Assoc::Left => out.push(stack.pop().unwrap()),
                                 Assoc::None => return Err(ParseError::NonAssoc),
-                                Assoc::Left => out.push(stack.pop().unwrap())
+                                Assoc::Right => break
                             }
                         }
                     }

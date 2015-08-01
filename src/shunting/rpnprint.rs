@@ -31,9 +31,6 @@ impl RPNExpr {
 impl fmt::Display for RPNExpr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 
-// (3 + 4) / (2 * (5 + 3))
-// 3 4 + 2 5 3 + * /
-
         fn printer(root: &AST) -> (String, (usize, Assoc)) {
             match root {
                 &AST::Leaf(ref token) => {
@@ -48,7 +45,7 @@ impl fmt::Display for RPNExpr {
                         &Token::Op(ref op, arity) if arity == 1 => {
                             let subtree = printer(&args[0]);
                             let (prec, assoc) = token.precedence();
-                            // TODO: not entirely correct
+                            // TODO: distinguish perfix/postfix operators
                             if prec > (subtree.1).0 {
                                 (format!("{}({})", op, subtree.0), (prec, assoc))
                             } else {
@@ -71,33 +68,24 @@ impl fmt::Display for RPNExpr {
                             } else {
                                 format!("{}", rhs.0)
                             };
-                            // TODO: figure out how '2+(3+4)' not print parens
+                            // NOTE: '2+(3+4)' will show parens to indicate that user
+                            // explicitly put them there
                             (format!("{} {} {}", lh, op, rh), (prec, assoc))
 
                         },
+                        &Token::Function(ref func, _) => {
+                            let expr = args.iter()
+                                .map(|leaf| printer(&leaf).0)
+                                .collect::<Vec<String>>()
+                                .connect(", ");
+                            (format!("{}({})", func, expr), token.precedence())
+                        },
                         _ => unreachable!()
                     }
-                },
-                //&AST::Node(&Token::Function(ref f, _), ref a) =>
-                /*
-                    let tok = match root {&AST::Node(tok, _) => tok, _ => unreachable!()};
-                    let (prec, assoc) = tok.precedence();
-                    let expr = a.iter()
-                        .map(|leaf| printer(leaf, prec))
-                        .collect::<Vec<String>>()
-                        .connect(&format!(" {} ", f));
-
-                    if prec < cur_prec ||
-                       prec == cur_prec && assoc == Assoc::Right {
-                        format!("({})", expr)
-                    } else {
-                        format!("{}", expr)
-                    }
-                */
+                }
             }
         }
 
-        let x = printer(&self.build_ast());
-        write!(f, "{}", x.0)
+        write!(f, "{}", printer(&self.build_ast()).0)
     }
 }

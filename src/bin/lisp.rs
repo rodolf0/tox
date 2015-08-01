@@ -1,10 +1,9 @@
 extern crate linenoise;
 extern crate tox;
 
-use std::rc::Rc;
-
 #[cfg(not(test))]
 fn main() {
+    use std::rc::Rc;
     use tox::lisp::{LispContext, Parser};
     let cx = Rc::new(LispContext::new());
     while let Some(input) = linenoise::input("~> ") {

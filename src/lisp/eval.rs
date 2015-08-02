@@ -72,10 +72,10 @@ impl LispContext {
                 None => Err(EvalErr::UnknownSym(sym.clone()))
             },
 
-            //&LispExpr::Quote(_) => Err(EvalErr::NotImplemented),
-            //&LispExpr::QuasiQuote(_) => Err(EvalErr::NotImplemented),
-            //&LispExpr::UnQuote(_) => Err(EvalErr::NotImplemented),
-            //&LispExpr::UnQSplice(_) => Err(EvalErr::NotImplemented),
+            &LispExpr::Quote(ref expr) => Ok(*expr.clone()),
+            &LispExpr::QuasiQuote(_) => Err(EvalErr::NotImplemented),
+            &LispExpr::UnQuote(_) => Err(EvalErr::NotImplemented),
+            &LispExpr::UnQSplice(_) => Err(EvalErr::NotImplemented),
 
             &LispExpr::List(ref list) => match list.first() {
                 Some(&LispExpr::Symbol(ref first)) => {

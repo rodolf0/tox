@@ -5,7 +5,7 @@ use std::ops;
 #[derive(Clone, PartialEq, Debug)]
 pub enum Token {
     OParen, CParen,
-    //Quote(String), QuasiQuote, UnQuote, UnQSplice,
+    Quote, QuasiQuote, UnQuote, UnQSplice,
     True, False,
     Symbol(String),
     Number(f64),
@@ -23,13 +23,12 @@ impl Nexter<Token> for Tokenizer {
             Some('(')  => Token::OParen,
             Some(')')  => Token::CParen,
 
-            // TODO parse quoted expr
-            //Some('\'') => Token::Quote,
-            //Some('`')  => Token::QuasiQuote,
-            //Some(',')  => match self.src.peek() {
-                //Some('@') => { self.src.next(); Token::UnQSplice },
-                //_ => Token::UnQuote,
-            //},
+            Some('\'') => Token::Quote,
+            Some('`')  => Token::QuasiQuote,
+            Some(',')  => match self.src.peek() {
+                Some('@') => { self.src.next(); Token::UnQSplice },
+                _ => Token::UnQuote,
+            },
 
             Some('"')  => {
                 self.src.until_chars("\"");
@@ -39,7 +38,7 @@ impl Nexter<Token> for Tokenizer {
                 } else {
                     let token = self.src.extract();
                     Token::String(token.iter()
-                                  .take(token.len() - 2)
+                                  .take(token.len() - 1)
                                   .skip(1).cloned().collect())
                 }
             },

@@ -89,6 +89,7 @@ pub fn builtins() -> HashMap<String, LispExpr> {
     builtins.insert(format!("cons"), builtin!(|args| cons(&args)));
     builtins.insert(format!("list"), builtin!(|args| Ok(LispExpr::List(args.clone()))));
     builtins.insert(format!("length"), builtin!(|args| match args.first() {
+        Some(&LispExpr::String(ref s)) => Ok(LispExpr::Number(s.len() as f64)),
         Some(&LispExpr::List(ref list)) => Ok(LispExpr::Number(list.len() as f64)),
         _ => Err(EvalErr::InvalidExpr)
     }));

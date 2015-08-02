@@ -17,10 +17,10 @@ pub enum LispExpr {
     Number(f64),
     True, False,
     Proc(Rc<Procedure>),
-    //Quote(Box<LispExpr>),
-    //QuasiQuote(Box<LispExpr>),
-    //UnQuote(Box<LispExpr>),
-    //UnQSplice(Box<LispExpr>),
+    Quote(Box<LispExpr>),
+    QuasiQuote(Box<LispExpr>),
+    UnQuote(Box<LispExpr>),
+    UnQSplice(Box<LispExpr>),
 }
 
 impl string::ToString for LispExpr {
@@ -41,10 +41,10 @@ impl string::ToString for LispExpr {
             &LispExpr::True  => format!("#t"),
             &LispExpr::False => format!("#f"),
             &LispExpr::Proc(ref p) => format!("{:?}", *p),
-            //&LispExpr::Quote(ref e) => format!("'{}", e.to_string()),
-            //&LispExpr::QuasiQuote(ref e) => format!("`{}", e.to_string()),
-            //&LispExpr::UnQuote(ref e) => format!(",{}", e.to_string()),
-            //&LispExpr::UnQSplice(ref e) => format!(",@{}", e.to_string()),
+            &LispExpr::Quote(ref e) => format!("'{}", e.to_string()),
+            &LispExpr::QuasiQuote(ref e) => format!("`{}", e.to_string()),
+            &LispExpr::UnQuote(ref e) => format!(",{}", e.to_string()),
+            &LispExpr::UnQSplice(ref e) => format!(",@{}", e.to_string()),
         }
     }
 }
@@ -77,10 +77,22 @@ impl Parser {
                 lex.next(); // get over that CParen
                 Ok(LispExpr::List(list))
             },
-            //Some(Token::Quote)      => Err(ParseError::NotImplemented),
-            //Some(Token::QuasiQuote) => Err(ParseError::NotImplemented),
-            //Some(Token::UnQuote)    => Err(ParseError::NotImplemented),
-            //Some(Token::UnQSplice)  => Err(ParseError::NotImplemented),
+            Some(Token::Quote) => {
+                let expr = try!(Parser::parse(lex));
+                Ok(LispExpr::Quote(Box::new(expr)))
+            },
+            Some(Token::QuasiQuote) => {
+                let expr = try!(Parser::parse(lex));
+                Ok(LispExpr::QuasiQuote(Box::new(expr)))
+            },
+            Some(Token::UnQuote) => {
+                let expr = try!(Parser::parse(lex));
+                Ok(LispExpr::UnQuote(Box::new(expr)))
+            },
+            Some(Token::UnQSplice) => {
+                let expr = try!(Parser::parse(lex));
+                Ok(LispExpr::UnQSplice(Box::new(expr)))
+            }
         }
     }
 }

@@ -4,9 +4,13 @@ version = "0.0.2"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 
 [features]
-dynlink-eval = []
+dynlink-eval = ["dylib"]
 
 [dependencies]
 linenoise-rust = "*"
 rand = "*"
 num = "*"
+
+[dependencies.dylib]
+version = "*"
+optional = true

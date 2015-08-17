@@ -110,11 +110,11 @@ impl MathContext {
 
 #[cfg(feature="dynlink-eval")]
 mod mathlink {
-    use std::dynamic_lib::DynamicLibrary;
+    extern crate dylib;
     use std::mem;
 
     pub fn link_fn(fname: &str) -> Result<fn(f64) -> f64, String> {
-        match DynamicLibrary::open(None) {
+        match dylib::DynamicLibrary::open(None) {
             Ok(lib) => unsafe {
                 match lib.symbol(fname) {
                     Ok(f) => Ok(mem::transmute::<*mut u8, fn(f64) -> f64>(f)),

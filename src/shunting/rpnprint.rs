@@ -77,7 +77,7 @@ impl fmt::Display for RPNExpr {
                             let expr = args.iter()
                                 .map(|leaf| printer(&leaf).0)
                                 .collect::<Vec<String>>()
-                                .connect(", ");
+                                .join(", ");
                             (format!("{}({})", func, expr), token.precedence())
                         },
                         _ => unreachable!()

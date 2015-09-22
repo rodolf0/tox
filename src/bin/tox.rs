@@ -46,7 +46,7 @@ mod repl {
 fn main() {
     if std::env::args().len() > 1 {
         let input = std::env::args().skip(1).
-            collect::<Vec<String>>().connect(" ");
+            collect::<Vec<String>>().join(" ");
         repl::evalexpr(&input[..]);
     } else {
         use tox::shunting::MathContext;

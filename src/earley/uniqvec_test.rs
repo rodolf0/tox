@@ -4,7 +4,7 @@ use std::iter::FromIterator;
 #[test]
 fn test1() {
     let mut uv = UniqVec::new();
-    let ins = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6];
+    let ins = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 0];
     uv.extend(ins.into_iter());
     assert_eq!(uv.len(), 10);
     uv.push(15);

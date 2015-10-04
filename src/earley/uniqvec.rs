@@ -4,15 +4,21 @@ use std::iter::FromIterator;
 use std::ops::Index;
 use std::rc::Rc;
 
+use std::slice;
+use std::iter;
 
-pub struct UniqedVec<T> {
+// checkout https://github.com/contain-rs/linked-hash-map
+// Could potentially replace Rc<T> with
+// struct Elem<T> { e: *const T } at the cost of extra complexity
+
+pub struct UniqVec<T> {
     order: Vec<Rc<T>>,
     dedup: HashSet<Rc<T>>,
 }
 
-impl<T: Hash + Eq> UniqedVec<T> {
-    pub fn new() -> UniqedVec<T> {
-        UniqedVec{order: Vec::new(), dedup: HashSet::new()}
+impl<T: Hash + Eq> UniqVec<T> {
+    pub fn new() -> UniqVec<T> {
+        UniqVec{order: Vec::new(), dedup: HashSet::new()}
     }
 
     pub fn push(&mut self, item: T) {
@@ -26,35 +32,31 @@ impl<T: Hash + Eq> UniqedVec<T> {
     pub fn len(&self) -> usize {
         self.dedup.len()
     }
+
+    pub fn iter<'a>(&'a self) ->
+    iter::Map<slice::Iter<'a, Rc<T>>, fn(&'a Rc<T>) -> &'a T> {
+        fn f<X>(e: &Rc<X>) -> &X {&**e};
+        self.order.iter().map(f)
+    }
 }
 
-impl<T: Hash + Eq> Index<usize> for UniqedVec<T> {
+impl<T: Hash + Eq> Index<usize> for UniqVec<T> {
     type Output = T;
     fn index<'b>(&'b self, idx: usize) -> &'b T {
         self.order.index(idx)
     }
 }
 
-impl<T: Hash + Eq> Extend<T> for UniqedVec<T> {
-    fn extend<I: IntoIterator<Item=T>>(&mut self, iter: I) {
-        for item in iter {
-            self.push(item);
-        }
+impl<T: Hash + Eq> Extend<T> for UniqVec<T> {
+    fn extend<I: IntoIterator<Item=T>>(&mut self, iterable: I) {
+        for item in iterable { self.push(item); }
     }
 }
 
-impl<T: Hash + Eq> FromIterator<T> for UniqedVec<T> {
-    fn from_iter<I: IntoIterator<Item=T>>(iter: I) -> Self {
-        let mut uniquedvec = UniqedVec::new();
-        uniquedvec.extend(iter.into_iter());
+impl<T: Hash + Eq> FromIterator<T> for UniqVec<T> {
+    fn from_iter<I: IntoIterator<Item=T>>(iterable: I) -> Self {
+        let mut uniquedvec = UniqVec::new();
+        uniquedvec.extend(iterable.into_iter());
         uniquedvec
     }
 }
-
-/*
-impl<'a, T: Hash + Eq> IntoIterator for &'a UniqedVec<T> {
-    type Item = &'a T;
-    type IntoIter = slice::Iter<'a, T>;
-    fn into_iter(self) -> slice::Iter<'a, T> { self.order.into_iter() }
-}
-*/

@@ -1,19 +1,17 @@
-use earley::uniquedvec::UniqedVec;
-
+use earley::UniqVec;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
+use std::fmt;
 
-// ex: let semicolon = Rc::new(|check| check == ";");
-// ex: let arithop = Rc::new(|op| op in ["+", "-", "*"]);
-// ex: let number = Rc::new(|op| op in [0-9]*);
+///////////////////////////////////////////////////////////
 pub struct Terminal {
-    pub f: Rc<Fn(&str) -> bool>,
+    func: Box<Fn(&str) -> bool>,
 }
 
 impl PartialEq for Terminal {
     fn eq(&self, other: &Terminal) -> bool {
-        self == other
+        self.id() == other.id()
     }
 }
 
@@ -21,45 +19,78 @@ impl Eq for Terminal {}
 
 impl Hash for Terminal {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        let addr = self as *const Terminal as u64;
-        addr.hash(state);
+        self.id().hash(state);
     }
 }
 
-// ex: 'Sum'
+impl fmt::Debug for Terminal {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Terminal[{}]", self.id())
+    }
+}
+
+impl Terminal {
+    pub fn check(&self, input: &str) -> bool {
+        (*self.func)(input)
+    }
+
+    fn id(&self) -> u64 {
+        &self.func as *const Box<_> as u64
+    }
+}
+
 pub type NonTerminal = String;
 
-#[derive(PartialEq, Eq, Hash)]
+///////////////////////////////////////////////////////////
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub enum Symbol {
     Terminal(Terminal),
     NonTerminal(NonTerminal),
 }
 
-#[derive(PartialEq, Eq, Hash)]
-pub struct Rule {
-    pub left: Symbol,
-    pub right: Vec<Symbol>,
+impl Symbol {
+    pub fn nonterm<S: Into<String>>(nt: S) -> Symbol {
+        Symbol::NonTerminal(nt.into())
+    }
+    //pub fn terminal<F: 'static + for<'a> Fn(&'a str) -> bool>(f: F) -> Symbol {
+    pub fn terminal<F: 'static + Fn(&str) -> bool>(f: F) -> Symbol {
+        Symbol::Terminal(Terminal{func: Box::new(f)})
+    }
 }
 
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub struct Rule {
+    pub name: NonTerminal,
+    pub spec: Vec<Symbol>,
+}
+
+impl Rule {
+    pub fn new<S: Into<String>>(name: S, spec: Vec<Symbol>) -> Rule {
+        Rule{
+            name: name.into(),
+            spec: spec,
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Item {
+    pub rule: Rc<Rule>,
+    pub start: usize,  // start of match (relative to input)
+    pub dot: usize,    // how far are we in the rule
+}
+
+impl Item {
+    pub fn next_symbol(&self) -> Option<&Symbol> {
+        self.rule.spec.get(self.dot)
+    }
+}
+
+///////////////////////////////////////////////////////////
 pub struct Grammar {
     pub start: NonTerminal,
     pub rules: HashMap<NonTerminal, Vec<Rc<Rule>>>,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Item {
-    pub rule: Rc<Rule>,
-    pub start: usize,  // where does the match start (relative to input)
-    // TODO: changed dot -> next? better reading algo?
-    pub dot: usize,    // how far are we in the rule
-}
-
-/*
-impl Item {
-    fn next_symbol(&self) {
-        self.rule[self.dot+1]
-    }
-}
-*/
-
-pub type StateSet = UniqedVec<Item>;
+pub type StateSet = UniqVec<Item>;

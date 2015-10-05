@@ -1,25 +1,29 @@
-use earley::UniqVec;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use std::fmt;
 
 ///////////////////////////////////////////////////////////
-pub struct Terminal {
-    func: Box<Fn(&str) -> bool>,
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub struct NonTerminal(String);
+
+impl NonTerminal {
+    pub fn new<S: Into<String>>(s: S) -> Self { NonTerminal(s.into()) }
 }
 
-impl PartialEq for Terminal {
-    fn eq(&self, other: &Terminal) -> bool {
-        self.id() == other.id()
+///////////////////////////////////////////////////////////
+pub struct Terminal(Box<Fn(&str)->bool>);
+
+impl Terminal {
+    pub fn new<F: 'static + Fn(&str)->bool>(f: F) -> Self {
+        Terminal(Box::new(f))
     }
-}
 
-impl Eq for Terminal {}
+    fn id(&self) -> u64 { self as *const Terminal as u64 }
 
-impl Hash for Terminal {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id().hash(state);
+    pub fn check(&self, input: &str) -> bool {
+        let &Terminal(ref func) = self;
+        func(input)
     }
 }
 
@@ -29,52 +33,75 @@ impl fmt::Debug for Terminal {
     }
 }
 
-impl Terminal {
-    pub fn check(&self, input: &str) -> bool {
-        (*self.func)(input)
-    }
-
-    fn id(&self) -> u64 {
-        &self.func as *const Box<_> as u64
-    }
+impl Hash for Terminal {
+    fn hash<H: Hasher>(&self, state: &mut H) { self.id().hash(state); }
 }
 
-pub type NonTerminal = String;
+impl PartialEq for Terminal {
+    fn eq(&self, other: &Terminal) -> bool { self.id() == other.id() }
+}
+
+impl Eq for Terminal {}
 
 ///////////////////////////////////////////////////////////
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(Debug, Hash, PartialEq, Eq)]
 pub enum Symbol {
-    Terminal(Terminal),
-    NonTerminal(NonTerminal),
+    NT(NonTerminal),
+    T(Terminal),
 }
 
-impl Symbol {
-    pub fn nonterm<S: Into<String>>(nt: S) -> Symbol {
-        Symbol::NonTerminal(nt.into())
-    }
-    //pub fn terminal<F: 'static + for<'a> Fn(&'a str) -> bool>(f: F) -> Symbol {
-    pub fn terminal<F: 'static + Fn(&str) -> bool>(f: F) -> Symbol {
-        Symbol::Terminal(Terminal{func: Box::new(f)})
-    }
+impl From<Terminal> for Symbol {
+    fn from(t: Terminal) -> Symbol { Symbol::T(t) }
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
+impl From<NonTerminal> for Symbol {
+    fn from(nt: NonTerminal) -> Symbol { Symbol::NT(nt) }
+}
+
+///////////////////////////////////////////////////////////
+#[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Rule {
-    pub name: NonTerminal,
-    pub spec: Vec<Symbol>,
+    pub name: Rc<Symbol>,
+    pub spec: Vec<Rc<Symbol>>,
 }
 
-impl Rule {
-    pub fn new<S: Into<String>>(name: S, spec: Vec<Symbol>) -> Rule {
-        Rule{
-            name: name.into(),
-            spec: spec,
+///////////////////////////////////////////////////////////
+pub struct Grammar {
+    pub start: String,
+    pub symbols: HashMap<String, Rc<Symbol>>,
+    pub rules: HashMap<String, Vec<Rule>>,
+}
+
+impl Grammar {
+    pub fn new<S: Into<String>>(start: S) -> Grammar {
+        Grammar{
+            start: start.into(),
+            symbols: HashMap::new(),
+            rules: HashMap::new(),
         }
     }
+
+    // register symbols used to build grammar rules
+    pub fn set_sym<N, S>(&mut self, name: N, symbol: S)
+        where N: Into<String>, S: Into<Symbol> {
+        self.symbols.insert(name.into(), Rc::new(symbol.into()));
+    }
+
+    // add new named grammar rule, rules are kept in order of addition
+    pub fn add_rule<S>(&mut self, name: S, spec: Vec<S>)
+    where S: Into<String> + AsRef<str> {
+        let rule = Rule{
+            name: self.symbols[name.as_ref()].clone(),
+            spec: spec.iter()
+                    .map(|s| self.symbols[s.as_ref()].clone())
+                    .collect(),
+        };
+        self.rules.entry(name.into()).or_insert(Vec::new()).push(rule);
+    }
 }
 
 ///////////////////////////////////////////////////////////
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Item {
     pub rule: Rc<Rule>,
     pub start: usize,  // start of match (relative to input)
@@ -82,15 +109,7 @@ pub struct Item {
 }
 
 impl Item {
-    pub fn next_symbol(&self) -> Option<&Symbol> {
+    pub fn next_symbol(&self) -> Option<&Rc<Symbol>> {
         self.rule.spec.get(self.dot)
     }
 }
-
-///////////////////////////////////////////////////////////
-pub struct Grammar {
-    pub start: NonTerminal,
-    pub rules: HashMap<NonTerminal, Vec<Rc<Rule>>>,
-}
-
-pub type StateSet = UniqVec<Item>;

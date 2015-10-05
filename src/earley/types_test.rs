@@ -1,52 +1,66 @@
-use earley::{Terminal, NonTerminal, Symbol, Rule, Item, StateSet};
+use earley::uniqvec::UniqVec;
+use earley::types::*;
 use std::rc::Rc;
 
-#[test]
-fn test1() {
-    fn ops(c: &str) -> bool {
-        let ops = "+-";
-        c.len() == 1 && ops.contains(c)
-    }
+#[cfg(test)]
+fn ops(o: &str) -> bool {
+    let ops = "+-";
+    o.len() == 1 && ops.contains(o)
+}
 
-    let term_ops = Symbol::terminal(ops);
-    let term_num = Symbol::terminal(|c: &str| {
-        let nums = "1234567890";
-        c.len() == 1 && nums.contains(c)
+#[test]
+fn symbol_uniqueness() {
+    let s_sum = Rc::new(Symbol::from(NonTerminal::new("Sum")));
+    let s_num = Rc::new(Symbol::from(Terminal::new(|n: &str| {
+                    let nums = "1234567890";
+                    n.len() == 1 && nums.contains(n)
+                })));
+    let s_ops = Rc::new(Symbol::from(Terminal::new(ops)));
+
+    let r1 = Rc::new(Rule{
+        name: s_sum.clone(),
+        spec: vec![s_sum.clone(), s_num.clone(), s_ops.clone()],
     });
 
-    let rule1 = Rule::new("Sum", vec![
-      Symbol::nonterm("Sum"),
-      term_ops,
-      Symbol::nonterm("Number")]);
+    let i1 = Item{rule: r1.clone(), start: 0, dot: 0};
+    let i2 = Item{rule: r1.clone(), start: 0, dot: 0};
+    assert_eq!(i1, i2);
 
-    let rule2 = Rule::new("Sum", vec![
-      Symbol::nonterm("Sum"),
-      term_ops,
-      Symbol::nonterm("Number")]);
+    // Check that Items work correctly with UniqVecs
+    let mut state_set = UniqVec::new();
+    state_set.push(i1);
+    state_set.push(i2);
+    assert_eq!(state_set.len(), 1);
 
-    assert_eq!(rule1, rule2);
+    state_set.push(Item{rule: r1.clone(), start: 0, dot: 1});
+    assert_eq!(state_set.len(), 2);
+}
 
-        /*
-    // can only be used once, will be moved
-    let numeric = |c: &str| {
+
+#[test]
+fn build_grammar() {
+    let mut g = Grammar::new("Sum");
+
+    // register some symbols
+    g.set_sym("Sum", NonTerminal::new("Sum"));
+    g.set_sym("Number", NonTerminal::new("Number"));
+    g.set_sym("[+-]", Terminal::new(ops));
+    g.set_sym("[0-9]", Terminal::new(|n: &str| {
         let nums = "1234567890";
-        c.len() == 1 && nums.contains(c)
-    };
+        n.len() == 1 && nums.contains(n)
+    }));
 
-    // Sum    -> Sum [+-] Number | Number
-    // Number -> [0-9] Number | [0-9] (fancy [0-9]+)
-    let rules = vec![
-        Rule::new("Sum", vec![
-                  Symbol::nonterm("Sum"),
-                  Symbol::terminal(ops),
-                  Symbol::nonterm("Number")]),
-        Rule::new("Sum", vec![
-                  Symbol::nonterm("Number")]),
-        Rule::new("Number", vec![
-                  Symbol::terminal(numeric),
-                  Symbol::nonterm("Number")]),
-        Rule::new("Number", vec![
-                  Symbol::terminal(numeric)]),
-    ];
-    */
+    g.add_rule("Sum",    vec!["Sum", "[+-]", "Number"]);
+    g.add_rule("Sum",    vec!["Number"]);
+    g.add_rule("Number", vec!["[0-9]", "Number"]);
+    g.add_rule("Number", vec!["[0-9]"]);
+
+    assert_eq!(g.start, "Sum");
+    assert_eq!(g.symbols.len(), 4);
+    assert_eq!(g.rules["Sum"].len(), 2);
+    assert_eq!(g.rules["Number"].len(), 2);
+
+    // check symbol override
+    g.set_sym("Sum", NonTerminal::new("Sum"));
+    assert_eq!(g.symbols.len(), 4);
 }

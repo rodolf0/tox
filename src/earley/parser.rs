@@ -55,7 +55,8 @@ impl EarleyParser {
     // Symbol after fat-dot is Term. If input matches symbol add to next state
     fn scan(&self, item: &Item,
             sym: &Terminal, input: &str, s_next: &mut StateSet) {
-        if sym.check(input) {
+        //if sym.check(input) {
+        if (*sym)(input) {
             s_next.push(Item{
                 rule: item.rule.clone(),
                 start: item.start,

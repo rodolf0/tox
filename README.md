@@ -1,4 +1,4 @@
-# tox
+## tox
 
 A command line math parser using shunting yard algorithm written in rust.
 

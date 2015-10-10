@@ -11,6 +11,7 @@ use std::iter;
 // Could potentially replace Rc<T> with
 // struct Elem<T> { e: *const T } at the cost of extra complexity
 
+#[derive(Clone)]
 pub struct UniqVec<T> {
     order: Vec<Rc<T>>,
     dedup: HashSet<Rc<T>>,
@@ -39,6 +40,13 @@ impl<T: Hash + Eq> UniqVec<T> {
         self.order.iter().map(f)
     }
 }
+
+impl<T: Clone> UniqVec<T> {
+    pub fn to_vec(&self) -> Vec<T> {
+        self.order.iter().map(|e| (**e).clone()).collect()
+    }
+}
+
 
 impl<T: Hash + Eq> Index<usize> for UniqVec<T> {
     type Output = T;

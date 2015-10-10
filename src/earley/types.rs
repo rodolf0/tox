@@ -1,11 +1,12 @@
+use earley::uniqvec::UniqVec;
 use std::collections::HashMap;
+use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
-use std::fmt;
 
 ///////////////////////////////////////////////////////////
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub struct NonTerminal(String);
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct NonTerminal(pub String);
 
 impl NonTerminal {
     pub fn new<S: Into<String>>(s: S) -> Self { NonTerminal(s.into()) }
@@ -66,10 +67,28 @@ pub struct Rule {
 }
 
 ///////////////////////////////////////////////////////////
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct Item {
+    pub rule: Rc<Rule>,
+    pub start: usize,  // start of match (relative to input)
+    pub dot: usize,    // how far are we in the rule
+}
+
+impl Item {
+    pub fn next_symbol<'a>(&'a self) -> Option<&'a Symbol> {
+        if let Some(symbol) = self.rule.spec.get(self.dot) {
+            Some(&*symbol)
+        } else {
+            None
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////
 pub struct Grammar {
     pub start: String,
     pub symbols: HashMap<String, Rc<Symbol>>,
-    pub rules: HashMap<String, Vec<Rule>>,
+    pub rules: HashMap<String, Vec<Rc<Rule>>>,
 }
 
 impl Grammar {
@@ -90,26 +109,16 @@ impl Grammar {
     // add new named grammar rule, rules are kept in order of addition
     pub fn add_rule<S>(&mut self, name: S, spec: Vec<S>)
     where S: Into<String> + AsRef<str> {
-        let rule = Rule{
+        let rule = Rc::new(Rule{
             name: self.symbols[name.as_ref()].clone(),
             spec: spec.iter()
                     .map(|s| self.symbols[s.as_ref()].clone())
                     .collect(),
-        };
+        });
         self.rules.entry(name.into()).or_insert(Vec::new()).push(rule);
     }
 }
 
 ///////////////////////////////////////////////////////////
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub struct Item {
-    pub rule: Rc<Rule>,
-    pub start: usize,  // start of match (relative to input)
-    pub dot: usize,    // how far are we in the rule
-}
-
-impl Item {
-    pub fn next_symbol(&self) -> Option<&Rc<Symbol>> {
-        self.rule.spec.get(self.dot)
-    }
-}
+pub type StateSet = UniqVec<Item>;
+//pub struct StateSet(UniqVec<Item>);

@@ -9,7 +9,10 @@ mod types;
 #[cfg(test)]
 mod types_test;
 
-pub use self::parser::EarleyParser;
+pub use self::lexer::Lexer;
+mod lexer;
+
+pub use self::parser::{ParseError, EarleyParser};
 pub mod parser;
-//#[cfg(test)]
-//mod parser_test;
+#[cfg(test)]
+mod parser_test;

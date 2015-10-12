@@ -31,7 +31,7 @@ pub fn build_state(&self, tok: &mut Lexer) -> Result<Vec<StateSet>, ParseError> 
     // Outere loop goes over each stateset
     let mut state_idx = 0;
     while state_idx < states.len() {
-        let input = tok.next();
+        //let input = tok.next();
         // Inner loop goes over each item in a stateset
         let mut item_idx = 0;
         while item_idx < states[state_idx].len() {
@@ -45,12 +45,14 @@ pub fn build_state(&self, tok: &mut Lexer) -> Result<Vec<StateSet>, ParseError> 
                 // Found terminal, scan the input to check if it matches
                 Some(&Symbol::T(ref terminal)) => {
                     let next_idx = state_idx + 1;
-                    if states.len() < next_idx {
+                    if states.len() <= next_idx {
                         states.push(StateSet::new());
                     }
                     let next_state = states.get_mut(next_idx).unwrap();
-                    let input = try!(input.clone().ok_or(ParseError::MissingInput));
-                    self.scan(&item, terminal, &input, next_state);
+                    //let input = try!(input.clone().ok_or(ParseError::MissingInput));
+                    if let Some(input) = tok.next() {
+                        self.scan(&item, terminal, &input, next_state);
+                    }
                 },
                 // we reached the end of the item's rule, trigger completion
                 None => {

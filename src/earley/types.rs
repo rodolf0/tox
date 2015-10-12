@@ -13,6 +13,7 @@ impl NonTerminal {
 }
 
 ///////////////////////////////////////////////////////////
+// TODO: grammar on function input
 pub struct Terminal(Box<Fn(&str)->bool>);
 
 impl Terminal {
@@ -121,4 +122,3 @@ impl Grammar {
 
 ///////////////////////////////////////////////////////////
 pub type StateSet = UniqVec<Item>;
-//pub struct StateSet(UniqVec<Item>);

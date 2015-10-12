@@ -38,5 +38,12 @@ fn test1() {
     let mut input = Lexer::from_str("1+(2*3+4)", "+*-/()");
     let p = EarleyParser::new(g);
 
-    let state = p.build_state(&mut input);
+    let state = p.build_state(&mut input).unwrap();
+
+    for (idx, stateset) in state.iter().enumerate() {
+        println!("=== {} ===", idx);
+        for i in stateset.iter() {
+            println!("{:?} -> {:?}", i.rule.name, i.rule.spec);
+        }
+    }
 }

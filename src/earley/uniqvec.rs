@@ -3,8 +3,7 @@ use std::hash::Hash;
 use std::iter::FromIterator;
 use std::ops::Index;
 use std::rc::Rc;
-use std::slice;
-use std::iter;
+use std::{slice, iter, fmt};
 
 // checkout https://github.com/contain-rs/linked-hash-map
 // Could potentially replace Rc<T> with
@@ -65,5 +64,11 @@ impl<T: Hash + Eq> FromIterator<T> for UniqVec<T> {
         let mut uniquedvec = UniqVec::new();
         uniquedvec.extend(iterable.into_iter());
         uniquedvec
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for UniqVec<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.order.fmt(f)
     }
 }

@@ -1,8 +1,8 @@
 use earley::{Terminal, NonTerminal, Grammar};
 use earley::{Lexer, EarleyParser};
 
-#[test]
-fn test1() {
+#[cfg(test)]
+fn build_grammar() -> Grammar {
     let mut g = Grammar::new("Sum");
 
     // register some symbols
@@ -35,15 +35,29 @@ fn test1() {
     assert_eq!(g.rules["Product"].len(), 2);
     assert_eq!(g.rules["Factor"].len(), 2);
 
+    return g;
+}
+
+
+#[test]
+fn test1() {
+    let g = build_grammar();
     let mut input = Lexer::from_str("1+(2*3+4)", "+*-/()");
     let p = EarleyParser::new(g);
 
     let state = p.build_state(&mut input).unwrap();
-
     for (idx, stateset) in state.iter().enumerate() {
         println!("=== {} ===", idx);
         for i in stateset.iter() {
             println!("{}|{}  {:?} -> {:?}", i.start, i.dot, i.rule.name, i.rule.spec);
         }
     }
+}
+
+#[test]
+fn test2() {
+    let g = build_grammar();
+    let mut input = Lexer::from_str("1+", "+*-/()");
+    let p = EarleyParser::new(g);
+    assert!(p.build_state(&mut input).is_err());
 }

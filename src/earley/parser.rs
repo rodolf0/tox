@@ -75,22 +75,26 @@ pub fn build_state(&self, tok: &mut Lexer) -> Result<Vec<StateSet>, ParseError> 
         }
         state_idx += 1;
     }
-
-    // check parse results, TODO: partial parse
     assert!(states.len() == state_idx);
+    self.check_states(states)
+}
+
+fn check_states(&self, states: Vec<StateSet>) -> Result<Vec<StateSet>, ParseError> {
     {
         let last = try!(states.last().ok_or(ParseError::BadInput));
         // Check that at least one item is complete, starts at the beginning
         // and that the name of the rule matches the starting symbol
+        let start = Symbol::NT(NonTerminal::new(self.grammar.start.clone()));
         if last.iter()
             .filter(|item| item.dot == item.rule.spec.len() &&
                            item.start == 0 &&
-                           Some(&self.grammar.start) == item.rule.name.view_str())
+                           *item.rule.name == start)
             .count() < 1 {
             return Err(ParseError::BadInput);
         }
+        // if the last state didn't contain any valid completions and we're
+        // interested in partial parses (eg: headers) we can check  states
     }
-
     Ok(states)
 }
 

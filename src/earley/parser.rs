@@ -5,6 +5,7 @@ use earley::Lexer;
 #[derive(PartialEq, Debug)]
 pub enum ParseError {
     BadStartRule,
+    BadInput,
 }
 
 pub struct EarleyParser {
@@ -74,6 +75,22 @@ pub fn build_state(&self, tok: &mut Lexer) -> Result<Vec<StateSet>, ParseError> 
         }
         state_idx += 1;
     }
+
+    // check parse results, TODO: partial parse
+    assert!(states.len() == state_idx);
+    {
+        let last = try!(states.last().ok_or(ParseError::BadInput));
+        // Check that at least one item is complete, starts at the beginning
+        // and that the name of the rule matches the starting symbol
+        if last.iter()
+            .filter(|item| item.dot == item.rule.spec.len() &&
+                           item.start == 0 &&
+                           Some(&self.grammar.start) == item.rule.name.view_str())
+            .count() < 1 {
+            return Err(ParseError::BadInput);
+        }
+    }
+
     Ok(states)
 }
 

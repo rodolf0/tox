@@ -43,7 +43,7 @@ fn test1() {
     for (idx, stateset) in state.iter().enumerate() {
         println!("=== {} ===", idx);
         for i in stateset.iter() {
-            println!("{:?} -> {:?}", i.rule.name, i.rule.spec);
+            println!("{}|{}  {:?} -> {:?}", i.start, i.dot, i.rule.name, i.rule.spec);
         }
     }
 }

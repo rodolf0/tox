@@ -60,6 +60,15 @@ impl From<NonTerminal> for Symbol {
     fn from(nt: NonTerminal) -> Symbol { Symbol::NT(nt) }
 }
 
+impl Symbol {
+    pub fn view_str<'a>(&'a self) -> Option<&'a String> {
+        match self {
+            &Symbol::NT(ref nonterm) => Some(&nonterm.0),
+            _ => None
+        }
+    }
+}
+
 ///////////////////////////////////////////////////////////
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Rule {

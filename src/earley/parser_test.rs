@@ -35,6 +35,7 @@ fn build_grammar() -> Grammar {
     assert_eq!(g.rules["Product"].len(), 2);
     assert_eq!(g.rules["Factor"].len(), 2);
 
+    g.build_nullable();
     return g;
 }
 
@@ -61,3 +62,37 @@ fn test2() {
     let p = EarleyParser::new(g);
     assert!(p.build_state(&mut input).is_err());
 }
+
+#[test]
+fn test3() {
+    let mut g = Grammar::new("A");
+    // Build bogus grammar
+    g.set_sym("A", NonTerminal::new("A"));
+    g.set_sym("B", NonTerminal::new("B"));
+    g.add_rule("A", Vec::new());
+    g.add_rule("A", vec!["B"]);
+    g.add_rule("B", vec!["A"]);
+    // build nullable symbols
+    g.build_nullable();
+
+    assert_eq!(g.start, "A");
+    assert_eq!(g.symbols.len(), 2);
+
+    let mut input = Lexer::from_str("", "-");
+    let p = EarleyParser::new(g);
+
+    let state = p.build_state(&mut input).unwrap();
+    for (idx, stateset) in state.iter().enumerate() {
+        println!("=== {} ===", idx);
+        for i in stateset.iter() {
+            println!("{}|{}  {:?} -> {:?}", i.start, i.dot, i.rule.name, i.rule.spec);
+        }
+    }
+}
+
+
+/*
+ *
+ * Pow := Num '^' Pow | Num
+ *
+ */

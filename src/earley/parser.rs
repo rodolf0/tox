@@ -41,7 +41,7 @@ pub fn build_state(&self, tok: &mut Lexer) -> Result<Vec<StateSet>, ParseError> 
 
                 // Found non-terminal, do a prediction
                 Some(&Symbol::NT(ref nonterm)) => {
-                    self.prediction(&mut states[state_idx], nonterm, state_idx);
+                    self.prediction(&mut states[state_idx], nonterm, &item, state_idx);
                 },
 
                 // Found terminal, scan the input to check if it matches
@@ -99,11 +99,20 @@ fn check_states(&self, states: Vec<StateSet>) -> Result<Vec<StateSet>, ParseErro
 }
 
 // Symbol after fat-dot is NonTerm. Add the derived rules to current set
-fn prediction(&self, s_i: &mut StateSet, next_sym: &NonTerminal, start: usize) {
+fn prediction(&self, s_i: &mut StateSet, next_sym: &NonTerminal, item: &Item, start: usize) {
     let &NonTerminal(ref next_sym) = next_sym;
     if let Some(rules) = self.grammar.rules.get(next_sym) {
-        s_i.extend(
-            rules.iter().map(|r| Item{rule: r.clone(), start: start, dot: 0}));
+        for rule in rules.iter() {
+            s_i.push(Item{rule: rule.clone(), start: start, dot: 0});
+            let name = match &*rule.name {
+                &Symbol::NT(ref name) => &name.0,
+                _ => unreachable!()
+            };
+            if self.grammar.nullable.contains(name) {
+                s_i.push(Item{rule: item.rule.clone(),
+                              start: item.start, dot: item.dot + 1});
+            }
+        }
     }
 }
 

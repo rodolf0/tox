@@ -56,10 +56,29 @@ fn build_grammar() {
     gb.rule("Number", vec!["[0-9]", "Number"]);
     gb.rule("Number", vec!["[0-9]"]);
 
-    let g = gb.build("Sum");
+    let g = gb.into_grammar("Sum");
 
     assert_eq!(g.start, g.symbols["Sum"]);
     assert_eq!(g.symbols.len(), 4);
     assert_eq!(g.rules["Sum"].len(), 2);
     assert_eq!(g.rules["Number"].len(), 2);
+    assert_eq!(g.nullable.len(), 0);
+}
+
+#[test]
+fn test_nullable() {
+    let mut gb = GrammarBuilder::new();
+
+    gb.symbol(NonTerminal::new("A"));
+    gb.symbol(NonTerminal::new("B"));
+
+    gb.rule("A", Vec::new());
+    gb.rule("A", vec!["B"]);
+    gb.rule("B", vec!["A"]);
+
+    let g = gb.into_grammar("A");
+
+    assert_eq!(g.start, g.symbols["A"]);
+    assert_eq!(g.symbols.len(), 2);
+    assert_eq!(g.nullable.len(), 2);
 }

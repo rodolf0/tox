@@ -1,4 +1,4 @@
-use earley::UniqVec;
+use earley::uniqvec::UniqVec;
 use std::iter::FromIterator;
 
 #[test]

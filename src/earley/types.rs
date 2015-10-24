@@ -1,4 +1,3 @@
-use earley::uniqvec::UniqVec;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -11,6 +10,7 @@ pub struct NonTerminal(String);
 
 impl NonTerminal {
     pub fn new<S: Into<String>>(s: S) -> Self { NonTerminal(s.into()) }
+    pub fn name<'a>(&'a self) -> &'a str { &self.0 }
 }
 
 ///////////////////////////////////////////////////////////
@@ -30,6 +30,8 @@ impl Terminal {
         let &Terminal(_, ref func) = self;
         func(input)
     }
+
+    pub fn name<'a>(&'a self) -> &'a str { &self.0 }
 }
 
 impl fmt::Debug for Terminal {
@@ -62,10 +64,10 @@ pub enum Symbol {
 }
 
 impl Symbol {
-    pub fn str<'a>(&'a self) -> &'a str {
+    pub fn name<'a>(&'a self) -> &'a str {
         match self {
-            &Symbol::NT(ref sym) => &sym.0,
-            &Symbol::T(ref sym) => &sym.0,
+            &Symbol::NT(ref sym) => sym.name(),
+            &Symbol::T(ref sym) => sym.name(),
         }
     }
 }
@@ -81,7 +83,6 @@ impl From<NonTerminal> for Symbol {
 ///////////////////////////////////////////////////////////
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Rule {
-    // TODO: should these be Strings indexing the grammar's symbols?
     pub name: Rc<Symbol>,
     pub spec: Vec<Rc<Symbol>>,
 }
@@ -116,7 +117,7 @@ impl GrammarBuilder {
 
     pub fn symbol<S: Into<Symbol>>(&mut self, symbol: S) -> &mut Self {
         let symbol = symbol.into();
-        self.symbols.insert(symbol.str().to_string(), Rc::new(symbol));
+        self.symbols.insert(symbol.name().to_string(), Rc::new(symbol));
         self
     }
 
@@ -132,7 +133,7 @@ impl GrammarBuilder {
         self
     }
 
-    // return a set of nullable rules according to the current grammar
+    // return a set of nullable rules names according to the current grammar
     fn build_nullable(&self) -> HashSet<String> {
         let mut nullable: HashSet<String> = HashSet::new();
         loop {
@@ -143,12 +144,12 @@ impl GrammarBuilder {
                 // for a rule to be nullable all symbols in the spec need
                 // to be in the nullable set, else they're not nullable.
                 // All empty specs will therefore be nullable (all symbols are)
-                let isnull = rule.spec.iter().all(|symbol| match &**symbol {
-                    nonterm @ &Symbol::NT(_) => nullable.contains(nonterm.str()),
+                let isnullable = rule.spec.iter().all(|symbol| match &**symbol {
+                    nt @ &Symbol::NT(_) => nullable.contains(nt.name()),
                     _ => false,
                 });
-                if isnull {
-                    nullable.insert(rule.name.str().to_string());
+                if isnullable {
+                    nullable.insert(rule.name.name().to_string());
                 }
             }
             // we're done building the set when it no longer grows
@@ -157,7 +158,7 @@ impl GrammarBuilder {
         nullable
     }
 
-    pub fn build<S: AsRef<str>>(self, start: S) -> Grammar {
+    pub fn into_grammar<S: AsRef<str>>(self, start: S) -> Grammar {
         Grammar{
             start: self.symbols[start.as_ref()].clone(),
             nullable: self.build_nullable(),
@@ -167,13 +168,10 @@ impl GrammarBuilder {
     }
 }
 
-//pub struct EarleyParser {
+///////////////////////////////////////////////////////////
 pub struct Grammar {
     pub start: Rc<Symbol>,
     pub rules: HashMap<String, Vec<Rc<Rule>>>,
     pub symbols: HashMap<String, Rc<Symbol>>,
     pub nullable: HashSet<String>,
 }
-
-///////////////////////////////////////////////////////////
-pub type StateSet = UniqVec<Item>;

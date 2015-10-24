@@ -1,41 +1,39 @@
-use earley::{Terminal, NonTerminal, Grammar};
+use earley::{Terminal, NonTerminal, GrammarBuilder, Grammar};
 use earley::{Lexer, EarleyParser};
 
 #[cfg(test)]
 fn build_grammar() -> Grammar {
-    let mut g = Grammar::new("Sum");
-
+    let mut gb = GrammarBuilder::new();
     // register some symbols
-    g.set_sym("Sum", NonTerminal::new("Sum"));
-    g.set_sym("Product", NonTerminal::new("Product"));
-    g.set_sym("Factor", NonTerminal::new("Factor"));
-    g.set_sym("Number", Terminal::new(|n: &str| {
+    gb.symbol(NonTerminal::new("Sum"));
+    gb.symbol(NonTerminal::new("Product"));
+    gb.symbol(NonTerminal::new("Factor"));
+    gb.symbol(Terminal::new("Number", |n: &str| {
         n.chars().all(|c| "1234567890".contains(c))
     }));
-    g.set_sym("[+-]", Terminal::new(|n: &str| {
+    gb.symbol(Terminal::new("[+-]", |n: &str| {
         n.len() == 1 && "+-".contains(n)
     }));
-    g.set_sym("[*/]", Terminal::new(|n: &str| {
+    gb.symbol(Terminal::new("[*/]", |n: &str| {
         n.len() == 1 && "*/".contains(n)
     }));
-    g.set_sym("(", Terminal::new(|n: &str| { n == "(" }));
-    g.set_sym(")", Terminal::new(|n: &str| { n == ")" }));
-
+    gb.symbol(Terminal::new("(", |n: &str| { n == "(" }));
+    gb.symbol(Terminal::new(")", |n: &str| { n == ")" }));
     // add grammar rules
-    g.add_rule("Sum",     vec!["Sum", "[+-]", "Product"]);
-    g.add_rule("Sum",     vec!["Product"]);
-    g.add_rule("Product", vec!["Product", "[*/]", "Factor"]);
-    g.add_rule("Product", vec!["Factor"]);
-    g.add_rule("Factor",  vec!["(", "Sum", ")"]);
-    g.add_rule("Factor",  vec!["Number"]);
+    gb.rule("Sum",     vec!["Sum", "[+-]", "Product"]);
+    gb.rule("Sum",     vec!["Product"]);
+    gb.rule("Product", vec!["Product", "[*/]", "Factor"]);
+    gb.rule("Product", vec!["Factor"]);
+    gb.rule("Factor",  vec!["(", "Sum", ")"]);
+    gb.rule("Factor",  vec!["Number"]);
+    let g = gb.into_grammar("Sum");
 
-    assert_eq!(g.start, "Sum");
+    assert_eq!(g.start, g.symbols["Sum"]);
     assert_eq!(g.symbols.len(), 8);
     assert_eq!(g.rules["Sum"].len(), 2);
     assert_eq!(g.rules["Product"].len(), 2);
     assert_eq!(g.rules["Factor"].len(), 2);
 
-    g.build_nullable();
     return g;
 }
 
@@ -65,17 +63,17 @@ fn test2() {
 
 #[test]
 fn test3() {
-    let mut g = Grammar::new("A");
+    let mut gb = GrammarBuilder::new();
     // Build bogus grammar
-    g.set_sym("A", NonTerminal::new("A"));
-    g.set_sym("B", NonTerminal::new("B"));
-    g.add_rule("A", Vec::new());
-    g.add_rule("A", vec!["B"]);
-    g.add_rule("B", vec!["A"]);
-    // build nullable symbols
-    g.build_nullable();
+    gb.symbol(NonTerminal::new("A"));
+    gb.symbol(NonTerminal::new("B"));
+    gb.rule("A", Vec::new());
+    gb.rule("A", vec!["B"]);
+    gb.rule("B", vec!["A"]);
 
-    assert_eq!(g.start, "A");
+    let g = gb.into_grammar("A");
+
+    assert_eq!(g.start, g.symbols["A"]);
     assert_eq!(g.symbols.len(), 2);
 
     let mut input = Lexer::from_str("", "-");
@@ -89,10 +87,3 @@ fn test3() {
         }
     }
 }
-
-
-/*
- *
- * Pow := Num '^' Pow | Num
- *
- */

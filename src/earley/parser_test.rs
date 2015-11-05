@@ -41,7 +41,7 @@ fn build_grammar() -> Grammar {
 #[test]
 fn test1() {
     let g = build_grammar();
-    let mut input = Lexer::from_str("1+(2*3+4)", "+*-/()");
+    let mut input = Lexer::from_str("1+(2*3-4)", "+*-/()");
     let p = EarleyParser::new(g);
 
     let state = p.build_state(&mut input).unwrap();
@@ -49,6 +49,29 @@ fn test1() {
         println!("=== {} ===", idx);
         for i in stateset.iter() {
             println!("{}|{}  {:?} -> {:?}", i.start, i.dot, i.rule.name, i.rule.spec);
+        }
+    }
+}
+
+#[test]
+fn test1a() {
+    let g = build_grammar();
+    let mut input = Lexer::from_str("1+(2*3-4)", "+*-/()");
+    let p = EarleyParser::new(g);
+
+    let state = p.build_state(&mut input).unwrap();
+    for (idx, stateset) in state.iter().enumerate() {
+        println!("=== {} ===", idx);
+        for i in stateset.iter() {
+            println!("{}|{}  {:?} -> {:?}", i.start, i.dot, i.rule.name, i.rule.spec);
+        }
+    }
+
+    let state = p.build_parsetree(state);
+    for (k, v) in state.iter() {
+        println!("=== {} ===", k);
+        for &(ref rule, ref end) in v.iter() {
+            println!("({:?}) {:?}", end, rule);
         }
     }
 }

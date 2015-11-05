@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -36,7 +37,7 @@ impl Terminal {
 
 impl fmt::Debug for Terminal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "\"{}\"", self.0)
     }
 }
 
@@ -99,6 +100,10 @@ impl Item {
     pub fn next_symbol<'a>(&'a self) -> Option<&'a Symbol> {
         self.rule.spec.get(self.dot).map(|s| &**s)
     }
+
+    pub fn complete(&self) -> bool {
+        self.rule.spec.len() == self.dot
+    }
 }
 
 ///////////////////////////////////////////////////////////
@@ -121,6 +126,9 @@ impl GrammarBuilder {
         self
     }
 
+    // The order in which rules are added is significant. When more than one
+    // rule aplies while parsing, the first rule will have precedence, check
+    // EarleyParser::build_parsetree to see how rules are prioritized.
     pub fn rule<S>(&mut self, name: S, spec: Vec<S>) -> &mut Self
         where S: Into<String> + AsRef<str> {
         let rule = Rc::new(Rule{
@@ -172,6 +180,28 @@ impl GrammarBuilder {
 pub struct Grammar {
     pub start: Rc<Symbol>,
     pub rules: HashMap<String, Vec<Rc<Rule>>>,
+    pub rules: HashMap<String, Vec<Rc<Rule>>>,
     pub symbols: HashMap<String, Rc<Symbol>>,
     pub nullable: HashSet<String>,
 }
+
+/*
+impl Grammar {
+    // TODO: this is shit
+    pub fn rule_cmp(&self, a: Rc<Rule>, b: Rc<Rule>) -> Ordering {
+        if a.name == b.name {
+            if let Some(rules) = self.rules.get(a.name.name()) {
+                match rules.iter().find(|&x| *x == a || *x == b) {
+                    Some(x) if *x == a => Ordering::Less,
+                    Some(x) if *x == b => Ordering::Greater,
+                    _ => Ordering::Less,
+                }
+            } else {
+                Ordering::Less
+            }
+        } else {
+            a.name.name().cmp(b.name.name())
+        }
+    }
+}
+*/

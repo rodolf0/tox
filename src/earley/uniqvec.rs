@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::iter::FromIterator;
@@ -36,6 +37,10 @@ impl<T: Hash + Eq> UniqVec<T> {
     iter::Map<slice::Iter<'a, Rc<T>>, fn(&'a Rc<T>) -> &'a T> {
         fn f<X>(e: &Rc<X>) -> &X {&**e};
         self.order.iter().map(f)
+    }
+
+    pub fn sort_by<F>(&mut self, cmp: F) where F: Fn(&T, &T) -> Ordering {
+        self.order.sort_by(|a, b| cmp(&**a, &**b));
     }
 }
 

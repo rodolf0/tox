@@ -20,11 +20,12 @@ impl EarleyParser {
     pub fn build_state(&self, tok: &mut Lexer) -> Result<Vec<StateSet>, ParseError> {
         // Build S0 state building items out of each start rule
         let mut states = Vec::new();
-        let strt_rules = try!(self.g.rules.get(self.g.start.name())
-                               .ok_or(ParseError::BadStartRule));
-        states.push(strt_rules.iter()
+        states.push(self.g.rules(self.g.start.name())
                     .map(|r| Item{rule: r.clone(), start: 0, dot: 0})
                     .collect::<StateSet>());
+        if states[0].len() < 1 {
+            return Err(ParseError::BadStartRule);
+        }
 
         // Outere loop goes over each stateset
         let mut state_idx = 0;
@@ -91,14 +92,12 @@ impl EarleyParser {
 
     // Symbol after fat-dot is NonTerm. Add the derived rules to current set
     fn prediction(&self, s_i: &mut StateSet, next_sym: &NonTerminal, item: &Item, start: usize) {
-        if let Some(matching_rules) = self.g.rules.get(next_sym.name()) {
-            for rule in matching_rules.iter() {
-                s_i.push(Item{rule: rule.clone(), start: start, dot: 0});
-                // trigger magical completion for nullable rules
-                if self.g.nullable.contains(rule.name.name()) {
-                    s_i.push(Item{rule: item.rule.clone(),
-                                  start: item.start, dot: item.dot + 1});
-                }
+        for rule in self.g.rules(next_sym.name()) {
+            s_i.push(Item{rule: rule.clone(), start: start, dot: 0});
+            // trigger magical completion for nullable rules
+            if self.g.nullable.contains(rule.name.name()) {
+                s_i.push(Item{rule: item.rule.clone(),
+                              start: item.start, dot: item.dot + 1});
             }
         }
     }

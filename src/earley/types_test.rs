@@ -41,40 +41,33 @@ fn symbol_uniqueness() {
 #[test]
 fn build_grammar() {
     let mut gb = GrammarBuilder::new();
-
-    // register some symbols
-    gb.symbol(NonTerminal::new("Sum"));
-    gb.symbol(NonTerminal::new("Number"));
-    gb.symbol(Terminal::new("[+-]", ops));
-    gb.symbol(Terminal::new("[0-9]", |n: &str| {
-        let nums = "1234567890";
-        n.len() == 1 && nums.contains(n)
-    }));
-
-    gb.rule("Sum",    vec!["Sum", "[+-]", "Number"]);
-    gb.rule("Sum",    vec!["Number"]);
-    gb.rule("Number", vec!["[0-9]", "Number"]);
-    gb.rule("Number", vec!["[0-9]"]);
-
+    gb.symbol(NonTerminal::new("Sum"))
+      .symbol(NonTerminal::new("Number"))
+      .symbol(Terminal::new("[+-]", ops))
+      .symbol(Terminal::new("[0-9]", |n: &str| {
+          let nums = "1234567890";
+          n.len() == 1 && nums.contains(n)
+      }));
+    gb.rule("Sum",    vec!["Sum", "[+-]", "Number"])
+      .rule("Sum",    vec!["Number"])
+      .rule("Number", vec!["[0-9]", "Number"])
+      .rule("Number", vec!["[0-9]"]);
     let g = gb.into_grammar("Sum");
 
     assert_eq!(g.start, g.symbols["Sum"]);
     assert_eq!(g.symbols.len(), 4);
-    assert_eq!(g.rules["Sum"].len(), 2);
-    assert_eq!(g.rules["Number"].len(), 2);
+    assert_eq!(g.rules.len(), 4);
     assert_eq!(g.nullable.len(), 0);
 }
 
 #[test]
 fn test_nullable() {
     let mut gb = GrammarBuilder::new();
-
-    gb.symbol(NonTerminal::new("A"));
-    gb.symbol(NonTerminal::new("B"));
-
-    gb.rule("A", Vec::new());
-    gb.rule("A", vec!["B"]);
-    gb.rule("B", vec!["A"]);
+    gb.symbol(NonTerminal::new("A"))
+      .symbol(NonTerminal::new("B"));
+    gb.rule("A", Vec::new())
+      .rule("A", vec!["B"])
+      .rule("B", vec!["A"]);
 
     let g = gb.into_grammar("A");
 

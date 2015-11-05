@@ -5,34 +5,35 @@ use earley::{Lexer, EarleyParser};
 fn build_grammar() -> Grammar {
     let mut gb = GrammarBuilder::new();
     // register some symbols
-    gb.symbol(NonTerminal::new("Sum"));
-    gb.symbol(NonTerminal::new("Product"));
-    gb.symbol(NonTerminal::new("Factor"));
-    gb.symbol(Terminal::new("Number", |n: &str| {
-        n.chars().all(|c| "1234567890".contains(c))
-    }));
-    gb.symbol(Terminal::new("[+-]", |n: &str| {
-        n.len() == 1 && "+-".contains(n)
-    }));
-    gb.symbol(Terminal::new("[*/]", |n: &str| {
-        n.len() == 1 && "*/".contains(n)
-    }));
-    gb.symbol(Terminal::new("(", |n: &str| { n == "(" }));
-    gb.symbol(Terminal::new(")", |n: &str| { n == ")" }));
+    gb.symbol(NonTerminal::new("Sum"))
+      .symbol(NonTerminal::new("Product"))
+      .symbol(NonTerminal::new("Factor"))
+      .symbol(Terminal::new("Number", |n: &str| {
+          n.chars().all(|c| "1234567890".contains(c))
+        }))
+      .symbol(Terminal::new("[+-]", |n: &str| {
+          n.len() == 1 && "+-".contains(n)
+        }))
+      .symbol(Terminal::new("[*/]", |n: &str| {
+          n.len() == 1 && "*/".contains(n)
+        }))
+      .symbol(Terminal::new("(", |n: &str| { n == "(" }))
+      .symbol(Terminal::new(")", |n: &str| { n == ")" }));
     // add grammar rules
-    gb.rule("Sum",     vec!["Sum", "[+-]", "Product"]);
-    gb.rule("Sum",     vec!["Product"]);
-    gb.rule("Product", vec!["Product", "[*/]", "Factor"]);
-    gb.rule("Product", vec!["Factor"]);
-    gb.rule("Factor",  vec!["(", "Sum", ")"]);
-    gb.rule("Factor",  vec!["Number"]);
+    gb.rule("Sum",     vec!["Sum", "[+-]", "Product"])
+      .rule("Sum",     vec!["Product"])
+      .rule("Product", vec!["Product", "[*/]", "Factor"])
+      .rule("Product", vec!["Factor"])
+      .rule("Factor",  vec!["(", "Sum", ")"])
+      .rule("Factor",  vec!["Number"]);
+
     let g = gb.into_grammar("Sum");
 
     assert_eq!(g.start, g.symbols["Sum"]);
     assert_eq!(g.symbols.len(), 8);
-    assert_eq!(g.rules["Sum"].len(), 2);
-    assert_eq!(g.rules["Product"].len(), 2);
-    assert_eq!(g.rules["Factor"].len(), 2);
+    assert_eq!(g.rules("Sum").count(), 2);
+    assert_eq!(g.rules("Product").count(), 2);
+    assert_eq!(g.rules("Factor").count(), 2);
 
     return g;
 }

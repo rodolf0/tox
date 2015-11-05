@@ -1,8 +1,7 @@
 use std::collections::{HashMap, HashSet};
-use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::mem;
 use std::rc::Rc;
+use std::{mem, fmt};
 
 ///////////////////////////////////////////////////////////
 #[derive(Debug, Hash, PartialEq, Eq)]
@@ -104,14 +103,14 @@ impl Item {
 ///////////////////////////////////////////////////////////
 pub struct GrammarBuilder {
     symbols: HashMap<String, Rc<Symbol>>,
-    rules: HashMap<String, Vec<Rc<Rule>>>,
+    rules: Vec<Rc<Rule>>,
 }
 
 impl GrammarBuilder {
     pub fn new() -> GrammarBuilder {
         GrammarBuilder{
             symbols: HashMap::new(),
-            rules: HashMap::new(),
+            rules: Vec::new(),
         }
     }
 
@@ -122,14 +121,14 @@ impl GrammarBuilder {
     }
 
     pub fn rule<S>(&mut self, name: S, spec: Vec<S>) -> &mut Self
-        where S: Into<String> + AsRef<str> {
-        let rule = Rc::new(Rule{
+    where S: Into<String> + AsRef<str> {
+        let r = Rc::new(Rule{
             name: self.symbols[name.as_ref()].clone(),
             spec: spec.iter()
                     .map(|s| self.symbols[s.as_ref()].clone())
                     .collect(),
         });
-        self.rules.entry(name.into()).or_insert(Vec::new()).push(rule);
+        self.rules.push(r);
         self
     }
 
@@ -139,8 +138,7 @@ impl GrammarBuilder {
         loop {
             let old_size = nullable.len();
             // for-each rule in the grammar, check if it's nullable
-            let rules = self.rules.values().flat_map(|ruleset| ruleset.iter());
-            for rule in rules {
+            for rule in self.rules.iter() {
                 // for a rule to be nullable all symbols in the spec need
                 // to be in the nullable set, else they're not nullable.
                 // All empty specs will therefore be nullable (all symbols are)
@@ -171,7 +169,15 @@ impl GrammarBuilder {
 ///////////////////////////////////////////////////////////
 pub struct Grammar {
     pub start: Rc<Symbol>,
-    pub rules: HashMap<String, Vec<Rc<Rule>>>,
+    pub rules: Vec<Rc<Rule>>,
     pub symbols: HashMap<String, Rc<Symbol>>,
     pub nullable: HashSet<String>,
+}
+
+impl Grammar {
+    pub fn rules<'a, S: Into<String>>(&'a self, name: S) ->
+	Box<Iterator<Item=&'a Rc<Rule>> + 'a> {
+        let name = name.into();
+        Box::new(self.rules.iter().filter(move |r| r.name.name() == name))
+    }
 }

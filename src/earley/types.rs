@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
@@ -35,7 +36,7 @@ impl Terminal {
 
 impl fmt::Debug for Terminal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "\"{}\"", self.0)
     }
 }
 
@@ -98,6 +99,10 @@ impl Item {
     pub fn next_symbol<'a>(&'a self) -> Option<&'a Symbol> {
         self.rule.spec.get(self.dot).map(|s| &**s)
     }
+
+    pub fn complete(&self) -> bool {
+        self.rule.spec.len() == self.dot
+    }
 }
 
 ///////////////////////////////////////////////////////////
@@ -120,6 +125,9 @@ impl GrammarBuilder {
         self
     }
 
+    // The order in which rules are added is significant. When more than one
+    // rule aplies while parsing, the first rule will have precedence, check
+    // EarleyParser::build_parsetree to see how rules are prioritized.
     pub fn rule<S>(&mut self, name: S, spec: Vec<S>) -> &mut Self
     where S: Into<String> + AsRef<str> {
         let r = Rc::new(Rule{

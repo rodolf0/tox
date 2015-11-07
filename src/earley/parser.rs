@@ -1,4 +1,6 @@
-use earley::{NonTerminal, Symbol, Item, Grammar};
+use std::collections::HashMap;
+use std::rc::Rc;
+use earley::{NonTerminal, Symbol, Item, Rule, Grammar};
 use earley::Lexer;
 use earley::uniqvec::UniqVec;
 
@@ -53,6 +55,8 @@ impl EarleyParser {
                                     dot: item.dot+1
                                 };
                                 if state_idx + 1 >= states.len() {
+                                    // assert enforce gamma rule
+                                    assert_eq!(state_idx + 1, states.len());
                                     states.push(StateSet::new());
                                 }
                                 states[state_idx + 1].push(new_item);
@@ -70,7 +74,7 @@ impl EarleyParser {
             }
             state_idx += 1;
         }
-        assert!(states.len() == state_idx);
+        assert!(states.len() == state_idx);  // equiv to checking gamma rule?
         self.check_states(states)
     }
 
@@ -79,8 +83,7 @@ impl EarleyParser {
             let last = try!(states.last().ok_or(ParseError::BadInput));
             // Check that at least one item is a. complete, b. starts at the beginning
             // and c. that the name of the rule matches the starting symbol
-            if last.iter().filter(|item| item.dot == item.rule.spec.len() &&
-                                   item.start == 0 &&
+            if last.iter().filter(|item| item.complete() && item.start == 0 &&
                                    item.rule.name == self.g.start).count() < 1 {
                 return Err(ParseError::BadInput);
             }
@@ -116,5 +119,27 @@ impl EarleyParser {
             start: orig_item.start,
             dot: orig_item.dot+1
         }));
+    }
+
+    pub fn build_parsetree(&self, state: Vec<StateSet>) -> HashMap<usize, UniqVec<(Rc<Rule>, usize)>> {
+        let mut revtable = HashMap::new();
+        // reveres states, index using starting point, keep (rule, end/state-idx)
+        for (state_idx, stateset) in state.iter().enumerate() {
+            for item in stateset.iter() {
+                if item.complete() {
+                    let x = revtable.entry(item.start).or_insert(UniqVec::new());
+                    x.push((item.rule.clone(), state_idx));
+                }
+            }
+        }
+        // sort rules according to grammar
+        /*
+        for (idx, stateset) in revtable.iter_mut() {
+            stateset.sort_by(|&(a_rule, a_end), &(b_rule, b_end)| {
+                self.g.rule_cmp(a_rule, b_rule)
+            });
+        }
+        */
+        revtable
     }
 }

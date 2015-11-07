@@ -68,7 +68,7 @@ fn test1a() {
         }
     }
 
-    let state = p.build_parsetree(state);
+    let state = p.build_tree(state);
     for (k, v) in state.iter() {
         println!("=== {} ===", k);
         for &(ref rule, ref end) in v.iter() {

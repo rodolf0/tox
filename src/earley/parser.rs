@@ -1,7 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::rc::Rc;
-use earley::{NonTerminal, Symbol, Item, Rule, Grammar};
+use earley::{NonTerminal, Symbol, Item, Grammar, RevTable};
 use earley::Lexer;
 use earley::uniqvec::UniqVec;
 
@@ -122,41 +120,48 @@ impl EarleyParser {
         }));
     }
 
-    pub fn build_tree(&self, state: Vec<StateSet>) -> HashMap<usize, Vec<(Rc<Rule>, usize)>> {
-        let mut revtable = self.build_revtable(state);
-        self.sort_rule_priorities(&mut revtable);
+    pub fn build_tree(&self, state: Vec<StateSet>) -> RevTable {
+        let revtable = self.build_revtable(state);
+
+        //let rules = revtable.get(0, self.g.start.name());
+
         revtable
     }
 
-    fn build_revtable(&self, state: Vec<StateSet>) -> HashMap<usize, Vec<(Rc<Rule>, usize)>> {
-        let mut revtable = HashMap::new();
+    fn build_revtable(&self, state: Vec<StateSet>) -> RevTable {
+        let mut revtable = RevTable::new();
         // Reveres states so we can search for trees from the beginning.
         // We only care about complete items, we'll store their rule and match length
         // and we'll index them according to starting point
         for (state_idx, stateset) in state.iter().enumerate() {
             for item in stateset.iter() {
                 if item.complete() {
-                    let x = revtable.entry(item.start).or_insert(Vec::new());
-                    x.push((item.rule.clone(), state_idx));
+                    revtable.push((item.start, item.rule.clone(), state_idx));
                 }
             }
         }
+        self.sort_rule_priorities(&mut revtable);
         revtable
     }
 
-    fn sort_rule_priorities(&self, revtable: &mut HashMap<usize, Vec<(Rc<Rule>, usize)>>) {
+    fn sort_rule_priorities(&self, revtable: &mut RevTable) {
         // resolving ambiguities:
-        // sort rules in each set according to appearance in grammar, then longest match
-        for (_, stateset) in revtable.iter_mut() {
-            stateset.sort_by(|&(ref a_rule, ref a_end), &(ref b_rule, ref b_end)| {
-                // these rules are guaranteed to exist since we inserted them
-                let ax = self.g.rules.iter().position(|r| *r == *a_rule).unwrap();
-                let bx = self.g.rules.iter().position(|r| *r == *b_rule).unwrap();
-                match ax.cmp(&bx) {
-                    Ordering::Equal => b_end.cmp(a_end), // longest match first
-                    other => other,
-                }
-            });
-        }
+        revtable.sort_by(|a, b| {
+            // sort by start-point
+            match a.0.cmp(&b.0) {
+                Ordering::Equal => {
+                    // these rules are guaranteed to exist since we inserted them
+                    // sort according to appearance in grammar
+                    let ax = self.g.rules.iter().position(|r| *r == a.1);
+                    let bx = self.g.rules.iter().position(|r| *r == b.1);
+                    match ax.unwrap().cmp(&bx.unwrap()) {
+                        // sort by longest match first
+                        Ordering::Equal => b.2.cmp(&a.2),
+                        other => other,
+                    }
+                },
+                other => other,
+            }
+        });
     }
 }

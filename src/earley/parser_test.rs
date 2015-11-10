@@ -68,12 +68,10 @@ fn test1a() {
         }
     }
 
+    println!("==========================================");
     let state = p.build_tree(state);
-    for (k, v) in state.iter() {
-        println!("=== {} ===", k);
-        for &(ref rule, ref end) in v.iter() {
-            println!("({:?}) {:?}", end, rule);
-        }
+    for &(start, ref rule, end) in state.iter() {
+        println!("{}|{}  {:?}", start, end, rule);
     }
 }
 

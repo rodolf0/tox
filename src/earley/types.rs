@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
-use std::{mem, fmt};
+use std::{mem, fmt, ops};
 
 ///////////////////////////////////////////////////////////
 #[derive(Debug, Hash, PartialEq, Eq)]
@@ -183,8 +183,31 @@ pub struct Grammar {
 
 impl Grammar {
     pub fn rules<'a, S: Into<String>>(&'a self, name: S) ->
-	Box<Iterator<Item=&'a Rc<Rule>> + 'a> {
+    Box<Iterator<Item=&'a Rc<Rule>> + 'a> {
         let name = name.into();
         Box::new(self.rules.iter().filter(move |r| r.name.name() == name))
     }
+}
+
+///////////////////////////////////////////////////////////
+// A Rev table is used to build the parse tree once the recognition is done.
+// The Earley states from the recognizer are reversed to build the tree
+pub struct RevTable(Vec<(usize, Rc<Rule>, usize)>);
+
+impl RevTable {
+    pub fn new() -> RevTable { RevTable(Vec::new()) }
+
+
+    //pub fn get<S: Into<String>>(&self, start: usize, end: usize, name: S) -> Vec<Rc<Rule>> {
+        //Vec::new()
+    //}
+}
+
+impl ops::Deref for RevTable {
+    type Target = Vec<(usize, Rc<Rule>, usize)>;
+    fn deref<'a>(&'a self) -> &'a Self::Target { &self.0 }
+}
+
+impl ops::DerefMut for RevTable {
+    fn deref_mut<'a>(&'a mut self) -> &'a mut Self::Target { &mut self.0 }
 }

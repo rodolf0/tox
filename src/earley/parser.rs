@@ -18,7 +18,7 @@ pub struct EarleyParser {
 impl EarleyParser {
     pub fn new(grammar: Grammar) -> EarleyParser { EarleyParser{g: grammar} }
 
-    pub fn build_state(&self, tok: &mut Lexer) -> Result<Vec<StateSet>, ParseError> {
+    pub fn parse(&self, tok: &mut Lexer) -> Result<Vec<StateSet>, ParseError> {
         // Build S0 state building items out of each start rule
         let mut states = Vec::new();
         states.push(self.g.rules(self.g.start.name())
@@ -54,7 +54,6 @@ impl EarleyParser {
                                     dot: item.dot+1
                                 };
                                 if state_idx + 1 >= states.len() {
-                                    // assert enforce gamma rule
                                     assert_eq!(state_idx + 1, states.len());
                                     states.push(StateSet::new());
                                 }
@@ -73,7 +72,7 @@ impl EarleyParser {
             }
             state_idx += 1;
         }
-        assert!(states.len() == state_idx);  // equiv to checking gamma rule?
+        assert!(states.len() == state_idx);
         self.check_states(states)
     }
 
@@ -120,15 +119,14 @@ impl EarleyParser {
         }));
     }
 
-    pub fn build_tree(&self, state: Vec<StateSet>) -> RevTable {
+    pub fn build_forest(&self, state: &Vec<StateSet>, item: &Item) {
         let revtable = self.build_revtable(state);
-
-        //let rules = revtable.get(0, self.g.start.name());
-
-        revtable
     }
 
-    fn build_revtable(&self, state: Vec<StateSet>) -> RevTable {
+    fn _build_forest(&self) {
+    }
+
+    fn build_revtable(&self, state: &Vec<StateSet>) -> RevTable {
         let mut revtable = RevTable::new();
         // Reveres states so we can search for trees from the beginning.
         // We only care about complete items, we'll store their rule and match length
@@ -140,10 +138,11 @@ impl EarleyParser {
                 }
             }
         }
-        self.sort_rule_priorities(&mut revtable);
+        self.sort_rule_priorities(&mut revtable); // THIS MAY NOT BE NEEDED
         revtable
     }
 
+    // THIS MAY NOT BE NEEDED
     fn sort_rule_priorities(&self, revtable: &mut RevTable) {
         // resolving ambiguities:
         revtable.sort_by(|a, b| {

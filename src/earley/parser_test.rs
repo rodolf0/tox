@@ -45,7 +45,7 @@ fn test1() {
     let mut input = Lexer::from_str("1+(2*3-4)", "+*-/()");
     let p = EarleyParser::new(g);
 
-    let state = p.build_state(&mut input).unwrap();
+    let state = p.parse(&mut input).unwrap();
     for (idx, stateset) in state.iter().enumerate() {
         println!("=== {} ===", idx);
         for i in stateset.iter() {
@@ -54,13 +54,14 @@ fn test1() {
     }
 }
 
+/*
 #[test]
 fn test1a() {
     let g = build_grammar();
     let mut input = Lexer::from_str("1+(2*3-4)", "+*-/()");
     let p = EarleyParser::new(g);
 
-    let state = p.build_state(&mut input).unwrap();
+    let state = p.parse(&mut input).unwrap();
     for (idx, stateset) in state.iter().enumerate() {
         println!("=== {} ===", idx);
         for i in stateset.iter() {
@@ -74,13 +75,14 @@ fn test1a() {
         println!("{}|{}  {:?}", start, end, rule);
     }
 }
+*/
 
 #[test]
 fn test2() {
     let g = build_grammar();
     let mut input = Lexer::from_str("1+", "+*-/()");
     let p = EarleyParser::new(g);
-    assert!(p.build_state(&mut input).is_err());
+    assert!(p.parse(&mut input).is_err());
 }
 
 #[test]
@@ -101,7 +103,7 @@ fn test3() {
     let mut input = Lexer::from_str("", "-");
     let p = EarleyParser::new(g);
 
-    let state = p.build_state(&mut input).unwrap();
+    let state = p.parse(&mut input).unwrap();
     for (idx, stateset) in state.iter().enumerate() {
         println!("=== {} ===", idx);
         for i in stateset.iter() {

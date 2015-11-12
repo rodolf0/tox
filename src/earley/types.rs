@@ -100,7 +100,7 @@ impl Item {
     }
 
     pub fn complete(&self) -> bool {
-        self.rule.spec.len() == self.dot
+        self.dot >= self.rule.spec.len()
     }
 }
 
@@ -197,10 +197,9 @@ pub struct RevTable(Vec<(usize, Rc<Rule>, usize)>);
 impl RevTable {
     pub fn new() -> RevTable { RevTable(Vec::new()) }
 
-
-    //pub fn get<S: Into<String>>(&self, start: usize, end: usize, name: S) -> Vec<Rc<Rule>> {
-        //Vec::new()
-    //}
+    pub fn get<S: Into<String>>(&self, start: usize, end: usize, name: S) -> Vec<Rc<Rule>> {
+        Vec::new()
+    }
 }
 
 impl ops::Deref for RevTable {

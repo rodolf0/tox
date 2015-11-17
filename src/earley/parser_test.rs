@@ -52,6 +52,11 @@ fn test1() {
             println!("{}|{}  {:?} -> {:?}", i.start, i.dot, i.rule.name, i.rule.spec);
         }
     }
+    println!("==========================================");
+    let state = p.build_revtable(&state);
+    for &(start, ref rule, end) in state.iter() {
+        println!("{}|{}  {:?}", start, end, rule);
+    }
 }
 
 /*
@@ -109,5 +114,36 @@ fn test3() {
         for i in stateset.iter() {
             println!("{}|{}  {:?} -> {:?}", i.start, i.dot, i.rule.name, i.rule.spec);
         }
+    }
+}
+
+#[test]
+fn test4() {
+    let mut gb = GrammarBuilder::new();
+    gb.symbol(NonTerminal::new("Sum"))
+      .symbol(Terminal::new("[+]", |n: &str| { n == "+" }))
+      .symbol(Terminal::new("Number", |n: &str| {
+          n.chars().all(|c| "1234567890".contains(c))
+        }));
+    gb.rule("Sum", vec!["Sum", "[+]", "Number"]);
+    gb.rule("Sum", vec!["Number", "[+]", "Sum"]);
+    gb.rule("Sum", vec!["Number"]);
+
+    let g = gb.into_grammar("Sum");
+
+    let mut input = Lexer::from_str("3+4", "+");
+    let p = EarleyParser::new(g);
+
+    let state = p.parse(&mut input).unwrap();
+    for (idx, stateset) in state.iter().enumerate() {
+        println!("=== {} ===", idx);
+        for i in stateset.iter() {
+            println!("{}|{}  {:?} -> {:?}", i.start, i.dot, i.rule.name, i.rule.spec);
+        }
+    }
+    println!("==========================================");
+    let state = p.build_revtable(&state);
+    for &(start, ref rule, end) in state.iter() {
+        println!("{}|{}  {:?}", start, end, rule);
     }
 }

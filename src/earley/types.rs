@@ -197,8 +197,9 @@ pub struct RevTable(Vec<(usize, Rc<Rule>, usize)>);
 impl RevTable {
     pub fn new() -> RevTable { RevTable(Vec::new()) }
 
-    pub fn get<S: Into<String>>(&self, start: usize, end: usize, name: S) -> Vec<Rc<Rule>> {
-        Vec::new()
+    // get a filtered version of the revtable, this should just return a Filter<>
+    pub fn get<S: Into<String>>(&self, start: usize, name: S) -> RevTable {
+        RevTable::new()
     }
 }
 
@@ -210,3 +211,9 @@ impl ops::Deref for RevTable {
 impl ops::DerefMut for RevTable {
     fn deref_mut<'a>(&'a mut self) -> &'a mut Self::Target { &mut self.0 }
 }
+
+///////////////////////////////////////////////////////////
+//pub struct Subtree {
+    //pub data: Option<_>,
+    //pub childern: Vec<Subtree>,
+//}

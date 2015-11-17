@@ -28,7 +28,7 @@ impl EarleyParser {
             return Err(ParseError::BadStartRule);
         }
 
-        // Outere loop goes over each stateset
+        // Outer loop goes over each stateset
         let mut state_idx = 0;
         while state_idx < states.len() {
             let input = tok.next();
@@ -72,7 +72,10 @@ impl EarleyParser {
             }
             state_idx += 1;
         }
-        assert!(states.len() == state_idx);
+        // if we want to pares partial input, we can't assert next->is_none,
+        // we need to count how many tokens we've read and check the that the
+        // start rule has reached the same length
+        assert!(states.len() == state_idx && tok.next().is_none());
         self.check_states(states)
     }
 
@@ -108,7 +111,7 @@ impl EarleyParser {
         // go over the parent state checking for items whose next symbol matches
         let matching_items = s_parent.iter()
             .filter_map(|orig_item| match orig_item.next_symbol() {
-                Some(n @ &Symbol::NT(_)) if *item.rule.name == *n => Some(orig_item),
+                Some(n @ &Symbol::NT(_)) if *n == *item.rule.name => Some(orig_item),
                 _ => None
             });
         // copy over matching items to new state
@@ -119,18 +122,33 @@ impl EarleyParser {
         }));
     }
 
-    pub fn build_forest(&self, state: &Vec<StateSet>, item: &Item) {
+    pub fn build_forest(&self, state: &Vec<StateSet>) {
         let revtable = self.build_revtable(state);
+
+        //let mut forest = Vec::new();
+
+        //let rules = revtable.get(0, 9, "Sum");
+        //for rule in rules {
+            //let mut tree = Subtree::Node(Vec::new());
+
+            //// (0->9) Sum -> Sum [+-] Product
+            //for sym in rule.spec.iter() {
+
+                //let childs = build_forest_helper(&revtable, start, end, sym.name());
+            //}
+        //}
     }
 
-    fn _build_forest(&self) {
-    }
+    //fn build_forest_helper(&self, revtable: &RevTable, start: usize, max: usize, name: &str) -> Vec<_> {
+        //let rows = revtable.get(start, name);
+        //for (start, rule, end) in rows {
+        //}
+    //}
 
-    fn build_revtable(&self, state: &Vec<StateSet>) -> RevTable {
+    pub fn build_revtable(&self, state: &Vec<StateSet>) -> RevTable {
         let mut revtable = RevTable::new();
         // Reveres states so we can search for trees from the beginning.
-        // We only care about complete items, we'll store their rule and match length
-        // and we'll index them according to starting point
+        // We only care about complete items, we'll store (start, rule, end)
         for (state_idx, stateset) in state.iter().enumerate() {
             for item in stateset.iter() {
                 if item.complete() {
@@ -138,11 +156,13 @@ impl EarleyParser {
                 }
             }
         }
-        self.sort_rule_priorities(&mut revtable); // THIS MAY NOT BE NEEDED
+        // OPTIONAL: prioritize rules according to grammar, so ambiguous
+        // grammars show parse trees in that order
+        self.sort_rule_priorities(&mut revtable);
         revtable
     }
 
-    // THIS MAY NOT BE NEEDED
+    // OPTIONAL: see build_revtable
     fn sort_rule_priorities(&self, revtable: &mut RevTable) {
         // resolving ambiguities:
         revtable.sort_by(|a, b| {

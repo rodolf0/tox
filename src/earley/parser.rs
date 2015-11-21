@@ -1,7 +1,10 @@
 use std::cmp::Ordering;
 use earley::{NonTerminal, Symbol, Item, Grammar, RevTable};
 use earley::Lexer;
+use earley::Subtree;
 use earley::uniqvec::UniqVec;
+use std::rc::Rc;
+use std::collections::VecDeque;
 
 pub type StateSet = UniqVec<Item>;
 
@@ -94,40 +97,38 @@ impl EarleyParser {
         Ok(states)
     }
 
-    fn helper(&self, states: &Vec<StateSet>, theroot: &Item, strt: usize) {
+    fn helper(&self, states: &Vec<StateSet>, theroot: &Item, strt: usize) -> Subtree {
+        let mut ret = VecDeque::new();
         let mut state_idx = strt;
         for needle in theroot.rule.spec.iter().rev() {
-            println!("Searching for {:?} completed at {}", needle, state_idx);
-            //if let &Symbol::T(ref t) = &**needle {
-                    //state_idx -= 1;
-                    //println!("{:?}", t);
-            //}
+            //println!("Searching for {:?} completed at {}", needle, state_idx);
             match &**needle {
                 &Symbol::NT(ref nt) => {
                     let prev = states[state_idx].iter()
                         .filter(|item| item.complete()
                                 && item.rule.name == *needle).next().unwrap();
-                    println!("{}: {:?}", state_idx, prev);
-                    self.helper(states, prev, state_idx);
-                    if prev.start > 0 {
-                        state_idx = prev.start;
-                    }
+                    //println!("{}: {:?}", state_idx, prev);
+                    let subtree = self.helper(states, prev, state_idx);
+                    state_idx = prev.start;
+                    ret.push_front(subtree);
                 },
                 &Symbol::T(ref t) => {
                     state_idx -= 1;
-                    println!("{}: needle={:?}", state_idx, t);
-                    //state_idx -= 1;
+                    //println!("{}: needle={:?}", state_idx, t);
+                    ret.push_front(Subtree::Node(needle.clone()));
                 }
             }
         }
+        Subtree::Children(ret)
     }
 
     pub fn build_tree(&self, states: Vec<StateSet>) {
         let root = states.last().unwrap().iter()
             .filter(|item| item.complete() && item.start == 0 &&
                     item.rule.name == self.g.start).next().unwrap();
-        println!("{:?}", root);
-        self.helper(&states, root, states.len() - 1);
+        //println!("{:?}", root);
+        let tree = self.helper(&states, root, states.len() - 1);
+        println!("{:?}", tree);
     }
 
     //fn prediction(&self, s_i: &StateSet, sym: NonTerminal)

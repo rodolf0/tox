@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use std::{mem, fmt, ops};
@@ -213,7 +213,8 @@ impl ops::DerefMut for RevTable {
 }
 
 ///////////////////////////////////////////////////////////
-//pub struct Subtree {
-    //pub data: Option<_>,
-    //pub childern: Vec<Subtree>,
-//}
+#[derive(Debug)]
+pub enum Subtree {
+    Node(Rc<Symbol>),
+    Children(VecDeque<Subtree>),
+}

@@ -53,35 +53,8 @@ fn test1() {
         }
     }
     println!("==========================================");
-    //let state = p.build_revtable(&state);
-    //for &(start, ref rule, end) in state.iter() {
-        //println!("{}|{}  {:?}", start, end, rule);
-    //}
     p.build_tree(state);
 }
-
-/*
-#[test]
-fn test1a() {
-    let g = build_grammar();
-    let mut input = Lexer::from_str("1+(2*3-4)", "+*-/()");
-    let p = EarleyParser::new(g);
-
-    let state = p.parse(&mut input).unwrap();
-    for (idx, stateset) in state.iter().enumerate() {
-        println!("=== {} ===", idx);
-        for i in stateset.iter() {
-            println!("{}|{}  {:?} -> {:?}", i.start, i.dot, i.rule.name, i.rule.spec);
-        }
-    }
-
-    println!("==========================================");
-    let state = p.build_tree(state);
-    for &(start, ref rule, end) in state.iter() {
-        println!("{}|{}  {:?}", start, end, rule);
-    }
-}
-*/
 
 #[test]
 fn test2() {

@@ -53,10 +53,11 @@ fn test1() {
         }
     }
     println!("==========================================");
-    let state = p.build_revtable(&state);
-    for &(start, ref rule, end) in state.iter() {
-        println!("{}|{}  {:?}", start, end, rule);
-    }
+    //let state = p.build_revtable(&state);
+    //for &(start, ref rule, end) in state.iter() {
+        //println!("{}|{}  {:?}", start, end, rule);
+    //}
+    p.build_tree(state);
 }
 
 /*

@@ -78,6 +78,7 @@ impl EarleyParser {
         // if we want to pares partial input, we can't assert next->is_none,
         // we need to count how many tokens we've read and check the that the
         // start rule has reached the same length
+        // TODO: may need to check this (GAMMA rule?)
         assert!(states.len() == state_idx && tok.next().is_none());
         self.check_states(states)
     }
@@ -101,20 +102,20 @@ impl EarleyParser {
         let mut ret = VecDeque::new();
         let mut state_idx = strt;
         for needle in theroot.rule.spec.iter().rev() {
-            //println!("Searching for {:?} completed at {}", needle, state_idx);
+            println!("Searching for {:?} completed at {}", needle, state_idx);
             match &**needle {
                 &Symbol::NT(ref nt) => {
                     let prev = states[state_idx].iter()
                         .filter(|item| item.complete()
                                 && item.rule.name == *needle).next().unwrap();
-                    //println!("{}: {:?}", state_idx, prev);
+                    println!("{}: {:?}", state_idx, prev);
                     let subtree = self.helper(states, prev, state_idx);
                     state_idx = prev.start;
                     ret.push_front(subtree);
                 },
                 &Symbol::T(ref t) => {
                     state_idx -= 1;
-                    //println!("{}: needle={:?}", state_idx, t);
+                    println!("{}: needle={:?}", state_idx, t);
                     ret.push_front(Subtree::Node(needle.clone()));
                 }
             }
@@ -126,7 +127,7 @@ impl EarleyParser {
         let root = states.last().unwrap().iter()
             .filter(|item| item.complete() && item.start == 0 &&
                     item.rule.name == self.g.start).next().unwrap();
-        //println!("{:?}", root);
+        println!("Start: {:?}", root);
         let tree = self.helper(&states, root, states.len() - 1);
         println!("{:?}", tree);
     }

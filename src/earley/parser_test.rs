@@ -121,3 +121,62 @@ fn test4() {
         println!("{}|{}  {:?}", start, end, rule);
     }
 }
+
+/*
+ * Sum -> Sum + Mul | Mul
+ * Mul -> Mul * Pow | Pow
+ * Pow -> Num ^ Pow | Num
+ * Num -> Number | ( Sum )
+ */
+
+
+#[cfg(test)]
+fn build_grammar2() -> Grammar {
+    let mut gb = GrammarBuilder::new();
+    // register some symbols
+    gb.symbol(NonTerminal::new("Sum"))
+      .symbol(NonTerminal::new("Mul"))
+      .symbol(NonTerminal::new("Pow"))
+      .symbol(NonTerminal::new("Num"))
+      .symbol(Terminal::new("Number", |n: &str| {
+          n.chars().all(|c| "1234567890".contains(c))
+        }))
+      .symbol(Terminal::new("[+-]", |n: &str| {
+          n.len() == 1 && "+-".contains(n)
+        }))
+      .symbol(Terminal::new("[*/]", |n: &str| {
+          n.len() == 1 && "*/".contains(n)
+        }))
+      .symbol(Terminal::new("[^]", |n: &str| { n == "^" }))
+      .symbol(Terminal::new("(", |n: &str| { n == "(" }))
+      .symbol(Terminal::new(")", |n: &str| { n == ")" }));
+
+    // add grammar rules
+    gb.rule("Sum",     vec!["Sum", "[+-]", "Mul"])
+      .rule("Sum",     vec!["Mul"])
+      .rule("Mul", vec!["Mul", "[*/]", "Pow"])
+      .rule("Mul", vec!["Pow"])
+      .rule("Pow", vec!["Num", "[^]", "Pow"])
+      .rule("Pow", vec!["Num"])
+      .rule("Num",  vec!["(", "Sum", ")"])
+      .rule("Num",  vec!["Number"]);
+
+    gb.into_grammar("Sum")
+}
+
+#[test]
+fn test5() {
+    let g = build_grammar2();
+    let mut input = Lexer::from_str("2^3^4^5", "+*-/()^");
+    let p = EarleyParser::new(g);
+
+    let state = p.parse(&mut input).unwrap();
+    for (idx, stateset) in state.iter().enumerate() {
+        println!("=== {} ===", idx);
+        for i in stateset.iter() {
+            println!("{}|{}  {:?} -> {:?}", i.start, i.dot, i.rule.name, i.rule.spec);
+        }
+    }
+    println!("==========================================");
+    p.build_tree(state);
+}

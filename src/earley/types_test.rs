@@ -22,8 +22,8 @@ fn symbol_uniqueness() {
         spec: vec![s_sum.clone(), s_num.clone(), s_ops.clone()],
     });
 
-    let i1 = Item{rule: r1.clone(), start: 0, dot: 0};
-    let i2 = Item{rule: r1.clone(), start: 0, dot: 0};
+    let i1 = Item::new(r1.clone(), 0, 0);
+    let i2 = Item::new(r1.clone(), 0, 0);
     assert_eq!(i1, i2);
 
     // Check that Items work correctly with UniqVecs
@@ -32,9 +32,9 @@ fn symbol_uniqueness() {
     state_set.push(i2);
     assert_eq!(state_set.len(), 1);
 
-    state_set.push(Item{rule: r1.clone(), start: 0, dot: 1});
+    state_set.push(Item::new(r1.clone(), 0, 1));
     assert_eq!(state_set.len(), 2);
-    state_set.push(Item{rule: r1.clone(), start: 0, dot: 1});
+    state_set.push(Item::new(r1.clone(), 0, 1));
     assert_eq!(state_set.len(), 2);
 }
 

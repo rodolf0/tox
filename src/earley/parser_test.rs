@@ -167,7 +167,7 @@ fn build_grammar2() -> Grammar {
 #[test]
 fn test5() {
     let g = build_grammar2();
-    let mut input = Lexer::from_str("2^3^4^5", "+*-/()^");
+    let mut input = Lexer::from_str("1+2^3^4*5/6+7*8^9", "+*-/()^");
     let p = EarleyParser::new(g);
 
     let state = p.parse(&mut input).unwrap();

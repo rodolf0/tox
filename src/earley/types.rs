@@ -92,9 +92,35 @@ pub struct Item {
     pub rule: Rc<Rule>,
     pub start: usize,  // start of match (relative to input)
     pub dot: usize,    // how far are we in the rule
+
+    pub bp_scan: Option<Rc<Item>>,
+    //pub scanned: Option<Symbol>,  // scanned terminal
+    pub bp_predict: Option<Rc<Item>>,
+    pub bp_compl1: Option<Rc<Item>>,
+    pub bp_compl2: Option<Rc<Item>>,
 }
 
 impl Item {
+    // TODO: need a builder
+    pub fn new2(rule: Rc<Rule>, start: usize, dot: usize) -> Item {
+        Item{rule: rule, start: start, dot: dot,
+             bp_scan: None, bp_predict: None, bp_compl1: None, bp_compl2: None}
+    }
+    pub fn new(rule: Rc<Rule>, start: usize, dot: usize) -> Rc<Item> {
+        Rc::new(Item{rule: rule, start: start, dot: dot,
+             bp_scan: None, bp_predict: None, bp_compl1: None, bp_compl2: None})
+    }
+    pub fn setscan(&mut self, scan: Option<Rc<Item>>) {
+        self.bp_scan = scan;
+    }
+    pub fn setpred(&mut self, pred: Option<Rc<Item>>) {
+        self.bp_predict = pred;
+    }
+    pub fn setcompl(&mut self, compl1: Option<Rc<Item>>, compl2: Option<Rc<Item>>) {
+        self.bp_compl1 = compl1;
+        self.bp_compl2 = compl2;
+    }
+
     pub fn next_symbol<'a>(&'a self) -> Option<&'a Symbol> {
         self.rule.spec.get(self.dot).map(|s| &**s)
     }

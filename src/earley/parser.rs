@@ -6,7 +6,7 @@ use earley::uniqvec::UniqVec;
 use std::rc::Rc;
 use std::collections::VecDeque;
 
-pub type StateSet = UniqVec<Item>;
+pub type StateSet = UniqVec<Rc<Item>>;
 
 #[derive(PartialEq, Debug)]
 pub enum ParseError {
@@ -25,7 +25,7 @@ impl EarleyParser {
         // Build S0 state building items out of each start rule
         let mut states = Vec::new();
         states.push(self.g.rules(self.g.start.name())
-                    .map(|r| Item{rule: r.clone(), start: 0, dot: 0})
+                    .map(|r| Item::new(r.clone(), 0, 0))
                     .collect::<StateSet>());
         if states[0].len() < 1 {
             return Err(ParseError::BadStartRule);
@@ -51,11 +51,13 @@ impl EarleyParser {
                     Some(&Symbol::T(ref terminal)) => {
                         if let Some(input) = input.clone() {
                             if terminal.check(&input) {
-                                let new_item = Item{
-                                    rule: item.rule.clone(),
-                                    start: item.start,
-                                    dot: item.dot+1
-                                };
+                                let mut new_item = Item::new(
+                                    item.rule.clone(),
+                                    item.start,
+                                    item.dot+1,
+                                );
+                                //new_item.setscan(Some(item.clone())); // backpointer to item that triggered this scan
+
                                 if state_idx + 1 >= states.len() {
                                     assert_eq!(state_idx + 1, states.len());
                                     states.push(StateSet::new());
@@ -105,13 +107,15 @@ impl EarleyParser {
             println!("Searching for {:?} completed at {}", needle, state_idx);
             match &**needle {
                 &Symbol::NT(ref nt) => {
-                    let prev = states[state_idx].iter()
+                    let prevs = states[state_idx].iter()
                         .filter(|item| item.complete()
-                                && item.rule.name == *needle).next().unwrap();
-                    println!("{}: {:?}", state_idx, prev);
-                    let subtree = self.helper(states, prev, state_idx);
-                    state_idx = prev.start;
-                    ret.push_front(subtree);
+                                && item.rule.name == *needle);
+                    for prev in prevs {
+                        println!("{}: {:?}", state_idx, prev);
+                        let subtree = self.helper(states, prev, state_idx);
+                        state_idx = prev.start;
+                        ret.push_front(subtree);
+                    }
                 },
                 &Symbol::T(ref t) => {
                     state_idx -= 1;
@@ -126,7 +130,7 @@ impl EarleyParser {
     pub fn build_tree(&self, states: Vec<StateSet>) {
         let root = states.last().unwrap().iter()
             .filter(|item| item.complete() && item.start == 0 &&
-                    item.rule.name == self.g.start).next().unwrap();
+                    item.rule.name == self.g.start).next().unwrap(); // assuming 1 parse
         println!("Start: {:?}", root);
         let tree = self.helper(&states, root, states.len() - 1);
         println!("{:?}", tree);
@@ -137,11 +141,10 @@ impl EarleyParser {
     // Symbol after fat-dot is NonTerm. Add the derived rules to current set
     fn prediction(&self, s_i: &mut StateSet, next_sym: &NonTerminal, item: &Item, start: usize) {
         for rule in self.g.rules(next_sym.name()) {
-            s_i.push(Item{rule: rule.clone(), start: start, dot: 0});
+            s_i.push(Item::new(rule.clone(), start, 0));
             // trigger magical completion for nullable rules
             if self.g.nullable.contains(rule.name.name()) {
-                s_i.push(Item{rule: item.rule.clone(),
-                              start: item.start, dot: item.dot + 1});
+                s_i.push(Item::new(item.rule.clone(), item.start, item.dot + 1));
             }
         }
     }
@@ -155,11 +158,11 @@ impl EarleyParser {
                 _ => None
             });
         // copy over matching items to new state
-        s_i.extend(matching_items.map(|orig_item| Item{
-            rule: orig_item.rule.clone(),
-            start: orig_item.start,
-            dot: orig_item.dot+1
-        }));
+        s_i.extend(matching_items.map(|orig_item| Item::new(
+            orig_item.rule.clone(),
+            orig_item.start,
+            orig_item.dot+1
+        )));
     }
 
     pub fn build_forest(&self, state: &Vec<StateSet>) {

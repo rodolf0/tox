@@ -1,16 +1,20 @@
-use std::cmp::Ordering;
-use earley::{NonTerminal, Symbol, Item, Grammar, RevTable};
+use earley::symbol::Symbol;
+use earley::{Item, Grammar};
 use earley::Lexer;
-use earley::Subtree;
 use earley::uniqvec::UniqVec;
 use std::rc::Rc;
 use std::collections::VecDeque;
 
-pub type StateSet = UniqVec<Rc<Item>>;
+#[derive(Debug)]
+pub enum Subtree {
+    Node(Rc<Symbol>),
+    Children(VecDeque<Subtree>),
+}
+
+pub type StateSet = UniqVec<Item>;
 
 #[derive(PartialEq, Debug)]
 pub enum ParseError {
-    BadStartRule,
     BadInput,
 }
 
@@ -22,70 +26,61 @@ impl EarleyParser {
     pub fn new(grammar: Grammar) -> EarleyParser { EarleyParser{g: grammar} }
 
     pub fn parse(&self, tok: &mut Lexer) -> Result<Vec<StateSet>, ParseError> {
-        // Build S0 state building items out of each start rule
+        // Populate S0 by building items for each start rule
         let mut states = Vec::new();
-        states.push(self.g.rules(self.g.start.name())
-                    .map(|r| Item::new(r.clone(), 0, 0))
-                    .collect::<StateSet>());
-        if states[0].len() < 1 {
-            return Err(ParseError::BadStartRule);
-        }
+        states.push(self.g.rules(self.g.start())
+                          .map(|rule| Item::new(rule.clone(), 0, 0))
+                          .collect::<StateSet>());
 
-        // Outer loop goes over each stateset
-        let mut state_idx = 0;
-        while state_idx < states.len() {
-            let input = tok.next();
-            // Inner loop goes over each item in a stateset
+        while let Some(input) = tok.next() {
+            let i = states.len() - 1;
+
             let mut item_idx = 0;
-            while item_idx < states[state_idx].len() {
-                // For each item check if we need to predict/scan/complete
-                let item = states[state_idx][item_idx].clone();
+            while item_idx < states[i].len() {
+                let item = states[i][item_idx].clone();
+
                 match item.next_symbol() {
-
-                    // Found non-terminal, do a prediction
-                    Some(&Symbol::NT(ref nonterm)) => {
-                        self.prediction(&mut states[state_idx], nonterm, &item, state_idx);
-                    },
-
-                    // Found terminal, scan the input to check if it matches
-                    Some(&Symbol::T(ref terminal)) => {
-                        if let Some(input) = input.clone() {
-                            if terminal.check(&input) {
-                                let mut new_item = Item::new(
-                                    item.rule.clone(),
-                                    item.start,
-                                    item.dot+1,
-                                );
-                                //new_item.setscan(Some(item.clone())); // backpointer to item that triggered this scan
-
-                                if state_idx + 1 >= states.len() {
-                                    assert_eq!(state_idx + 1, states.len());
-                                    states.push(StateSet::new());
-                                }
-                                states[state_idx + 1].push(new_item);
+                    // prediction, insert items for all rules named like this nonterm
+                    Some(&Symbol::NonTerm(ref name)) => {
+                        for rule in self.g.rules(&name) {
+                            states[i].push(Item::new(rule.clone(), 0, i));
+                            // trigger magical completion for nullable rules
+                            if self.g.is_nullable(rule.name()) {
+                                states[i].push(Item::new(
+                                    item.rule.clone(), item.dot + 1, item.start));
                             }
                         }
                     },
 
+                    // Found terminal, check input and populate S[i+1]
+                    Some(&Symbol::Terminal(_, ref testfn)) => if testfn(&input) {
+                        if states.len() <= i + 1 {
+                            assert_eq!(states.len(), i + 1);
+                            states.push(StateSet::new());
+                        }
+                        states[i+1].push(Item::new(
+                            item.rule.clone(), item.dot+1, item.start));
+                    },
+
                     // we reached the end of the item's rule, trigger completion
                     None => {
-                        let s_parent = states[item.start].clone();
-                        self.completion(&mut states[state_idx], &s_parent, &item);
-                    }
+                        // go back to state where 'item' started and advance
+                        // any item if its next symbol matches the current one's name
+                        let parent_state = states[item.start].clone();  // TODO: no need to clone
+                        let parent_items = parent_state.iter().filter_map(|pitem|
+                            match pitem.next_symbol() {
+                                Some(sym) if sym.is_nonterm() &&
+                                             *sym == *item.rule.name => Some(pitem),
+                                _ => None
+                            });
+                        states[i].extend(parent_items.map(|pitem| Item::new(
+                            pitem.rule.clone(), pitem.dot + 1, pitem.start)));
+                    },
                 }
                 item_idx += 1;
             }
-            state_idx += 1;
         }
-        // if we want to pares partial input, we can't assert next->is_none,
-        // we need to count how many tokens we've read and check the that the
-        // start rule has reached the same length
-        // TODO: may need to check this (GAMMA rule?)
-        assert!(states.len() == state_idx && tok.next().is_none());
-        self.check_states(states)
-    }
 
-    fn check_states(&self, states: Vec<StateSet>) -> Result<Vec<StateSet>, ParseError> {
         {
             let last = try!(states.last().ok_or(ParseError::BadInput));
             // Check that at least one item is a. complete, b. starts at the beginning
@@ -94,12 +89,11 @@ impl EarleyParser {
                                    item.rule.name == self.g.start).count() < 1 {
                 return Err(ParseError::BadInput);
             }
-            // if the last state didn't contain any valid completions and we're
-            // interested in partial parses (eg: headers) we can check  states
         }
         Ok(states)
     }
 
+    /*
     fn helper(&self, states: &Vec<StateSet>, theroot: &Item, strt: usize) -> Subtree {
         let mut ret = VecDeque::new();
         let mut state_idx = strt;
@@ -135,95 +129,5 @@ impl EarleyParser {
         let tree = self.helper(&states, root, states.len() - 1);
         println!("{:?}", tree);
     }
-
-    //fn prediction(&self, s_i: &StateSet, sym: NonTerminal)
-
-    // Symbol after fat-dot is NonTerm. Add the derived rules to current set
-    fn prediction(&self, s_i: &mut StateSet, next_sym: &NonTerminal, item: &Item, start: usize) {
-        for rule in self.g.rules(next_sym.name()) {
-            s_i.push(Item::new(rule.clone(), start, 0));
-            // trigger magical completion for nullable rules
-            if self.g.nullable.contains(rule.name.name()) {
-                s_i.push(Item::new(item.rule.clone(), item.start, item.dot + 1));
-            }
-        }
-    }
-
-    // fat-dot at end of rule. Successful partial parse. Add parents to current
-    fn completion(&self, s_i: &mut StateSet, s_parent: &StateSet, item: &Item) {
-        // go over the parent state checking for items whose next symbol matches
-        let matching_items = s_parent.iter()
-            .filter_map(|orig_item| match orig_item.next_symbol() {
-                Some(n @ &Symbol::NT(_)) if *n == *item.rule.name => Some(orig_item),
-                _ => None
-            });
-        // copy over matching items to new state
-        s_i.extend(matching_items.map(|orig_item| Item::new(
-            orig_item.rule.clone(),
-            orig_item.start,
-            orig_item.dot+1
-        )));
-    }
-
-    pub fn build_forest(&self, state: &Vec<StateSet>) {
-        let revtable = self.build_revtable(state);
-
-        //let mut forest = Vec::new();
-
-        //let rules = revtable.get(0, 9, "Sum");
-        //for rule in rules {
-            //let mut tree = Subtree::Node(Vec::new());
-
-            //// (0->9) Sum -> Sum [+-] Product
-            //for sym in rule.spec.iter() {
-
-                //let childs = build_forest_helper(&revtable, start, end, sym.name());
-            //}
-        //}
-    }
-
-    //fn build_forest_helper(&self, revtable: &RevTable, start: usize, max: usize, name: &str) -> Vec<_> {
-        //let rows = revtable.get(start, name);
-        //for (start, rule, end) in rows {
-        //}
-    //}
-
-    pub fn build_revtable(&self, state: &Vec<StateSet>) -> RevTable {
-        let mut revtable = RevTable::new();
-        // Reveres states so we can search for trees from the beginning.
-        // We only care about complete items, we'll store (start, rule, end)
-        for (state_idx, stateset) in state.iter().enumerate() {
-            for item in stateset.iter() {
-                if item.complete() {
-                    revtable.push((item.start, item.rule.clone(), state_idx));
-                }
-            }
-        }
-        // OPTIONAL: prioritize rules according to grammar, so ambiguous
-        // grammars show parse trees in that order
-        self.sort_rule_priorities(&mut revtable);
-        revtable
-    }
-
-    // OPTIONAL: see build_revtable
-    fn sort_rule_priorities(&self, revtable: &mut RevTable) {
-        // resolving ambiguities:
-        revtable.sort_by(|a, b| {
-            // sort by start-point
-            match a.0.cmp(&b.0) {
-                Ordering::Equal => {
-                    // these rules are guaranteed to exist since we inserted them
-                    // sort according to appearance in grammar
-                    let ax = self.g.rules.iter().position(|r| *r == a.1);
-                    let bx = self.g.rules.iter().position(|r| *r == b.1);
-                    match ax.unwrap().cmp(&bx.unwrap()) {
-                        // sort by longest match first
-                        Ordering::Equal => b.2.cmp(&a.2),
-                        other => other,
-                    }
-                },
-                other => other,
-            }
-        });
-    }
+    */
 }

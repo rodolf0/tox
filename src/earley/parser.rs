@@ -1,17 +1,16 @@
 use earley::symbol::Symbol;
-use earley::{Item, Grammar};
+use earley::items::{Item, StateSet};
+use earley::grammar::Grammar;
+
 use earley::Lexer;
-use earley::uniqvec::UniqVec;
-use std::rc::Rc;
-use std::collections::VecDeque;
+//use std::collections::VecDeque;
+//use std::rc::Rc;
 
-#[derive(Debug)]
-pub enum Subtree {
-    Node(Rc<Symbol>),
-    Children(VecDeque<Subtree>),
-}
-
-pub type StateSet = UniqVec<Item>;
+//#[derive(Debug)]
+//pub enum Subtree {
+    //Node(Rc<Symbol>),
+    //Children(VecDeque<Subtree>),
+//}
 
 #[derive(PartialEq, Debug)]
 pub enum ParseError {
@@ -31,9 +30,9 @@ impl EarleyParser {
         states.push(self.g.rules(self.g.start())
                           .map(|rule| Item::new(rule.clone(), 0, 0))
                           .collect::<StateSet>());
-
-        while let Some(input) = tok.next() {
-            let i = states.len() - 1;
+        let mut i = 0;
+        while i < states.len() {
+            let input = tok.next();
 
             let mut item_idx = 0;
             while item_idx < states[i].len() {
@@ -53,13 +52,15 @@ impl EarleyParser {
                     },
 
                     // Found terminal, check input and populate S[i+1]
-                    Some(&Symbol::Terminal(_, ref testfn)) => if testfn(&input) {
-                        if states.len() <= i + 1 {
-                            assert_eq!(states.len(), i + 1);
-                            states.push(StateSet::new());
+                    Some(&Symbol::Terminal(_, ref testfn)) => if let Some(ref input) = input {
+                        if testfn(&input) {
+                            if states.len() <= i + 1 {
+                                assert_eq!(states.len(), i + 1);
+                                states.push(StateSet::new());
+                            }
+                            states[i+1].push(Item::new(
+                                item.rule.clone(), item.dot+1, item.start));
                         }
-                        states[i+1].push(Item::new(
-                            item.rule.clone(), item.dot+1, item.start));
                     },
 
                     // we reached the end of the item's rule, trigger completion
@@ -79,12 +80,13 @@ impl EarleyParser {
                 }
                 item_idx += 1;
             }
+            i += 1;
         }
 
         {
-            let last = try!(states.last().ok_or(ParseError::BadInput));
             // Check that at least one item is a. complete, b. starts at the beginning
             // and c. that the name of the rule matches the starting symbol
+            let last = try!(states.last().ok_or(ParseError::BadInput));
             if last.iter().filter(|item| item.complete() && item.start == 0 &&
                                    item.rule.name == self.g.start).count() < 1 {
                 return Err(ParseError::BadInput);

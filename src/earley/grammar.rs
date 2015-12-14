@@ -1,7 +1,7 @@
+use earley::symbol::Symbol;
+use earley::items::Rule;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
-use earley::symbol::Symbol;
-use earley::rules::Rule;
 
 pub struct Grammar {
     pub start: Rc<Symbol>,

@@ -40,8 +40,8 @@ impl Symbol {
 impl fmt::Debug for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            &Symbol::NonTerm(ref name) => write!(f, "NT'{}'", name),
-            &Symbol::Terminal(ref name, _) => write!(f, "T'{}'", name),
+            &Symbol::NonTerm(ref name) => write!(f, "{}", name),
+            &Symbol::Terminal(ref name, _) => write!(f, "'{}'", name),
         }
     }
 }
@@ -66,8 +66,9 @@ impl PartialEq for Symbol {
             (&Symbol::Terminal(ref name_a, ref func_a),
              &Symbol::Terminal(ref name_b, ref func_b)) => {
                 name_a == name_b && unsafe {
-                    mem::transmute::<_, (usize, usize)>(&**func_a) ==
-                    mem::transmute::<_, (usize, usize)>(&**func_b)
+                    let a = mem::transmute::<_, (usize, usize)>(&**func_a);
+                    let b = mem::transmute::<_, (usize, usize)>(&**func_b);
+                    a == b
                 }
             },
             _ => false,

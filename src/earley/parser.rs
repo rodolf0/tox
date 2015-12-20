@@ -82,7 +82,6 @@ impl EarleyParser {
             }
             i += 1;
         }
-
         {
             // Check that at least one item is a. complete, b. starts at the beginning
             // and c. that the name of the rule matches the starting symbol

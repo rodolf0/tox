@@ -93,9 +93,9 @@ use earley::{Lexer, EarleyParser};
 #[test]
 fn print_statesets() {
     let p = EarleyParser::new(build_grammar());
-    //let mut input = Lexer::from_str("1+(2*3-4)", "+*-/()");
-    let mut input = Lexer::from_str("1+2", "+*-/()");
+    let mut input = Lexer::from_str("1+(2*3-4)", "+*-/()");
     let state = p.parse(&mut input).unwrap();
+    assert_eq!(state.len(), 10);
 
     for (idx, stateset) in state.iter().enumerate() {
         println!("=== {} ===", idx);
@@ -105,13 +105,28 @@ fn print_statesets() {
     }
 }
 
-//#[test]
-//fn test2() {
-    //let g = build_grammar();
-    //let mut input = Lexer::from_str("1+", "+*-/()");
-    //let p = EarleyParser::new(g);
-    //assert!(p.parse(&mut input).is_err());
-//}
+#[test]
+fn test_ambiguous_grammar() {
+    // S -> SS | b
+    // Earley's corner case that generates spurious trees for bbb
+    let mut gb = GrammarBuilder::new();
+    gb.symbol(Symbol::nonterm("S"))
+      .symbol(Symbol::terminal("b", |n: &str| n == "b"))
+      .rule("S", vec!["S", "S"])
+      .rule("S", vec!["b"]);
+    let mut input = Lexer::from_str("b b b", " ");
+    let p = EarleyParser::new(gb.into_grammar("S"));
+    let states = p.parse(&mut input).unwrap();
+    assert_eq!(states.len(), 4);
+}
+
+#[test]
+fn test_badparse() {
+    let g = build_grammar();
+    let mut input = Lexer::from_str("1+", "+*-/()");
+    let p = EarleyParser::new(g);
+    assert!(p.parse(&mut input).is_err());
+}
 
 //#[test]
 //fn test3() {

@@ -39,6 +39,12 @@ impl Item {
     pub fn complete(&self) -> bool {
         self.dot >= self.rule.spec.len()
     }
+
+    // check if item is complete and rule name matches <name>
+    pub fn completes(&self, name: &str) -> bool {
+        self.complete() && self.rule.name() == name
+    }
+
 }
 
 impl fmt::Debug for Item {

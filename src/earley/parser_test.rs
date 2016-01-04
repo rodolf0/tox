@@ -1,6 +1,7 @@
 use earley::symbol::Symbol;
 use earley::items::{Rule, Item, StateSet};
 use earley::grammar::{GrammarBuilder, Grammar};
+use earley::tree1::build_tree;
 use std::rc::Rc;
 
 #[test]
@@ -152,7 +153,7 @@ fn test_sum() {
         }
     }
     println!("=== tree ===");
-    p.build_tree(states);
+    println!("{:?}", build_tree(&p.g, states));
 }
 
 #[test]
@@ -179,35 +180,35 @@ fn test_pow() {
         }
     }
     println!("=== tree ===");
-    p.build_tree(states);
+    println!("{:?}", build_tree(&p.g, states));
 }
 
-//#[test]
-//fn test3() {
-    //let mut gb = GrammarBuilder::new();
-    //// Build bogus grammar
-    //gb.symbol(NonTerminal::new("A"));
-    //gb.symbol(NonTerminal::new("B"));
-    //gb.rule("A", Vec::new());
-    //gb.rule("A", vec!["B"]);
-    //gb.rule("B", vec!["A"]);
+#[test]
+fn test3() {
+    let mut gb = GrammarBuilder::new();
+    // Build bogus grammar
+    gb.symbol(Symbol::nonterm("A"));
+    gb.symbol(Symbol::nonterm("B"));
+    gb.rule("A", Vec::new());
+    gb.rule("A", vec!["B"]);
+    gb.rule("B", vec!["A"]);
 
-    //let g = gb.into_grammar("A");
+    let g = gb.into_grammar("A");
 
-    //assert_eq!(g.start, g.symbols["A"]);
-    //assert_eq!(g.symbols.len(), 2);
+    assert_eq!(g.start, g.symbols["A"]);
+    assert_eq!(g.symbols.len(), 2);
 
-    //let mut input = Lexer::from_str("", "-");
-    //let p = EarleyParser::new(g);
+    let mut input = Lexer::from_str("", "-");
+    let p = EarleyParser::new(g);
 
-    //let state = p.parse(&mut input).unwrap();
-    //for (idx, stateset) in state.iter().enumerate() {
-        //println!("=== {} ===", idx);
-        //for i in stateset.iter() {
-            //println!("{}|{}  {:?} -> {:?}", i.start, i.dot, i.rule.name, i.rule.spec);
-        //}
-    //}
-//}
+    let state = p.parse(&mut input).unwrap();
+    for (idx, stateset) in state.iter().enumerate() {
+        println!("=== {} ===", idx);
+        for i in stateset.iter() {
+            println!("{:?}", i);
+        }
+    }
+}
 
 
 //Sum -> Sum + Mul | Mul
@@ -251,17 +252,16 @@ fn build_grammar2() -> Grammar {
 #[test]
 fn test5() {
     let g = build_grammar2();
-    //let mut input = Lexer::from_str("1+2^3^4*5/6+7*8^9", "+*-/()^");
-    let mut input = Lexer::from_str("2^3", "^+*-/()");
+    let mut input = Lexer::from_str("1+2^3^4*5/6+7*8^9", "+*-/()^");
     let p = EarleyParser::new(g);
 
-    let state = p.parse(&mut input).unwrap();
-    for (idx, stateset) in state.iter().enumerate() {
+    let states = p.parse(&mut input).unwrap();
+    for (idx, stateset) in states.iter().enumerate() {
         println!("=== {} ===", idx);
         for i in stateset.iter() {
             println!("{:?}", i);
         }
     }
     println!("==========================================");
-    p.build_tree(state);
+    println!("{:?}", build_tree(&p.g, states));
 }

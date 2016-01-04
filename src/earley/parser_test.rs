@@ -103,8 +103,6 @@ fn print_statesets() {
             println!("{:?}", i);
         }
     }
-    println!("=== tree ===");
-    p.build_tree(state);
 }
 
 #[test]

@@ -1,5 +1,5 @@
 use earley::symbol::Symbol;
-use earley::items::{Item, StateSet, Rule};
+use earley::items::{Item, StateSet};
 use earley::grammar::Grammar;
 use earley::Lexer;
 
@@ -87,96 +87,36 @@ impl EarleyParser {
     }
 }
 
-use std::collections::VecDeque;
 use std::cmp::Ordering;
+use std::ops;
 use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct Subtree {
     pub value: Rc<Symbol>,
-    pub children: VecDeque<Subtree>,
+    pub children: Vec<Subtree>,
 }
 
-impl EarleyParser {
-    //pub fn build_tree(&self, states: Vec<StateSet>) -> Subtree {
-        //// get a complete item from the last stateset
-        //let root = states.last().unwrap().iter()
-            //.filter(|item| item.completes(self.g.start.name()) && item.start == 0)
-            //.next().unwrap(); // assuming 1 parse
-        //println!("Start: {:?}", root);
-        //let tree = self.bt_helper(&states, root, states.len() - 1);
-        //println!("{:?}", &tree);
-        //tree
-    //}
+pub struct RevTable(Vec<(usize, Item, usize)>);
 
-    pub fn build_tree(&self, states: Vec<StateSet>) -> Subtree {
-        //let last = states.len() - 1;
-        //let revtable = purge_items(states);
-        //let root = revtable.iter().filter(|it|
-                    //it.0 == 0 && // rule starts at 0
-                    //it.2 == last && // rule covers all input
-                    //it.1.name() == self.g.start.name()); // named like start
-
-        // get a complete item from the last stateset
-        let root = states.last().unwrap().iter()
-            .filter(|item| item.completes(self.g.start.name()) && item.start == 0)
-            .next().unwrap(); // assuming 1 parse
-        println!("Start: {:?}", root);
-        let tree = self.bt_helper(&states, root, states.len() - 1);
-        println!("{:?}", &tree);
-        tree
-    }
-
-    fn bt_helper(&self, states: &Vec<StateSet>, theroot: &Item, mut end: usize) -> Subtree {
-        let mut subtree = Subtree{value: theroot.rule.name.clone(),
-                                  children: VecDeque::new()};
-        for needle in theroot.rule.spec.iter().rev() {
-            match &**needle {
-                &Symbol::NonTerm(_) => {
-                    println!("Searching for {:?} completed at {}", needle, end);
-                    // look for items completed at 'end' state with rule named 'needle'
-                    let mut items = states[end].iter()
-                        .filter(|item| item.completes(needle.name()));
-                    // we're _randomly_ picking the first item
-                    // if the grammar is non-ambig then it's the only option
-                    //
-                    // should pick the top priority one, sort items per rule precedence
-                    let item = items.next().unwrap();
-
-                    let subsubtree = self.bt_helper(states, item, end);
-                    subtree.children.push_front(subsubtree); // cause rev-iter
-
-                    end = item.start;
-                    //println!("{}: {:?}", end, completed);
-                },
-                &Symbol::Terminal(ref t, _) => {
-                    println!("hit {:?} at {}", t, end);
-                    subtree.children.push_front(
-                        Subtree{value: needle.clone(), children: VecDeque::new()});
-                    end -= 1; // we'll search...
-                }
-            }
-        }
-        subtree
-    }
-
+impl RevTable {
     // Return a list of (start, rule, end)
     // * Flip the earley items so we can search forward
     // * Only completed items are put on the final list
     // * Sort rules acording to order of apearance in grammar (resolve ambiguities)
-    fn purge_items(&self, states: Vec<StateSet>) -> Vec<(usize, Rc<Rule>, usize)> {
+    pub fn new(grammar: &Grammar, states: Vec<StateSet>) -> RevTable {
         let mut items = Vec::new();
         for (idx, stateset) in states.iter().enumerate() {
             items.extend(stateset.iter().filter(|item| item.complete())
-                                 .map(|item| (item.start, item.rule.clone(), idx)));
+                                 .map(|item| (item.start, item.clone(), idx)));
         }
         // sort by start-point, then rule appearance in grammar, then longest
         items.sort_by(|a, b| {
             match a.0.cmp(&b.0) {
                 Ordering::Equal => {
                     // sort according to appearance in grammar
-                    let ax = self.g.rules.iter().position(|r| *r == a.1);
-                    let bx = self.g.rules.iter().position(|r| *r == b.1);
+                    let ax = grammar.rules.iter().position(|r| *r == a.1.rule);
+                    let bx = grammar.rules.iter().position(|r| *r == b.1.rule);
                     match ax.unwrap().cmp(&bx.unwrap()) {
                         // sort by longest match first
                         Ordering::Equal => b.2.cmp(&a.2),
@@ -186,6 +126,61 @@ impl EarleyParser {
                 other => other,
             }
         });
-        items
+        RevTable(items)
+    }
+}
+
+impl ops::Deref for RevTable {
+    type Target = Vec<(usize, Item, usize)>;
+    fn deref<'a>(&'a self) -> &'a Self::Target { &self.0 }
+}
+
+impl ops::DerefMut for RevTable {
+    fn deref_mut<'a>(&'a mut self) -> &'a mut Self::Target { &mut self.0 }
+}
+
+
+impl EarleyParser {
+    pub fn build_tree(&self, states: Vec<StateSet>) -> Subtree {
+        let last = states.len() - 1;
+        let revtable = RevTable::new(&self.g, states);
+        let root = revtable.iter().filter(|it|
+                        it.0 == 0 && // rule starts at 0
+                        it.2 == last && // rule covers all input
+                        it.1.rule.name() == self.g.start.name()) // named like start
+                    .next().unwrap(); // just grab one parse
+        //return Subtree{value: Rc::new(Symbol::nonterm("X")), children: Vec::new()};
+        println!("Start: {:?}", root);
+        let tree = EarleyParser::bt_helper(&revtable, &root.1, 0);
+        println!("{:?}", &tree);
+        tree
+    }
+
+    fn bt_helper(revtable: &RevTable, root: &Item, mut start: usize) -> Subtree {
+        let mut subtree = Subtree{value: root.rule.name.clone(), children: Vec::new()};
+        for needle in root.rule.spec.iter() {
+            match &**needle {
+                &Symbol::NonTerm(_) => {
+                    println!("Searching for {:?} starting at {}", needle, start);
+                    // we're picking the first item sorted per grammar order
+                    let item = revtable.iter()
+                        .filter(|entry| entry.1 != *root && // avoid infinite left recursion
+                                        entry.0 == start &&
+                                        entry.1.rule.name() == needle.name())
+                        .next().unwrap();
+                    let subsubtree = EarleyParser::bt_helper(revtable, &item.1, start);
+                    subtree.children.push(subsubtree);
+                    start = item.2;
+                    //println!("{}: {:?}", end, completed);
+                },
+                &Symbol::Terminal(ref t, _) => {
+                    println!("hit {:?} at {}", t, start);
+                    subtree.children.push(
+                        Subtree{value: needle.clone(), children: Vec::new()});
+                    start += 1; // we'll search...
+                }
+            }
+        }
+        subtree
     }
 }

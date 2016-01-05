@@ -22,18 +22,18 @@ fn symbol_uniqueness() {
     };
 
     // test item comparison
-    assert_eq!(Item::new(rule.clone(), 0, 0), Item::new(rule.clone(), 0, 0));
-    assert!(Item::new(rule.clone(), 0, 0) != Item::new(rule.clone(), 0, 1));
+    assert_eq!(Item::new(rule.clone(), 0, 0, 0), Item::new(rule.clone(), 0, 0, 0));
+    assert!(Item::new(rule.clone(), 0, 0, 0) != Item::new(rule.clone(), 0, 1, 0));
 
     // check that items are deduped in statesets
     let mut ss = StateSet::new();
-    ss.push(Item::new(rule.clone(), 0, 0));
-    ss.push(Item::new(rule.clone(), 0, 0));
+    ss.push(Item::new(rule.clone(), 0, 0, 0));
+    ss.push(Item::new(rule.clone(), 0, 0, 0));
     assert_eq!(ss.len(), 1);
-    ss.push(Item::new(rule.clone(), 1, 0));
+    ss.push(Item::new(rule.clone(), 1, 0, 1));
     assert_eq!(ss.len(), 2);
 
-    let ix = Item::new(rule.clone(), 2, 3);
+    let ix = Item::new(rule.clone(), 2, 3, 3);
     let vi = vec![ix.clone(), ix.clone(), ix.clone(), ix.clone()];
     ss.extend(vi.into_iter());
     assert_eq!(ss.len(), 3);
@@ -252,13 +252,16 @@ fn build_grammar2() -> Grammar {
 #[test]
 fn test5() {
     let g = build_grammar2();
-    let mut input = Lexer::from_str("1+2^3^4*5/6+7*8^9", "+*-/()^");
+    //let mut input = Lexer::from_str("1+2^3^4*5/6+7*8^9", "+*-/()^");
+	//let mut input = Lexer::from_str("(1+2^3)^4*5/6+7*8^9", "+*-/()^");
+	let mut input = Lexer::from_str("1+2^3^(4*5)/6+7*8^9", "+*-/()^");
+    //let mut input = Lexer::from_str("1+2^3^4*5", "+*-/()^");
     let p = EarleyParser::new(g);
 
     let states = p.parse(&mut input).unwrap();
     for (idx, stateset) in states.iter().enumerate() {
         println!("=== {} ===", idx);
-        for i in stateset.iter() {
+        for i in stateset.iter().filter(|it| it.complete()) {
             println!("{:?}", i);
         }
     }

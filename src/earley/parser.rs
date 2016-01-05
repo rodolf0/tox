@@ -19,7 +19,7 @@ impl EarleyParser {
         // Populate S0 by building items for each start rule
         let mut states = Vec::new();
         states.push(self.g.rules(self.g.start())
-                          .map(|rule| Item::new(rule.clone(), 0, 0))
+                          .map(|rule| Item::new(rule.clone(), 0, 0, 0))
                           .collect::<StateSet>());
         let mut i = 0;
         while i < states.len() {
@@ -33,11 +33,11 @@ impl EarleyParser {
                     // prediction, insert items for all rules named like this nonterm
                     Some(&Symbol::NonTerm(ref name)) => {
                         for rule in self.g.rules(&name) {
-                            states[i].push(Item::new(rule.clone(), 0, i));
+                            states[i].push(Item::new(rule.clone(), 0, i, i));
                             // trigger magical completion for nullable rules
                             if self.g.is_nullable(rule.name()) {
                                 states[i].push(Item::new(
-                                    item.rule.clone(), item.dot + 1, item.start));
+                                    item.rule.clone(), item.dot + 1, item.start, i));
                             }
                         }
                     },
@@ -50,7 +50,7 @@ impl EarleyParser {
                                 states.push(StateSet::new());
                             }
                             states[i+1].push(Item::new(
-                                item.rule.clone(), item.dot+1, item.start));
+                                item.rule.clone(), item.dot+1, item.start, i+1));
                         }
                     },
 
@@ -66,7 +66,7 @@ impl EarleyParser {
                                 _ => None
                             });
                         states[i].extend(parent_items.map(|pitem| Item::new(
-                            pitem.rule.clone(), pitem.dot + 1, pitem.start)));
+                            pitem.rule.clone(), pitem.dot + 1, pitem.start, i)));
                     },
                 }
                 item_idx += 1;

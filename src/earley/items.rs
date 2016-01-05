@@ -24,12 +24,13 @@ impl Rule {
 pub struct Item {
     pub rule: Rc<Rule>,
     pub dot: usize,    // index into the production
-    pub start: usize,  // Earley state where this item starts
+    pub start: usize,  // Earley state where item starts
+    pub end: usize,    // Earley state where item ends
 }
 
 impl Item {
-    pub fn new(rule: Rc<Rule>, dot: usize, start: usize) -> Item {
-        Item{rule: rule, dot: dot, start: start}
+    pub fn new(rule: Rc<Rule>, dot: usize, start: usize, end: usize) -> Item {
+        Item{rule: rule, dot: dot, start: start, end: end}
     }
 
     pub fn next_symbol<'a>(&'a self) -> Option<&'a Symbol> {
@@ -53,7 +54,8 @@ impl fmt::Debug for Item {
             .take(self.dot).map(|s| s.name()).collect::<Vec<&str>>().join(" ");
         let post = self.rule.spec.iter()
             .skip(self.dot).map(|s| s.name()).collect::<Vec<&str>>().join(" ");
-        write!(f, "({}) {:10} -> {} \u{00b7} {}", self.start, self.rule.name(), pre, post)
+        write!(f, "({} - {}) {:7} -> {} \u{00b7} {}",
+               self.start, self.end, self.rule.name(), pre, post)
     }
 }
 

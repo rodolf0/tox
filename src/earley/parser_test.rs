@@ -254,7 +254,7 @@ fn test5() {
     let g = build_grammar2();
     //let mut input = Lexer::from_str("1+2^3^4*5/6+7*8^9", "+*-/()^");
 	//let mut input = Lexer::from_str("(1+2^3)^4*5/6+7*8^9", "+*-/()^");
-	let mut input = Lexer::from_str("1+2^3^(4*5)/6+7*8^9", "+*-/()^");
+    let mut input = Lexer::from_str("1+2^3^(4*5)/6+7*8^9", "+*-/()^");
     //let mut input = Lexer::from_str("1+2^3^4*5", "+*-/()^");
     let p = EarleyParser::new(g);
 

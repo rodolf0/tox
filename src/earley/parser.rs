@@ -12,10 +12,16 @@ pub struct EarleyParser {
     pub g: Grammar
 }
 
+pub struct ParseState {
+    pub states: Vec<StateSet>,
+    pub input: Vec<String>,
+}
+
 impl EarleyParser {
     pub fn new(grammar: Grammar) -> EarleyParser { EarleyParser{g: grammar} }
 
-    pub fn parse(&self, tok: &mut Lexer) -> Result<Vec<StateSet>, ParseError> {
+    pub fn parse(&self, tok: &mut Lexer) -> Result<ParseState, ParseError> {
+        let mut tokens = Vec::new();
         // Populate S0 by building items for each start rule
         let mut states = Vec::new();
         states.push(self.g.rules(self.g.start())
@@ -24,6 +30,10 @@ impl EarleyParser {
         let mut i = 0;
         while i < states.len() {
             let input = tok.next();
+            // collect tokens
+            if let Some(ref input) = input {
+                tokens.push(input.to_string());
+            }
 
             let mut item_idx = 0;
             while item_idx < states[i].len() {
@@ -75,7 +85,8 @@ impl EarleyParser {
         }
         {
             // Check that at least one item is a. complete, b. starts at the beginning
-            // and c. that the name of the rule matches the starting symbol
+            // and c. that the name of the rule matches the starting symbol. It spans
+            // the whole input because we search at the last stateset
             let last = try!(states.last().ok_or(ParseError::BadInput));
             if last.iter().filter(|item|
                     item.start == 0 && item.completes(self.g.start.name())
@@ -83,6 +94,6 @@ impl EarleyParser {
                 return Err(ParseError::BadInput);
             }
         }
-        Ok(states)
+        Ok(ParseState{states: states, input: tokens})
     }
 }

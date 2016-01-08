@@ -95,15 +95,17 @@ use earley::{Lexer, EarleyParser};
 fn print_statesets() {
     let p = EarleyParser::new(build_grammar());
     let mut input = Lexer::from_str("1+(2*3-4)", "+*-/()");
-    let state = p.parse(&mut input).unwrap();
-    assert_eq!(state.len(), 10);
+    let ps = p.parse(&mut input).unwrap();
+    assert_eq!(ps.states.len(), 10);
 
-    for (idx, stateset) in state.iter().enumerate() {
+    for (idx, stateset) in ps.states.iter().enumerate() {
         println!("=== {} ===", idx);
         for i in stateset.iter() {
             println!("{:?}", i);
         }
     }
+    println!("=== tree ===");
+    println!("{:?}", build_tree(&p.g, &ps));
 }
 
 #[test]
@@ -117,8 +119,14 @@ fn test_ambiguous_grammar() {
       .rule("S", vec!["b"]);
     let mut input = Lexer::from_str("b b b", " ");
     let p = EarleyParser::new(gb.into_grammar("S"));
-    let states = p.parse(&mut input).unwrap();
-    assert_eq!(states.len(), 4);
+    let ps = p.parse(&mut input).unwrap();
+    assert_eq!(ps.states.len(), 4);
+    for (idx, stateset) in ps.states.iter().enumerate() {
+        println!("=== {} ===", idx);
+        for i in stateset.iter() {
+            println!("{:?}", i);
+        }
+    }
 }
 
 #[test]
@@ -144,16 +152,16 @@ fn test_sum() {
       .rule("N", vec!["[0-9]"]);
     let mut input = Lexer::from_str("1+2", "+");
     let p = EarleyParser::new(gb.into_grammar("S"));
-    let states = p.parse(&mut input).unwrap();
+    let ps = p.parse(&mut input).unwrap();
 
-    for (idx, stateset) in states.iter().enumerate() {
+    for (idx, stateset) in ps.states.iter().enumerate() {
         println!("=== {} ===", idx);
         for i in stateset.iter() {
             println!("{:?}", i);
         }
     }
     println!("=== tree ===");
-    println!("{:?}", build_tree(&p.g, states));
+    println!("{:?}", build_tree(&p.g, &ps));
 }
 
 #[test]
@@ -171,16 +179,16 @@ fn test_pow() {
       .rule("N", vec!["[0-9]"]);
     let mut input = Lexer::from_str("1^2", "^");
     let p = EarleyParser::new(gb.into_grammar("P"));
-    let states = p.parse(&mut input).unwrap();
+    let ps = p.parse(&mut input).unwrap();
 
-    for (idx, stateset) in states.iter().enumerate() {
+    for (idx, stateset) in ps.states.iter().enumerate() {
         println!("=== {} ===", idx);
         for i in stateset.iter() {
             println!("{:?}", i);
         }
     }
     println!("=== tree ===");
-    println!("{:?}", build_tree(&p.g, states));
+    println!("{:?}", build_tree(&p.g, &ps));
 }
 
 #[test]
@@ -201,8 +209,8 @@ fn test3() {
     let mut input = Lexer::from_str("", "-");
     let p = EarleyParser::new(g);
 
-    let state = p.parse(&mut input).unwrap();
-    for (idx, stateset) in state.iter().enumerate() {
+    let ps = p.parse(&mut input).unwrap();
+    for (idx, stateset) in ps.states.iter().enumerate() {
         println!("=== {} ===", idx);
         for i in stateset.iter() {
             println!("{:?}", i);
@@ -252,19 +260,48 @@ fn build_grammar2() -> Grammar {
 #[test]
 fn test5() {
     let g = build_grammar2();
-    //let mut input = Lexer::from_str("1+2^3^4*5/6+7*8^9", "+*-/()^");
-	//let mut input = Lexer::from_str("(1+2^3)^4*5/6+7*8^9", "+*-/()^");
-    let mut input = Lexer::from_str("1+2^3^(4*5)/6+7*8^9", "+*-/()^");
+    let mut input = Lexer::from_str("1+2^3^4*5/6+7*8^9", "+*-/()^");
+    //let mut input = Lexer::from_str("(1+2^3)^4*5/6+7*8^9", "+*-/()^");
+    //let mut input = Lexer::from_str("1+2^3^(4*5)/6+7*8^9", "+*-/()^");
     //let mut input = Lexer::from_str("1+2^3^4*5", "+*-/()^");
     let p = EarleyParser::new(g);
 
-    let states = p.parse(&mut input).unwrap();
-    for (idx, stateset) in states.iter().enumerate() {
+    let ps = p.parse(&mut input).unwrap();
+    for (idx, stateset) in ps.states.iter().enumerate() {
         println!("=== {} ===", idx);
         for i in stateset.iter().filter(|it| it.complete()) {
             println!("{:?}", i);
         }
     }
     println!("==========================================");
-    println!("{:?}", build_tree(&p.g, states));
+    println!("{:?}", build_tree(&p.g, &ps));
+}
+
+
+
+#[test]
+fn test6() {
+    // E -> E + E | E * E | n
+    let mut gb = GrammarBuilder::new();
+    gb.symbol(Symbol::nonterm("E"))
+      .symbol(Symbol::terminal("+", |n: &str| n == "+"))
+      .symbol(Symbol::terminal("*", |n: &str| n == "*"))
+      .symbol(Symbol::terminal("n", |n: &str|
+          n.chars().all(|c| "1234567890".contains(c))))
+      .rule("E", vec!["E", "+", "E"])
+      .rule("E", vec!["E", "*", "E"])
+      .rule("E", vec!["n"]);
+
+    let mut input = Lexer::from_str("1+2*3", "+*");
+    let p = EarleyParser::new(gb.into_grammar("E"));
+    let ps = p.parse(&mut input).unwrap();
+
+    for (idx, stateset) in ps.states.iter().enumerate() {
+        println!("=== {} ===", idx);
+        for i in stateset.iter() {
+            println!("{:?}", i);
+        }
+    }
+    //println!("=== tree ===");
+    //println!("{:?}", build_tree(&p.g, &ps));
 }

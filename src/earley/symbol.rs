@@ -1,5 +1,4 @@
-use std::hash::{Hash, Hasher};
-use std::{mem, fmt};
+use std::{fmt, hash, mem};
 
 pub enum Symbol {
     NonTerm(String),
@@ -46,8 +45,8 @@ impl fmt::Debug for Symbol {
     }
 }
 
-impl Hash for Symbol {
-    fn hash<H: Hasher>(&self, state: &mut H) {
+impl hash::Hash for Symbol {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {
             &Symbol::NonTerm(ref name) => name.hash(state),
             &Symbol::Terminal(ref name, ref f) => {

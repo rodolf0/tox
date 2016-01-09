@@ -2,7 +2,7 @@ use earley::symbol::Symbol;
 use std::collections::HashSet;
 use std::ops::Index;
 use std::rc::Rc;
-use std::{slice, iter, fmt};
+use std::{fmt, hash, iter, slice};
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Rule {
@@ -20,17 +20,44 @@ impl Rule {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Hash, PartialEq, Eq, Clone)]
+#[derive(Clone)]
 pub struct Item {
     pub rule: Rc<Rule>,
     pub dot: usize,    // index into the production
     pub start: usize,  // Earley state where item starts
     pub end: usize,    // Earley state where item ends
+    pub bp: HashSet<(Item, Item)>,  // backpointers to producers of this item
 }
+
+// override Hash/Eq to avoid 'bp' from deduplicate Items in StateSets
+impl hash::Hash for Item {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.rule.hash(state);
+        self.dot.hash(state);
+        self.start.hash(state);
+        self.end.hash(state);
+    }
+}
+
+impl PartialEq for Item {
+    fn eq(&self, other: &Item) -> bool {
+        self.rule == other.rule && self.dot == other.dot &&
+        self.start == other.start && self.end == other.end
+    }
+}
+
+impl Eq for Item {}
 
 impl Item {
     pub fn new(rule: Rc<Rule>, dot: usize, start: usize, end: usize) -> Item {
-        Item{rule: rule, dot: dot, start: start, end: end}
+        Item{rule: rule, dot: dot, start: start, end: end, bp: HashSet::new()}
+    }
+
+    pub fn new2(rule: Rc<Rule>, dot: usize, start: usize, end: usize,
+                bp: (Item, Item)) -> Item {
+        let mut _bp = HashSet::new();
+        _bp.insert(bp);
+        Item{rule: rule, dot: dot, start: start, end: end, bp: _bp}
     }
 
     pub fn next_symbol<'a>(&'a self) -> Option<&'a Symbol> {
@@ -45,17 +72,16 @@ impl Item {
     pub fn completes(&self, name: &str) -> bool {
         self.complete() && self.rule.name() == name
     }
-
 }
 
 impl fmt::Debug for Item {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let pre = self.rule.spec.iter()
-            .take(self.dot).map(|s| s.name()).collect::<Vec<&str>>().join(" ");
+            .take(self.dot).map(|s| s.name()).collect::<Vec<_>>().join(" ");
         let post = self.rule.spec.iter()
-            .skip(self.dot).map(|s| s.name()).collect::<Vec<&str>>().join(" ");
-        write!(f, "({} - {}) {:7} -> {} \u{00b7} {}",
-               self.start, self.end, self.rule.name(), pre, post)
+            .skip(self.dot).map(|s| s.name()).collect::<Vec<_>>().join(" ");
+        write!(f, "({} - {}) {:7} -> {} \u{00b7} {} # {:?}",
+               self.start, self.end, self.rule.name(), pre, post, self.bp)
     }
 }
 
@@ -72,8 +98,15 @@ impl StateSet {
         StateSet{order: Vec::new(), dedup: HashSet::new()}
     }
 
+    // push items into the set, merging back-pointer sets
     pub fn push(&mut self, item: Item) {
-        if !self.dedup.contains(&item) {
+        if self.dedup.contains(&item) {
+            self.dedup.remove(&item);
+            let i = self.order.iter().position(|it| *it == item);
+            let mut updated = self.order.get_mut(i.unwrap()).unwrap();
+            updated.bp.extend(item.bp.into_iter());
+            self.dedup.insert(updated.clone());
+        } else {
             self.order.push(item.clone());
             self.dedup.insert(item);
         }

@@ -20,6 +20,7 @@ pub struct ParseState {
 impl EarleyParser {
     pub fn new(grammar: Grammar) -> EarleyParser { EarleyParser{g: grammar} }
 
+    // TODO: leave scan loop for the end
     pub fn parse(&self, tok: &mut Lexer) -> Result<ParseState, ParseError> {
         let mut tokens = Vec::new();
         // Populate S0 by building items for each start rule
@@ -46,7 +47,8 @@ impl EarleyParser {
                             states[i].push(Item::new(rule.clone(), 0, i, i));
                             // trigger magical completion for nullable rules
                             if self.g.is_nullable(rule.name()) {
-                                states[i].push(Item::new(
+                                states[i].push(
+                                    Item::new( // TODO: should use new2 ?
                                     item.rule.clone(), item.dot + 1, item.start, i));
                             }
                         }
@@ -68,15 +70,17 @@ impl EarleyParser {
                     None => {
                         // go back to state where 'item' started and advance
                         // any item if its next symbol matches the current one's name
-                        let parent_state = states[item.start].clone();  // TODO: no need to clone
+                        let parent_state = states[item.start].clone();
                         let parent_items = parent_state.iter().filter_map(|pitem|
                             match pitem.next_symbol() {
                                 Some(sym) if sym.is_nonterm() &&
                                              *sym == *item.rule.name => Some(pitem),
                                 _ => None
                             });
-                        states[i].extend(parent_items.map(|pitem| Item::new(
-                            pitem.rule.clone(), pitem.dot + 1, pitem.start, i)));
+                        states[i].extend(parent_items.map(|pitem|
+                            Item::new2(pitem.rule.clone(), pitem.dot + 1, pitem.start, i,
+                                       (pitem.clone(), item.clone()))
+                        ));
                     },
                 }
                 item_idx += 1;

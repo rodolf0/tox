@@ -14,34 +14,6 @@ pub struct Subtree {
 }
 
 
-// * Only completed items are put on the final list
-// * Sort rules acording to order of apearance in grammar (resolve ambiguities)
-//fn purge_items(grammar: &Grammar, states: Vec<StateSet>) -> Vec<Item> {
-    //let mut items = Vec::new();
-    //for stateset in states.iter() {
-        //items.extend(stateset.iter().cloned().filter(|item| item.complete()));
-    //}
-    //// sort by start-point, then rule appearance in grammar, then longest
-    //items.sort_by(|a, b| {
-        //match a.start.cmp(&b.start) {
-            //Ordering::Equal => {
-                //// sort according to appearance in grammar
-                //let ax = grammar.rules.iter().position(|r| *r == a.rule);
-                //let bx = grammar.rules.iter().position(|r| *r == b.rule);
-                //match ax.unwrap().cmp(&bx.unwrap()) {
-                    //// sort by longest match first
-                    ////Ordering::Equal => (b.end - b.start).cmp(&(a.end - a.start)),
-                    //Ordering::Equal => (a.end - a.start).cmp(&(b.end - b.start)),
-                    //other => other,
-                //}
-            //},
-            //other => other,
-        //}
-    //});
-    //items
-//}
-
-
 pub fn build_tree(grammar: &Grammar, pstate: &ParseState) -> Option<Subtree> {
     // get an item that spans the whole input and the rule matches the start
     let root = pstate.states.last().unwrap().iter()
@@ -96,46 +68,3 @@ fn bt_helper(pstate: &ParseState, root: &Item, mut end: usize) -> Option<Subtree
     }
     return None;
 }
-
-
-
-/*
-fn bt_helper(table: &Vec<Item>, theroot: &Item, mut depth: usize) -> Subtree {
-    let mut subtree = Subtree{value: theroot.rule.name.clone(),
-                              children: VecDeque::new()};
-    for (depth, needle) in theroot.rule.spec.iter().enumerate().rev() {
-    //for needle in theroot.rule.spec.iter().rev() {
-        match &**needle {
-            &Symbol::NonTerm(_) => {
-                let ond = end;
-                // look for items completed at 'end' state with rule named 'needle'
-                let mut items = table.iter().filter(|it| it.end == ond &&  // items completed at 'end'
-                                                    it.rule.name == *needle && // match rule name
-                                                    **it != *theroot && // avoid self-recursion
-                                                    it.start >= theroot.start && // don't spill search outside parent's boundaries
-
-                                                    (depth != 0 || it.start == theroot.start)) // is this necesary ? anchor to first item?
-                    ;
-                                       //.next().unwrap();
-
-                let item = items.next();
-                if item.is_some() {
-                    println!("Searching for {:?} completed at {}: {:?}", needle, end, item);
-                    let subsubtree = bt_helper(table, item.unwrap(), end);
-                    subtree.children.push_front(subsubtree); // cause rev-iter
-                    end = item.unwrap().start;
-                }
-
-                //println!("{}: {:?}", end, completed);
-            },
-            &Symbol::Terminal(ref t, _) => {
-                subtree.children.push_front(
-                    Subtree{value: needle.clone(), children: VecDeque::new()});
-                end -= 1;
-                println!("hit {:?} at {}", t, end);
-            }
-        }
-    }
-    subtree
-}
-*/

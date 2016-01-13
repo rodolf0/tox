@@ -1,5 +1,5 @@
 use earley::symbol::Symbol;
-use earley::items::{Item, StateSet};
+use earley::items::{Item, StateSet, Trigger};
 use earley::grammar::Grammar;
 use earley::parser::ParseState;
 
@@ -35,11 +35,9 @@ fn bt_helper(pstate: &ParseState, root: &Item) -> Option<Subtree> {
 
         let tree1 = bt_helper(pstate, bp1);
 
-        let tree2 = if let Some(ref bp2) = *bp2 {
-            bt_helper(pstate, bp2)
-        } else {
-            //Some(Subtree{value: })
-            None
+        let tree2 = match bp2 {
+            &Trigger::Completion(ref bp2) => bt_helper(pstate, bp2),
+            &Trigger::Scan(ref input) => None,
         };
 
         // if complete -> print rule.spec

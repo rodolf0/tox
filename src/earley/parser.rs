@@ -1,5 +1,5 @@
 use earley::symbol::Symbol;
-use earley::items::{Item, StateSet};
+use earley::items::{Item, StateSet, Trigger};
 use earley::grammar::Grammar;
 use earley::Lexer;
 
@@ -63,7 +63,7 @@ impl EarleyParser {
                             }
                             states[i+1].push(Item::new2(
                                 item.rule.clone(), item.dot+1, item.start, i+1,
-                                (item.clone(), None)));
+                                (item.clone(), Trigger::Scan(input.to_string()))));
                         }
                     },
 
@@ -80,7 +80,7 @@ impl EarleyParser {
                             });
                         states[i].extend(parent_items.map(|pitem|
                             Item::new2(pitem.rule.clone(), pitem.dot + 1, pitem.start, i,
-                                       (pitem.clone(), Some(item.clone())))
+                                       (pitem.clone(), Trigger::Completion(item.clone())))
                         ));
                     },
                 }

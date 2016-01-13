@@ -127,6 +127,8 @@ fn test_ambiguous_grammar() {
             println!("{:?}", i);
         }
     }
+    println!("=== tree ===");
+    println!("{:?}", build_tree(&p.g, &ps));
 }
 
 #[test]
@@ -264,6 +266,7 @@ fn test5() {
     //let mut input = Lexer::from_str("(1+2^3)^4*5/6+7*8^9", "+*-/()^");
     //let mut input = Lexer::from_str("1+2^3^(4*5)/6+7*8^9", "+*-/()^");
     //let mut input = Lexer::from_str("1+2^3^4*5", "+*-/()^");
+    //let mut input = Lexer::from_str("(1+2)*3", "+*-/()^");
     let p = EarleyParser::new(g);
 
     let ps = p.parse(&mut input).unwrap();
@@ -302,6 +305,6 @@ fn test6() {
             println!("{:?}", i);
         }
     }
-    //println!("=== tree ===");
-    //println!("{:?}", build_tree(&p.g, &ps));
+	println!("=== tree ===");
+	println!("{:?}", build_tree(&p.g, &ps));
 }

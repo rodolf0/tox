@@ -61,8 +61,9 @@ impl EarleyParser {
                                 assert_eq!(states.len(), i + 1);
                                 states.push(StateSet::new());
                             }
-                            states[i+1].push(Item::new(
-                                item.rule.clone(), item.dot+1, item.start, i+1));
+                            states[i+1].push(Item::new2(
+                                item.rule.clone(), item.dot+1, item.start, i+1,
+                                (item.clone(), None)));
                         }
                     },
 
@@ -79,7 +80,7 @@ impl EarleyParser {
                             });
                         states[i].extend(parent_items.map(|pitem|
                             Item::new2(pitem.rule.clone(), pitem.dot + 1, pitem.start, i,
-                                       (pitem.clone(), item.clone()))
+                                       (pitem.clone(), Some(item.clone())))
                         ));
                     },
                 }

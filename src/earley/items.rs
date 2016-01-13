@@ -16,6 +16,10 @@ impl Rule {
     }
 
     pub fn name<'a>(&'a self) -> &'a str { self.name.name() }
+
+    pub fn spec(&self) -> String {
+        self.spec.iter().map(|s| s.name()).collect::<Vec<_>>().join(" ")
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -26,7 +30,7 @@ pub struct Item {
     pub dot: usize,    // index into the production
     pub start: usize,  // Earley state where item starts
     pub end: usize,    // Earley state where item ends
-    pub bp: HashSet<(Item, Item)>,  // backpointers to producers of this item
+    pub bp: HashSet<(Item, Option<Item>)>,  // backpointers to producers of this item
 }
 
 // override Hash/Eq to avoid 'bp' from deduplicate Items in StateSets
@@ -54,7 +58,7 @@ impl Item {
     }
 
     pub fn new2(rule: Rc<Rule>, dot: usize, start: usize, end: usize,
-                bp: (Item, Item)) -> Item {
+                bp: (Item, Option<Item>)) -> Item {
         let mut _bp = HashSet::new();
         _bp.insert(bp);
         Item{rule: rule, dot: dot, start: start, end: end, bp: _bp}

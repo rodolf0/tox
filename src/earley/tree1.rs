@@ -26,6 +26,10 @@ pub fn build_tree(grammar: &Grammar, pstate: &ParseState) -> Option<Subtree> {
 
 // (1, 4) > tree1: None, tree2: Subtree{b, []}  ==>  Subtree{b, []}
 
+
+// TODO: this is a (probably non-general) prototype
+// should return a list of children ?? see
+// http://loup-vaillant.fr/tutorials/earley-parsing/semantic-actions
 fn bt_helper(pstate: &ParseState, root: &Item) -> Option<Subtree> {
 
     // only bp2 can be complete, bp1 is the item being advanced

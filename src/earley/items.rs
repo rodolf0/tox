@@ -35,7 +35,8 @@ pub struct Item {
     pub dot: usize,    // index into the production
     pub start: usize,  // Earley state where item starts
     pub end: usize,    // Earley state where item ends
-    pub bp: HashSet<(Item, Trigger)>,  // backpointers to producers of this item
+    // backpointers to source of this item: (source-item, trigger)
+    pub bp: HashSet<(Item, Trigger)>,
 }
 
 // override Hash/Eq to avoid 'bp' from deduplicate Items in StateSets

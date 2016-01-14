@@ -3,16 +3,13 @@ use earley::items::{Item, StateSet, Trigger};
 use earley::grammar::Grammar;
 use earley::parser::ParseState;
 
-use std::collections::VecDeque;
-use std::rc::Rc;
-
 #[derive(Debug)]
-pub struct Subtree {
-    pub value: String,
-    pub children: VecDeque<Subtree>,
+pub enum Tree {
+    Node(String),
+    SubT(Vec<Tree>), // SubT((String, Vec<Tree>))
 }
 
-pub fn build_tree(grammar: &Grammar, pstate: &ParseState) -> Option<Subtree> {
+pub fn build_tree(grammar: &Grammar, pstate: &ParseState) -> Tree {
     // get an item that spans the whole input and the rule matches the start
     let root = pstate.states.last().unwrap().iter()
                      .filter(|it| it.start == 0 &&
@@ -23,14 +20,47 @@ pub fn build_tree(grammar: &Grammar, pstate: &ParseState) -> Option<Subtree> {
 }
 
 
+// if incomplete, lo que esta a la izquierda acumular en la lista y devolver None en el valor
+// si esta completo, stringify spec en 'valor' y meter la lista
 
-// (1, 4) > tree1: None, tree2: Subtree{b, []}  ==>  Subtree{b, []}
 
+fn bt_helper(pstate: &ParseState, root: &Item) -> Tree {
 
+    let (tree_source, tree_trigger) = match root.bp.iter().next() {
+        Some(&(ref bp_source, ref bp_trigger)) => {
+            let tree_source = bt_helper(pstate, bp_source);
+            let tree_trigger = match bp_trigger {
+                //&Trigger::Completion(ref bp_trigger) => bt_helper(pstate, bp_trigger),
+                &Trigger::Completion(ref bp_trigger) =>
+                    Tree::SubT(vec![bt_helper(pstate, bp_trigger)]),
+                &Trigger::Scan(ref input) => Tree::Node(input.to_string()),
+            };
+            (tree_source, tree_trigger)
+        },
+        _ => (Tree::SubT(Vec::new()), Tree::SubT(Vec::new())) // yuck use None
+    };
+
+    //if root.complete() {
+        //Tree::SubT(vec![tree_source, tree_trigger])
+    //} else {
+        let mut childs = Vec::new();
+        match tree_source {
+            n @ Tree::Node(_) => childs.push(n),
+            Tree::SubT(l) => childs.extend(l),
+        }
+        match tree_trigger {
+            n @ Tree::Node(_) => childs.push(n),
+            Tree::SubT(l) => childs.extend(l),
+        }
+        Tree::SubT(childs)
+    //}
+}
+
+/*
 // TODO: this is a (probably non-general) prototype
 // should return a list of children ?? see
 // http://loup-vaillant.fr/tutorials/earley-parsing/semantic-actions
-fn bt_helper(pstate: &ParseState, root: &Item) -> Option<Subtree> {
+fn bt_helper(pstate: &ParseState, root: &Item) -> Subtree {
 
     // only bp2 can be complete, bp1 is the item being advanced
 
@@ -77,3 +107,4 @@ fn bt_helper(pstate: &ParseState, root: &Item) -> Option<Subtree> {
     }
 
 }
+*/

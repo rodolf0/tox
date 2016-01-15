@@ -218,6 +218,8 @@ fn test3() {
             println!("{:?}", i);
         }
     }
+    println!("==========================================");
+    println!("{:?}", build_tree(&p.g, &ps));
 }
 
 
@@ -281,7 +283,6 @@ fn test5() {
 }
 
 
-
 #[test]
 fn test6() {
     // E -> E + E | E * E | n
@@ -296,6 +297,33 @@ fn test6() {
       .rule("E", vec!["n"]);
 
     let mut input = Lexer::from_str("1+2*3", "+*");
+    let p = EarleyParser::new(gb.into_grammar("E"));
+    let ps = p.parse(&mut input).unwrap();
+
+    for (idx, stateset) in ps.states.iter().enumerate() {
+        println!("=== {} ===", idx);
+        for i in stateset.iter() {
+            println!("{:?}", i);
+        }
+    }
+	println!("=== tree ===");
+	println!("{:?}", build_tree(&p.g, &ps));
+}
+
+#[test]
+fn test7() {
+    // E -> E + E + E | E * E | n
+    let mut gb = GrammarBuilder::new();
+    gb.symbol(Symbol::nonterm("E"))
+      .symbol(Symbol::terminal("+", |n: &str| n == "+"))
+      .symbol(Symbol::terminal("*", |n: &str| n == "*"))
+      .symbol(Symbol::terminal("n", |n: &str|
+          n.chars().all(|c| "1234567890".contains(c))))
+      .rule("E", vec!["E", "+", "E", "+", "E"])
+      .rule("E", vec!["E", "*", "E"])
+      .rule("E", vec!["n"]);
+
+    let mut input = Lexer::from_str("0*1+2+3", "+*");
     let p = EarleyParser::new(gb.into_grammar("E"));
     let ps = p.parse(&mut input).unwrap();
 

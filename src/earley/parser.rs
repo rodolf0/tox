@@ -6,6 +6,7 @@ use earley::Lexer;
 #[derive(PartialEq, Debug)]
 pub enum ParseError {
     BadInput,
+    PartialParse,
 }
 
 pub struct EarleyParser {
@@ -31,7 +32,7 @@ impl EarleyParser {
         let mut i = 0;
         while i < states.len() {
             let input = tok.next();
-            // collect tokens
+            // accumulate tokens
             if let Some(ref input) = input {
                 tokens.push(input.to_string());
             }
@@ -89,6 +90,9 @@ impl EarleyParser {
             i += 1;
         }
         {
+            if tokens.len() + 1 != states.len() {
+                return Err(ParseError::PartialParse);
+            }
             // Check that at least one item is a. complete, b. starts at the beginning
             // and c. that the name of the rule matches the starting symbol. It spans
             // the whole input because we search at the last stateset

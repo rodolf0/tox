@@ -34,19 +34,15 @@ fn bt_helper(pstate: &ParseState, root: &Item) -> Option<Subtree> {
             // Eg: E -> E + E .  // prediction is E +, trigger E
             &Trigger::Completion(ref bp_trigger) => {
                 let trigger = bt_helper(pstate, bp_trigger);
-                if let Some(trigger) = trigger {
-                    prediction.push(trigger);
-                }
+                if let Some(trigger) = trigger { prediction.push(trigger); }
                 Some(Subtree::SubT(root.rule.spec(), prediction))
             },
             // Eg: E -> E + . E  // prediction is E, trigger +
             &Trigger::Scan(ref input) => {
-                //if prediction.len() == 0 {
-                    //Some(Subtree::Node(format!("#"), input.to_string()))
-                //} else {
-                    prediction.push(Subtree::Node(format!("!"), input.to_string()));
-                    Some(Subtree::SubT(format!("@"), prediction))
-                //}
+                let label = bp_prediction.next_symbol().unwrap()
+                                         .name().to_string();
+                prediction.push(Subtree::Node(label, input.to_string()));
+                Some(Subtree::SubT(root.rule.spec(), prediction))
             }
         }
     } else {

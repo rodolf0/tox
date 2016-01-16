@@ -97,8 +97,9 @@ impl EarleyParser {
             // and c. that the name of the rule matches the starting symbol. It spans
             // the whole input because we search at the last stateset
             let last = try!(states.last().ok_or(ParseError::BadInput));
-            if last.iter().filter(|item|
-                    item.start == 0 && item.completes(self.g.start.name())
+            if last.iter().filter(|item| item.start == 0 &&
+                                         item.complete() &&
+                                         item.rule.name == self.g.start
                 ).count() < 1 {
                 return Err(ParseError::BadInput);
             }

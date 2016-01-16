@@ -346,9 +346,9 @@ fn test8() {
     gb.symbol(Symbol::nonterm("E"))
       .symbol(Symbol::nonterm("X"))
       .symbol(Symbol::terminal("+", |n: &str| n == "+"))
-      //.rule("E", vec!["X", "+", "+"])
       //.rule("E", vec!["X", "+"])
       //.rule("E", vec!["+", "X"])
+      //.rule("E", vec!["X", "+", "+"])
       //.rule("E", vec!["+", "+", "X"])
       .rule("E", vec!["+", "X", "+"])
       .rule("X", Vec::new());

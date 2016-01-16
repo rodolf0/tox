@@ -13,6 +13,7 @@ pub struct EarleyParser {
     pub g: Grammar
 }
 
+#[derive(Debug)]
 pub struct ParseState {
     pub states: Vec<StateSet>,
     pub input: Vec<String>,

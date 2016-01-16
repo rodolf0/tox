@@ -90,7 +90,7 @@ impl fmt::Debug for Item {
             .take(self.dot).map(|s| s.name()).collect::<Vec<_>>().join(" ");
         let post = self.rule.spec.iter()
             .skip(self.dot).map(|s| s.name()).collect::<Vec<_>>().join(" ");
-        write!(f, "({} - {}) {:7} -> {} \u{00b7} {} # {:?}",
+        write!(f, "({} - {}) {} -> {} \u{00b7} {} # {:?}",
                self.start, self.end, self.rule.name(), pre, post, self.bp)
     }
 }

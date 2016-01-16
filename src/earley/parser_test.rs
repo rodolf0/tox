@@ -336,3 +336,34 @@ fn test7() {
 	println!("=== tree ===");
 	println!("{:?}", build_tree(&p.g, &ps));
 }
+
+
+#[test]
+fn test8() {
+    // E -> + X
+    // X ->
+    let mut gb = GrammarBuilder::new();
+    gb.symbol(Symbol::nonterm("E"))
+      .symbol(Symbol::nonterm("X"))
+      .symbol(Symbol::terminal("+", |n: &str| n == "+"))
+      //.rule("E", vec!["X", "+", "+"])
+      //.rule("E", vec!["X", "+"])
+      //.rule("E", vec!["+", "X"])
+      //.rule("E", vec!["+", "+", "X"])
+      .rule("E", vec!["+", "X", "+"])
+      .rule("X", Vec::new());
+
+    let mut input = Lexer::from_str("++", "+");
+    //let mut input = Lexer::from_str("+", "+");
+    let p = EarleyParser::new(gb.into_grammar("E"));
+    let ps = p.parse(&mut input).unwrap();
+
+    for (idx, stateset) in ps.states.iter().enumerate() {
+        println!("=== {} ===", idx);
+        for i in stateset.iter() {
+            println!("{:?}", i);
+        }
+    }
+	println!("=== tree ===");
+	println!("{:?}", build_tree(&p.g, &ps));
+}

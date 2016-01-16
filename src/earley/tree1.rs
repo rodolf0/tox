@@ -1,5 +1,4 @@
-use earley::symbol::Symbol;
-use earley::items::{Item, StateSet, Trigger};
+use earley::items::{Item, Trigger};
 use earley::grammar::Grammar;
 use earley::parser::ParseState;
 
@@ -23,33 +22,33 @@ pub fn build_tree(grammar: &Grammar, pstate: &ParseState) -> Option<Subtree> {
 // trigger is either a scan or a completion, only those can advance a prediction
 
 fn bt_helper(pstate: &ParseState, root: &Item) -> Option<Subtree> {
-    if let Some(&(ref bp_source, ref bp_trigger)) = root.bp.iter().next() {
-
-        let mut source = match bt_helper(pstate, bp_source) {
+    if let Some(&(ref bp_prediction, ref bp_trigger)) = root.bp.iter().next() {
+        // source/left-side is always a prediction (completions/scans are right side of bp)
+        // flat-accumulate all left-side back-pointers
+        let mut prediction = match bt_helper(pstate, bp_prediction) {
             Some(n @ Subtree::Node(_, _)) => vec!(n),
             Some(Subtree::SubT(_, childs)) => childs,
             None =>  Vec::new()
         };
-
         match bp_trigger {
+            // Eg: E -> E + E .  // prediction is E +, trigger E
             &Trigger::Completion(ref bp_trigger) => {
                 let trigger = bt_helper(pstate, bp_trigger);
                 if let Some(trigger) = trigger {
-                    source.push(trigger);
+                    prediction.push(trigger);
                 }
-                Some(Subtree::SubT(root.rule.spec(), source))
+                Some(Subtree::SubT(root.rule.spec(), prediction))
             },
-            &Trigger::Scan(ref input) => { // Eg: E -> E + . E  // source is E, trigger +
-
-                if source.len() == 0 { // aiming for source sub-tree to be None
-                    Some(Subtree::Node(format!("#"), input.to_string()))
-                } else {
-                    source.push(Subtree::Node(format!("!"), input.to_string()));
-                    Some(Subtree::SubT(format!("@"), source))
-                }
+            // Eg: E -> E + . E  // prediction is E, trigger +
+            &Trigger::Scan(ref input) => {
+                //if prediction.len() == 0 {
+                    //Some(Subtree::Node(format!("#"), input.to_string()))
+                //} else {
+                    prediction.push(Subtree::Node(format!("!"), input.to_string()));
+                    Some(Subtree::SubT(format!("@"), prediction))
+                //}
             }
         }
-
     } else {
         None
     }

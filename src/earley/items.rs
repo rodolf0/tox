@@ -36,7 +36,7 @@ pub struct Item {
     pub start: usize,  // Earley state where item starts
     pub end: usize,    // Earley state where item ends
     // backpointers to source of this item: (source-item, trigger)
-    pub bp: HashSet<(Item, Trigger)>, // TODO: indexes into some table
+    pub bp: HashSet<(Item, Trigger)>, // TODO: Rc<Item> for less mem
 }
 
 // override Hash/Eq to avoid 'bp' from deduplicate Items in StateSets
@@ -49,6 +49,7 @@ impl hash::Hash for Item {
     }
 }
 
+// override Hash/Eq to avoid 'bp' from deduplicate Items in StateSets
 impl PartialEq for Item {
     fn eq(&self, other: &Item) -> bool {
         self.rule == other.rule && self.dot == other.dot &&
@@ -94,7 +95,7 @@ impl fmt::Debug for Item {
 
 #[derive(Clone)]
 pub struct StateSet {
-    order: Vec<Item>,
+    order: Vec<Item>, // TODO: use Rc<Item> for less mem
     dedup: HashSet<Item>,
 }
 

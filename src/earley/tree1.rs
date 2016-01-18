@@ -8,14 +8,18 @@ pub enum Subtree {
     SubT(String, Vec<Subtree>), // ("E + E", [("n", "5"), ("[+-]", "+"), ("E * E", [...])])
 }
 
+// for non-ambiguous grammars this retreieve the only possible parse
+
 pub fn build_tree(grammar: &Grammar, pstate: &ParseState) -> Option<Subtree> {
     // get an item that spans the whole input and the rule matches the start
-    let root = pstate.states.last().unwrap().iter()
+    let mut root = pstate.states.last().unwrap().iter()
                      .filter(|it| it.start == 0 &&
                                   it.complete() &&
-                                  it.rule.name == grammar.start)
-                     .next().unwrap(); // there should only be 1 top level match
-    bt_helper(pstate, &root)
+                                  it.rule.name == grammar.start);
+    if let Some(root) = root.next() {
+        return bt_helper(pstate, root);
+    }
+    None
 }
 
 // source is always a prediction, can't be anything else cause it's on the left side

@@ -2,6 +2,7 @@ use earley::symbol::Symbol;
 use earley::items::{Rule, Item, StateSet};
 use earley::grammar::{GrammarBuilder, Grammar};
 use earley::tree1::build_tree;
+use earley::trees::build_trees;
 use earley::{Lexer, EarleyParser, ParseError};
 use std::rc::Rc;
 
@@ -140,7 +141,7 @@ fn grammar_ambiguous() {
     assert_eq!(ps.states.len(), 4);
     print_statesets(&ps.states);
     println!("=== tree ===");
-    println!("{:?}", build_tree(&p.g, &ps));
+    for t in build_trees(&p.g, &ps) { println!("{:?}", t); }
 }
 
 #[test]
@@ -229,11 +230,11 @@ fn math_ambiguous() {
       .rule("E", vec!["n"]);
     // parse something ... should return 2 parse trees
     let p = EarleyParser::new(gb.into_grammar("E"));
-    let mut input = Lexer::from_str("1+2*3", "+*");
+    let mut input = Lexer::from_str("0*1*2*3*4*5", "+*");
     let ps = p.parse(&mut input).unwrap();
     print_statesets(&ps.states);
     println!("=== tree ===");
-    println!("{:?}", build_tree(&p.g, &ps));
+    for t in build_trees(&p.g, &ps) { println!("{:?}", t); }
 }
 
 #[test]

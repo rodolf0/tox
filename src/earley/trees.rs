@@ -15,7 +15,7 @@ pub fn build_trees(grammar: &Grammar, pstate: &ParseState) -> Vec<Subtree> {
     let roots = pstate.states.last().unwrap().iter()
                      .filter(|it| it.start == 0 &&
                                   it.complete() &&
-                                  it.rule.name == grammar.start);
+                                  it.rule.name() == grammar.start());
     //roots.map(|r| bt_helper(pstate, r).iter()).collect()
     let mut out = Vec::new();
     for r in roots {

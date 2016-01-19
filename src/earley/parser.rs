@@ -77,7 +77,7 @@ impl EarleyParser {
                         let parent_items = parent_state.iter().filter_map(|pitem|
                             match pitem.next_symbol() {
                                 Some(sym) if sym.is_nonterm() &&
-                                             *sym == *item.rule.name => Some(pitem),
+                                             sym.name() == item.rule.name() => Some(pitem),
                                 _ => None
                             });
                         states[i].extend(parent_items.map(|pitem|
@@ -100,7 +100,7 @@ impl EarleyParser {
             let last = try!(states.last().ok_or(ParseError::BadInput));
             if last.iter().filter(|item| item.start == 0 &&
                                          item.complete() &&
-                                         item.rule.name == self.g.start
+                                         item.rule.name() == self.g.start()
                 ).count() < 1 {
                 return Err(ParseError::BadInput);
             }

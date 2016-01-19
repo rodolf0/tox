@@ -14,7 +14,7 @@ impl Grammar {
     // get rules filtered by name
     pub fn rules<'a>(&'a self, name: &'a str) ->
     Box<Iterator<Item=&'a Rc<Rule>> + 'a> {
-        Box::new(self.rules.iter().filter(move |r| r.name.name() == name))
+        Box::new(self.rules.iter().filter(move |r| r.name() == name))
     }
 
     // grammar's start symbol
@@ -62,9 +62,7 @@ impl GrammarBuilder {
                 // for a rule to be nullable all symbols in the spec need to be
                 // in the nullable set, else they're not nullable. All empty
                 // specs will therefore be nullable (all of it's 0 symbols are)
-                let isnullable = rule.spec.iter().all(|symbol|
-                    symbol.is_nonterm() && nullable.contains(symbol.name())
-                );
+                let isnullable = rule.nullable(&nullable);
                 if isnullable { nullable.insert(rule.name().to_string()); }
             }
             // we're done building the set when it no longer grows

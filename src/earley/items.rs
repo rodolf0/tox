@@ -6,8 +6,8 @@ use std::{fmt, hash, iter, slice};
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Rule {
-    pub name: Rc<Symbol>,
-    pub spec: Vec<Rc<Symbol>>,
+    name: Rc<Symbol>,
+    spec: Vec<Rc<Symbol>>,
 }
 
 impl Rule {
@@ -19,6 +19,11 @@ impl Rule {
 
     pub fn spec(&self) -> String {
         self.spec.iter().map(|s| s.name()).collect::<Vec<_>>().join(" ")
+    }
+
+    // TODO: deprecate after nullable symbols re-write
+    pub fn nullable(&self, nullset: &HashSet<String>) -> bool {
+        self.spec.iter().all(|s| s.is_nonterm() && nullset.contains(s.name()))
     }
 }
 

@@ -15,7 +15,7 @@ pub fn build_tree(grammar: &Grammar, pstate: &ParseState) -> Option<Subtree> {
     let mut root = pstate.states.last().unwrap().iter()
                      .filter(|it| it.start == 0 &&
                                   it.complete() &&
-                                  it.rule.name == grammar.start);
+                                  it.rule.name() == grammar.start());
     if let Some(root) = root.next() {
         return bt_helper(pstate, root);
     }

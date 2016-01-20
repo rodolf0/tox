@@ -1,5 +1,4 @@
-use earley::symbol::Symbol;
-use earley::items::{Item, StateSet, Trigger};
+use earley::types::{Symbol, Item, StateSet};
 use earley::grammar::Grammar;
 use earley::Lexer;
 
@@ -46,12 +45,11 @@ impl EarleyParser {
                     // prediction, insert items for all rules named like this nonterm
                     Some(&Symbol::NonTerm(ref name)) => {
                         for rule in self.g.rules(&name) {
-                            states[i].push(Item::new(rule.clone(), 0, i, i));
+                            states[i].push(Item::predict_new(rule, i));
                             // trigger magical completion for nullable rules
                             if self.g.is_nullable(rule.name()) {
-                                states[i].push(
-                                    Item::new( // TODO: should use new2 ?
-                                    item.rule.clone(), item.dot + 1, item.start, i));
+                                // TODO: get rid of this way of nullables
+                                states[i].push(Item::advance(&item, i));
                             }
                         }
                     },
@@ -63,9 +61,7 @@ impl EarleyParser {
                                 assert_eq!(states.len(), i + 1);
                                 states.push(StateSet::new());
                             }
-                            states[i+1].push(Item::new2(
-                                item.rule.clone(), item.dot+1, item.start, i+1,
-                                (item.clone(), Trigger::Scan(input.to_string()))));
+                            states[i+1].push(Item::scan_new(&item, i+1, input));
                         }
                     },
 
@@ -73,17 +69,11 @@ impl EarleyParser {
                     None => {
                         // go back to state where 'item' started and advance
                         // any item if its next symbol matches the current one's name
-                        let parent_state = states[item.start].clone();
-                        let parent_items = parent_state.iter().filter_map(|pitem|
-                            match pitem.next_symbol() {
-                                Some(sym) if sym.is_nonterm() &&
-                                             sym.name() == item.rule.name() => Some(pitem),
-                                _ => None
-                            });
-                        states[i].extend(parent_items.map(|pitem|
-                            Item::new2(pitem.rule.clone(), pitem.dot + 1, pitem.start, i,
-                                       (pitem.clone(), Trigger::Completion(item.clone())))
-                        ));
+                        let completed = states[item.start].iter()
+                            .filter(|source| item.can_complete(source))
+                            .map(|source| Item::complete_new(source, &item, i))
+                            .collect::<Vec<_>>();
+                        states[i].extend(completed);
                     },
                 }
                 item_idx += 1;
@@ -98,10 +88,9 @@ impl EarleyParser {
             // and c. that the name of the rule matches the starting symbol. It spans
             // the whole input because we search at the last stateset
             let last = try!(states.last().ok_or(ParseError::BadInput));
-            if last.iter().filter(|item| item.start == 0 &&
-                                         item.complete() &&
-                                         item.rule.name() == self.g.start()
-                ).count() < 1 {
+            if last.filter_by_rule(self.g.start())
+                   .filter(|item| item.start == 0 && item.complete())
+                   .count() < 1 {
                 return Err(ParseError::BadInput);
             }
         }

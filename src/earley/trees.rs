@@ -1,4 +1,4 @@
-use earley::items::{Item, Trigger};
+use earley::types::{Item, Trigger};
 use earley::grammar::Grammar;
 use earley::parser::ParseState;
 
@@ -11,17 +11,11 @@ pub enum Subtree {
 // for non-ambiguous grammars this retreieve the only possible parse
 
 pub fn build_trees(grammar: &Grammar, pstate: &ParseState) -> Vec<Subtree> {
-    // get an item that spans the whole input and the rule matches the start
-    let roots = pstate.states.last().unwrap().iter()
-                     .filter(|it| it.start == 0 &&
-                                  it.complete() &&
-                                  it.rule.name() == grammar.start());
-    //roots.map(|r| bt_helper(pstate, r).iter()).collect()
-    let mut out = Vec::new();
-    for r in roots {
-        out.extend(bt_helper(pstate, r));
-    }
-    out
+    pstate.states.last().unwrap()
+                 .filter_by_rule(grammar.start())
+                 .filter(|it| it.start == 0 && it.complete())
+                 .flat_map(|r| bt_helper(pstate, r).into_iter())
+                 .collect()
 }
 
 // source is always a prediction, can't be anything else cause it's on the left side
@@ -55,7 +49,7 @@ fn bt_helper(pstate: &ParseState, root: &Item) -> Vec<Subtree> {
                     for trigger in bt_helper(pstate, bp_trigger) {
                         let mut p = prediction.clone();
                         p.push(trigger.clone());
-                        trees.push(Subtree::SubT(root.rule.spec(), p));
+                        trees.push(Subtree::SubT(root.rule_spec(), p));
                     }
                 }
             },
@@ -68,7 +62,7 @@ fn bt_helper(pstate: &ParseState, root: &Item) -> Vec<Subtree> {
                         Subtree::SubT(_, childs) => childs,
                     };
                     prediction.push(Subtree::Node(label.clone(), input.to_string()));
-                    trees.push(Subtree::SubT(root.rule.spec(), prediction));
+                    trees.push(Subtree::SubT(root.rule_spec(), prediction));
                 }
             }
         };

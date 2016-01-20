@@ -1,8 +1,86 @@
-use earley::symbol::Symbol;
 use std::collections::HashSet;
 use std::ops::Index;
 use std::rc::Rc;
-use std::{fmt, hash, iter, slice};
+use std::{fmt, hash, mem, iter, slice};
+
+pub enum Symbol {
+    NonTerm(String),
+    Terminal(String, Box<Fn(&str)->bool>),
+}
+
+impl Symbol {
+    pub fn nonterm<S: Into<String>>(s: S) -> Self { Symbol::NonTerm(s.into()) }
+
+    pub fn terminal<S, F>(name: S, f: F) -> Self
+    where S: Into<String>, F: 'static + Fn(&str)->bool {
+        Symbol::Terminal(name.into(), Box::new(f))
+    }
+
+    pub fn name<'a>(&'a self) -> &'a str {
+        match self {
+            &Symbol::NonTerm(ref name) => name,
+            &Symbol::Terminal(ref name, _) => name,
+        }
+    }
+
+    pub fn term_match(&self, input: &str) -> bool {
+        match self {
+            &Symbol::Terminal(_, ref f) => f(input),
+            &Symbol::NonTerm(_) => false,
+        }
+    }
+
+    pub fn is_nonterm(&self) -> bool {
+        match self { &Symbol::NonTerm(_) => true, _ => false }
+    }
+
+    pub fn is_term(&self) -> bool {
+        match self { &Symbol::Terminal(_, _) => true, _ => false }
+    }
+}
+
+impl fmt::Debug for Symbol {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Symbol::NonTerm(ref name) => write!(f, "{}", name),
+            &Symbol::Terminal(ref name, _) => write!(f, "'{}'", name),
+        }
+    }
+}
+
+impl hash::Hash for Symbol {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        match self {
+            &Symbol::NonTerm(ref name) => name.hash(state),
+            &Symbol::Terminal(ref name, ref f) => {
+                name.hash(state);
+                let (x, y) = unsafe { mem::transmute::<_, (usize, usize)>(&**f) };
+                x.hash(state); y.hash(state);
+            }
+        }
+    }
+}
+
+impl PartialEq for Symbol {
+    fn eq(&self, other: &Symbol) -> bool {
+        match (self, other) {
+            (&Symbol::NonTerm(ref a), &Symbol::NonTerm(ref b)) => a == b,
+            (&Symbol::Terminal(ref name_a, ref func_a),
+             &Symbol::Terminal(ref name_b, ref func_b)) => {
+                name_a == name_b && unsafe {
+                    let a = mem::transmute::<_, (usize, usize)>(&**func_a);
+                    let b = mem::transmute::<_, (usize, usize)>(&**func_b);
+                    a == b
+                }
+            },
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Symbol {}
+
+///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Rule {
@@ -28,6 +106,7 @@ impl Rule {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Trigger {
     Completion(Item),
@@ -36,7 +115,7 @@ pub enum Trigger {
 
 #[derive(Clone)]
 pub struct Item {
-    pub rule: Rc<Rule>,
+    rule: Rc<Rule>,
     pub dot: usize,    // index into the production
     pub start: usize,  // Earley state where item starts
     pub end: usize,    // Earley state where item ends
@@ -80,8 +159,44 @@ impl Item {
         self.rule.spec.get(self.dot).map(|s| &**s)
     }
 
-    pub fn complete(&self) -> bool {
-        self.dot >= self.rule.spec.len()
+    pub fn complete(&self) -> bool { self.dot >= self.rule.spec.len() }
+
+    pub fn rule_spec(&self) -> String { self.rule.spec() }
+
+    // check if other item's next-symbol matches our rule's name
+    pub fn can_complete(&self, other: &Item) -> bool {
+        self.complete() && match other.next_symbol() {
+            Some(s) if s.is_nonterm() &&
+                       s.name() == self.rule.name() => true,
+            _ => false
+        }
+    }
+
+    // build a new Item for a prediction
+    pub fn predict_new(rule: &Rc<Rule>, start: usize) -> Item {
+        Item{rule: rule.clone(), dot: 0,
+             start: start, end: start, bp: HashSet::new()}
+    }
+
+    // use an existing Item as a template for a new one but advance it
+    pub fn advance(tpl: &Item, end: usize) -> Item {
+        Item{rule: tpl.rule.clone(), dot: tpl.dot+1,
+             start: tpl.start, end: end, bp: HashSet::new()}
+    }
+
+    // produce an Item after scanning using another item as the base
+    pub fn scan_new(source: &Item, end: usize, input: &str) -> Item {
+        let mut _bp = HashSet::new();
+        _bp.insert((source.clone(), Trigger::Scan(input.to_string())));
+        Item{rule: source.rule.clone(), dot: source.dot+1,
+             start: source.start, end: end, bp: _bp}
+    }
+
+    pub fn complete_new(source: &Item, trigger: &Item, end: usize) -> Item {
+        let mut _bp = HashSet::new();
+        _bp.insert((source.clone(), Trigger::Completion(trigger.clone())));
+        Item{rule: source.rule.clone(), dot: source.dot+1,
+             start: source.start, end: end, bp: _bp}
     }
 }
 
@@ -127,6 +242,11 @@ impl StateSet {
 
     pub fn iter<'a>(&'a self) -> slice::Iter<'a, Item> {
         self.order.iter()
+    }
+
+    pub fn filter_by_rule<'a>(&'a self, name: &'a str) ->
+           Box<Iterator<Item=&'a Item> + 'a> {
+        Box::new(self.order.iter().filter(move |it| it.rule.name() == name))
     }
 }
 

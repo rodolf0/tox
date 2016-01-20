@@ -1,5 +1,4 @@
-use earley::symbol::Symbol;
-use earley::items::Rule;
+use earley::types::{Symbol, Rule};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
@@ -13,7 +12,7 @@ pub struct Grammar {
 impl Grammar {
     // get rules filtered by name
     pub fn rules<'a>(&'a self, name: &'a str) ->
-    Box<Iterator<Item=&'a Rc<Rule>> + 'a> {
+           Box<Iterator<Item=&'a Rc<Rule>> + 'a> {
         Box::new(self.rules.iter().filter(move |r| r.name() == name))
     }
 

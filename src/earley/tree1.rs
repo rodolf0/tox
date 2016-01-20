@@ -1,4 +1,4 @@
-use earley::items::{Item, Trigger};
+use earley::types::{Item, Trigger};
 use earley::grammar::Grammar;
 use earley::parser::ParseState;
 
@@ -12,10 +12,9 @@ pub enum Subtree {
 
 pub fn build_tree(grammar: &Grammar, pstate: &ParseState) -> Option<Subtree> {
     // get an item that spans the whole input and the rule matches the start
-    let mut root = pstate.states.last().unwrap().iter()
-                     .filter(|it| it.start == 0 &&
-                                  it.complete() &&
-                                  it.rule.name() == grammar.start());
+    let mut root = pstate.states.last().unwrap()
+                    .filter_by_rule(grammar.start())
+                    .filter(|it| it.start == 0 && it.complete());
     if let Some(root) = root.next() {
         return bt_helper(pstate, root);
     }
@@ -46,7 +45,7 @@ fn bt_helper(pstate: &ParseState, root: &Item) -> Option<Subtree> {
                 prediction.push(Subtree::Node(label, input.to_string()));
             }
         };
-        Some(Subtree::SubT(root.rule.spec(), prediction))
+        Some(Subtree::SubT(root.rule_spec(), prediction))
     } else {
         None
     }

@@ -1,5 +1,4 @@
-use earley::symbol::Symbol;
-use earley::items::{Rule, Item, StateSet};
+use earley::types::{Symbol, Rule, Item, StateSet};
 use earley::grammar::{GrammarBuilder, Grammar};
 use earley::tree1::build_tree;
 use earley::trees::build_trees;

@@ -116,9 +116,9 @@ pub enum Trigger {
 #[derive(Clone)]
 pub struct Item {
     rule: Rc<Rule>,
-    pub dot: usize,    // index into the production
+    dot: usize,    // index into the production
     pub start: usize,  // Earley state where item starts
-    pub end: usize,    // Earley state where item ends
+    end: usize,    // Earley state where item ends
     // backpointers to source of this item: (source-item, trigger)
     pub bp: HashSet<(Item, Trigger)>, // TODO: Rc<Item> for less mem
 }
@@ -240,9 +240,7 @@ impl StateSet {
 
     pub fn len(&self) -> usize { self.dedup.len() }
 
-    pub fn iter<'a>(&'a self) -> slice::Iter<'a, Item> {
-        self.order.iter()
-    }
+    pub fn iter<'a>(&'a self) -> slice::Iter<'a, Item> { self.order.iter() }
 
     pub fn filter_by_rule<'a>(&'a self, name: &'a str) ->
            Box<Iterator<Item=&'a Item> + 'a> {
@@ -266,13 +264,9 @@ impl iter::FromIterator<Item> for StateSet {
 
 impl Index<usize> for StateSet {
     type Output = Item;
-    fn index<'b>(&'b self, idx: usize) -> &'b Item {
-        self.order.index(idx)
-    }
+    fn index<'b>(&'b self, idx: usize) -> &'b Item { self.order.index(idx) }
 }
 
 impl fmt::Debug for StateSet {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.order.fmt(f)
-    }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.order.fmt(f) }
 }

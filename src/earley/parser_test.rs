@@ -49,8 +49,6 @@ fn symbol_nullable() {
       .rule("A", vec!["B"])
       .rule("B", vec!["A"]);
     let g = gb.into_grammar("A");
-    assert_eq!(g.start, g.symbols["A"]);
-    assert_eq!(g.symbols.len(), 2);
     assert_eq!(g.nullable.len(), 2);
 }
 
@@ -89,8 +87,6 @@ fn grammar_math() -> Grammar {
       .rule("Num", vec!["Number"]);
 
     let grammar = gb.into_grammar("Sum");
-    assert_eq!(grammar.start, grammar.symbols["Sum"]);
-    assert_eq!(grammar.symbols.len(), 10);
     assert_eq!(grammar.rules("Sum").count(), 2);
     assert_eq!(grammar.rules("Mul").count(), 2);
     assert_eq!(grammar.rules("Pow").count(), 2);
@@ -205,8 +201,6 @@ fn grammar_empty() {
       .rule("A", vec!["B"])
       .rule("B", vec!["A"]);
     let g = gb.into_grammar("A");
-    assert_eq!(g.start, g.symbols["A"]);
-    assert_eq!(g.symbols.len(), 2);
     let p = EarleyParser::new(g);
     let mut input = Lexer::from_str("", "-");
     let ps = p.parse(&mut input).unwrap();

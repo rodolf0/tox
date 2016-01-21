@@ -5,7 +5,6 @@ use std::rc::Rc;
 pub struct Grammar {
     pub start: Rc<Symbol>,
     pub rules: Vec<Rc<Rule>>,
-    pub symbols: HashMap<String, Rc<Symbol>>,
     pub nullable: HashSet<String>,
 }
 
@@ -75,7 +74,6 @@ impl GrammarBuilder {
             start: self.symbols[start.as_ref()].clone(),
             nullable: self.build_nullable(),
             rules: self.rules,
-            symbols: self.symbols,
         }
     }
 }

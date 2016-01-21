@@ -148,13 +148,6 @@ impl Item {
         Item{rule: rule, dot: dot, start: start, end: end, bp: HashSet::new()}
     }
 
-    pub fn new2(rule: Rc<Rule>, dot: usize, start: usize, end: usize,
-                bp: (Item, Trigger)) -> Item {
-        let mut _bp = HashSet::new();
-        _bp.insert(bp);
-        Item{rule: rule, dot: dot, start: start, end: end, bp: _bp}
-    }
-
     pub fn next_symbol<'a>(&'a self) -> Option<&'a Symbol> {
         self.rule.spec.get(self.dot).map(|s| &**s)
     }

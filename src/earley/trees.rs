@@ -13,7 +13,7 @@ pub enum Subtree {
 pub fn build_trees(grammar: &Grammar, pstate: &ParseState) -> Vec<Subtree> {
     pstate.states.last().unwrap()
                  .filter_by_rule(grammar.start())
-                 .filter(|it| it.start == 0 && it.complete())
+                 .filter(|it| it.start() == 0 && it.complete())
                  .flat_map(|r| bt_helper(pstate, r).into_iter())
                  .collect()
 }

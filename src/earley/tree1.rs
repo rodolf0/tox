@@ -14,7 +14,7 @@ pub fn build_tree(grammar: &Grammar, pstate: &ParseState) -> Option<Subtree> {
     // get an item that spans the whole input and the rule matches the start
     let mut root = pstate.states.last().unwrap()
                     .filter_by_rule(grammar.start())
-                    .filter(|it| it.start == 0 && it.complete());
+                    .filter(|it| it.start() == 0 && it.complete());
     if let Some(root) = root.next() {
         return bt_helper(pstate, root);
     }

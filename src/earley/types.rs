@@ -106,7 +106,7 @@ pub enum Trigger {
 pub struct Item {
     rule: Rc<Rule>,
     dot: usize,    // index into the production
-    pub start: usize,  // Earley state where item starts
+    start: usize,  // Earley state where item starts
     end: usize,    // Earley state where item ends
     // backpointers to source of this item: (source-item, trigger)
     pub bp: HashSet<(Item, Trigger)>, // TODO: Rc<Item> for less mem
@@ -141,6 +141,7 @@ impl Item {
         self.rule.spec.get(self.dot).map(|s| &**s)
     }
 
+    pub fn start(&self) -> usize { self.start }
     pub fn complete(&self) -> bool { self.dot >= self.rule.spec.len() }
 
     pub fn rule_spec(&self) -> String { self.rule.spec() }

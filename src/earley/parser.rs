@@ -69,7 +69,7 @@ impl EarleyParser {
                     None => {
                         // go back to state where 'item' started and advance
                         // any item if its next symbol matches the current one's name
-                        let completed = states[item.start].iter()
+                        let completed = states[item.start()].iter()
                             .filter(|source| item.can_complete(source))
                             .map(|source| Item::complete_new(source, &item, i))
                             .collect::<Vec<_>>();
@@ -89,7 +89,7 @@ impl EarleyParser {
             // the whole input because we search at the last stateset
             let last = try!(states.last().ok_or(ParseError::BadInput));
             if last.filter_by_rule(self.g.start())
-                   .filter(|item| item.start == 0 && item.complete())
+                   .filter(|item| item.start() == 0 && item.complete())
                    .count() < 1 {
                 return Err(ParseError::BadInput);
             }

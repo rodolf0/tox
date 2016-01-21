@@ -229,6 +229,7 @@ impl StateSet {
 
     pub fn iter<'a>(&'a self) -> slice::Iter<'a, Item> { self.order.iter() }
 
+    // get all items whose rule name is 'name'
     pub fn filter_by_rule<'a>(&'a self, name: &'a str) ->
            Box<Iterator<Item=&'a Item> + 'a> {
         Box::new(self.order.iter().filter(move |it| it.rule.name() == name))

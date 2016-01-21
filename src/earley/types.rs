@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{hash_set, HashSet};
 use std::ops::Index;
 use std::rc::Rc;
 use std::{fmt, hash, mem, iter, slice};
@@ -109,7 +109,7 @@ pub struct Item {
     start: usize,  // Earley state where item starts
     end: usize,    // Earley state where item ends
     // backpointers to source of this item: (source-item, trigger)
-    pub bp: HashSet<(Item, Trigger)>, // TODO: Rc<Item> for less mem
+    bp: HashSet<(Item, Trigger)>, // TODO: Rc<Item> for less mem
 }
 
 // override Hash/Eq to avoid 'bp' from deduplicate Items in StateSets
@@ -137,14 +137,14 @@ impl Item {
         Item{rule: rule, dot: dot, start: start, end: end, bp: HashSet::new()}
     }
 
-    pub fn next_symbol<'a>(&'a self) -> Option<&'a Symbol> {
-        self.rule.spec.get(self.dot).map(|s| &**s)
-    }
-
     pub fn start(&self) -> usize { self.start }
     pub fn complete(&self) -> bool { self.dot >= self.rule.spec.len() }
 
     pub fn rule_spec(&self) -> String { self.rule.spec() }
+
+    pub fn next_symbol<'a>(&'a self) -> Option<&'a Symbol> {
+        self.rule.spec.get(self.dot).map(|s| &**s)
+    }
 
     // check if other item's next-symbol matches our rule's name
     pub fn can_complete(&self, other: &Item) -> bool {
@@ -181,6 +181,10 @@ impl Item {
         Item{rule: source.rule.clone(), dot: source.dot+1,
              start: source.start, end: end, bp: _bp}
     }
+
+    pub fn back_pointers<'a>(&'a self) -> hash_set::Iter<'a, (Item, Trigger)> {
+        self.bp.iter()
+    }
 }
 
 impl fmt::Debug for Item {
@@ -198,7 +202,7 @@ impl fmt::Debug for Item {
 
 #[derive(Clone)]
 pub struct StateSet {
-    order: Vec<Item>, // TODO: use Rc<Item> for less mem
+    order: Vec<Item>, // TODO: use Rc<Item> for less mem?
     dedup: HashSet<Item>,
 }
 

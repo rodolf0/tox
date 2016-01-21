@@ -25,7 +25,7 @@ pub fn build_tree(grammar: &Grammar, pstate: &ParseState) -> Option<Subtree> {
 // trigger is either a scan or a completion, only those can advance a prediction
 
 fn bt_helper(pstate: &ParseState, root: &Item) -> Option<Subtree> {
-    if let Some(&(ref bp_prediction, ref bp_trigger)) = root.bp.iter().next() {
+    if let Some(&(ref bp_prediction, ref bp_trigger)) = root.back_pointers().next() {
         // source/left-side is always a prediction (completions/scans are right side of bp)
         // flat-accumulate all left-side back-pointers
         let mut prediction = match bt_helper(pstate, bp_prediction) {

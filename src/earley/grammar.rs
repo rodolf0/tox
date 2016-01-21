@@ -42,7 +42,7 @@ impl GrammarBuilder {
     }
 
     pub fn rule<S>(&mut self, name: S, spec: Vec<S>) -> &mut Self
-    where S: Into<String> + AsRef<str> {
+            where S: Into<String> + AsRef<str> {
         let rule = Rule::new(
             self.symbols[name.as_ref()].clone(),
             spec.iter().map(|s| self.symbols[s.as_ref()].clone()).collect()

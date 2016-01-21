@@ -12,7 +12,7 @@ impl Symbol {
     pub fn nonterm<S: Into<String>>(s: S) -> Self { Symbol::NonTerm(s.into()) }
 
     pub fn terminal<S, F>(name: S, f: F) -> Self
-    where S: Into<String>, F: 'static + Fn(&str)->bool {
+            where S: Into<String>, F: 'static + Fn(&str)->bool {
         Symbol::Terminal(name.into(), Box::new(f))
     }
 
@@ -23,19 +23,8 @@ impl Symbol {
         }
     }
 
-    pub fn term_match(&self, input: &str) -> bool {
-        match self {
-            &Symbol::Terminal(_, ref f) => f(input),
-            &Symbol::NonTerm(_) => false,
-        }
-    }
-
     pub fn is_nonterm(&self) -> bool {
         match self { &Symbol::NonTerm(_) => true, _ => false }
-    }
-
-    pub fn is_term(&self) -> bool {
-        match self { &Symbol::Terminal(_, _) => true, _ => false }
     }
 }
 

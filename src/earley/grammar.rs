@@ -3,9 +3,9 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 pub struct Grammar {
-    pub start: Rc<Symbol>,
-    pub rules: Vec<Rc<Rule>>,
-    pub nullable: HashSet<String>,
+    start: Rc<Symbol>,
+    rules: Vec<Rc<Rule>>,
+    nullable: HashSet<String>,
 }
 
 impl Grammar {

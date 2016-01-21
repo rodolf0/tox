@@ -49,7 +49,8 @@ fn symbol_nullable() {
       .rule("A", vec!["B"])
       .rule("B", vec!["A"]);
     let g = gb.into_grammar("A");
-    assert_eq!(g.nullable.len(), 2);
+    assert!(g.is_nullable("A"));
+    assert!(g.is_nullable("B"));
 }
 
 // Sum -> Sum + Mul | Mul

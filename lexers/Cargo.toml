@@ -2,3 +2,4 @@
 name = "lexers"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 version = "0.0.3"
+description = "Various string tokenizers"

@@ -1,4 +1,4 @@
-use earley::types::{Symbol, Rule};
+use types::{Symbol, Rule};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 

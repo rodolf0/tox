@@ -1,6 +1,6 @@
-use earley::types::{Symbol, Item, StateSet};
-use earley::grammar::Grammar;
-use earley::Lexer;
+use types::{Symbol, Item, StateSet};
+use grammar::Grammar;
+use lexers::Scanner;
 
 #[derive(PartialEq, Debug)]
 pub enum ParseError {
@@ -22,7 +22,7 @@ impl EarleyParser {
     pub fn new(grammar: Grammar) -> EarleyParser { EarleyParser{g: grammar} }
 
     // TODO: leave scan loop for the end. see earley-doc.pdf
-    pub fn parse(&self, tok: &mut Lexer) -> Result<ParseState, ParseError> {
+    pub fn parse(&self, tok: &mut Scanner<String>) -> Result<ParseState, ParseError> {
         let mut tokens = Vec::new();
         // Populate S0 by building items for each start rule
         let mut states = Vec::new();

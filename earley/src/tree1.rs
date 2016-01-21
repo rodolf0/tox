@@ -1,6 +1,6 @@
-use earley::types::{Item, Trigger};
-use earley::grammar::Grammar;
-use earley::parser::ParseState;
+use types::{Item, Trigger};
+use grammar::Grammar;
+use parser::ParseState;
 
 #[derive(Debug)]
 pub enum Subtree {

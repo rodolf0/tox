@@ -1,8 +1,9 @@
-use earley::types::{Symbol, Rule, Item, StateSet};
-use earley::grammar::{GrammarBuilder, Grammar};
-use earley::tree1::build_tree;
-use earley::trees::build_trees;
-use earley::{Lexer, EarleyParser, ParseError};
+use types::{Symbol, Rule, Item, StateSet};
+use grammar::{GrammarBuilder, Grammar};
+use tree1::build_tree;
+use trees::build_trees;
+use parser::{EarleyParser, ParseError};
+use lexers::DelimTokenizer;
 use std::rc::Rc;
 
 #[test]
@@ -106,7 +107,7 @@ fn print_statesets(ss: &Vec<StateSet>) {
 
 #[test]
 fn test_badparse() {
-    let mut input = Lexer::from_str("1+", "+*");
+    let mut input = DelimTokenizer::from_str("1+", "+*");
     let out = EarleyParser::new(grammar_math()).parse(&mut input);
     assert_eq!(out.unwrap_err(), ParseError::BadInput);
 }
@@ -117,7 +118,7 @@ fn test_partialparse() {
     gb.symbol(Symbol::nonterm("Start"))
       .symbol(Symbol::terminal("+", |n: &str| n == "+"))
       .rule("Start", vec!["+", "+"]);
-    let mut input = Lexer::from_str("+++", "+");
+    let mut input = DelimTokenizer::from_str("+++", "+");
     let out = EarleyParser::new(gb.into_grammar("Start")).parse(&mut input);
     assert_eq!(out.unwrap_err(), ParseError::PartialParse);
 }
@@ -131,7 +132,7 @@ fn grammar_ambiguous() {
       .rule("S", vec!["S", "S"])
       .rule("S", vec!["b"]);
     // Earley's corner case that generates spurious trees for bbb
-    let mut input = Lexer::from_str("b b b", " ");
+    let mut input = DelimTokenizer::from_str("b b b", " ");
     let p = EarleyParser::new(gb.into_grammar("S"));
     let ps = p.parse(&mut input).unwrap();
     assert_eq!(ps.states.len(), 4);
@@ -143,7 +144,7 @@ fn grammar_ambiguous() {
 #[test]
 fn math_grammar_test() {
     let p = EarleyParser::new(grammar_math());
-    let mut input = Lexer::from_str("1+(2*3-4)", "+*-/()");
+    let mut input = DelimTokenizer::from_str("1+(2*3-4)", "+*-/()");
     let ps = p.parse(&mut input).unwrap();
     assert_eq!(ps.states.len(), 10);
     print_statesets(&ps.states);
@@ -164,7 +165,7 @@ fn test_left_recurse() {
       .rule("S", vec!["N"])
       .rule("N", vec!["[0-9]"]);
     let p = EarleyParser::new(gb.into_grammar("S"));
-    let mut input = Lexer::from_str("1+2", "+");
+    let mut input = DelimTokenizer::from_str("1+2", "+");
     let ps = p.parse(&mut input).unwrap();
     print_statesets(&ps.states);
     println!("=== tree ===");
@@ -184,7 +185,7 @@ fn test_right_recurse() {
       .rule("P", vec!["N"])
       .rule("N", vec!["[0-9]"]);
     let p = EarleyParser::new(gb.into_grammar("P"));
-    let mut input = Lexer::from_str("1^2", "^");
+    let mut input = DelimTokenizer::from_str("1^2", "^");
     let ps = p.parse(&mut input).unwrap();
     print_statesets(&ps.states);
     println!("=== tree ===");
@@ -203,7 +204,7 @@ fn grammar_empty() {
       .rule("B", vec!["A"]);
     let g = gb.into_grammar("A");
     let p = EarleyParser::new(g);
-    let mut input = Lexer::from_str("", "-");
+    let mut input = DelimTokenizer::from_str("", "-");
     let ps = p.parse(&mut input).unwrap();
     print_statesets(&ps.states);
     println!("=== tree ===");
@@ -224,7 +225,7 @@ fn math_ambiguous() {
       .rule("E", vec!["n"]);
     // parse something ... should return 2 parse trees
     let p = EarleyParser::new(gb.into_grammar("E"));
-    let mut input = Lexer::from_str("0*1*2*3*4*5", "+*");
+    let mut input = DelimTokenizer::from_str("0*1*2*3*4*5", "+*");
     let ps = p.parse(&mut input).unwrap();
     print_statesets(&ps.states);
     println!("=== tree ===");
@@ -242,7 +243,7 @@ fn math_various() {
     ];
     for input in inputs.iter() {
         println!("============ input: {}", input);
-        let mut input = Lexer::from_str(input, "+*-/()^");
+        let mut input = DelimTokenizer::from_str(input, "+*-/()^");
         let ps = p.parse(&mut input).unwrap();
         print_statesets(&ps.states);
         println!("=== tree ===");
@@ -271,7 +272,7 @@ fn chained_terminals() {
           .rule("E", variant.clone())
           .rule("X", Vec::new());
         let p = EarleyParser::new(gb.into_grammar("E"));
-        let mut input = Lexer::from_str(tokens, "+");
+        let mut input = DelimTokenizer::from_str(tokens, "+");
         let ps = p.parse(&mut input).unwrap();
         print_statesets(&ps.states);
         println!("=== tree === variant {:?} === input {}", variant, tokens);

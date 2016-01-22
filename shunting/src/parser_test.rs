@@ -1,24 +1,24 @@
-use shunting::{ShuntingParser, ParseError};
-use shunting::Token;
+use parser::{ShuntingParser, ParseError};
+use lexers::MathToken;
 
 #[test]
 fn test_parse1() {
     let rpn = ShuntingParser::parse_str("3+4*2/-(1-5)^2^3").unwrap();
     let expect = [
-        Token::Number(3.0),
-        Token::Number(4.0),
-        Token::Number(2.0),
-        Token::Op(format!("*"), 2),
-        Token::Number(1.0),
-        Token::Number(5.0),
-        Token::Op(format!("-"), 2),
-        Token::Number(2.0),
-        Token::Number(3.0),
-        Token::Op(format!("^"), 2),
-        Token::Op(format!("^"), 2),
-        Token::Op(format!("-"), 1),
-        Token::Op(format!("/"), 2),
-        Token::Op(format!("+"), 2),
+        MathToken::Number(3.0),
+        MathToken::Number(4.0),
+        MathToken::Number(2.0),
+        MathToken::Op(format!("*"), 2),
+        MathToken::Number(1.0),
+        MathToken::Number(5.0),
+        MathToken::Op(format!("-"), 2),
+        MathToken::Number(2.0),
+        MathToken::Number(3.0),
+        MathToken::Op(format!("^"), 2),
+        MathToken::Op(format!("^"), 2),
+        MathToken::Op(format!("-"), 1),
+        MathToken::Op(format!("/"), 2),
+        MathToken::Op(format!("+"), 2),
     ];
     for (i, token) in expect.iter().enumerate() {
         assert_eq!(rpn[i], *token);
@@ -28,20 +28,20 @@ fn test_parse1() {
 fn test_parse2() {
     let rpn = ShuntingParser::parse_str("3.4e-2 * sin(x)/(7! % -4) * max(2, x)").unwrap();
     let expect = [
-        Token::Number(3.4e-2),
-        Token::Variable(format!("x")),
-        Token::Function(format!("sin"), 1),
-        Token::Op(format!("*"), 2),
-        Token::Number(7.0),
-        Token::Op(format!("!"), 1),
-        Token::Number(4.0),
-        Token::Op(format!("-"), 1),
-        Token::Op(format!("%"), 2),
-        Token::Op(format!("/"), 2),
-        Token::Number(2.0),
-        Token::Variable(format!("x")),
-        Token::Function(format!("max"), 2),
-        Token::Op(format!("*"), 2),
+        MathToken::Number(3.4e-2),
+        MathToken::Variable(format!("x")),
+        MathToken::Function(format!("sin"), 1),
+        MathToken::Op(format!("*"), 2),
+        MathToken::Number(7.0),
+        MathToken::Op(format!("!"), 1),
+        MathToken::Number(4.0),
+        MathToken::Op(format!("-"), 1),
+        MathToken::Op(format!("%"), 2),
+        MathToken::Op(format!("/"), 2),
+        MathToken::Number(2.0),
+        MathToken::Variable(format!("x")),
+        MathToken::Function(format!("max"), 2),
+        MathToken::Op(format!("*"), 2),
     ];
     for (i, token) in expect.iter().enumerate() {
         assert_eq!(rpn[i], *token);
@@ -52,19 +52,19 @@ fn test_parse2() {
 fn test_parse3() {
     let rpn = ShuntingParser::parse_str("sqrt(-(1-x^2) / (1 + x^2))").unwrap();
     let expect = [
-        Token::Number(1.0),
-        Token::Variable(format!("x")),
-        Token::Number(2.0),
-        Token::Op(format!("^"), 2),
-        Token::Op(format!("-"), 2),
-        Token::Op(format!("-"), 1),
-        Token::Number(1.0),
-        Token::Variable(format!("x")),
-        Token::Number(2.0),
-        Token::Op(format!("^"), 2),
-        Token::Op(format!("+"), 2),
-        Token::Op(format!("/"), 2),
-        Token::Function(format!("sqrt"), 1),
+        MathToken::Number(1.0),
+        MathToken::Variable(format!("x")),
+        MathToken::Number(2.0),
+        MathToken::Op(format!("^"), 2),
+        MathToken::Op(format!("-"), 2),
+        MathToken::Op(format!("-"), 1),
+        MathToken::Number(1.0),
+        MathToken::Variable(format!("x")),
+        MathToken::Number(2.0),
+        MathToken::Op(format!("^"), 2),
+        MathToken::Op(format!("+"), 2),
+        MathToken::Op(format!("/"), 2),
+        MathToken::Function(format!("sqrt"), 1),
     ];
     for (i, token) in expect.iter().enumerate() {
         assert_eq!(rpn[i], *token);
@@ -97,7 +97,7 @@ fn check_arity() {
 
     for token in rpn.iter() {
         match *token {
-            Token::Function(ref func, arity) => {
+            MathToken::Function(ref func, arity) => {
                 let expected_arity = expect.get(&func[..]);
                 assert_eq!(*expected_arity.unwrap(), arity);
             },

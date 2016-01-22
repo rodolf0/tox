@@ -1,0 +1,18 @@
+[package]
+name = "shunting"
+version = "0.0.3"
+authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
+description = "A shunting-yard math parser"
+
+[features]
+dynlink-eval = ["dylib"]
+
+[dependencies]
+lexers = { path = "../lexers" }
+linenoise-rust = "*"
+rand = "*"
+num = "*"
+
+[dependencies.dylib]
+version = "*"
+optional = true

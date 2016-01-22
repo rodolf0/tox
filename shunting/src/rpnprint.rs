@@ -1,10 +1,11 @@
-use shunting::{RPNExpr, Token, Assoc};
+use lexers::{MathToken, TokenAssoc};
+use parser::RPNExpr;
 use std::fmt;
 
 #[derive(Debug, Clone)]
 enum AST<'a> {
-    Leaf(&'a Token),
-    Node(&'a Token, Vec<AST<'a>>),
+    Leaf(&'a MathToken),
+    Node(&'a MathToken, Vec<AST<'a>>),
 }
 
 impl RPNExpr {
@@ -12,10 +13,10 @@ impl RPNExpr {
         let mut ops = Vec::new();
         for token in self.iter() {
             match *token {
-                Token::Number(_) |
-                Token::Variable(_) => ops.push(AST::Leaf(token)),
-                Token::Function(_, arity) |
-                Token::Op(_, arity) => {
+                MathToken::Number(_) |
+                MathToken::Variable(_) => ops.push(AST::Leaf(token)),
+                MathToken::Function(_, arity) |
+                MathToken::Op(_, arity) => {
                     let n = ops.len() - arity;
                     let node = AST::Node(token, ops.iter().skip(n).cloned().collect());
                     ops.truncate(n);
@@ -31,18 +32,18 @@ impl RPNExpr {
 impl fmt::Display for RPNExpr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 
-        fn printer(root: &AST) -> (String, (usize, Assoc)) {
+        fn printer(root: &AST) -> (String, (usize, TokenAssoc)) {
             match root {
                 &AST::Leaf(ref token) => {
                     match *token {
-                        &Token::Number(ref x)   => (format!("{}", x), token.precedence()),
-                        &Token::Variable(ref x) => (format!("{}", x), token.precedence()),
+                        &MathToken::Number(ref x)   => (format!("{}", x), token.precedence()),
+                        &MathToken::Variable(ref x) => (format!("{}", x), token.precedence()),
                         _ => unreachable!()
                     }
                 },
                 &AST::Node(ref token, ref args) => {
                     match *token {
-                        &Token::Op(ref op, arity) if arity == 1 => {
+                        &MathToken::Op(ref op, arity) if arity == 1 => {
                             let subtree = printer(&args[0]);
                             let (prec, assoc) = token.precedence();
                             // TODO: distinguish perfix/postfix operators
@@ -52,18 +53,18 @@ impl fmt::Display for RPNExpr {
                                 (format!("{}{}", op, subtree.0), (prec, assoc))
                             }
                         },
-                        &Token::Op(ref op, arity) if arity == 2 => {
+                        &MathToken::Op(ref op, arity) if arity == 2 => {
                             let (lhs, rhs) = (printer(&args[0]), printer(&args[1]));
                             let (prec, assoc) = token.precedence();
 
                             let lh = if prec > (lhs.1).0 ||
-                                        (prec == (lhs.1).0 && assoc != Assoc::Left) {
+                                        (prec == (lhs.1).0 && assoc != TokenAssoc::Left) {
                                 format!("({})", lhs.0)
                             } else {
                                 format!("{}", lhs.0)
                             };
                             let rh = if prec > (rhs.1).0 ||
-                                        (prec == (rhs.1).0 && assoc != Assoc::Right) {
+                                        (prec == (rhs.1).0 && assoc != TokenAssoc::Right) {
                                 format!("({})", rhs.0)
                             } else {
                                 format!("{}", rhs.0)
@@ -73,7 +74,7 @@ impl fmt::Display for RPNExpr {
                             (format!("{} {} {}", lh, op, rh), (prec, assoc))
 
                         },
-                        &Token::Function(ref func, _) => {
+                        &MathToken::Function(ref func, _) => {
                             let expr = args.iter()
                                 .map(|leaf| printer(&leaf).0)
                                 .collect::<Vec<String>>()

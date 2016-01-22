@@ -1,8 +1,7 @@
 extern crate rand;
+use parser::RPNExpr;
+use lexers::MathToken;
 use std::collections::HashMap;
-
-use shunting::Token;
-use shunting::RPNExpr;
 
 #[derive(Debug, PartialEq)]
 pub enum EvalErr {
@@ -42,12 +41,12 @@ impl MathContext {
 
         for token in rpn.iter() {
             match *token {
-                Token::Number(num)       => operands.push(num),
-                Token::Variable(ref var) => match self.context.get(var) {
+                MathToken::Number(num)       => operands.push(num),
+                MathToken::Variable(ref var) => match self.context.get(var) {
                     Some(value) => operands.push(*value),
                     None => return Err(EvalErr::UnknownVar(var.to_string()))
                 },
-                Token::Op(ref op, arity) if arity == 2 => {
+                MathToken::Op(ref op, arity) if arity == 2 => {
                     let r = try!(operands.pop().ok_or(EvalErr::WrongNumberOfArgs));
                     let l = try!(operands.pop().ok_or(EvalErr::WrongNumberOfArgs));
                     match &op[..] {
@@ -60,7 +59,7 @@ impl MathContext {
                         _ => return Err(EvalErr::BadToken(op.clone()))
                     }
                 },
-                Token::Op(ref op, arity) if arity == 1 => {
+                MathToken::Op(ref op, arity) if arity == 1 => {
                     let o = try!(operands.pop().ok_or(EvalErr::WrongNumberOfArgs));
                     match &op[..] {
                         "-" => operands.push(-o),
@@ -71,7 +70,7 @@ impl MathContext {
                         _ => return Err(EvalErr::BadToken(op.clone()))
                     }
                 },
-                Token::Function(ref fname, arity) => {
+                MathToken::Function(ref fname, arity) => {
                     if arity > operands.len() {
                         return Err(EvalErr::WrongNumberOfArgs);
                     }

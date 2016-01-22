@@ -1,15 +1,14 @@
-use scanner::{Scanner, Nexter};
-use std::ops::{Deref, DerefMut};
+use scanner::{Nexter, Scanner};
 
 #[derive(PartialEq, Debug)]
-pub enum Assoc {
+pub enum TokenAssoc {
     Left,
     Right,
     None
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum Token {
+pub enum MathToken {
     Unknown(String),
     Number(f64),
     Variable(String),
@@ -20,8 +19,8 @@ pub enum Token {
     Comma,
 }
 
-impl Token {
-    pub fn precedence(&self) -> (usize, Assoc) {
+impl MathToken {
+    pub fn precedence(&self) -> (usize, TokenAssoc) {
         // You can play with the relation between exponentiation an unary - by
         // a. switching order in which the lexer tokenizes, if it tries
         // operators first then '-' will never be the negative part of number,
@@ -31,63 +30,50 @@ impl Token {
         // If '-' has lower precedence then 2^-3 will fail to evaluate if the
         // '-' isn't part of the number because ^ will only find 1 operator
         match *self {
-            Token::OParen                   => (1, Assoc::Left),  // keep at bottom
-            Token::Op(ref o, 2) if o == "+" => (2, Assoc::Left),
-            Token::Op(ref o, 2) if o == "-" => (2, Assoc::Left),
-            Token::Op(ref o, 2) if o == "*" => (3, Assoc::Left),
-            Token::Op(ref o, 2) if o == "/" => (3, Assoc::Left),
-            Token::Op(ref o, 2) if o == "%" => (3, Assoc::Left),
-            Token::Op(ref o, 1) if o == "-" => (5, Assoc::Right), // unary minus
-            Token::Op(ref o, 2) if o == "^" => (5, Assoc::Right),
-            Token::Op(ref o, 1) if o == "!" => (6, Assoc::Left),  // factorial
+            MathToken::OParen                   => (1, TokenAssoc::Left), // keep at bottom
+            MathToken::Op(ref o, 2) if o == "+" => (2, TokenAssoc::Left),
+            MathToken::Op(ref o, 2) if o == "-" => (2, TokenAssoc::Left),
+            MathToken::Op(ref o, 2) if o == "*" => (3, TokenAssoc::Left),
+            MathToken::Op(ref o, 2) if o == "/" => (3, TokenAssoc::Left),
+            MathToken::Op(ref o, 2) if o == "%" => (3, TokenAssoc::Left),
+            MathToken::Op(ref o, 1) if o == "-" => (5, TokenAssoc::Right), // unary minus
+            MathToken::Op(ref o, 2) if o == "^" => (5, TokenAssoc::Right),
+            MathToken::Op(ref o, 1) if o == "!" => (6, TokenAssoc::Left),  // factorial
             // Func: could keep at bottom like OParen but '(' is already split
-            Token::Function(_, _)           => (7, Assoc::Left),
-            _                               => (99, Assoc::None)
+            MathToken::Function(_, _)           => (7, TokenAssoc::Left),
+            _                                   => (99, TokenAssoc::None)
         }
     }
 
     pub fn is_op(&self, opstr: &str, arity: usize) -> bool {
-        if let Token::Op(ref op, ar) = *self {
+        if let MathToken::Op(ref op, ar) = *self {
             return op == opstr && arity == ar;
         }
         false
     }
 }
 
-struct Tokenizer {
+pub struct MathTokenizer {
     src: Scanner<char>,
-    prev: Option<Token>
+    prev: Option<MathToken>
 }
 
-pub struct Lexer {
-    output: Scanner<Token>,
-}
-
-impl Deref for Lexer {
-    type Target = Scanner<Token>;
-    fn deref<'a>(&'a self) -> &'a Scanner<Token> { &self.output }
-}
-
-impl DerefMut for Lexer {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut Scanner<Token> { &mut self.output }
-}
-
-impl Lexer {
-    pub fn from_str(source: &str) -> Lexer {
-        let tokenizer = Box::new(
-            Tokenizer{src: Scanner::from_str(source), prev: None});
-        Lexer{output: Scanner::new(tokenizer)}
+impl MathTokenizer {
+    pub fn from_str(source: &str) -> Scanner<MathToken> {
+        Scanner::new(Box::new(
+            MathTokenizer{src: Scanner::from_str(source), prev: None}
+        ))
     }
 }
 
-impl Nexter<Token> for Tokenizer {
-    fn get_item(&mut self) -> Option<Token> {
+impl Nexter<MathToken> for MathTokenizer {
+    fn get_item(&mut self) -> Option<MathToken> {
         self.src.ignore_ws();
         let token = self.match_operator().
             or_else(|| self.match_varfunc()).
             or_else(|| self.match_number()).
             or_else(|| if self.src.next().is_some() {
-                Some(Token::Unknown(self.src.extract_string()))
+                Some(MathToken::Unknown(self.src.extract_string()))
             } else {
                 None
             });
@@ -96,8 +82,8 @@ impl Nexter<Token> for Tokenizer {
     }
 }
 
-impl Tokenizer {
-    fn match_varfunc(&mut self) -> Option<Token> {
+impl MathTokenizer {
+    fn match_varfunc(&mut self) -> Option<MathToken> {
         let alfa = concat!("abcdefghijklmnopqrstuvwxyz",
                            "ABCDEFGHIJKLMNOPQRSTUVWXYZ_");
         let alnum = concat!("0123456789",
@@ -106,19 +92,19 @@ impl Tokenizer {
         if self.src.accept_chars(alfa).is_some() {
             self.src.skip_chars(alnum);
             if self.src.peek() == Some('(') {
-                return Some(Token::Function(self.src.extract_string(), 0));
+                return Some(MathToken::Function(self.src.extract_string(), 0));
             }
-            return Some(Token::Variable(self.src.extract_string()));
+            return Some(MathToken::Variable(self.src.extract_string()));
         }
         None
     }
 
-    fn match_number(&mut self) -> Option<Token> {
+    fn match_number(&mut self) -> Option<MathToken> {
         use std::str::FromStr;
         if let Some(num) = self._match_number() {
             return match f64::from_str(&num) {
-                Ok(fnum) => Some(Token::Number(fnum)),
-                Err(_) => Some(Token::Unknown(num)),
+                Ok(fnum) => Some(MathToken::Number(fnum)),
+                Err(_) => Some(MathToken::Unknown(num)),
             }
         }
         None
@@ -172,14 +158,14 @@ impl Tokenizer {
         Some(self.src.extract_string())
     }
 
-    fn match_operator(&mut self) -> Option<Token> {
+    fn match_operator(&mut self) -> Option<MathToken> {
         let token = match self.src.accept_chars("+-*/%^!(),=") {
-            Some('(') => Token::OParen,
-            Some(')') => Token::CParen,
-            Some(',') => Token::Comma,
-            Some('!') => Token::Op('!'.to_string(), 1),
-            Some('-') if Self::_makes_unary(&self.prev) => Token::Op('-'.to_string(), 1),
-            Some(bop) => Token::Op(bop.to_string(), 2),
+            Some('(') => MathToken::OParen,
+            Some(')') => MathToken::CParen,
+            Some(',') => MathToken::Comma,
+            Some('!') => MathToken::Op('!'.to_string(), 1),
+            Some('-') if Self::_makes_unary(&self.prev) => MathToken::Op('-'.to_string(), 1),
+            Some(bop) => MathToken::Op(bop.to_string(), 2),
             None => return None
         };
         self.src.ignore();
@@ -187,11 +173,11 @@ impl Tokenizer {
     }
 
     // when would a minus be unary? we need to know the prev token
-    fn _makes_unary(prev: &Option<Token>) -> bool {
+    fn _makes_unary(prev: &Option<MathToken>) -> bool {
         match *prev {
-            Some(Token::Number(_)) => false,
-            Some(Token::Variable(_)) => false,
-            Some(Token::CParen) => false,
+            Some(MathToken::Number(_)) => false,
+            Some(MathToken::Variable(_)) => false,
+            Some(MathToken::CParen) => false,
             _ => true
         }
     }

@@ -1,0 +1,9 @@
+[package]
+name = "lisp"
+version = "0.0.3"
+authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
+description = "A lisp like thingy"
+
+[dependencies]
+lexers = { path = "../lexers" }
+linenoise-rust = "*"

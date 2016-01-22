@@ -1,10 +1,11 @@
 extern crate linenoise;
-extern crate tox;
+extern crate lexers;
+extern crate lisp;
 
 #[cfg(not(test))]
 fn main() {
     use std::rc::Rc;
-    use tox::lisp::{LispContext, Parser};
+    use lisp::{LispContext, Parser};
     let cx = Rc::new(LispContext::new());
     while let Some(input) = linenoise::input("~> ") {
         linenoise::history_add(&input[..]);

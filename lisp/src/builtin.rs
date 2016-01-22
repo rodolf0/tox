@@ -1,4 +1,6 @@
-use lisp::{LispExpr, EvalErr, Procedure};
+use eval::EvalErr;
+use parser::LispExpr;
+use procedure::Procedure;
 use std::collections::HashMap;
 use std::{ops, cmp};
 use std::rc::Rc;

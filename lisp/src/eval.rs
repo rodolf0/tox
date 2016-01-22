@@ -1,5 +1,6 @@
-use lisp::{Parser, ParseError, LispExpr, Procedure};
-use lisp::builtins;
+use parser::{Parser, ParseError, LispExpr};
+use procedure::Procedure;
+use builtin::builtins;
 
 use std::collections::HashMap;
 use std::iter::FromIterator;

@@ -10,3 +10,6 @@ pub use math_tokenizer::{MathToken, TokenAssoc, MathTokenizer};
 mod math_tokenizer;
 #[cfg(test)]
 mod math_tokenizer_test;
+
+pub use lisp_tokenizer::{LispToken, LispTokenizer};
+mod lisp_tokenizer;

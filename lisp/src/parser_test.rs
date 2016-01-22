@@ -1,4 +1,4 @@
-use lisp::{Parser, LispExpr};
+use parser::{Parser, LispExpr};
 
 #[test]
 fn test_lisp1() {

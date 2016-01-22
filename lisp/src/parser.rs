@@ -1,4 +1,5 @@
-use lisp::{Token, Lexer, Procedure};
+use lexers::{Scanner, LispToken, LispTokenizer};
+use procedure::Procedure;
 use std::string;
 use std::rc::Rc;
 
@@ -54,21 +55,21 @@ pub struct Parser;
 
 impl Parser {
     pub fn parse_str(expr: &str) -> Result<LispExpr, ParseError> {
-        Self::parse(&mut Lexer::from_str(expr))
+        Self::parse(&mut LispTokenizer::from_str(expr))
     }
 
-    fn parse(lex: &mut Lexer) -> Result<LispExpr, ParseError> {
+    fn parse(lex: &mut Scanner<LispToken>) -> Result<LispExpr, ParseError> {
         match lex.next() {
             None                    => Err(ParseError::UnexpectedEOF),
-            Some(Token::CParen)     => Err(ParseError::UnexpectedCParen),
-            Some(Token::True)       => Ok(LispExpr::True),
-            Some(Token::False)      => Ok(LispExpr::False),
-            Some(Token::String(n))  => Ok(LispExpr::String(n)),
-            Some(Token::Number(n))  => Ok(LispExpr::Number(n)),
-            Some(Token::Symbol(s))  => Ok(LispExpr::Symbol(s)),
-            Some(Token::OParen)     => {
+            Some(LispToken::CParen)     => Err(ParseError::UnexpectedCParen),
+            Some(LispToken::True)       => Ok(LispExpr::True),
+            Some(LispToken::False)      => Ok(LispExpr::False),
+            Some(LispToken::String(n))  => Ok(LispExpr::String(n)),
+            Some(LispToken::Number(n))  => Ok(LispExpr::Number(n)),
+            Some(LispToken::Symbol(s))  => Ok(LispExpr::Symbol(s)),
+            Some(LispToken::OParen)     => {
                 let mut list = Vec::new();
-                while lex.peek() != Some(Token::CParen) { // even when != None
+                while lex.peek() != Some(LispToken::CParen) { // even when != None
                     match Parser::parse(lex) {
                         Err(err) => return Err(err),
                         Ok(expr) => list.push(expr),
@@ -77,19 +78,19 @@ impl Parser {
                 lex.next(); // get over that CParen
                 Ok(LispExpr::List(list))
             },
-            Some(Token::Quote) => {
+            Some(LispToken::Quote) => {
                 let expr = try!(Parser::parse(lex));
                 Ok(LispExpr::Quote(Box::new(expr)))
             },
-            Some(Token::QuasiQuote) => {
+            Some(LispToken::QuasiQuote) => {
                 let expr = try!(Parser::parse(lex));
                 Ok(LispExpr::QuasiQuote(Box::new(expr)))
             },
-            Some(Token::UnQuote) => {
+            Some(LispToken::UnQuote) => {
                 let expr = try!(Parser::parse(lex));
                 Ok(LispExpr::UnQuote(Box::new(expr)))
             },
-            Some(Token::UnQSplice) => {
+            Some(LispToken::UnQSplice) => {
                 let expr = try!(Parser::parse(lex));
                 Ok(LispExpr::UnQSplice(Box::new(expr)))
             }

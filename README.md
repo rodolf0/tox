@@ -43,3 +43,7 @@ A lisp-like interpreter. Try out the **lisp** binary.
 * https://github.com/tomerfiliba/tau/blob/master/earley3.py
 * http://loup-vaillant.fr/tutorials/earley-parsing/
 * https://user.phil-fak.uni-duesseldorf.de/~kallmeyer/Parsing/earley.pdf
+
+### lisp references
+* http://norvig.com/lispy.html
+* http://norvig.com/lispy2.html

@@ -1,9 +1,11 @@
 extern crate linenoise;
-extern crate tox;
+extern crate lexers;
+extern crate shunting;
 
 #[cfg(not(test))]
 mod repl {
-    use tox::shunting::{Lexer, Token, ShuntingParser, MathContext};
+    use shunting::{ShuntingParser, MathContext};
+    use lexers::{MathTokenizer, MathToken};
 
     pub fn evalexpr(input: &str) {
         match ShuntingParser::parse_str(input) {
@@ -16,9 +18,9 @@ mod repl {
     }
 
     pub fn parse_statement(cx: &mut MathContext, input: &str) {
-        let mut ml = Lexer::from_str(input);
+        let mut ml = MathTokenizer::from_str(input);
         let backtrack = ml.pos();
-        if let (Some(Token::Variable(var)), Some(assig)) = (ml.next(), ml.next()) {
+        if let (Some(MathToken::Variable(var)), Some(assig)) = (ml.next(), ml.next()) {
             if assig.is_op("=", 2) {
                 match ShuntingParser::parse(&mut ml) {
                     Err(e) => println!("Parse error: {:?}", e),
@@ -49,7 +51,7 @@ fn main() {
             collect::<Vec<String>>().join(" ");
         repl::evalexpr(&input[..]);
     } else {
-        use tox::shunting::MathContext;
+        use shunting::MathContext;
         let mut cx = MathContext::new();
         while let Some(input) = linenoise::input(">> ") {
             linenoise::history_add(&input[..]);

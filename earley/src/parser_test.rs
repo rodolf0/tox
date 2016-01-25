@@ -260,7 +260,6 @@ fn chained_terminals() {
         vec!["+", "+", "X"],
         vec!["+", "X", "+"],
     ];
-
     for variant in rule_variants {
         let tokens = match variant.len() {
             2 => "+", 3 => "++", _ => unreachable!()
@@ -277,5 +276,49 @@ fn chained_terminals() {
         print_statesets(&ps.states);
         println!("=== tree === variant {:?} === input {}", variant, tokens);
         println!("{:?}", build_tree(&p.g, &ps));
+    }
+}
+
+#[test]
+fn natural_lang() {
+    let mut gb = GrammarBuilder::new();
+    gb.symbol(Symbol::terminal("N", |n: &str| {
+        n == "time" || n == "flight" || n == "banana" ||
+        n == "flies" || n == "boy" || n == "telescope"
+      }))
+      .symbol(Symbol::terminal("D", |n: &str| {
+        n == "the" || n == "a" || n == "an"
+      }))
+      .symbol(Symbol::terminal("V", |n: &str| {
+        n == "book" || n == "eat" || n == "sleep" || n == "saw"
+      }))
+      .symbol(Symbol::terminal("P", |n: &str| {
+        n == "with" || n == "in" || n == "on" || n == "at" || n == "through"
+      }))
+      .symbol(Symbol::terminal("[name]", |n: &str| n == "john" || n == "houston"))
+      .symbol(Symbol::nonterm("PP"))
+      .symbol(Symbol::nonterm("NP"))
+      .symbol(Symbol::nonterm("VP"))
+      .symbol(Symbol::nonterm("VP"))
+      .symbol(Symbol::nonterm("S"));
+    gb.rule("NP", vec!["D", "N"])
+      .rule("NP", vec!["[name]"])
+      .rule("NP", vec!["NP", "PP"])
+      .rule("PP", vec!["P", "NP"])
+      .rule("VP", vec!["V", "NP"])
+      .rule("VP", vec!["VP", "PP"])
+      .rule("S", vec!["NP", "VP"])
+      .rule("S", vec!["VP"]);
+    let p = EarleyParser::new(gb.into_grammar("S"));
+    let inputs = vec![
+        "book the flight through houston",
+        "john saw the boy with the telescope",
+    ];
+    for input in inputs.iter() {
+        println!("============ input: {}", input);
+        let mut input = DelimTokenizer::from_str(input, " ");
+        let ps = p.parse(&mut input).unwrap();
+        println!("=== tree ===");
+        for t in build_trees(&p.g, &ps) { println!("{:?}", t); }
     }
 }

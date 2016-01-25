@@ -5,6 +5,7 @@ authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "A shunting-yard math parser"
 
 [features]
+default = ["dynlink-eval"]
 dynlink-eval = ["dylib"]
 
 [dependencies]

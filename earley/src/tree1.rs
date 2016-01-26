@@ -16,6 +16,7 @@ pub fn build_tree(grammar: &Grammar, pstate: &ParseState) -> Option<Subtree> {
                     .filter_by_rule(grammar.start())
                     .filter(|it| it.start() == 0 && it.complete());
     if let Some(root) = root.next() {
+        // TODO: missing start -> rule (top-most derivation missing)
         return bt_helper(pstate, root);
     }
     None

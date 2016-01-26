@@ -14,7 +14,7 @@ extern crate earley;
 #[cfg(not(test))]
 fn build_parser() -> earley::EarleyParser {
     use earley::Symbol;
-    let num = regex::Regex::new(r"^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$").unwrap();
+    let num = regex::Regex::new(r"^-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?$").unwrap();
     let sss = regex::Regex::new(r"^[A-Za-z_]+[A-Za-z0-9_]*$").unwrap();
     let mut gb = earley::GrammarBuilder::new();
     gb.symbol(Symbol::nonterm("Sum"))
@@ -49,6 +49,7 @@ fn main() {
     let parser = build_parser();
     while let Some(input) = linenoise::input("~> ") {
         linenoise::history_add(&input[..]);
+        // TODO: the tokenizer breaks exponent sign
         let mut input = lexers::DelimTokenizer::from_str(&input, "+-*/%^!(), ");
         if let Ok(pstate) = parser.parse(&mut input) {
             for t in earley::build_trees(&parser.g, &pstate) { println!("{:?}", t); }

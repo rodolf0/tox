@@ -35,7 +35,7 @@ impl Nexter<LispToken> for LispTokenizer {
             },
 
             Some('"')  => {
-                self.0.until_chars("\"");
+                self.0.until_any_char("\"");
                 if self.0.next() != Some('"') { // consume closing quote
                     self.0.ignore();
                     return None; // drop partial string, parse as unexpected EOF
@@ -47,7 +47,7 @@ impl Nexter<LispToken> for LispTokenizer {
                 }
             },
             Some(_) => {
-                self.0.until_chars(" \n\r\t)");
+                self.0.until_any_char(" \n\r\t)");
                 let token = self.0.extract_string();
                 match &token[..] {
                     "#t" => LispToken::True,

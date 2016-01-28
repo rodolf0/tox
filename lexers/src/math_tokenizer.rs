@@ -89,8 +89,8 @@ impl MathTokenizer {
         let alnum = concat!("0123456789",
                             "abcdefghijklmnopqrstuvwxyz",
                             "ABCDEFGHIJKLMNOPQRSTUVWXYZ_");
-        if self.src.accept_chars(alfa).is_some() {
-            self.src.skip_chars(alnum);
+        if self.src.accept_any_char(alfa).is_some() {
+            self.src.skip_all_chars(alnum);
             if self.src.peek() == Some('(') {
                 return Some(MathToken::Function(self.src.extract_string(), 0));
             }
@@ -112,15 +112,15 @@ impl MathTokenizer {
 
     fn _match_numeric(&mut self) -> Option<String> {
         let backtrack = self.src.pos();
-        if self.src.accept_chars("0").is_some() {
-            if self.src.accept_chars("xob").is_some() {
+        if self.src.accept_any_char("0").is_some() {
+            if self.src.accept_any_char("xob").is_some() {
                 let digits = match self.src.curr().unwrap() {
                     'x' => "0123456789ABCDEF",
                     'o' => "01234567",
                     'b' => "01",
                     _ => unreachable!()
                 };
-                if self.src.skip_chars(digits) {
+                if self.src.skip_all_chars(digits) {
                     return Some(self.src.extract_string());
                 }
             }
@@ -133,33 +133,33 @@ impl MathTokenizer {
         let backtrack = self.src.pos();
         let digits = "0123456789";
         // optional sign
-        self.src.accept_chars("+-");
+        self.src.accept_any_char("+-");
         // require integer part
-        if !self.src.skip_chars(digits) {
+        if !self.src.skip_all_chars(digits) {
             self.src.set_pos(backtrack);
             return None;
         }
         // check for fractional part, else it's just an integer
         let backtrack = self.src.pos();
-        if self.src.accept_chars(".").is_some() && !self.src.skip_chars(digits) {
+        if self.src.accept_any_char(".").is_some() && !self.src.skip_all_chars(digits) {
             self.src.set_pos(backtrack);
             return Some(self.src.extract_string()); // integer
         }
         // check for exponent part
         let backtrack = self.src.pos();
-        if self.src.accept_chars("e").is_some() {
-            self.src.accept_chars("+-"); // exponent sign is optional
-            if !self.src.skip_chars(digits) {
+        if self.src.accept_any_char("e").is_some() {
+            self.src.accept_any_char("+-"); // exponent sign is optional
+            if !self.src.skip_all_chars(digits) {
                 self.src.set_pos(backtrack);
                 return Some(self.src.extract_string()); //float
             }
         }
-        self.src.accept_chars("i"); // accept imaginary numbers
+        self.src.accept_any_char("i"); // accept imaginary numbers
         Some(self.src.extract_string())
     }
 
     fn match_operator(&mut self) -> Option<MathToken> {
-        let token = match self.src.accept_chars("+-*/%^!(),=") {
+        let token = match self.src.accept_any_char("+-*/%^!(),=") {
             Some('(') => MathToken::OParen,
             Some(')') => MathToken::CParen,
             Some(',') => MathToken::Comma,

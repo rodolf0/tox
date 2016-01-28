@@ -112,21 +112,20 @@ impl<T: Clone> Scanner<T> {
 impl<T: Clone + Hash + Eq> Scanner<T> {
     // Advance the scanner only if the next char is in the 'any' set,
     // self.curr() will return the matched char if accept matched any
-    pub fn accept(&mut self, any: &HashSet<T>) -> Option<T> {
-        if let Some(next) = self.peek() {
-            if any.contains(&next) {
-                self.next();
-                return Some(next);
-            }
+    pub fn accept_any(&mut self, any: &HashSet<T>) -> Option<T> {
+        let backtrack = self.pos();
+        if let Some(next) = self.next() {
+            if any.contains(&next) { return Some(next); }
         }
+        self.set_pos(backtrack);
         None
     }
 
     // Skip over the 'over' set, result is if the scanner was advanced,
     // after skip a call to self.curr() will return the last matching char
-    pub fn skip(&mut self, over: &HashSet<T>) -> bool {
+    pub fn skip_all(&mut self, over: &HashSet<T>) -> bool {
         let mut advanced = false;
-        while self.accept(over).is_some() { advanced = true; }
+        while self.accept_any(over).is_some() { advanced = true; }
         return advanced;
     }
 
@@ -156,30 +155,38 @@ impl Scanner<char> {
         tokens
     }
 
-    pub fn accept_chars(&mut self, any: &str) -> Option<char> {
-        if let Some(next) = self.peek() {
-            if any.contains(next) {
-                self.next();
-                return Some(next);
-            }
+    pub fn accept_any_char(&mut self, any: &str) -> Option<char> {
+        let backtrack = self.pos();
+        if let Some(next) = self.next() {
+            if any.contains(next) { return Some(next); }
         }
+        self.set_pos(backtrack);
         None
     }
 
-    pub fn skip_chars(&mut self, over: &str) -> bool {
+    pub fn accept_char(&mut self, c: char) -> Option<char> {
+        let backtrack = self.pos();
+        if let Some(next) = self.next() {
+            if next == c { return Some(next); }
+        }
+        self.set_pos(backtrack);
+        None
+    }
+
+    pub fn skip_all_chars(&mut self, over: &str) -> bool {
         let mut advanced = false;
-        while self.accept_chars(over).is_some() { advanced = true; }
+        while self.accept_any_char(over).is_some() { advanced = true; }
         return advanced;
     }
 
-    pub fn skip_ws(&mut self) -> bool { self.skip_chars(WHITE) }
+    pub fn skip_ws(&mut self) -> bool { self.skip_all_chars(WHITE) }
 
     pub fn ignore_ws(&mut self) {
-        self.skip_chars(WHITE);
+        self.skip_all_chars(WHITE);
         self.ignore();
     }
 
-    pub fn until_chars(&mut self, any: &str) -> bool {
+    pub fn until_any_char(&mut self, any: &str) -> bool {
         let mut advanced = false;
         while let Some(next) = self.peek() {
             if any.contains(next) { break; }

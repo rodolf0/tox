@@ -17,10 +17,10 @@ impl DelimTokenizer {
 
 impl Nexter<String> for DelimTokenizer {
     fn get_item(&mut self) -> Option<String> {
-        self.s.ignore_ws();
-        if self.s.until_chars(&self.delims) {
+        self.s.ignore_ws(); // TODO: can't ignore whitespace if it's not delim
+        if self.s.until_any_char(&self.delims) {
             return Some(self.s.extract_string());
-        } else if let Some(c) = self.s.accept_chars(&self.delims) {
+        } else if let Some(c) = self.s.accept_any_char(&self.delims) {
             self.s.ignore();
             return Some(c.to_string());
         }

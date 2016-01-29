@@ -164,13 +164,13 @@ impl Scanner<char> {
         None
     }
 
-    pub fn accept_char(&mut self, c: char) -> Option<char> {
+    pub fn accept_char(&mut self, c: char) -> bool {
         let backtrack = self.pos();
         if let Some(next) = self.next() {
-            if next == c { return Some(next); }
+            if next == c { return true; }
         }
         self.set_pos(backtrack);
-        None
+        false
     }
 
     pub fn skip_all_chars(&mut self, over: &str) -> bool {

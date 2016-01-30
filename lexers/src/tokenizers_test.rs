@@ -132,11 +132,23 @@ fn test5() {
 
 #[test]
 fn test_delim_tokenizer() {
-    let mut lx = DelimTokenizer::from_str("this  is a   test ", " ", true);
-    let expect = vec!["this", "is", "a", "test"]
-        .iter().map(|s| s.to_string()).collect::<Vec<_>>();
-    for exp_token in expect.iter() {
-        assert_eq!(*exp_token, lx.next().unwrap());
+    let inputs = vec![
+        ("this  is a   test ", " ", true),
+        ("just,more,tests,hi", ",", true),
+        ("another, test, here,going on", " ,", true),
+        ("1+2*3/5", "/+*", false),
+    ];
+    let expect = vec![
+        vec!["this", "is", "a", "test"],
+        vec!["just", "more", "tests", "hi"],
+        vec!["another", "test", "here", "going", "on"],
+        vec!["1", "+", "2", "*", "3", "/", "5"],
+    ];
+    for (input, expected) in inputs.iter().zip(expect.iter()) {
+        let mut lx = DelimTokenizer::from_str(input.0, input.1, input.2);
+        for exp in expected.iter() {
+            assert_eq!(*exp, lx.next().unwrap());
+        }
+        assert_eq!(lx.next(), None);
     }
-    assert_eq!(lx.next(), None);
 }

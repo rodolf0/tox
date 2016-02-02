@@ -121,48 +121,39 @@ impl LispTokenizer {
     }
 }
 
-
 impl Nexter<LispToken> for LispTokenizer {
     fn get_item(&mut self) -> Option<LispToken> {
         self.0.ignore_ws();
-        let token = match self.0.next() {
-            Some('(')  => LispToken::OParen,
-            Some(')')  => LispToken::CParen,
-
-            Some('\'') => LispToken::Quote,
-            Some('`')  => LispToken::QuasiQuote,
-            Some(',')  => match self.0.peek() {
-                Some('@') => { self.0.next(); LispToken::UnQSplice },
-                _ => LispToken::UnQuote,
-            },
-
-            Some('"')  => {
-                self.0.until_any_char("\"");
-                if self.0.next() != Some('"') { // consume closing quote
-                    self.0.ignore();
-                    return None; // drop partial string, parse as unexpected EOF
-                } else {
-                    let token = self.0.extract();
-                    LispToken::String(token.iter()
-                                  .take(token.len() - 1)
-                                  .skip(1).cloned().collect())
-                }
-            },
-            Some(_) => {
-                self.0.until_any_char(" \n\r\t)");
+        if let Some(s) = helpers::scan_quoted_string(&mut self.0, '"') {
+            Some(LispToken::String(s))
+        } else if let Some(t) = self.0.accept_any_char(")(\'`,") {
+            let token = match t {
+                '(' => LispToken::OParen,
+                ')' => LispToken::CParen,
+                '\'' => LispToken::Quote,
+                '`' => LispToken::QuasiQuote,
+                ',' => match self.0.accept_char('@') {
+                    true => LispToken::UnQSplice,
+                    false => LispToken::UnQuote,
+                },
+                _ => unreachable!()
+            };
+            self.0.ignore();
+            Some(token)
+        } else {
+            if self.0.until_any_char(") \n\r\t") { // or til EOF
                 let token = self.0.extract_string();
                 match &token[..] {
-                    "#t" => LispToken::True,
-                    "#f" => LispToken::False,
+                    "#t" => Some(LispToken::True),
+                    "#f" => Some(LispToken::False),
                     num  => match f64::from_str(num) {
-                        Ok(n) => LispToken::Number(n),
-                        Err(_)  => LispToken::Symbol(token.clone())
+                        Ok(n) => Some(LispToken::Number(n)),
+                        Err(_)  => Some(LispToken::Symbol(token.clone())),
                     }
                 }
-            },
-            None => return None
-        };
-        self.0.ignore();
-        Some(token)
+            } else {
+                None
+            }
+        }
     }
 }

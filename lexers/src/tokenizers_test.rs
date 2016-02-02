@@ -1,4 +1,5 @@
 use tokenizers::{MathToken, MathTokenizer};
+use tokenizers::{LispToken, LispTokenizer};
 use tokenizers::DelimTokenizer;
 
 #[test]
@@ -146,9 +147,28 @@ fn test_delim_tokenizer() {
     ];
     for (input, expected) in inputs.iter().zip(expect.iter()) {
         let mut lx = DelimTokenizer::from_str(input.0, input.1, input.2);
-        for exp in expected.iter() {
-            assert_eq!(*exp, lx.next().unwrap());
-        }
+        for exp in expected.iter() { assert_eq!(*exp, lx.next().unwrap()); }
+        assert_eq!(lx.next(), None);
+    }
+}
+
+#[test]
+fn test_lisp_tokenizer() {
+    let inputs = vec![
+        "(+ 3 4 5)",
+        "(max 'a \"hello\")",
+    ];
+    let expect = vec![
+        vec![LispToken::OParen, LispToken::Symbol(format!("+")),
+             LispToken::Number(3.0), LispToken::Number(4.0),
+             LispToken::Number(5.0), LispToken::CParen],
+        vec![LispToken::OParen, LispToken::Symbol(format!("max")),
+             LispToken::Quote, LispToken::Symbol(format!("a")),
+             LispToken::String(format!("\"hello\"")), LispToken::CParen],
+    ];
+    for (input, expected) in inputs.iter().zip(expect.iter()) {
+        let mut lx = LispTokenizer::from_str(input);
+        for exp in expected.iter() { assert_eq!(*exp, lx.next().unwrap()); }
         assert_eq!(lx.next(), None);
     }
 }

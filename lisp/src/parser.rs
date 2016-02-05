@@ -60,7 +60,7 @@ impl Parser {
 
     fn parse(lex: &mut Scanner<LispToken>) -> Result<LispExpr, ParseError> {
         match lex.next() {
-            None                    => Err(ParseError::UnexpectedEOF),
+            None                        => Err(ParseError::UnexpectedEOF),
             Some(LispToken::CParen)     => Err(ParseError::UnexpectedCParen),
             Some(LispToken::True)       => Ok(LispExpr::True),
             Some(LispToken::False)      => Ok(LispExpr::False),

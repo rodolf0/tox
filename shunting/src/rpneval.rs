@@ -1,7 +1,8 @@
 extern crate rand;
-use parser::RPNExpr;
-use lexers::MathToken;
 use std::collections::HashMap;
+
+use lexers::MathToken;
+use parser::RPNExpr;
 
 #[derive(Debug, PartialEq)]
 pub enum EvalErr {
@@ -19,9 +20,7 @@ macro_rules! nargs {
     }
 }
 
-pub struct MathContext {
-    context: HashMap<String, f64>
-}
+pub struct MathContext(pub HashMap<String, f64>);
 
 impl MathContext {
     pub fn new() -> MathContext {
@@ -29,24 +28,24 @@ impl MathContext {
         let mut cx = HashMap::new();
         cx.insert(format!("pi"), consts::PI);
         cx.insert(format!("e"), consts::E);
-        MathContext{context: cx}
+        MathContext(cx)
     }
 
     pub fn setvar(&mut self, var: &str, val: f64) {
-        self.context.insert(var.to_string(), val);
+        self.0.insert(var.to_string(), val);
     }
 
     pub fn eval(&self, rpn: &RPNExpr) -> Result<f64, EvalErr> {
         let mut operands = Vec::new();
 
-        for token in rpn.iter() {
+        for token in rpn.0.iter() {
             match *token {
                 MathToken::Number(num)       => operands.push(num),
-                MathToken::Variable(ref var) => match self.context.get(var) {
+                MathToken::Variable(ref var) => match self.0.get(var) {
                     Some(value) => operands.push(*value),
                     None => return Err(EvalErr::UnknownVar(var.to_string()))
                 },
-                MathToken::Op(ref op, arity) if arity == 2 => {
+                MathToken::BOp(ref op) => {
                     let r = try!(operands.pop().ok_or(EvalErr::WrongNumberOfArgs));
                     let l = try!(operands.pop().ok_or(EvalErr::WrongNumberOfArgs));
                     match &op[..] {
@@ -59,7 +58,7 @@ impl MathContext {
                         _ => return Err(EvalErr::BadToken(op.clone()))
                     }
                 },
-                MathToken::Op(ref op, arity) if arity == 1 => {
+                MathToken::UOp(ref op) => {
                     let o = try!(operands.pop().ok_or(EvalErr::WrongNumberOfArgs));
                     match &op[..] {
                         "-" => operands.push(-o),
@@ -74,9 +73,8 @@ impl MathContext {
                     if arity > operands.len() {
                         return Err(EvalErr::WrongNumberOfArgs);
                     }
-                    let start = operands.len() - arity;
-                    let args = operands[start..].iter().cloned().collect::<Vec<f64>>();
-                    operands.truncate(start);
+                    let cut = operands.len() - arity;
+                    let args = operands.split_off(cut);
                     match Self::eval_fn(fname, args) {
                         Ok(n) => operands.push(n),
                         Err(e) => return Err(e)
@@ -111,7 +109,6 @@ impl MathContext {
 mod mathlink {
     extern crate dylib;
     use std::mem;
-
     pub fn link_fn(fname: &str) -> Result<fn(f64) -> f64, String> {
         match dylib::DynamicLibrary::open(None) {
             Ok(lib) => unsafe {

@@ -1,5 +1,5 @@
-use lexers::{MathToken, TokenAssoc};
-use parser::RPNExpr;
+use lexers::MathToken;
+use parser::{RPNExpr, Assoc, precedence};
 use std::fmt;
 
 #[derive(Debug, Clone)]
@@ -11,16 +11,24 @@ enum AST<'a> {
 impl RPNExpr {
     fn build_ast<'a>(&'a self) -> AST<'a> {
         let mut ops = Vec::new();
-        for token in self.iter() {
+        for token in self.0.iter() {
             match *token {
                 MathToken::Number(_) |
                 MathToken::Variable(_) => ops.push(AST::Leaf(token)),
-                MathToken::Function(_, arity) |
-                MathToken::Op(_, arity) => {
+                MathToken::Function(_, arity) => {
                     let n = ops.len() - arity;
-                    let node = AST::Node(token, ops.iter().skip(n).cloned().collect());
-                    ops.truncate(n);
-                    ops.push(node);
+                    let operands = ops.split_off(n);
+                    ops.push(AST::Node(token, operands));
+                },
+                MathToken::BOp(_) => {
+                    let n = ops.len() - 2;
+                    let operands = ops.split_off(n);
+                    ops.push(AST::Node(token, operands));
+                },
+                MathToken::UOp(_) => {
+                    let n = ops.len() - 1;
+                    let operands = ops.split_off(n);
+                    ops.push(AST::Node(token, operands));
                 },
                 _ => unreachable!()
             }
@@ -32,20 +40,20 @@ impl RPNExpr {
 impl fmt::Display for RPNExpr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 
-        fn printer(root: &AST) -> (String, (usize, TokenAssoc)) {
+        fn printer(root: &AST) -> (String, (usize, Assoc)) {
             match root {
                 &AST::Leaf(ref token) => {
                     match *token {
-                        &MathToken::Number(ref x)   => (format!("{}", x), token.precedence()),
-                        &MathToken::Variable(ref x) => (format!("{}", x), token.precedence()),
+                        &MathToken::Number(ref x)   => (format!("{}", x), precedence(token)),
+                        &MathToken::Variable(ref x) => (format!("{}", x), precedence(token)),
                         _ => unreachable!()
                     }
                 },
                 &AST::Node(ref token, ref args) => {
                     match *token {
-                        &MathToken::Op(ref op, arity) if arity == 1 => {
+                        &MathToken::UOp(ref op) => {
                             let subtree = printer(&args[0]);
-                            let (prec, assoc) = token.precedence();
+                            let (prec, assoc) = precedence(token);
                             // TODO: distinguish perfix/postfix operators
                             if prec > (subtree.1).0 {
                                 (format!("{}({})", op, subtree.0), (prec, assoc))
@@ -53,18 +61,18 @@ impl fmt::Display for RPNExpr {
                                 (format!("{}{}", op, subtree.0), (prec, assoc))
                             }
                         },
-                        &MathToken::Op(ref op, arity) if arity == 2 => {
+                        &MathToken::BOp(ref op) => {
                             let (lhs, rhs) = (printer(&args[0]), printer(&args[1]));
-                            let (prec, assoc) = token.precedence();
+                            let (prec, assoc) = precedence(token);
 
                             let lh = if prec > (lhs.1).0 ||
-                                        (prec == (lhs.1).0 && assoc != TokenAssoc::Left) {
+                                        (prec == (lhs.1).0 && assoc != Assoc::Left) {
                                 format!("({})", lhs.0)
                             } else {
                                 format!("{}", lhs.0)
                             };
                             let rh = if prec > (rhs.1).0 ||
-                                        (prec == (rhs.1).0 && assoc != TokenAssoc::Right) {
+                                        (prec == (rhs.1).0 && assoc != Assoc::Right) {
                                 format!("({})", rhs.0)
                             } else {
                                 format!("{}", rhs.0)
@@ -79,7 +87,7 @@ impl fmt::Display for RPNExpr {
                                 .map(|leaf| printer(&leaf).0)
                                 .collect::<Vec<String>>()
                                 .join(", ");
-                            (format!("{}({})", func, expr), token.precedence())
+                            (format!("{}({})", func, expr), precedence(token))
                         },
                         _ => unreachable!()
                     }

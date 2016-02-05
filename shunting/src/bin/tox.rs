@@ -21,7 +21,7 @@ mod repl {
         let mut ml = MathTokenizer::from_str(input);
         let backtrack = ml.pos();
         if let (Some(MathToken::Variable(var)), Some(assig)) = (ml.next(), ml.next()) {
-            if assig.is_op("=", 2) {
+            if assig == MathToken::BOp(format!("=")) {
                 match ShuntingParser::parse(&mut ml) {
                     Err(e) => println!("Parse error: {:?}", e),
                     Ok(rpn) => match cx.eval(&rpn) {

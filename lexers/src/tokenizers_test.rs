@@ -36,7 +36,7 @@ fn test2() {
     let expect = [
         MathToken::Number(3.4e-2),
         MathToken::BOp(format!("*")),
-        MathToken::Function(format!("sin")),
+        MathToken::Function(format!("sin"), 0),
         MathToken::OParen,
         MathToken::Variable(format!("x")),
         MathToken::CParen,
@@ -49,7 +49,7 @@ fn test2() {
         MathToken::Number(4.0),
         MathToken::CParen,
         MathToken::BOp(format!("*")),
-        MathToken::Function(format!("max")),
+        MathToken::Function(format!("max"), 0),
         MathToken::OParen,
         MathToken::Number(2.0),
         MathToken::Comma,
@@ -67,7 +67,7 @@ fn test2() {
 fn test3() {
     let mut lx = MathTokenizer::from_str("sqrt(-(1-x^2) / (1 + x^2))");
     let expect = [
-        MathToken::Function(format!("sqrt")),
+        MathToken::Function(format!("sqrt"), 0),
         MathToken::OParen,
         MathToken::UOp(format!("-")),
         MathToken::OParen,
@@ -115,7 +115,7 @@ fn test4() {
 fn test5() {
     let mut lx = MathTokenizer::from_str("max(0, 1, 3)");
     let expect = [
-        MathToken::Function(format!("max")),
+        MathToken::Function(format!("max"), 0),
         MathToken::OParen,
         MathToken::Number(0.0),
         MathToken::Comma,

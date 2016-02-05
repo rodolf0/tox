@@ -7,7 +7,7 @@ pub enum MathToken {
     Unknown(String),
     Number(f64),
     Variable(String),
-    Function(String),
+    Function(String, usize), // arity
     UOp(String), BOp(String),
     OParen, CParen, Comma,
 }
@@ -46,7 +46,7 @@ impl MathTokenizer {
             }
         } else if let Some(id) = helpers::scan_identifier(&mut self.src) {
             match self.src.peek() {
-                Some('(') => Some(MathToken::Function(id)),
+                Some('(') => Some(MathToken::Function(id, 0)),
                 _ => Some(MathToken::Variable(id))
             }
         } else if let Some(num) = helpers::scan_number(&mut self.src) {

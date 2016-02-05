@@ -22,7 +22,3 @@ fn test_lisp1() {
     ]);
     assert_eq!(p.unwrap(), r);
 }
-
-#[test]
-fn test_lisp2() {
-}

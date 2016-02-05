@@ -50,7 +50,7 @@ fn main() {
     while let Some(input) = linenoise::input("~> ") {
         linenoise::history_add(&input[..]);
         // TODO: the tokenizer breaks exponent sign
-        let mut input = lexers::DelimTokenizer::from_str(&input, "+-*/%^!(), ");
+        let mut input = lexers::DelimTokenizer::from_str(&input, "+-*/%^!(), ", false);
         if let Ok(pstate) = parser.parse(&mut input) {
             for t in earley::build_trees(&parser.g, &pstate) { println!("{:?}", t); }
         }

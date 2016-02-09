@@ -21,7 +21,6 @@ pub struct ParseState {
 impl EarleyParser {
     pub fn new(grammar: Grammar) -> EarleyParser { EarleyParser{g: grammar} }
 
-    // TODO: leave scan loop for the end. see earley-doc.pdf
     pub fn parse(&self, tok: &mut Scanner<String>) -> Result<ParseState, ParseError> {
         let mut tokens = Vec::new();
         // Populate S0 by building items for each start rule
@@ -31,6 +30,40 @@ impl EarleyParser {
                           .collect::<StateSet>());
         let mut i = 0;
         while i < states.len() {
+
+            let mut statelen = states[i].len() + 1; // just to make it differ
+            while statelen != states[i].len() {
+                println!("running for state {}", i);
+                statelen = states[i].len();
+                let mut item_idx = 0;
+                while item_idx < states[i].len() {
+                    let item = states[i][item_idx].clone();
+
+                    match item.next_symbol() {
+                        // prediction, insert items for all rules named like this nonterm
+                        Some(&Symbol::NonTerm(ref name)) => {
+                            for rule in self.g.rules(&name) {
+                                states[i].push(Item::predict_new(rule, i));
+                            }
+                        },
+
+                        // we reached the end of the item's rule, trigger completion
+                        None => {
+                            // go back to state where 'item' started and advance
+                            // any item if its next symbol matches the current one's name
+                            let completed = states[item.start()].iter()
+                                .filter(|source| item.can_complete(source))
+                                .map(|source| Item::complete_new(source, &item, i))
+                                .collect::<Vec<_>>();
+                            states[i].extend(completed);
+                        },
+
+                        _ => () // ignore scan in this loop
+                    }
+                    item_idx += 1;
+                }
+            }
+
             let input = tok.next();
             // accumulate tokens
             if let Some(ref input) = input {
@@ -40,20 +73,7 @@ impl EarleyParser {
             let mut item_idx = 0;
             while item_idx < states[i].len() {
                 let item = states[i][item_idx].clone();
-
                 match item.next_symbol() {
-                    // prediction, insert items for all rules named like this nonterm
-                    Some(&Symbol::NonTerm(ref name)) => {
-                        for rule in self.g.rules(&name) {
-                            states[i].push(Item::predict_new(rule, i));
-                            // trigger magical completion for nullable rules
-                            if self.g.is_nullable(rule.name()) {
-                                // TODO: get rid of this way of nullables
-                                states[i].push(Item::complete_new(&item, &item, i));
-                            }
-                        }
-                    },
-
                     // Found terminal, check input and populate S[i+1]
                     Some(&Symbol::Terminal(_, ref testfn)) => if let Some(ref input) = input {
                         if testfn(&input) {
@@ -64,22 +84,14 @@ impl EarleyParser {
                             states[i+1].push(Item::scan_new(&item, i+1, input));
                         }
                     },
-
-                    // we reached the end of the item's rule, trigger completion
-                    None => {
-                        // go back to state where 'item' started and advance
-                        // any item if its next symbol matches the current one's name
-                        let completed = states[item.start()].iter()
-                            .filter(|source| item.can_complete(source))
-                            .map(|source| Item::complete_new(source, &item, i))
-                            .collect::<Vec<_>>();
-                        states[i].extend(completed);
-                    },
+                    _ => () // only care about scans
                 }
                 item_idx += 1;
             }
             i += 1;
         }
+
+
         {
             if tokens.len() + 1 != states.len() {
                 return Err(ParseError::PartialParse);

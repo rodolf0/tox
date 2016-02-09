@@ -89,9 +89,9 @@ impl Rule {
     }
 
     // TODO: deprecate after nullable symbols re-write
-    pub fn nullable(&self, nullset: &HashSet<String>) -> bool {
-        self.spec.iter().all(|s| s.is_nonterm() && nullset.contains(s.name()))
-    }
+    //pub fn nullable(&self, nullset: &HashSet<String>) -> bool {
+        //self.spec.iter().all(|s| s.is_nonterm() && nullset.contains(s.name()))
+    //}
 }
 
 ///////////////////////////////////////////////////////////////////////////////

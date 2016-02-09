@@ -5,7 +5,7 @@ use std::rc::Rc;
 pub struct Grammar {
     start: Rc<Symbol>,
     rules: Vec<Rc<Rule>>,
-    nullable: HashSet<String>,
+    //nullable: HashSet<String>,
 }
 
 impl Grammar {
@@ -19,9 +19,9 @@ impl Grammar {
     pub fn start<'a>(&'a self) -> &'a str { self.start.name() }
 
     // check if a symbol in the grammar can derive in a nullable
-    pub fn is_nullable(&self, nonterm: &str) -> bool {
-        self.nullable.contains(nonterm)
-    }
+    //pub fn is_nullable(&self, nonterm: &str) -> bool {
+        //self.nullable.contains(nonterm)
+    //}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -51,28 +51,28 @@ impl GrammarBuilder {
         self
     }
 
-    fn build_nullable(&self) -> HashSet<String> {
-        let mut nullable: HashSet<String> = HashSet::new();
-        loop {
-            let old_size = nullable.len();
-            // for-each rule in the grammar, check if it's nullable
-            for rule in self.rules.iter() {
-                // for a rule to be nullable all symbols in the spec need to be
-                // in the nullable set, else they're not nullable. All empty
-                // specs will therefore be nullable (all of it's 0 symbols are)
-                let isnullable = rule.nullable(&nullable);
-                if isnullable { nullable.insert(rule.name().to_string()); }
-            }
-            // we're done building the set when it no longer grows
-            if old_size == nullable.len() { break; }
-        }
-        nullable
-    }
+    //fn build_nullable(&self) -> HashSet<String> {
+        //let mut nullable: HashSet<String> = HashSet::new();
+        //loop {
+            //let old_size = nullable.len();
+            //// for-each rule in the grammar, check if it's nullable
+            //for rule in self.rules.iter() {
+                //// for a rule to be nullable all symbols in the spec need to be
+                //// in the nullable set, else they're not nullable. All empty
+                //// specs will therefore be nullable (all of it's 0 symbols are)
+                //let isnullable = rule.nullable(&nullable);
+                //if isnullable { nullable.insert(rule.name().to_string()); }
+            //}
+            //// we're done building the set when it no longer grows
+            //if old_size == nullable.len() { break; }
+        //}
+        //nullable
+    //}
 
     pub fn into_grammar<S: AsRef<str>>(self, start: S) -> Grammar {
         Grammar{
             start: self.symbols[start.as_ref()].clone(),
-            nullable: self.build_nullable(),
+            //nullable: self.build_nullable(),
             rules: self.rules,
         }
     }

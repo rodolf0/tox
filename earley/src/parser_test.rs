@@ -211,7 +211,7 @@ fn grammar_epsilon() {
       .rule("P", vec![]);
     let g = gb.into_grammar("P");
     let p = EarleyParser::new(g);
-    let mut input = Scanner::from_buf("( )".split_whitespace()
+    let mut input = Scanner::from_buf("".split_whitespace()
                                       .map(|s| s.to_string()));
     let ps = p.parse(&mut input).unwrap();
     print_statesets(&ps.states);

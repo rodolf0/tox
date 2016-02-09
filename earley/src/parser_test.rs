@@ -3,7 +3,7 @@ use grammar::{GrammarBuilder, Grammar};
 use tree1::build_tree;
 use trees::build_trees;
 use parser::{EarleyParser, ParseError};
-use lexers::DelimTokenizer;
+use lexers::{Scanner, DelimTokenizer};
 use std::rc::Rc;
 
 #[test]
@@ -39,19 +39,6 @@ fn symbol_uniqueness() {
     let vi = vec![ix.clone(), ix.clone(), ix.clone(), ix.clone()];
     ss.extend(vi.into_iter());
     assert_eq!(ss.len(), 3);
-}
-
-#[test]
-fn symbol_nullable() {
-    let mut gb = GrammarBuilder::new();
-    gb.symbol(Symbol::nonterm("A"))
-      .symbol(Symbol::nonterm("B"));
-    gb.rule("A", Vec::new())
-      .rule("A", vec!["B"])
-      .rule("B", vec!["A"]);
-    let g = gb.into_grammar("A");
-    assert!(g.is_nullable("A"));
-    assert!(g.is_nullable("B"));
 }
 
 // Sum -> Sum + Mul | Mul
@@ -209,6 +196,51 @@ fn grammar_empty() {
     print_statesets(&ps.states);
     println!("=== tree ===");
     println!("{:?}", build_tree(&p.g, &ps));
+}
+
+#[test]
+fn grammar_epsilon() {
+    // Grammar for balanced parenthesis
+    // P  -> '(' P ')' | P P | <epsilon>
+    let mut gb = GrammarBuilder::new();
+    gb.symbol(Symbol::nonterm("P"))
+      .symbol(Symbol::terminal("(", |l| l == "("))
+      .symbol(Symbol::terminal(")", |l| l == ")"))
+      .rule("P", vec!["(", "P", ")"])
+      .rule("P", vec!["P", "P"])
+      .rule("P", vec![]);
+    let g = gb.into_grammar("P");
+    let p = EarleyParser::new(g);
+    let mut input = Scanner::from_buf("( )".split_whitespace()
+                                      .map(|s| s.to_string()));
+    let ps = p.parse(&mut input).unwrap();
+    print_statesets(&ps.states);
+    println!("=== tree ===");
+    for t in build_trees(&p.g, &ps) { println!("{:?}", t); }
+}
+
+#[test]
+fn grammar_example() {
+    // Grammar for all words containing 'main'
+    // Program   -> Letters 'm' 'a' 'i' 'n' Letters
+    // Letters   -> oneletter Letters | <epsilon>
+    // oneletter -> [a-zA-Z]
+    let mut gb = GrammarBuilder::new();
+    gb.symbol(Symbol::nonterm("Program"))
+      .symbol(Symbol::nonterm("Letters"))
+      .symbol(Symbol::terminal("oneletter", |l| l.len() == 1 &&
+                               l.chars().next().unwrap().is_alphabetic()))
+      .symbol(Symbol::terminal("m", |l| l == "m"))
+      .symbol(Symbol::terminal("a", |l| l == "a"))
+      .symbol(Symbol::terminal("i", |l| l == "i"))
+      .symbol(Symbol::terminal("n", |l| l == "n"))
+      .rule("Program", vec!["Letters", "m", "a", "i", "n", "Letters"])
+      .rule("Letters", vec!["oneletter", "Letters"])
+      .rule("Letters", vec![]);
+    let g = gb.into_grammar("Program");
+    let p = EarleyParser::new(g);
+    let mut input = Scanner::from_buf("containsmainword".chars().map(|c| c.to_string()));
+    let ps = p.parse(&mut input).unwrap();
 }
 
 #[test]

@@ -30,8 +30,8 @@ impl<T: Clone> Scanner<T> {
         Scanner{src: Some(source), buf: Vec::new(), pos: -1}
     }
 
-    pub fn from_buf<V: Into<Vec<T>>>(source: V) -> Scanner<T> {
-        Scanner{src: None, buf: source.into(), pos: -1}
+    pub fn from_buf<V: IntoIterator<Item=T>>(source: V) -> Scanner<T> {
+        Scanner{src: None, buf: Vec::from_iter(source.into_iter()), pos: -1}
     }
 
     pub fn pos(&self) -> isize { self.pos }

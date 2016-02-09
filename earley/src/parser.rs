@@ -49,7 +49,7 @@ impl EarleyParser {
                             // trigger magical completion for nullable rules
                             if self.g.is_nullable(rule.name()) {
                                 // TODO: get rid of this way of nullables
-                                states[i].push(Item::advance(&item, i));
+                                states[i].push(Item::complete_new(&item, &item, i));
                             }
                         }
                     },

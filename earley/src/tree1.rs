@@ -1,5 +1,5 @@
 use types::{Item, Trigger, Grammar};
-use parser::ParseState;
+use parser::EarleyState;
 
 #[derive(Debug)]
 pub enum Subtree {
@@ -9,7 +9,7 @@ pub enum Subtree {
 
 // for non-ambiguous grammars this retreieve the only possible parse
 
-pub fn build_tree(grammar: &Grammar, pstate: &ParseState) -> Option<Subtree> {
+pub fn build_tree(grammar: &Grammar, pstate: &EarleyState) -> Option<Subtree> {
     // get an item that spans the whole input and the rule matches the start
     let mut root = pstate.states.last().unwrap()
                     .filter_by_rule(grammar.start())
@@ -24,7 +24,7 @@ pub fn build_tree(grammar: &Grammar, pstate: &ParseState) -> Option<Subtree> {
 // source is always a prediction, can't be anything else cause it's on the left side
 // trigger is either a scan or a completion, only those can advance a prediction
 
-fn bt_helper(pstate: &ParseState, root: &Item) -> Option<Subtree> {
+fn bt_helper(pstate: &EarleyState, root: &Item) -> Option<Subtree> {
     if let Some(&(ref bp_prediction, ref bp_trigger)) = root.back_pointers().iter().next() {
         // source/left-side is always a prediction (completions/scans are right side of bp)
         // flat-accumulate all left-side back-pointers

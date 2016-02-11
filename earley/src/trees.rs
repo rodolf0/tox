@@ -1,5 +1,5 @@
 use types::{Item, Trigger, Grammar};
-use parser::ParseState;
+use parser::EarleyState;
 
 #[derive(Debug, Clone)]
 pub enum Subtree {
@@ -9,7 +9,7 @@ pub enum Subtree {
 
 // for non-ambiguous grammars this retreieve the only possible parse
 
-pub fn build_trees(grammar: &Grammar, pstate: &ParseState) -> Vec<Subtree> {
+pub fn build_trees(grammar: &Grammar, pstate: &EarleyState) -> Vec<Subtree> {
     // TODO: missing start -> rule (top-most derivation missing)
     pstate.states.last().unwrap()
                  .filter_by_rule(grammar.start())
@@ -22,7 +22,7 @@ pub fn build_trees(grammar: &Grammar, pstate: &ParseState) -> Vec<Subtree> {
 // trigger is either a scan or a completion, only those can advance a prediction
 
 // TODO: return iterator so we don't bust memory
-fn bt_helper(pstate: &ParseState, root: &Item) -> Vec<Subtree> {
+fn bt_helper(pstate: &EarleyState, root: &Item) -> Vec<Subtree> {
     let mut trees = Vec::new();
     for &(ref bp_prediction, ref bp_trigger) in root.back_pointers().iter() {
         // source/left-side is always a prediction (completions/scans are right side of bp)

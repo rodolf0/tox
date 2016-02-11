@@ -12,7 +12,7 @@ pub struct EarleyParser {
 }
 
 #[derive(Debug)]
-pub struct ParseState {
+pub struct EarleyState {
     pub states: Vec<StateSet>,
     pub input: Vec<String>,
 }
@@ -20,7 +20,7 @@ pub struct ParseState {
 impl EarleyParser {
     pub fn new(grammar: Grammar) -> EarleyParser { EarleyParser{g: grammar} }
 
-    pub fn parse(&self, tok: &mut Scanner<String>) -> Result<ParseState, ParseError> {
+    pub fn parse(&self, tok: &mut Scanner<String>) -> Result<EarleyState, ParseError> {
         let mut tokens = Vec::new();
         // Populate S0 by building items for each start rule
         let mut states = Vec::new();
@@ -108,6 +108,6 @@ impl EarleyParser {
                 return Err(ParseError::BadInput);
             }
         }
-        Ok(ParseState{states: states, input: tokens})
+        Ok(EarleyState{states: states, input: tokens})
     }
 }

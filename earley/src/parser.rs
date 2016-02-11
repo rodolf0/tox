@@ -1,5 +1,4 @@
-use types::{Symbol, Item, StateSet};
-use grammar::Grammar;
+use types::{Symbol, Item, StateSet, Grammar};
 use lexers::Scanner;
 
 #[derive(PartialEq, Debug)]
@@ -33,8 +32,8 @@ impl EarleyParser {
 
             let mut statelen = states[i].len() + 1; // just to make it differ
             while statelen != states[i].len() {
-                println!("running for state {}", i);
                 statelen = states[i].len();
+                println!("running for state {}", i);
                 let mut item_idx = 0;
 
                 // while there are unprocessed items

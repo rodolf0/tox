@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::ops::Index;
 use std::{fmt, hash, mem, iter, slice};
 use std::rc::Rc;
@@ -88,11 +88,6 @@ impl Rule {
     pub fn spec(&self) -> String {
         self.spec.iter().map(|s| s.name()).collect::<Vec<_>>().join(" ")
     }
-
-    // TODO: deprecate after nullable symbols re-write
-    //pub fn nullable(&self, nullset: &HashSet<String>) -> bool {
-        //self.spec.iter().all(|s| s.is_nonterm() && nullset.contains(s.name()))
-    //}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -188,7 +183,7 @@ impl fmt::Debug for Item {
             .take(self.dot).map(|s| s.name()).collect::<Vec<_>>().join(" ");
         let post = self.rule.spec.iter()
             .skip(self.dot).map(|s| s.name()).collect::<Vec<_>>().join(" ");
-        write!(f, "({} - {}) {} -> {} \u{00b7} {} # bp={}",
+        write!(f, "({} - {}) {} -> {} \u{00b7} {} #bp: {}",
                self.start, self.end, self.rule.name(), pre, post,
                self.bp.borrow().len())
     }
@@ -256,4 +251,57 @@ impl Index<usize> for StateSet {
 
 impl fmt::Debug for StateSet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.order.fmt(f) }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct Grammar {
+    start: Rc<Symbol>,
+    rules: Vec<Rc<Rule>>,
+}
+
+impl Grammar {
+    // get rules filtered by name
+    pub fn rules<'a>(&'a self, name: &'a str) ->
+           Box<Iterator<Item=&'a Rc<Rule>> + 'a> {
+        Box::new(self.rules.iter().filter(move |r| r.name() == name))
+    }
+
+    // grammar's start symbol
+    pub fn start<'a>(&'a self) -> &'a str { self.start.name() }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct GrammarBuilder {
+    symbols: HashMap<String, Rc<Symbol>>,
+    rules: Vec<Rc<Rule>>,
+}
+
+impl GrammarBuilder {
+    pub fn new() -> GrammarBuilder {
+        GrammarBuilder{ symbols: HashMap::new(), rules: Vec::new()}
+    }
+
+    pub fn symbol(&mut self, symbol: Symbol) -> &mut Self {
+        self.symbols.insert(symbol.name().to_string(), Rc::new(symbol));
+        self
+    }
+
+    pub fn rule<S>(&mut self, name: S, spec: Vec<S>) -> &mut Self
+            where S: Into<String> + AsRef<str> {
+        let rule = Rule::new(
+            self.symbols[name.as_ref()].clone(),
+            spec.iter().map(|s| self.symbols[s.as_ref()].clone()).collect()
+        );
+        self.rules.push(Rc::new(rule));
+        self
+    }
+
+    pub fn into_grammar<S: AsRef<str>>(self, start: S) -> Grammar {
+        Grammar{
+            start: self.symbols[start.as_ref()].clone(),
+            rules: self.rules,
+        }
+    }
 }

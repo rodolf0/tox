@@ -1,5 +1,4 @@
-use types::{Symbol, Rule, Item, StateSet};
-use grammar::{GrammarBuilder, Grammar};
+use types::{Symbol, Rule, Item, StateSet, GrammarBuilder, Grammar};
 use tree1::build_tree;
 use trees::build_trees;
 use parser::{EarleyParser, ParseError};
@@ -284,6 +283,8 @@ fn math_various() {
 
 #[test]
 fn chained_terminals() {
+    // E -> X + +  (and other variants)
+    // X -> <epsilon>
     let rule_variants = vec![
         vec!["X", "+"],
         vec!["+", "X"],

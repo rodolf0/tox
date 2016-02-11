@@ -1,5 +1,4 @@
-use types::{Item, Trigger};
-use grammar::Grammar;
+use types::{Item, Trigger, Grammar};
 use parser::ParseState;
 
 #[derive(Debug)]

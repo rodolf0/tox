@@ -23,10 +23,9 @@ pub fn build_trees(grammar: &Grammar, pstate: &ParseState) -> Vec<Subtree> {
 // trigger is either a scan or a completion, only those can advance a prediction
 
 // TODO: return iterator so we don't bust memory
-// TODO: use Rc<Item> everywhere (ie: move items to the heap and share them)
 fn bt_helper(pstate: &ParseState, root: &Item) -> Vec<Subtree> {
     let mut trees = Vec::new();
-    for &(ref bp_prediction, ref bp_trigger) in root.back_pointers() {
+    for &(ref bp_prediction, ref bp_trigger) in root.back_pointers().iter() {
         // source/left-side is always a prediction (completions/scans are right side of bp)
         // flat-accumulate all left-side back-pointers
 
@@ -68,7 +67,7 @@ fn bt_helper(pstate: &ParseState, root: &Item) -> Vec<Subtree> {
             }
         };
     }
-    if root.back_pointers().count() == 0 {
+    if root.back_pointers().len() == 0 {
         trees.push(Subtree::SubT(String::new(), Vec::new()));
     }
     trees

@@ -1,5 +1,5 @@
 use types::{Symbol, Rule};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct Grammar {

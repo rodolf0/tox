@@ -1,7 +1,8 @@
-use std::collections::{hash_set, HashSet};
+use std::collections::HashSet;
 use std::ops::Index;
-use std::rc::Rc;
 use std::{fmt, hash, mem, iter, slice};
+use std::rc::Rc;
+use std::cell::RefCell;
 
 pub enum Symbol {
     NonTerm(String),
@@ -98,7 +99,7 @@ impl Rule {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Trigger {
-    Completion(Item),
+    Completion(Rc<Item>),
     Scan(String),
 }
 
@@ -109,10 +110,10 @@ pub struct Item {
     start: usize,  // Earley state where item starts
     end: usize,    // Earley state where item ends
     // backpointers to source of this item: (source-item, trigger)
-    bp: HashSet<(Item, Trigger)>, // TODO: Rc<Item> for less mem
+    bp: RefCell<HashSet<(Rc<Item>, Trigger)>>,
 }
 
-// override Hash/Eq to avoid 'bp' from deduplicate Items in StateSets
+// Items are deduped only by rule, dot, start, end (ie: not bp)
 impl hash::Hash for Item {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.rule.hash(state);
@@ -122,19 +123,19 @@ impl hash::Hash for Item {
     }
 }
 
-// override Hash/Eq to avoid 'bp' from deduplicate Items in StateSets
+// Items are deduped only by rule, dot, start, end (ie: not bp)
 impl PartialEq for Item {
     fn eq(&self, other: &Item) -> bool {
         self.rule == other.rule && self.dot == other.dot &&
         self.start == other.start && self.end == other.end
     }
 }
-
 impl Eq for Item {}
 
 impl Item {
     pub fn new(rule: Rc<Rule>, dot: usize, start: usize, end: usize) -> Item {
-        Item{rule: rule, dot: dot, start: start, end: end, bp: HashSet::new()}
+        Item{rule: rule, dot: dot, start: start, end: end,
+             bp: RefCell::new(HashSet::new())}
     }
 
     pub fn start(&self) -> usize { self.start }
@@ -147,7 +148,7 @@ impl Item {
     }
 
     // check if other item's next-symbol matches our rule's name
-    pub fn can_complete(&self, other: &Item) -> bool {
+    pub fn can_complete(&self, other: &Rc<Item>) -> bool {
         self.complete() && match other.next_symbol() {
             Some(s) if s.is_nonterm() &&
                        s.name() == self.rule.name() => true,
@@ -157,33 +158,27 @@ impl Item {
 
     // build a new Item for a prediction
     pub fn predict_new(rule: &Rc<Rule>, start: usize) -> Item {
-        Item{rule: rule.clone(), dot: 0,
-             start: start, end: start, bp: HashSet::new()}
-    }
-
-    // use an existing Item as a template for a new one but advance it
-    pub fn advance(tpl: &Item, end: usize) -> Item {
-        Item{rule: tpl.rule.clone(), dot: tpl.dot+1,
-             start: tpl.start, end: end, bp: HashSet::new()}
+        Item{rule: rule.clone(), dot: 0, start: start, end: start,
+             bp: RefCell::new(HashSet::new())}
     }
 
     // produce an Item after scanning using another item as the base
-    pub fn scan_new(source: &Item, end: usize, input: &str) -> Item {
+    pub fn scan_new(source: &Rc<Item>, end: usize, input: &str) -> Item {
         let mut _bp = HashSet::new();
         _bp.insert((source.clone(), Trigger::Scan(input.to_string())));
         Item{rule: source.rule.clone(), dot: source.dot+1,
-             start: source.start, end: end, bp: _bp}
+             start: source.start, end: end, bp: RefCell::new(_bp)}
     }
 
-    pub fn complete_new(source: &Item, trigger: &Item, end: usize) -> Item {
+    pub fn complete_new(source: &Rc<Item>, trigger: &Rc<Item>, end: usize) -> Item {
         let mut _bp = HashSet::new();
         _bp.insert((source.clone(), Trigger::Completion(trigger.clone())));
         Item{rule: source.rule.clone(), dot: source.dot+1,
-             start: source.start, end: end, bp: _bp}
+             start: source.start, end: end, bp: RefCell::new(_bp)}
     }
 
-    pub fn back_pointers<'a>(&'a self) -> hash_set::Iter<'a, (Item, Trigger)> {
-        self.bp.iter()
+    pub fn back_pointers(&self) -> HashSet<(Rc<Item>, Trigger)> {
+        self.bp.borrow().clone()
     }
 }
 
@@ -193,8 +188,9 @@ impl fmt::Debug for Item {
             .take(self.dot).map(|s| s.name()).collect::<Vec<_>>().join(" ");
         let post = self.rule.spec.iter()
             .skip(self.dot).map(|s| s.name()).collect::<Vec<_>>().join(" ");
-        write!(f, "({} - {}) {} -> {} \u{00b7} {} # {:?}",
-               self.start, self.end, self.rule.name(), pre, post, self.bp)
+        write!(f, "({} - {}) {} -> {} \u{00b7} {} # bp={}",
+               self.start, self.end, self.rule.name(), pre, post,
+               self.bp.borrow().len())
     }
 }
 
@@ -202,10 +198,11 @@ impl fmt::Debug for Item {
 
 #[derive(Clone)]
 pub struct StateSet {
-    order: Vec<Item>, // TODO: use Rc<Item> for less mem?
-    dedup: HashSet<Item>,
+    order: Vec<Rc<Item>>,
+    dedup: HashSet<Rc<Item>>,
 }
 
+// Statesets are filled with Item's via push/extend. These are boxed to share BP
 impl StateSet {
     pub fn new() -> StateSet {
         StateSet{order: Vec::new(), dedup: HashSet::new()}
@@ -213,13 +210,15 @@ impl StateSet {
 
     // push items into the set, merging back-pointer sets
     pub fn push(&mut self, item: Item) {
+        // TODO: super inefficient, just need to merge item's bp into existing
+        // waiting for set API to stabilize
         if self.dedup.contains(&item) {
-            self.dedup.remove(&item);
-            let i = self.order.iter().position(|it| *it == item);
-            let mut updated = self.order.get_mut(i.unwrap()).unwrap();
-            updated.bp.extend(item.bp.into_iter());
-            self.dedup.insert(updated.clone());
+            let existent = self.dedup.iter().filter(|&x| **x == item)
+                                     .next().unwrap(); // yuck, need a get method
+            existent.bp.borrow_mut()
+                       .extend(item.bp.into_inner());
         } else {
+            let item = Rc::new(item);
             self.order.push(item.clone());
             self.dedup.insert(item);
         }
@@ -227,11 +226,11 @@ impl StateSet {
 
     pub fn len(&self) -> usize { self.dedup.len() }
 
-    pub fn iter<'a>(&'a self) -> slice::Iter<'a, Item> { self.order.iter() }
+    pub fn iter<'a>(&'a self) -> slice::Iter<'a, Rc<Item>> { self.order.iter() }
 
     // get all items whose rule name is 'name'
     pub fn filter_by_rule<'a>(&'a self, name: &'a str) ->
-           Box<Iterator<Item=&'a Item> + 'a> {
+           Box<Iterator<Item=&'a Rc<Item>> + 'a> {
         Box::new(self.order.iter().filter(move |it| it.rule.name() == name))
     }
 }
@@ -251,8 +250,8 @@ impl iter::FromIterator<Item> for StateSet {
 }
 
 impl Index<usize> for StateSet {
-    type Output = Item;
-    fn index<'b>(&'b self, idx: usize) -> &'b Item { self.order.index(idx) }
+    type Output = Rc<Item>;
+    fn index<'b>(&'b self, idx: usize) -> &'b Rc<Item> { self.order.index(idx) }
 }
 
 impl fmt::Debug for StateSet {

@@ -34,10 +34,9 @@ fn symbol_uniqueness() {
     assert_eq!(ss.len(), 1);
     ss.push(Item::new(rule.clone(), 1, 0, 1));
     assert_eq!(ss.len(), 2);
-
-    let ix = Item::new(rule.clone(), 2, 3, 3);
-    let vi = vec![ix.clone(), ix.clone(), ix.clone(), ix.clone()];
-    ss.extend(vi.into_iter());
+    ss.push(Item::new(rule.clone(), 1, 0, 1));
+    assert_eq!(ss.len(), 2);
+    ss.push(Item::new(rule.clone(), 2, 0, 1));
     assert_eq!(ss.len(), 3);
 }
 
@@ -240,7 +239,7 @@ fn grammar_example() {
     let g = gb.into_grammar("Program");
     let p = EarleyParser::new(g);
     let mut input = Scanner::from_buf("containsmainword".chars().map(|c| c.to_string()));
-    let ps = p.parse(&mut input).unwrap();
+    p.parse(&mut input).unwrap();
 }
 
 #[test]

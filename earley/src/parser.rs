@@ -36,6 +36,9 @@ impl EarleyParser {
                 println!("running for state {}", i);
                 statelen = states[i].len();
                 let mut item_idx = 0;
+
+                // while there are unprocessed items
+
                 while item_idx < states[i].len() {
                     let item = states[i][item_idx].clone();
 

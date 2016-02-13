@@ -123,7 +123,7 @@ fn grammar_ambiguous() {
     assert_eq!(ps.states.len(), 4);
     print_statesets(&ps.states);
     println!("=== tree ===");
-    for t in build_trees(&p.g, &ps) { println!("{:?}", t); }
+    for t in build_trees(p.g.start(), &ps) { println!("{:?}", t); }
 }
 
 #[test]
@@ -134,7 +134,7 @@ fn math_grammar_test() {
     assert_eq!(ps.states.len(), 10);
     print_statesets(&ps.states);
     println!("=== tree ===");
-    println!("{:?}", build_tree(&p.g, &ps));
+    println!("{:?}", build_tree(p.g.start(), &ps));
 }
 
 #[test]
@@ -154,7 +154,7 @@ fn test_left_recurse() {
     let ps = p.parse(&mut input).unwrap();
     print_statesets(&ps.states);
     println!("=== tree ===");
-    println!("{:?}", build_tree(&p.g, &ps));
+    println!("{:?}", build_tree(p.g.start(), &ps));
 }
 
 #[test]
@@ -174,7 +174,7 @@ fn test_right_recurse() {
     let ps = p.parse(&mut input).unwrap();
     print_statesets(&ps.states);
     println!("=== tree ===");
-    println!("{:?}", build_tree(&p.g, &ps));
+    println!("{:?}", build_tree(p.g.start(), &ps));
 }
 
 #[test]
@@ -193,7 +193,7 @@ fn grammar_empty() {
     let ps = p.parse(&mut input).unwrap();
     print_statesets(&ps.states);
     println!("=== tree ===");
-    println!("{:?}", build_tree(&p.g, &ps));
+    println!("{:?}", build_tree(p.g.start(), &ps));
 }
 
 #[test]
@@ -214,7 +214,8 @@ fn grammar_epsilon() {
     let ps = p.parse(&mut input).unwrap();
     print_statesets(&ps.states);
     println!("=== tree ===");
-    for t in build_trees(&p.g, &ps) { println!("{:?}", t); }
+    //for t in build_trees(p.g.start(), &ps) { println!("{:?}", t); }
+    println!("{:?}", build_tree(p.g.start(), &ps));
 }
 
 #[test]
@@ -259,7 +260,7 @@ fn math_ambiguous() {
     let ps = p.parse(&mut input).unwrap();
     print_statesets(&ps.states);
     println!("=== tree ===");
-    for t in build_trees(&p.g, &ps) { println!("{:?}", t); }
+    for t in build_trees(p.g.start(), &ps) { println!("{:?}", t); }
 }
 
 #[test]
@@ -277,7 +278,7 @@ fn math_various() {
         let ps = p.parse(&mut input).unwrap();
         print_statesets(&ps.states);
         println!("=== tree ===");
-        println!("{:?}", build_tree(&p.g, &ps));
+        println!("{:?}", build_tree(p.g.start(), &ps));
     }
 }
 
@@ -307,7 +308,7 @@ fn chained_terminals() {
         let ps = p.parse(&mut input).unwrap();
         print_statesets(&ps.states);
         println!("=== tree === variant {:?} === input {}", variant, tokens);
-        println!("{:?}", build_tree(&p.g, &ps));
+        println!("{:?}", build_tree(p.g.start(), &ps));
     }
 }
 
@@ -351,6 +352,6 @@ fn natural_lang() {
         let mut input = DelimTokenizer::from_str(input, " ", true);
         let ps = p.parse(&mut input).unwrap();
         println!("=== tree ===");
-        for t in build_trees(&p.g, &ps) { println!("{:?}", t); }
+        for t in build_trees(p.g.start(), &ps) { println!("{:?}", t); }
     }
 }

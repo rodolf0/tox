@@ -1,4 +1,4 @@
-use types::{Item, Trigger, Grammar};
+use types::{Item, Trigger};
 use parser::EarleyState;
 
 #[derive(Debug, Clone)]
@@ -9,12 +9,12 @@ pub enum Subtree {
 
 // for non-ambiguous grammars this retreieve the only possible parse
 
-pub fn build_trees(grammar: &Grammar, pstate: &EarleyState) -> Vec<Subtree> {
-    // TODO: missing start -> rule (top-most derivation missing)
+pub fn build_trees(startsym: &str, pstate: &EarleyState) -> Vec<Subtree> {
+    // TODO: missing start -> rule (top-most derivation missing) (root node)
     pstate.states.last().unwrap()
-                 .filter_by_rule(grammar.start())
+                 .filter_by_rule(startsym)
                  .filter(|it| it.start() == 0 && it.complete())
-                 .flat_map(|r| bt_helper(pstate, r).into_iter())
+                 .flat_map(|root| bt_helper(pstate, root).into_iter())
                  .collect()
 }
 

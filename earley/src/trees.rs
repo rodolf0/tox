@@ -10,11 +10,11 @@ pub enum Subtree {
 // for non-ambiguous grammars this retreieve the only possible parse
 
 pub fn build_trees(startsym: &str, pstate: &EarleyState) -> Vec<Subtree> {
-    // TODO: missing start -> rule (top-most derivation missing) (root node)
     pstate.states.last().unwrap()
                  .filter_by_rule(startsym)
                  .filter(|it| it.start() == 0 && it.complete())
                  .flat_map(|root| bt_helper(pstate, root).into_iter())
+                 .map(|subt| Subtree::SubT(startsym.to_string(), vec![subt]))
                  .collect()
 }
 

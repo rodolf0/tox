@@ -10,13 +10,14 @@ pub enum Subtree {
 
 // for non-ambiguous grammars this retreieve the only possible parse
 pub fn build_tree(startsym: &str, pstate: &EarleyState) -> Option<Subtree> {
-    // get an item that spans the whole input and the rule matches the start
-    // TODO missing root node
-    pstate.states.last().unwrap()
+    match pstate.states.last().unwrap()
                  .filter_by_rule(startsym)
                  .filter(|it| it.start() == 0 && it.complete())
                  .filter_map(|root| bt_helper(pstate, root))
-                 .last()
+                 .last() {
+        Some(subt) => Some(Subtree::SubT(startsym.to_string(), vec![subt])),
+        _ => None
+    }
 }
 
 // source is always a prediction, can't be anything else cause it's on the left side,

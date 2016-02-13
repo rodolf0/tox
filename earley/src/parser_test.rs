@@ -178,7 +178,7 @@ fn test_right_recurse() {
 }
 
 #[test]
-fn grammar_empty() {
+fn bogus_empty() {
     // A -> <empty> | B
     // B -> A
     let mut gb = GrammarBuilder::new();
@@ -192,12 +192,12 @@ fn grammar_empty() {
     let mut input = DelimTokenizer::from_str("", "-", false);
     let ps = p.parse(&mut input).unwrap();
     print_statesets(&ps.states);
-    println!("=== tree ===");
-    println!("{:?}", build_tree(p.g.start(), &ps));
+    // this generates an infinite number of parse trees, don't print them
+    // it's a bogus grammar
 }
 
 #[test]
-fn grammar_epsilon() {
+fn bogus_epsilon() {
     // Grammar for balanced parenthesis
     // P  -> '(' P ')' | P P | <epsilon>
     let mut gb = GrammarBuilder::new();
@@ -213,9 +213,8 @@ fn grammar_epsilon() {
                                       .map(|s| s.to_string()));
     let ps = p.parse(&mut input).unwrap();
     print_statesets(&ps.states);
-    println!("=== tree ===");
-    //for t in build_trees(p.g.start(), &ps) { println!("{:?}", t); }
-    println!("{:?}", build_tree(p.g.start(), &ps));
+    // this generates an infinite number of parse trees, don't print them
+    // it's a bogus grammar
 }
 
 #[test]

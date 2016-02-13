@@ -105,7 +105,7 @@ fn test_partialparse() {
       .rule("Start", vec!["+", "+"]);
     let mut input = DelimTokenizer::from_str("+++", "+", false);
     let out = EarleyParser::new(gb.into_grammar("Start")).parse(&mut input);
-    assert_eq!(out.unwrap_err(), ParseError::PartialParse);
+    assert_eq!(out.unwrap_err(), ParseError::BadInput);
 }
 
 #[test]
@@ -238,7 +238,7 @@ fn grammar_example() {
     let g = gb.into_grammar("Program");
     let p = EarleyParser::new(g);
     let mut input = Scanner::from_buf("containsmainword".chars().map(|c| c.to_string()));
-    p.parse(&mut input).unwrap();
+    assert!(p.parse(&mut input).is_ok());
 }
 
 #[test]

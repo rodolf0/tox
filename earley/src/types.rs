@@ -23,10 +23,6 @@ impl Symbol {
             &Symbol::Terminal(ref name, _) => name,
         }
     }
-
-    pub fn is_nonterm(&self) -> bool {
-        match self { &Symbol::NonTerm(_) => true, _ => false }
-    }
 }
 
 impl fmt::Debug for Symbol {
@@ -145,8 +141,15 @@ impl Item {
     // check if other item's next-symbol matches our rule's name
     pub fn can_complete(&self, other: &Rc<Item>) -> bool {
         self.complete() && match other.next_symbol() {
-            Some(s) if s.is_nonterm() &&
-                       s.name() == self.rule.name() => true,
+            Some(&Symbol::NonTerm(ref name)) => name == self.rule.name(),
+            _ => false
+        }
+    }
+
+    // check item's next symbol is a temrinal that scans lexeme
+    pub fn can_scan(&self, lexeme: &str) -> bool {
+        match self.next_symbol() {
+            Some(&Symbol::Terminal(_, ref f)) => f(lexeme),
             _ => false
         }
     }
@@ -194,7 +197,7 @@ impl fmt::Debug for Item {
 #[derive(Clone)]
 pub struct StateSet {
     order: Vec<Rc<Item>>,
-    dedup: HashSet<Rc<Item>>,
+    dedup: HashSet<Rc<Item>>, // TODO: do we actually need order ?
 }
 
 // Statesets are filled with Item's via push/extend. These are boxed to share BP

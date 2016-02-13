@@ -1,5 +1,6 @@
 use types::{Symbol, Item, StateSet, Grammar};
 use lexers::Scanner;
+use std::iter::FromIterator;
 
 #[derive(PartialEq, Debug)]
 pub enum ParseError {
@@ -14,90 +15,64 @@ pub struct EarleyParser {
 #[derive(Debug)]
 pub struct EarleyState {
     pub states: Vec<StateSet>,
-    pub input: Vec<String>,
+    pub lexemes: Vec<String>,
 }
 
 impl EarleyParser {
     pub fn new(grammar: Grammar) -> EarleyParser { EarleyParser{g: grammar} }
 
     pub fn parse(&self, tok: &mut Scanner<String>) -> Result<EarleyState, ParseError> {
-        let mut tokens = Vec::new();
-        // Populate S0 by building items for each start rule
+        let mut lexemes = Vec::new();
         let mut states = Vec::new();
+        // Populate S0: add items for each rule matching the start symbol
         states.push(self.g.rules(self.g.start())
                           .map(|rule| Item::new(rule.clone(), 0, 0, 0))
                           .collect::<StateSet>());
-        let mut i = 0;
-        while i < states.len() {
-
-            let mut statelen = states[i].len() + 1; // just to make it differ
-            while statelen != states[i].len() {
-                statelen = states[i].len();
-                println!("running for state {}", i);
+        let mut state_idx = 0;
+        while states.len() > state_idx {
+            loop {
+                // predict/complete until the stateset stops growing
+                let num_items = states[state_idx].len();
+                // iterate over all items in this stateset predict/complete
                 let mut item_idx = 0;
-
-                // while there are unprocessed items
-
-                while item_idx < states[i].len() {
-                    let item = states[i][item_idx].clone();
-
+                while states[state_idx].len() > item_idx {
+                    let item = states[state_idx][item_idx].clone();
                     match item.next_symbol() {
-                        // prediction, insert items for all rules named like this nonterm
+                        // Prediction
                         Some(&Symbol::NonTerm(ref name)) => {
-                            for rule in self.g.rules(&name) {
-                                states[i].push(Item::predict_new(rule, i));
-                            }
+                            let predictions = self.g.rules(&name)
+                                  .map(|rule| Item::predict_new(rule, state_idx));
+                            states[state_idx].extend(predictions);
                         },
-
-                        // we reached the end of the item's rule, trigger completion
+                        // Completion
                         None => {
                             // go back to state where 'item' started and advance
                             // any item if its next symbol matches the current one's name
-                            let completed = states[item.start()].iter()
+                            let completions = states[item.start()].iter()
                                 .filter(|source| item.can_complete(source))
-                                .map(|source| Item::complete_new(source, &item, i))
+                                .map(|source| Item::complete_new(source, &item, state_idx))
                                 .collect::<Vec<_>>();
-                            states[i].extend(completed);
+                            states[state_idx].extend(completions);
                         },
-
-                        _ => () // ignore scan in this loop
+                        _ => () // process Scans later
                     }
                     item_idx += 1;
                 }
+                if num_items == states[state_idx].len() { break; } // no new items we're OK
             }
-
-            let input = tok.next();
-            // accumulate tokens
-            if let Some(ref input) = input {
-                tokens.push(input.to_string());
+            // Scan input to populate Si+1
+            if let Some(lexeme) = tok.next() {
+                lexemes.push(lexeme.clone());
+                let scans = states[state_idx].iter()
+                    .filter(|item| item.can_scan(&lexeme))
+                    .map(|item| Item::scan_new(&item, state_idx+1, &lexeme))
+                    .collect::<Vec<_>>();
+                states.push(StateSet::from_iter(scans));
+                assert_eq!(states.len(), state_idx + 2);
             }
-
-            let mut item_idx = 0;
-            while item_idx < states[i].len() {
-                let item = states[i][item_idx].clone();
-                match item.next_symbol() {
-                    // Found terminal, check input and populate S[i+1]
-                    Some(&Symbol::Terminal(_, ref testfn)) => if let Some(ref input) = input {
-                        if testfn(&input) {
-                            if states.len() <= i + 1 {
-                                assert_eq!(states.len(), i + 1);
-                                states.push(StateSet::new());
-                            }
-                            states[i+1].push(Item::scan_new(&item, i+1, input));
-                        }
-                    },
-                    _ => () // only care about scans
-                }
-                item_idx += 1;
-            }
-            i += 1;
+            state_idx += 1;
         }
-
-
         {
-            if tokens.len() + 1 != states.len() {
-                return Err(ParseError::PartialParse);
-            }
             // Check that at least one item is a. complete, b. starts at the beginning
             // and c. that the name of the rule matches the starting symbol. It spans
             // the whole input because we search at the last stateset
@@ -108,6 +83,6 @@ impl EarleyParser {
                 return Err(ParseError::BadInput);
             }
         }
-        Ok(EarleyState{states: states, input: tokens})
+        Ok(EarleyState{states: states, lexemes: lexemes})
     }
 }

@@ -43,8 +43,8 @@ fn bt_helper(pstate: &EarleyState, root: &Rc<Item>) -> Option<Subtree> {
                 let label = bp_prediction.next_symbol().unwrap().name().to_string();
                 prediction.push(Subtree::Node(label, input.to_string()));
             }
-        };
-        Some(Subtree::SubT(root.rule_spec(), prediction))
+        }
+        Some(Subtree::SubT(root.str_rule(), prediction))
     } else {
         None
     }

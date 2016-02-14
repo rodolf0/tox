@@ -48,7 +48,7 @@ fn bt_helper(pstate: &EarleyState, root: &Item) -> Vec<Subtree> {
                     for trigger in bt_helper(pstate, bp_trigger) {
                         let mut p = prediction.clone();
                         p.push(trigger.clone());
-                        trees.push(Subtree::SubT(root.rule_spec(), p));
+                        trees.push(Subtree::SubT(root.str_rule(), p));
                     }
                 }
             },
@@ -61,7 +61,7 @@ fn bt_helper(pstate: &EarleyState, root: &Item) -> Vec<Subtree> {
                         Subtree::SubT(_, childs) => childs,
                     };
                     prediction.push(Subtree::Node(label.clone(), input.to_string()));
-                    trees.push(Subtree::SubT(root.rule_spec(), prediction));
+                    trees.push(Subtree::SubT(root.str_rule(), prediction));
                 }
             }
         };

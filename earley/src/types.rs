@@ -132,7 +132,9 @@ impl Item {
     pub fn start(&self) -> usize { self.start }
     pub fn complete(&self) -> bool { self.dot >= self.rule.spec.len() }
 
-    pub fn rule_spec(&self) -> String { self.rule.spec() }
+    pub fn str_rule(&self) -> String {
+        format!("{} -> {}", self.rule.name(), self.rule.spec())
+    }
 
     pub fn next_symbol<'a>(&'a self) -> Option<&'a Symbol> {
         self.rule.spec.get(self.dot).map(|s| &**s)

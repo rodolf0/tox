@@ -24,28 +24,29 @@ pub fn build_tree(startsym: &str, pstate: &EarleyState) -> Option<Subtree> {
 // trigger is either a scan or a completion, only those can advance a prediction,
 // to write this helper just draw a tree of the backpointers and see how they link
 fn bt_helper(pstate: &EarleyState, root: &Rc<Item>) -> Option<Subtree> {
-    if let Some(&(ref bp_prediction, ref bp_trigger)) = root.back_pointers().iter().last() {
-        // source/left-side is always a prediction (completions/scans are right side of bp)
-        // flat-accumulate all left-side back-pointers
-        let mut prediction = match bt_helper(pstate, bp_prediction) {
-            Some(n @ Subtree::Node(_, _)) => vec![n],
-            Some(Subtree::SubT(_, childs)) => childs,
-            None =>  Vec::new()
-        };
-        match bp_trigger {
-            // Eg: E -> E + E .  // prediction is E +, trigger E
-            &Trigger::Completion(ref bp_trigger) => {
-                let trigger = bt_helper(pstate, bp_trigger);
-                if let Some(trigger) = trigger { prediction.push(trigger); }
-            },
-            // Eg: E -> E + . E  // prediction is E, trigger +
-            &Trigger::Scan(ref input) => {
-                let label = bp_prediction.next_symbol().unwrap().name().to_string();
-                prediction.push(Subtree::Node(label, input.to_string()));
+    match root.back_pointers().iter().last() {
+        Some(&(ref bp_prediction, ref bp_trigger)) => {
+            // source/left-side is always a prediction (completions/scans are right side of bp)
+            // flat-accumulate all left-side back-pointers
+            let mut prediction = match bt_helper(pstate, bp_prediction) {
+                Some(n @ Subtree::Node(_, _)) => vec![n],
+                Some(Subtree::SubT(_, childs)) => childs,
+                None =>  Vec::new()
+            };
+            match bp_trigger {
+                // Eg: E -> E + E .  // prediction is E +, trigger E
+                &Trigger::Completion(ref bp_trigger) => {
+                    let trigger = bt_helper(pstate, bp_trigger);
+                    if let Some(trigger) = trigger { prediction.push(trigger); }
+                },
+                // Eg: E -> E + . E  // prediction is E, trigger +
+                &Trigger::Scan(ref input) => {
+                    let label = bp_prediction.next_symbol().unwrap().name().to_string();
+                    prediction.push(Subtree::Node(label, input.to_string()));
+                }
             }
-        }
-        Some(Subtree::SubT(root.str_rule(), prediction))
-    } else {
-        None
+            Some(Subtree::SubT(root.str_rule(), prediction))
+        },
+        _ => None
     }
 }

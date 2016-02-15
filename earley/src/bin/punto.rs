@@ -79,7 +79,7 @@ fn main() {
         let mut input = lexers::DelimTokenizer::from_str(&input, " ", true);
         match parser.parse(&mut input) {
             Ok(estate) => {
-                let tree = earley::build_tree(parser.g.start(), &estate);
+                let tree = earley::one_tree(parser.g.start(), &estate);
                 fn printer(node: &Subtree, n: usize) {
                     match node {
                         &Subtree::Node(ref term, ref value) => println!("\"{}. {}\" -> \"{}. {}\"", n, term, n + 1, value),

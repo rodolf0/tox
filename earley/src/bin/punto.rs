@@ -82,13 +82,13 @@ fn main() {
                 let tree = earley::one_tree(parser.g.start(), &estate);
                 fn printer(node: &Subtree, n: usize) {
                     match node {
-                        &Subtree::Node(ref term, ref value) => println!("\"{}. {}\" -> \"{}. {}\"", n, term, n + 1, value),
+                        &Subtree::Node(ref term, ref value) => println!("  \"{}. {}\" -> \"{}. {}\"", n, term, n + 1, value),
                         &Subtree::SubT(ref spec, ref childs) => for (nn, c) in childs.iter().enumerate() {
                             let x = match c {
                                 &Subtree::Node(ref term, _) => term,
                                 &Subtree::SubT(ref sspec, _) => sspec,
                             };
-                            println!("\"{}. {}\" -> \"{}. {}\"", n, spec, n + nn + 100, x);
+                            println!("  \"{}. {}\" -> \"{}. {}\"", n, spec, n + nn + 100, x);
                             printer(&c, n + nn + 100);
                         }
                     }

@@ -6,6 +6,7 @@ extern crate lexers;
 extern crate earley;
 
 use earley::Subtree;
+use std::collections::HashMap;
 
 // Grammar with unary-minus binding tighter than power
 //
@@ -72,6 +73,31 @@ fn build_parser() -> earley::EarleyParser {
     earley::EarleyParser::new(gb.into_grammar("expr"))
 }
 
+
+#[derive(Debug, Clone)]
+enum Sexpr {
+    Nil,
+    S(String),
+    List(Vec<Sexpr>),
+}
+
+type Action = Box<Fn(Vec<Sexpr>)->Sexpr>;
+//type TokEval = Box<Fn(&Subtree)->Sexpr>;
+
+ // TODO: provide handler to interpret value, default action to Nil Sexpr
+fn semanter(subtree: &Subtree, actions: &HashMap<&str, Action>) -> Sexpr {
+    match subtree {
+        &Subtree::Node(ref name, ref value) => Sexpr::S(value.to_string()), // TODO: use TokEval
+        &Subtree::SubT(ref rule, ref subtrees) => {
+            let args = subtrees.iter().map(|tree| semanter(tree, actions)).collect();
+            actions[rule.trim()](args)
+        }
+    }
+}
+
+// TODO: get rid of this
+fn aux<F: 'static + Fn(Vec<Sexpr>)->Sexpr>(f: F) -> Action { Box::new(f) }
+
 fn main() {
     let parser = build_parser();
     while let Some(input) = linenoise::input("~> ") {
@@ -80,23 +106,48 @@ fn main() {
         match parser.parse(&mut input) {
             Ok(estate) => {
                 let tree = earley::one_tree(parser.g.start(), &estate);
-                fn printer(node: &Subtree, n: usize) {
-                    match node {
-                        &Subtree::Node(ref term, ref value) => println!("  \"{}. {}\" -> \"{}. {}\"", n, term, n + 1, value),
-                        &Subtree::SubT(ref spec, ref childs) => for (nn, c) in childs.iter().enumerate() {
-                            let x = match c {
-                                &Subtree::Node(ref term, _) => term,
-                                &Subtree::SubT(ref sspec, _) => sspec,
-                            };
-                            println!("  \"{}. {}\" -> \"{}. {}\"", n, spec, n + nn + 100, x);
-                            printer(&c, n + nn + 100);
-                        }
-                    }
-                };
 
-                println!("digraph arbol {{");
-                printer(&tree.unwrap(), 0);
-                println!("}}");
+                let mut actions = HashMap::new();
+                actions.insert("expr", aux(|args: Vec<Sexpr>| Sexpr::List(args)));
+                actions.insert("expr -> addpart", aux(|args: Vec<Sexpr>| args[0].clone()));
+                actions.insert("expr -> expr [+] addpart", aux(|args: Vec<Sexpr>| Sexpr::List(args)));
+                actions.insert("addpart -> uminus", aux(|args: Vec<Sexpr>| args[0].clone()));
+                actions.insert("addpart -> addpart [*] uminus", aux(|args: Vec<Sexpr>| Sexpr::List(args)));
+                actions.insert("uminus -> mulpart", aux(|args: Vec<Sexpr>| args[0].clone()));
+                actions.insert("uminus -> [-] uminus", aux(|args: Vec<Sexpr>| Sexpr::List(args)));
+                actions.insert("mulpart -> ufact", aux(|args: Vec<Sexpr>| args[0].clone()));
+                actions.insert("mulpart -> ufact [^] uminus", aux(|args: Vec<Sexpr>| Sexpr::List(args)));
+                actions.insert("ufact -> group", aux(|args: Vec<Sexpr>| args[0].clone()));
+                actions.insert("ufact -> ufact [!]", aux(|args: Vec<Sexpr>| Sexpr::List(args)));
+                actions.insert("group -> [n]", aux(|args: Vec<Sexpr>| args[0].clone()));
+                actions.insert("group -> [v]", aux(|args: Vec<Sexpr>| args[0].clone()));
+                actions.insert("group -> [(] expr [)]", aux(|args: Vec<Sexpr>| args[1].clone())); // drop parens
+                actions.insert("group -> func", aux(|args: Vec<Sexpr>| args[0].clone()));
+                actions.insert("func -> [v] [(] args [)]", aux(|args: Vec<Sexpr>| Sexpr::List(vec![args[0].clone(), args[2].clone()])));
+                actions.insert("args -> expr", aux(|args: Vec<Sexpr>| args[0].clone()));
+                actions.insert("args -> args [,] expr", aux(|args: Vec<Sexpr>| Sexpr::List(args)));
+                actions.insert("args ->", aux(|args: Vec<Sexpr>| args[0].clone()));
+
+                let s = semanter(&tree.unwrap(), &actions);
+                println!("{:?}", s);
+
+                //fn printer(node: &Subtree, n: usize) {
+                    //match node {
+                        //&Subtree::Node(ref term, ref value) => println!("  \"{}. {}\" -> \"{}. {}\"", n, term, n + 1, value),
+                        //&Subtree::SubT(ref spec, ref childs) => for (nn, c) in childs.iter().enumerate() {
+                            //let x = match c {
+                                //&Subtree::Node(ref term, _) => term,
+                                //&Subtree::SubT(ref sspec, _) => sspec,
+                            //};
+                            //println!("  \"{}. {}\" -> \"{}. {}\"", n, spec, n + nn + 100, x);
+                            //printer(&c, n + nn + 100);
+                        //}
+                    //}
+                //};
+
+                //println!("digraph arbol {{");
+                //printer(&tree.unwrap(), 0);
+                //println!("}}");
             },
             Err(e) => println!("Parse err: {:?}", e)
         }

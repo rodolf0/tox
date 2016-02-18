@@ -9,46 +9,37 @@ pub enum Subtree {
 }
 
 // for non-ambiguous grammars this retreieve the only possible parse
-pub fn one_tree(startsym: &str, pstate: &EarleyState) -> Option<Subtree> {
-    match pstate.states.last().unwrap()
+pub fn one_tree(startsym: &str, pstate: &EarleyState) -> Subtree {
+    pstate.states.last().unwrap()
                  .filter_by_rule(startsym)
                  .filter(|it| it.start() == 0 && it.complete())
-                 .filter_map(|root| one_helper(pstate, root))
-                 .last() {
-        Some(subt) => Some(Subtree::SubT(startsym.to_string(), vec![subt])),
-        _ => None
-    }
+                 .map(|root| one_helper(pstate, root))
+                 .next().unwrap()
 }
 
 // source is always a prediction, can't be anything else cause it's on the left side,
 // trigger is either a scan or a completion, only those can advance a prediction,
 // to write this helper just draw a tree of the backpointers and see how they link
-fn one_helper(pstate: &EarleyState, root: &Rc<Item>) -> Option<Subtree> {
-    match root.back_pointers().iter().last() {
-        Some(&(ref bp_prediction, ref bp_trigger)) => {
-            // source/left-side is always a prediction (completions/scans are right side of bp)
-            // flat-accumulate all left-side back-pointers
-            let mut prediction = match one_helper(pstate, bp_prediction) {
-                Some(n @ Subtree::Node(_, _)) => vec![n],
-                Some(Subtree::SubT(_, childs)) => childs,
-                None =>  Vec::new()
-            };
-            match bp_trigger {
-                // Eg: E -> E + E .  // prediction is E +, trigger E
-                &Trigger::Completion(ref bp_trigger) => {
-                    let trigger = one_helper(pstate, bp_trigger);
-                    if let Some(trigger) = trigger { prediction.push(trigger); }
-                },
-                // Eg: E -> E + . E  // prediction is E, trigger +
-                &Trigger::Scan(ref input) => {
-                    let label = bp_prediction.next_symbol().unwrap().name().to_string();
-                    prediction.push(Subtree::Node(label, input.to_string()));
-                }
+fn one_helper(pstate: &EarleyState, root: &Rc<Item>) -> Subtree {
+    let mut tree = Vec::new();
+    if let Some(&(ref bp_prediction, ref bp_trigger)) = root.back_pointers().iter().next() {
+        // source/left-side is always a prediction (completions/scans are right side of bp)
+        // flat-accumulate all left-side back-pointers that lead to the trigger
+        let mut prediction = match one_helper(pstate, bp_prediction) {
+            n @ Subtree::Node(_, _) => tree.push(n),
+            Subtree::SubT(_, childs) => tree.extend(childs),
+        };
+        match bp_trigger {
+            // Eg: E -> E + E .  // prediction is E +, trigger E
+            &Trigger::Completion(ref bp_trigger) => tree.push(one_helper(pstate, bp_trigger)),
+            // Eg: E -> E + . E  // prediction is E, trigger +
+            &Trigger::Scan(ref input) => {
+                let label = bp_prediction.next_symbol().unwrap().name().to_string();
+                tree.push(Subtree::Node(label, input.to_string()));
             }
-            Some(Subtree::SubT(root.str_rule(), prediction))
-        },
-        _ => None
+        }
     }
+    Subtree::SubT(root.str_rule(), tree)
 }
 
 
@@ -57,7 +48,6 @@ pub fn all_trees(startsym: &str, pstate: &EarleyState) -> Vec<Subtree> {
                  .filter_by_rule(startsym)
                  .filter(|it| it.start() == 0 && it.complete())
                  .flat_map(|root| all_helper(pstate, root).into_iter())
-                 .map(|subt| Subtree::SubT(startsym.to_string(), vec![subt]))
                  .collect()
 }
 
@@ -67,14 +57,6 @@ fn all_helper(pstate: &EarleyState, root: &Rc<Item>) -> Vec<Subtree> {
     for &(ref bp_prediction, ref bp_trigger) in root.back_pointers().iter() {
         // source/left-side is always a prediction (completions/scans are right side of bp)
         // flat-accumulate all left-side back-pointers
-
-        let mut predictions = Vec::new();
-        for left_tree in all_helper(pstate, bp_prediction) {
-            predictions.push(match left_tree {
-                n @ Subtree::Node(_, _) => vec![n],
-                Subtree::SubT(_, childs) => childs,
-            });
-        }
 
         match bp_trigger {
             // Eg: E -> E + E .  // prediction is E +, trigger E

@@ -21,25 +21,26 @@ pub fn one_tree(startsym: &str, pstate: &EarleyState) -> Subtree {
 // trigger is either a scan or a completion, only those can advance a prediction,
 // to write this helper just draw a tree of the backpointers and see how they link
 fn one_helper(pstate: &EarleyState, root: &Rc<Item>) -> Subtree {
-    let mut tree = Vec::new();
-    if let Some(&(ref bp_prediction, ref bp_trigger)) = root.back_pointers().iter().next() {
+    let mut childs = Vec::new();
+    if let Some(&(ref bp_pred, ref bp_trig)) = root.back_pointers().iter().next() {
         // source/left-side is always a prediction (completions/scans are right side of bp)
         // flat-accumulate all left-side back-pointers that lead to the trigger
-        let mut prediction = match one_helper(pstate, bp_prediction) {
-            n @ Subtree::Node(_, _) => tree.push(n),
-            Subtree::SubT(_, childs) => tree.extend(childs),
+        match one_helper(pstate, bp_pred) {
+            n @ Subtree::Node(_, _) => childs.push(n),
+            Subtree::SubT(_, c) => childs.extend(c),
         };
-        match bp_trigger {
+        match bp_trig {
             // Eg: E -> E + E .  // prediction is E +, trigger E
-            &Trigger::Completion(ref bp_trigger) => tree.push(one_helper(pstate, bp_trigger)),
+            &Trigger::Completion(ref bp_trig) =>
+                childs.push(one_helper(pstate, bp_trig)),
             // Eg: E -> E + . E  // prediction is E, trigger +
             &Trigger::Scan(ref input) => {
-                let label = bp_prediction.next_symbol().unwrap().name().to_string();
-                tree.push(Subtree::Node(label, input.to_string()));
+                let label = bp_pred.next_symbol().unwrap().name().to_string();
+                childs.push(Subtree::Node(label, input.to_string()));
             }
         }
     }
-    Subtree::SubT(root.str_rule(), tree)
+    Subtree::SubT(root.str_rule(), childs)
 }
 
 
@@ -51,44 +52,37 @@ pub fn all_trees(startsym: &str, pstate: &EarleyState) -> Vec<Subtree> {
                  .collect()
 }
 
-// TODO: return iterator so we don't bust memory
+// Enhance: return iterators to avoid busting mem
 fn all_helper(pstate: &EarleyState, root: &Rc<Item>) -> Vec<Subtree> {
+    let back_pointers = root.back_pointers();
     let mut trees = Vec::new();
-    for &(ref bp_prediction, ref bp_trigger) in root.back_pointers().iter() {
-        // source/left-side is always a prediction (completions/scans are right side of bp)
-        // flat-accumulate all left-side back-pointers
 
-        match bp_trigger {
-            // Eg: E -> E + E .  // prediction is E +, trigger E
-            &Trigger::Completion(ref bp_trigger) => {
-                for predtree in all_helper(pstate, bp_prediction) {
-                    let prediction = match predtree {
-                        n @ Subtree::Node(_, _) => vec![n],
-                        Subtree::SubT(_, childs) => childs,
-                    };
-                    for trigger in all_helper(pstate, bp_trigger) {
-                        let mut p = prediction.clone();
-                        p.push(trigger.clone());
-                        trees.push(Subtree::SubT(root.str_rule(), p));
+    if back_pointers.len() == 0 {
+        trees.push(Subtree::SubT(root.str_rule(), Vec::new()));
+    } else {
+        for &(ref bp_pred, ref bp_trig) in back_pointers.iter() {
+            for predtree in all_helper(pstate, bp_pred) {
+                let mut prediction = match predtree {
+                    n @ Subtree::Node(_, _) => vec![n],
+                    Subtree::SubT(_, c) => c,
+                };
+                match bp_trig {
+                    // Eg: E -> E + E .  // prediction is E +, trigger E
+                    &Trigger::Completion(ref bp_trig) =>
+                        for trigger in all_helper(pstate, bp_trig) {
+                            let mut p = prediction.clone();
+                            p.push(trigger.clone());
+                            trees.push(Subtree::SubT(root.str_rule(), p));
+                        },
+                    // Eg: E -> E + . E  // prediction is E, trigger +
+                    &Trigger::Scan(ref input) => {
+                        let label = bp_pred.next_symbol().unwrap().name().to_string();
+                        prediction.push(Subtree::Node(label.clone(), input.to_string()));
+                        trees.push(Subtree::SubT(root.str_rule(), prediction));
                     }
                 }
-            },
-            // Eg: E -> E + . E  // prediction is E, trigger +
-            &Trigger::Scan(ref input) => {
-                let label = bp_prediction.next_symbol().unwrap().name().to_string();
-                for predtree in all_helper(pstate, bp_prediction) {
-                    let mut prediction = match predtree {
-                        n @ Subtree::Node(_, _) => vec![n],
-                        Subtree::SubT(_, childs) => childs,
-                    };
-                    prediction.push(Subtree::Node(label.clone(), input.to_string()));
-                    trees.push(Subtree::SubT(root.str_rule(), prediction));
-                }
             }
-        };
-    }
-    if root.back_pointers().len() == 0 {
-        trees.push(Subtree::SubT(String::new(), Vec::new()));
+        }
     }
     trees
 }

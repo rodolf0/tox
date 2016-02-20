@@ -126,6 +126,27 @@ fn grammar_ambiguous() {
 }
 
 #[test]
+fn grammar_ambiguous_epsilon() {
+    // S -> SSX | b
+    // X -> <e>
+    let mut gb = GrammarBuilder::new();
+    gb.symbol(Symbol::nonterm("S"))
+      .symbol(Symbol::nonterm("X"))
+      .symbol(Symbol::terminal("b", |n: &str| n == "b"))
+      .rule("S", vec!["S", "S", "X"])
+      .rule("X", vec![])
+      .rule("S", vec!["b"]);
+    // Earley's corner case that generates spurious trees for bbb
+    let mut input = DelimTokenizer::from_str("b b b", " ", true);
+    let p = EarleyParser::new(gb.into_grammar("S"));
+    let ps = p.parse(&mut input).unwrap();
+    assert_eq!(ps.states.len(), 4);
+    print_statesets(&ps.states);
+    println!("=== tree ===");
+    for t in all_trees(p.g.start(), &ps) { println!("{:?}", t); }
+}
+
+#[test]
 fn math_grammar_test() {
     let p = EarleyParser::new(grammar_math());
     let mut input = DelimTokenizer::from_str("1+(2*3-4)", "+*-/()", false);
@@ -191,8 +212,9 @@ fn bogus_empty() {
     let mut input = DelimTokenizer::from_str("", "-", false);
     let ps = p.parse(&mut input).unwrap();
     print_statesets(&ps.states);
-    // this generates an infinite number of parse trees, don't print them
-    // it's a bogus grammar
+    // this generates an infinite number of parse trees, don't print them all
+    println!("=== tree ===");
+    println!("{:?}", one_tree(p.g.start(), &ps));
 }
 
 #[test]
@@ -212,8 +234,9 @@ fn bogus_epsilon() {
                                       .map(|s| s.to_string()));
     let ps = p.parse(&mut input).unwrap();
     print_statesets(&ps.states);
-    // this generates an infinite number of parse trees, don't print them
-    // it's a bogus grammar
+    // this generates an infinite number of parse trees, don't print them all
+    println!("=== tree ===");
+    println!("{:?}", one_tree(p.g.start(), &ps));
 }
 
 #[test]
@@ -254,11 +277,12 @@ fn math_ambiguous() {
       .rule("E", vec!["n"]);
     // parse something ... should return 2 parse trees
     let p = EarleyParser::new(gb.into_grammar("E"));
-    let mut input = DelimTokenizer::from_str("0*1*2*3*4*5", "+*", false);
+    let mut input = DelimTokenizer::from_str("0*1*2*3*4*5*6", "*", false);
     let ps = p.parse(&mut input).unwrap();
     print_statesets(&ps.states);
     println!("=== tree ===");
     for t in all_trees(p.g.start(), &ps) { println!("{:?}", t); }
+    // number of trees here should match Catalan numbers
 }
 
 #[test]

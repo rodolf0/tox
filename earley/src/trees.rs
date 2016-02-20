@@ -56,7 +56,6 @@ pub fn all_trees(startsym: &str, pstate: &EarleyState) -> Vec<Subtree> {
 fn all_helper(pstate: &EarleyState, root: &Rc<Item>) -> Vec<Subtree> {
     let back_pointers = root.back_pointers();
     let mut trees = Vec::new();
-
     if back_pointers.len() == 0 {
         trees.push(Subtree::SubT(root.str_rule(), Vec::new()));
     } else {

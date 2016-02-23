@@ -272,6 +272,10 @@ impl Grammar {
         Box::new(self.rules.iter().filter(move |r| r.name() == name))
     }
 
+    pub fn all_rules<'a>(&'a self) -> slice::Iter<'a, Rc<Rule>> {
+        self.rules.iter()
+    }
+
     // grammar's start symbol
     pub fn start<'a>(&'a self) -> &'a str { self.start.name() }
 }

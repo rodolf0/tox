@@ -7,5 +7,4 @@ description = "An earley parser"
 [dependencies]
 lexers = { path = "../lexers" }
 linenoise-rust = "*"
-num = "*"
 regex = "*"

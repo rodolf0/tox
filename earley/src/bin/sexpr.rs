@@ -28,7 +28,7 @@ use std::fmt;
 // func     -> id '(' args ')'
 // args     -> args ',' expr | expr | <e>
 
-fn build_parser() -> earley::EarleyParser {
+fn build_grammar() -> earley::Grammar {
     use earley::Symbol;
     let num = regex::Regex::new(r"^-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?$").unwrap();
     let sss = regex::Regex::new(r"^[A-Za-z_]+[A-Za-z0-9_]*$").unwrap();
@@ -71,13 +71,12 @@ fn build_parser() -> earley::EarleyParser {
       .rule("args",    vec!["args", "[,]", "expr"])
       .rule("args",    vec![])
       ;
-    earley::EarleyParser::new(gb.into_grammar("expr"))
+    gb.into_grammar("expr")
 }
 
 
 #[derive(Clone)]
 enum Sexpr {
-    Nil,
     S(String),
     List(Vec<Sexpr>),
 }
@@ -88,7 +87,6 @@ impl Sexpr {
             &Sexpr::List(ref c) =>
                 format!("({})", c.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(" ")),
             &Sexpr::S(ref s) => s.clone(),
-            _ => "nil".to_string(),
         }
     }
 }
@@ -99,75 +97,69 @@ impl fmt::Debug for Sexpr {
     }
 }
 
-type Action = Box<Fn(Vec<Sexpr>) -> Sexpr>;
+type Action<R> = Box<Fn(Vec<R>) -> R>;
+//type TokHandle<R> = for<'r> Fn(&'r str, &'r str) -> R;
 
-fn semanter<TH>(subtree: &Subtree, actions: &HashMap<&str, Action>, tokh: &TH) -> Sexpr
-        where TH: for<'r> Fn(&'r str, &'r str) -> Sexpr {
+fn semanter<R, TH>(subtree: &Subtree, actions: &HashMap<String, Action<R>>, tokh: &TH) -> R
+        where TH: for<'r> Fn(&'r str, &'r str) -> R {
     match subtree {
         &Subtree::Node(ref name, ref value) => tokh(name, value),
         &Subtree::SubT(ref rule, ref subtrees) => {
             let args = subtrees.iter().map(|t| semanter(t, actions, tokh)).collect();
-            match actions.get(rule.trim()) { // trim -> as_str
-                Some(action) => action(args),
-                _ => Sexpr::Nil,
-            }
+            let action = &actions[rule.trim()];
+            action(args)
         }
     }
 }
 
 // TODO: get rid of this
-fn b<F: 'static + Fn(Vec<Sexpr>)->Sexpr>(f: F) -> Action { Box::new(f) }
+fn b<R, F: 'static + Fn(Vec<R>)->R>(f: F) -> Action<R> { Box::new(f) }
 
-fn sexpr_actions<'x>() -> HashMap<&'x str, Action> {
-    let mut actions = HashMap::new();
-    actions.insert("expr"                          , b(|args| Sexpr::List(args)));
-    actions.insert("expr -> addpart"               , b(|args| args[0].clone()));
-    actions.insert("expr -> expr [+] addpart"      , b(|args| Sexpr::List(args)));
-    actions.insert("addpart -> uminus"             , b(|args| args[0].clone()));
-    actions.insert("addpart -> addpart [*] uminus" , b(|args| Sexpr::List(args)));
-    actions.insert("uminus -> mulpart"             , b(|args| args[0].clone()));
-    actions.insert("uminus -> [-] uminus"          , b(|args| Sexpr::List(args)));
-    actions.insert("mulpart -> ufact"              , b(|args| args[0].clone()));
-    actions.insert("mulpart -> ufact [^] uminus"   , b(|args| Sexpr::List(args)));
-    actions.insert("ufact -> group"                , b(|args| args[0].clone()));
-    actions.insert("ufact -> ufact [!]"            , b(|args| Sexpr::List(args)));
-    actions.insert("group -> [n]"                  , b(|args| args[0].clone()));
-    actions.insert("group -> [v]"                  , b(|args| args[0].clone()));
-    actions.insert("group -> [(] expr [)]"         , b(|args| args[1].clone())); // drop parens
-    actions.insert("group -> func"                 , b(|args| args[0].clone()));
-    actions.insert("func -> [v] [(] args [)]"      , b(|args| Sexpr::List(vec![args[0].clone(), args[2].clone()])));
-    actions.insert("args -> expr"                  , b(|args| args[0].clone()));
-    actions.insert("args -> args [,] expr"         , b(|args| Sexpr::List(args)));
-    actions.insert("args ->"                       , b(|args| args[0].clone()));
-    actions
+fn sexpr_actions() -> HashMap<String, Action<Sexpr>> {
+    vec![
+        ("expr -> addpart"               , b(|a: Vec<Sexpr>| a[0].clone())),
+        ("expr -> expr [+] addpart"      , b(|a: Vec<Sexpr>| Sexpr::List(a))),
+        ("addpart -> uminus"             , b(|a: Vec<Sexpr>| a[0].clone())),
+        ("addpart -> addpart [*] uminus" , b(|a: Vec<Sexpr>| Sexpr::List(a))),
+        ("uminus -> mulpart"             , b(|a: Vec<Sexpr>| a[0].clone())),
+        ("uminus -> [-] uminus"          , b(|a: Vec<Sexpr>| Sexpr::List(a))),
+        ("mulpart -> ufact"              , b(|a: Vec<Sexpr>| a[0].clone())),
+        ("mulpart -> ufact [^] uminus"   , b(|a: Vec<Sexpr>| Sexpr::List(a))),
+        ("ufact -> group"                , b(|a: Vec<Sexpr>| a[0].clone())),
+        ("ufact -> ufact [!]"            , b(|a: Vec<Sexpr>| Sexpr::List(a))),
+        ("group -> [n]"                  , b(|a: Vec<Sexpr>| a[0].clone())),
+        ("group -> [v]"                  , b(|a: Vec<Sexpr>| a[0].clone())),
+        ("group -> [(] expr [)]"         , b(|a: Vec<Sexpr>| a[1].clone())),
+        ("group -> func"                 , b(|a: Vec<Sexpr>| a[0].clone())),
+        ("func -> [v] [(] args [)]"      , b(|a: Vec<Sexpr>| Sexpr::List(vec![a[0].clone(), a[2].clone()]))),
+        ("args -> expr"                  , b(|a: Vec<Sexpr>| a[0].clone())),
+        ("args -> args [,] expr"         , b(|a: Vec<Sexpr>| Sexpr::List(a))),
+        ("args ->"                       , b(|a: Vec<Sexpr>| a[0].clone())),
+    ].into_iter().map(|(spec, func)| (spec.to_string(), func))
+                 .collect::<HashMap<String, Action<Sexpr>>>()
 }
 
-fn prn_actions<'x>() -> HashMap<&'x str, Action> {
-    let mut actions = HashMap::new();
-    //actions.insert("expr"                          , b(|args| {println!("hola"); Sexpr::Nil}));
-    //actions.insert("expr -> addpart"               , b(|args| args[0].clone()));
-    //actions.insert("expr -> expr [+] addpart"      , b(|args| Sexpr::List(args)));
-    //actions.insert("addpart -> uminus"             , b(|args| args[0].clone()));
-    //actions.insert("addpart -> addpart [*] uminus" , b(|args| Sexpr::List(args)));
-    //actions.insert("uminus -> mulpart"             , b(|args| args[0].clone()));
-    //actions.insert("uminus -> [-] uminus"          , b(|args| Sexpr::List(args)));
-    //actions.insert("mulpart -> ufact"              , b(|args| args[0].clone()));
-    //actions.insert("mulpart -> ufact [^] uminus"   , b(|args| Sexpr::List(args)));
-    //actions.insert("ufact -> group"                , b(|args| args[0].clone()));
-    //actions.insert("ufact -> ufact [!]"            , b(|args| Sexpr::List(args)));
-    //actions.insert("group -> [n]"                  , b(|args| args[0].clone()));
-    //actions.insert("group -> [v]"                  , b(|args| args[0].clone()));
-    //actions.insert("group -> [(] expr [)]"         , b(|args| args[1].clone())); // drop parens
-    //actions.insert("group -> func"                 , b(|args| args[0].clone()));
-    //actions.insert("func -> [v] [(] args [)]"      , b(|args| Sexpr::List(vec![args[0].clone(), args[2].clone()])));
-    //actions.insert("args -> expr"                  , b(|args| args[0].clone()));
-    //actions.insert("args -> args [,] expr"         , b(|args| Sexpr::List(args)));
-    //actions.insert("args ->"                       , b(|args| args[0].clone()));
-    actions
+/*
+fn prn_actions() -> HashMap<String, Action<usize>> {
+    build_grammar().all_rules()
+        .map(|rule| {
+
+        })
+        .map(|rule| format!("{} -> {}", rule.name(), rule.spec()))
+        .map(|spec| (spec.clone(), b(move |childs| {
+            for child in childs {
+                match child {
+                    &Subtree::Node(ref terminal, _) => println!("{} -> {}", spec, terminal),
+                    &Subtree::SubT(ref cspec, _) => println!("{} -> {}", spec, cspec),
+                }
+            }
+        })))
+        .collect::<HashMap<_, _>>()
 }
+*/
 
 fn main() {
-    let parser = build_parser();
+    let parser = earley::EarleyParser::new(build_grammar());
     while let Some(input) = linenoise::input("~> ") {
         linenoise::history_add(&input[..]);
         let mut input = lexers::DelimTokenizer::from_str(&input, " ", true);
@@ -175,8 +167,12 @@ fn main() {
             Ok(estate) => {
                 let tree = earley::one_tree(parser.g.start(), &estate);
 
-                let s = semanter(&tree, &prn_actions(), &|_, value: &str| Sexpr::S(value.to_string()));
+                let s = semanter(&tree, &sexpr_actions(), &|_, value: &str| Sexpr::S(value.to_string()));
                 println!("{:?}", s);
+                //semanter(&tree, &prn_actions(), &|terminal: &str, value: &str| {
+                    //println!("{} -> {}", terminal, value);
+                    //0
+                //});
 
                 //fn printer(node: &Subtree, n: usize) {
                     //match node {

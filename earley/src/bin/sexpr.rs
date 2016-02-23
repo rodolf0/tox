@@ -98,10 +98,11 @@ impl fmt::Debug for Sexpr {
 }
 
 type Action<R> = Box<Fn(Vec<R>) -> R>;
-//type TokHandle<R> = for<'r> Fn(&'r str, &'r str) -> R;
+type TokHandle<R> = for<'r> FnMut(&'r str, &'r str) -> R;
 
-fn semanter<R, TH>(subtree: &Subtree, actions: &HashMap<String, Action<R>>, tokh: &TH) -> R
-        where TH: for<'r> Fn(&'r str, &'r str) -> R {
+fn semanter<R>(subtree: &Subtree,
+               actions: &HashMap<String, Action<R>>,
+               tokh: &mut TokHandle<R>) -> R {
     match subtree {
         &Subtree::Node(ref name, ref value) => tokh(name, value),
         &Subtree::SubT(ref rule, ref subtrees) => {
@@ -111,6 +112,35 @@ fn semanter<R, TH>(subtree: &Subtree, actions: &HashMap<String, Action<R>>, tokh
         }
     }
 }
+
+/*
+fn semanter2<R, TH>(subtree: &Subtree, actions: &HashMap<String, Action<R>>, tokh: &mut TH) -> R
+        where TH: for<'r> FnMut(&'r str, &'r str) -> R {
+    match subtree {
+        &Subtree::Node(ref name, ref value) => tokh(name, value),
+        &Subtree::SubT(ref rule, ref subtrees) => for t in subtrees {
+            let action = &actions[rule.trim()];
+            action(args);
+            semanter2(t, actions, tokh)
+        }
+    }
+}
+*/
+
+//fn printer(node: &Subtree, n: usize) {
+    //match node {
+        //&Subtree::Node(ref term, ref value) => println!("  \"{}. {}\" -> \"{}. {}\"", n, term, n + 1, value),
+        //&Subtree::SubT(ref spec, ref childs) => for (nn, c) in childs.iter().enumerate() {
+            //let x = match c {
+                //&Subtree::Node(ref term, _) => term,
+                //&Subtree::SubT(ref sspec, _) => sspec,
+            //};
+            //println!("  \"{}. {}\" -> \"{}. {}\"", n, spec, n + nn + 100, x);
+            //printer(&c, n + nn + 100);
+        //}
+    //}
+//};
+
 
 // TODO: get rid of this
 fn b<R, F: 'static + Fn(Vec<R>)->R>(f: F) -> Action<R> { Box::new(f) }
@@ -139,24 +169,20 @@ fn sexpr_actions() -> HashMap<String, Action<Sexpr>> {
                  .collect::<HashMap<String, Action<Sexpr>>>()
 }
 
-/*
 fn prn_actions() -> HashMap<String, Action<usize>> {
-    build_grammar().all_rules()
+    build_grammar().all_rules().cloned()
         .map(|rule| {
-
-        })
-        .map(|rule| format!("{} -> {}", rule.name(), rule.spec()))
-        .map(|spec| (spec.clone(), b(move |childs| {
-            for child in childs {
-                match child {
-                    &Subtree::Node(ref terminal, _) => println!("{} -> {}", spec, terminal),
-                    &Subtree::SubT(ref cspec, _) => println!("{} -> {}", spec, cspec),
+            let spec = format!("{} -> {}", rule.name(), rule.spec());
+            let action = b(move |childs: Vec<usize>| {
+                for (i, child) in rule.spec_parts().iter().enumerate() {
+                    println!("\"{}. {}\" -> \"{}. {}\"", childs[i] + 1, rule.name(), childs[i], child);
                 }
-            }
-        })))
+                childs.last().unwrap() + 1
+            });
+            (spec, action)
+        })
         .collect::<HashMap<_, _>>()
 }
-*/
 
 fn main() {
     let parser = earley::EarleyParser::new(build_grammar());
@@ -167,30 +193,14 @@ fn main() {
             Ok(estate) => {
                 let tree = earley::one_tree(parser.g.start(), &estate);
 
-                let s = semanter(&tree, &sexpr_actions(), &|_, value: &str| Sexpr::S(value.to_string()));
-                println!("{:?}", s);
-                //semanter(&tree, &prn_actions(), &|terminal: &str, value: &str| {
-                    //println!("{} -> {}", terminal, value);
-                    //0
-                //});
-
-                //fn printer(node: &Subtree, n: usize) {
-                    //match node {
-                        //&Subtree::Node(ref term, ref value) => println!("  \"{}. {}\" -> \"{}. {}\"", n, term, n + 1, value),
-                        //&Subtree::SubT(ref spec, ref childs) => for (nn, c) in childs.iter().enumerate() {
-                            //let x = match c {
-                                //&Subtree::Node(ref term, _) => term,
-                                //&Subtree::SubT(ref sspec, _) => sspec,
-                            //};
-                            //println!("  \"{}. {}\" -> \"{}. {}\"", n, spec, n + nn + 100, x);
-                            //printer(&c, n + nn + 100);
-                        //}
-                    //}
-                //};
-
-                //println!("digraph arbol {{");
-                //printer(&tree.unwrap(), 0);
-                //println!("}}");
+                //let s = semanter(&tree, &sexpr_actions(), &|_, value: &str| Sexpr::S(value.to_string()));
+                //println!("{:?}", s);
+                let mut nnn = 0;
+                semanter(&tree, &prn_actions(), &mut move |terminal: &str, value: &str| {
+                    nnn += 100;
+                    println!("\"{}. {}\" -> \"{}. {}\"", nnn + 1, terminal, nnn, value);
+                    nnn + 1
+                });
             },
             Err(e) => println!("Parse err: {:?}", e)
         }

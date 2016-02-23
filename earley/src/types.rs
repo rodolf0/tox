@@ -84,6 +84,10 @@ impl Rule {
     pub fn spec(&self) -> String {
         self.spec.iter().map(|s| s.name()).collect::<Vec<_>>().join(" ")
     }
+
+    pub fn spec_parts(&self) -> Vec<String> {
+        self.spec.iter().map(|s| s.name().to_string()).collect()
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

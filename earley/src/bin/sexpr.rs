@@ -98,11 +98,11 @@ impl fmt::Debug for Sexpr {
 }
 
 type Action<R> = Box<Fn(Vec<R>) -> R>;
-type TokHandle<R> = for<'r> FnMut(&'r str, &'r str) -> R;
+type TokHandle<R> = for<'r> Fn(&'r str, &'r str) -> R;
 
 fn semanter<R>(subtree: &Subtree,
                actions: &HashMap<String, Action<R>>,
-               tokh: &mut TokHandle<R>) -> R {
+               tokh: &TokHandle<R>) -> R {
     match subtree {
         &Subtree::Node(ref name, ref value) => tokh(name, value),
         &Subtree::SubT(ref rule, ref subtrees) => {
@@ -112,35 +112,6 @@ fn semanter<R>(subtree: &Subtree,
         }
     }
 }
-
-/*
-fn semanter2<R, TH>(subtree: &Subtree, actions: &HashMap<String, Action<R>>, tokh: &mut TH) -> R
-        where TH: for<'r> FnMut(&'r str, &'r str) -> R {
-    match subtree {
-        &Subtree::Node(ref name, ref value) => tokh(name, value),
-        &Subtree::SubT(ref rule, ref subtrees) => for t in subtrees {
-            let action = &actions[rule.trim()];
-            action(args);
-            semanter2(t, actions, tokh)
-        }
-    }
-}
-*/
-
-//fn printer(node: &Subtree, n: usize) {
-    //match node {
-        //&Subtree::Node(ref term, ref value) => println!("  \"{}. {}\" -> \"{}. {}\"", n, term, n + 1, value),
-        //&Subtree::SubT(ref spec, ref childs) => for (nn, c) in childs.iter().enumerate() {
-            //let x = match c {
-                //&Subtree::Node(ref term, _) => term,
-                //&Subtree::SubT(ref sspec, _) => sspec,
-            //};
-            //println!("  \"{}. {}\" -> \"{}. {}\"", n, spec, n + nn + 100, x);
-            //printer(&c, n + nn + 100);
-        //}
-    //}
-//};
-
 
 // TODO: get rid of this
 fn b<R, F: 'static + Fn(Vec<R>)->R>(f: F) -> Action<R> { Box::new(f) }
@@ -169,38 +140,49 @@ fn sexpr_actions() -> HashMap<String, Action<Sexpr>> {
                  .collect::<HashMap<String, Action<Sexpr>>>()
 }
 
-fn prn_actions() -> HashMap<String, Action<usize>> {
-    build_grammar().all_rules().cloned()
-        .map(|rule| {
-            let spec = format!("{} -> {}", rule.name(), rule.spec());
-            let action = b(move |childs: Vec<usize>| {
-                for (i, child) in rule.spec_parts().iter().enumerate() {
-                    println!("\"{}. {}\" -> \"{}. {}\"", childs[i] + 1, rule.name(), childs[i], child);
-                }
-                childs.last().unwrap() + 1
-            });
-            (spec, action)
-        })
-        .collect::<HashMap<_, _>>()
+
+fn dotprinter(node: &Subtree, n: usize) {
+    match node {
+        &Subtree::Node(ref term, ref value) => println!("  \"{}. {}\" -> \"{}. {}\"", n, term, n + 1, value),
+        &Subtree::SubT(ref spec, ref childs) => for (nn, c) in childs.iter().enumerate() {
+            let x = match c {
+                &Subtree::Node(ref term, _) => term,
+                &Subtree::SubT(ref sspec, _) => sspec,
+            };
+            println!("  \"{}. {}\" -> \"{}. {}\"", n, spec, n + nn + 100, x);
+            dotprinter(&c, n + nn + 100);
+        }
+    }
 }
+
 
 fn main() {
     let parser = earley::EarleyParser::new(build_grammar());
+
+    if std::env::args().len() > 1 {
+        let input = std::env::args().skip(1).
+            collect::<Vec<String>>().join(" ");
+        let mut input = lexers::DelimTokenizer::from_str(&input[..], " ", true);
+        match parser.parse(&mut input) {
+            Ok(estate) => {
+                let tree = earley::one_tree(parser.g.start(), &estate);
+                println!("digraph x {{");
+                dotprinter(&tree, 0);
+                println!("}}");
+            },
+            Err(e) => println!("Parse err: {:?}", e)
+        }
+        return;
+    }
+
     while let Some(input) = linenoise::input("~> ") {
         linenoise::history_add(&input[..]);
         let mut input = lexers::DelimTokenizer::from_str(&input, " ", true);
         match parser.parse(&mut input) {
             Ok(estate) => {
                 let tree = earley::one_tree(parser.g.start(), &estate);
-
-                //let s = semanter(&tree, &sexpr_actions(), &|_, value: &str| Sexpr::S(value.to_string()));
-                //println!("{:?}", s);
-                let mut nnn = 0;
-                semanter(&tree, &prn_actions(), &mut move |terminal: &str, value: &str| {
-                    nnn += 100;
-                    println!("\"{}. {}\" -> \"{}. {}\"", nnn + 1, terminal, nnn, value);
-                    nnn + 1
-                });
+                let s = semanter(&tree, &sexpr_actions(), &|_, value: &str| Sexpr::S(value.to_string()));
+                println!("{:?}", s);
             },
             Err(e) => println!("Parse err: {:?}", e)
         }

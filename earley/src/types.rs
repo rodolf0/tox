@@ -217,6 +217,7 @@ impl StateSet {
         // TODO: super inefficient, just need to merge item's bp into existing
         // waiting for set API to stabilize
         if self.dedup.contains(&item) {
+            //let existent = self.dedup.get(item).unwrap();
             let existent = self.dedup.iter().filter(|&x| **x == item)
                                      .next().unwrap(); // yuck, need a get method
             existent.bp.borrow_mut()

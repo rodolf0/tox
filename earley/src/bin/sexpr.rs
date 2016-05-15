@@ -9,16 +9,6 @@ use earley::Subtree;
 use std::collections::HashMap;
 use std::fmt;
 
-// Grammar with unary-minus binding tighter than power
-//
-// expr     -> expr '[+-]' addpart | addpart
-// addpart  -> addpart '[*%/]' mulpart | mulpart
-// mulpart  -> uminus '^' mulpart | uminus
-// uminus   -> '-' uminus | group
-// group    -> num | id | '(' expr ')'
-
-// Grammar with unary-minus binding less tight than power
-//
 // expr     -> expr '[+-]' addpart | addpart
 // addpart  -> addpart '[*%/]' uminus | uminus
 // uminus   -> '-' uminus | mulpart
@@ -31,7 +21,7 @@ use std::fmt;
 fn build_grammar() -> earley::Grammar {
     use earley::Symbol;
     let num = regex::Regex::new(r"^-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?$").unwrap();
-    let sss = regex::Regex::new(r"^[A-Za-z_]+[A-Za-z0-9_]*$").unwrap();
+    let var = regex::Regex::new(r"^[A-Za-z_]+[A-Za-z0-9_]*$").unwrap();
     let mut gb = earley::GrammarBuilder::new();
     gb.symbol(Symbol::nonterm("expr"))
       .symbol(Symbol::nonterm("addpart"))
@@ -42,7 +32,7 @@ fn build_grammar() -> earley::Grammar {
       .symbol(Symbol::nonterm("func"))
       .symbol(Symbol::nonterm("args"))
       .symbol(Symbol::terminal("[n]", move |n: &str| num.is_match(n)))
-      .symbol(Symbol::terminal("[v]", move |n: &str| sss.is_match(n)))
+      .symbol(Symbol::terminal("[v]", move |n: &str| var.is_match(n)))
       .symbol(Symbol::terminal("[+]", |n: &str| n == "+" || n == "-"))
       .symbol(Symbol::terminal("[*]", |n: &str| n == "*" || n == "/" || n == "%"))
       .symbol(Symbol::terminal("[-]", |n: &str| n == "-"))
@@ -155,6 +145,23 @@ fn dotprinter(node: &Subtree, n: usize) {
     }
 }
 
+struct Tokenizer(lexers::Scanner<char>);
+
+impl lexers::Nexter<String> for Tokenizer {
+    fn get_item(&mut self) -> Option<String> {
+        self.0.ignore_ws();
+        lexers::scan_number(&mut self.0)
+            .or_else(|| lexers::scan_identifier(&mut self.0))
+            .or_else(|| lexers::scan_math_op(&mut self.0))
+    }
+}
+
+impl Tokenizer {
+    fn from_str(input: &str) -> lexers::Scanner<String> {
+        lexers::Scanner::new(
+            Box::new(Tokenizer(lexers::Scanner::from_str(&input))))
+    }
+}
 
 fn main() {
     let parser = earley::EarleyParser::new(build_grammar());
@@ -162,8 +169,7 @@ fn main() {
     if std::env::args().len() > 1 {
         let input = std::env::args().skip(1).
             collect::<Vec<String>>().join(" ");
-        let mut input = lexers::DelimTokenizer::from_str(&input[..], " ", true);
-        match parser.parse(&mut input) {
+        match parser.parse(&mut Tokenizer::from_str(&input)) {
             Ok(estate) => {
                 let tree = earley::one_tree(parser.g.start(), &estate);
                 println!("digraph x {{");
@@ -177,8 +183,7 @@ fn main() {
 
     while let Some(input) = linenoise::input("~> ") {
         linenoise::history_add(&input[..]);
-        let mut input = lexers::DelimTokenizer::from_str(&input, " ", true);
-        match parser.parse(&mut input) {
+        match parser.parse(&mut Tokenizer::from_str(&input)) {
             Ok(estate) => {
                 let tree = earley::one_tree(parser.g.start(), &estate);
                 let s = semanter(&tree, &sexpr_actions(), &|_, value: &str| Sexpr::S(value.to_string()));

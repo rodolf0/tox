@@ -7,7 +7,6 @@ extern crate earley;
 
 use earley::Subtree;
 use std::collections::HashMap;
-use std::fmt;
 
 // expr     -> expr '[+-]' addpart | addpart
 // addpart  -> addpart '[*%/]' uminus | uminus
@@ -33,8 +32,8 @@ fn build_grammar() -> earley::Grammar {
       .symbol(Symbol::nonterm("args"))
       .symbol(Symbol::terminal("[n]", move |n: &str| num.is_match(n)))
       .symbol(Symbol::terminal("[v]", move |n: &str| var.is_match(n)))
-      .symbol(Symbol::terminal("[+]", |n: &str| n == "+" || n == "-"))
-      .symbol(Symbol::terminal("[*]", |n: &str| n == "*" || n == "/" || n == "%"))
+      .symbol(Symbol::terminal("[+-]", |n: &str| n == "+" || n == "-"))
+      .symbol(Symbol::terminal("[*/%]", |n: &str| n == "*" || n == "/" || n == "%"))
       .symbol(Symbol::terminal("[-]", |n: &str| n == "-"))
       .symbol(Symbol::terminal("[^]", |n: &str| n == "^"))
       .symbol(Symbol::terminal("[!]", |n: &str| n == "!"))
@@ -43,9 +42,9 @@ fn build_grammar() -> earley::Grammar {
       .symbol(Symbol::terminal("[)]", |n: &str| n == ")"))
       ;
     gb.rule("expr",    vec!["addpart"])
-      .rule("expr",    vec!["expr", "[+]", "addpart"])
+      .rule("expr",    vec!["expr", "[+-]", "addpart"])
       .rule("addpart", vec!["uminus"])
-      .rule("addpart", vec!["addpart", "[*]", "uminus"])
+      .rule("addpart", vec!["addpart", "[*/%]", "uminus"])
       .rule("uminus",  vec!["mulpart"])
       .rule("uminus",  vec!["[-]", "uminus"])
       .rule("mulpart", vec!["ufact"])
@@ -64,73 +63,6 @@ fn build_grammar() -> earley::Grammar {
     gb.into_grammar("expr")
 }
 
-
-#[derive(Clone)]
-enum Sexpr {
-    S(String),
-    List(Vec<Sexpr>),
-}
-
-impl Sexpr {
-    fn to_string(&self) -> String {
-        match self {
-            &Sexpr::List(ref c) =>
-                format!("({})", c.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(" ")),
-            &Sexpr::S(ref s) => s.clone(),
-        }
-    }
-}
-
-impl fmt::Debug for Sexpr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.to_string())
-    }
-}
-
-type Action<R> = Box<Fn(Vec<R>) -> R>;
-type TokHandle<R> = for<'r> Fn(&'r str, &'r str) -> R;
-
-fn semanter<R>(subtree: &Subtree,
-               actions: &HashMap<String, Action<R>>,
-               tokh: &TokHandle<R>) -> R {
-    match subtree {
-        &Subtree::Node(ref name, ref value) => tokh(name, value),
-        &Subtree::SubT(ref rule, ref subtrees) => {
-            let args = subtrees.iter().map(|t| semanter(t, actions, tokh)).collect();
-            let action = &actions[rule.trim()];
-            action(args)
-        }
-    }
-}
-
-// TODO: get rid of this
-fn b<R, F: 'static + Fn(Vec<R>)->R>(f: F) -> Action<R> { Box::new(f) }
-
-fn sexpr_actions() -> HashMap<String, Action<Sexpr>> {
-    vec![
-        ("expr -> addpart"               , b(|a: Vec<Sexpr>| a[0].clone())),
-        ("expr -> expr [+] addpart"      , b(|a: Vec<Sexpr>| Sexpr::List(a))),
-        ("addpart -> uminus"             , b(|a: Vec<Sexpr>| a[0].clone())),
-        ("addpart -> addpart [*] uminus" , b(|a: Vec<Sexpr>| Sexpr::List(a))),
-        ("uminus -> mulpart"             , b(|a: Vec<Sexpr>| a[0].clone())),
-        ("uminus -> [-] uminus"          , b(|a: Vec<Sexpr>| Sexpr::List(a))),
-        ("mulpart -> ufact"              , b(|a: Vec<Sexpr>| a[0].clone())),
-        ("mulpart -> ufact [^] uminus"   , b(|a: Vec<Sexpr>| Sexpr::List(a))),
-        ("ufact -> group"                , b(|a: Vec<Sexpr>| a[0].clone())),
-        ("ufact -> ufact [!]"            , b(|a: Vec<Sexpr>| Sexpr::List(a))),
-        ("group -> [n]"                  , b(|a: Vec<Sexpr>| a[0].clone())),
-        ("group -> [v]"                  , b(|a: Vec<Sexpr>| a[0].clone())),
-        ("group -> [(] expr [)]"         , b(|a: Vec<Sexpr>| a[1].clone())),
-        ("group -> func"                 , b(|a: Vec<Sexpr>| a[0].clone())),
-        ("func -> [v] [(] args [)]"      , b(|a: Vec<Sexpr>| Sexpr::List(vec![a[0].clone(), a[2].clone()]))),
-        ("args -> expr"                  , b(|a: Vec<Sexpr>| a[0].clone())),
-        ("args -> args [,] expr"         , b(|a: Vec<Sexpr>| Sexpr::List(a))),
-        ("args ->"                       , b(|a: Vec<Sexpr>| a[0].clone())),
-    ].into_iter().map(|(spec, func)| (spec.to_string(), func))
-                 .collect::<HashMap<String, Action<Sexpr>>>()
-}
-
-
 fn dotprinter(node: &Subtree, n: usize) {
     match node {
         &Subtree::Node(ref term, ref value) => println!("  \"{}. {}\" -> \"{}. {}\"", n, term, n + 1, value),
@@ -145,14 +77,69 @@ fn dotprinter(node: &Subtree, n: usize) {
     }
 }
 
+fn seval(n: &Subtree, ctx: &mut HashMap<String, f64>) -> f64 {
+    use std::str::FromStr;
+    use std::f64::consts;
+    match n {
+        &Subtree::Node(ref key, ref val) => match key.as_ref() {
+            "[n]" => f64::from_str(&val).unwrap(),
+            "[v]" => match val.as_ref() {
+                "e" => consts::E,
+                "pi" => consts::PI,
+                x => ctx[x]
+            },
+            _ => unreachable!()
+        },
+        &Subtree::SubT(ref key, ref subn) => match key.as_ref() {
+            "expr -> addpart" => seval(&subn[0], ctx),
+            "expr -> expr [+-] addpart" => match &subn[1] {
+                &Subtree::Node(_, ref op) if op == "+" => seval(&subn[0], ctx) + seval(&subn[2], ctx),
+                &Subtree::Node(_, ref op) if op == "-" => seval(&subn[0], ctx) - seval(&subn[2], ctx),
+                _ => unreachable!()
+            },
+            "addpart -> uminus" => seval(&subn[0], ctx),
+            "addpart -> addpart [*/%] uminus" => match &subn[1] {
+                &Subtree::Node(_, ref op) if op == "*" => seval(&subn[0], ctx) * seval(&subn[2], ctx),
+                &Subtree::Node(_, ref op) if op == "-" => seval(&subn[0], ctx) / seval(&subn[2], ctx),
+                &Subtree::Node(_, ref op) if op == "%" => seval(&subn[0], ctx) % seval(&subn[2], ctx),
+                _ => unreachable!()
+            },
+            "uminus -> mulpart" => seval(&subn[0], ctx),
+            "uminus -> [-] uminus" => - seval(&subn[1], ctx),
+            "mulpart -> ufact" => seval(&subn[0], ctx),
+            "mulpart -> ufact [^] uminus" => match &subn[1] {
+                &Subtree::Node(_, ref op) if op == "^" => seval(&subn[0], ctx).powf(seval(&subn[2], ctx)),
+                _ => unreachable!()
+            },
+            "ufact -> group" => seval(&subn[0], ctx),
+            "ufact -> ufact [!]" => panic!(), // no gamma function?
+            "group -> [n]" => seval(&subn[0], ctx),
+            "group -> [v]" => seval(&subn[0], ctx),
+            "group -> [(] expr [)]" => seval(&subn[1], ctx),
+            "group -> func" => seval(&subn[0], ctx),
+            "func -> [v] [(] args [)]" => match &subn[0] {
+                &Subtree::Node(_, ref f) if f == "sin" => seval(&subn[2], ctx).sin(),
+                &Subtree::Node(_, ref f) if f == "cos" => seval(&subn[2], ctx).cos(),
+                _ => panic!()
+            },
+            "args -> expr" => seval(&subn[0], ctx),
+            "args -> args [,] expr" => panic!(), // TODO: flatten args
+            "args ->" => panic!(), // ????
+            _ => unreachable!()
+        }
+    }
+}
+
+// TODO: build AST from Subtree
+
 struct Tokenizer(lexers::Scanner<char>);
 
 impl lexers::Nexter<String> for Tokenizer {
     fn get_item(&mut self) -> Option<String> {
         self.0.ignore_ws();
-        lexers::scan_number(&mut self.0)
+        lexers::scan_math_op(&mut self.0)
+            .or_else(|| lexers::scan_number(&mut self.0))
             .or_else(|| lexers::scan_identifier(&mut self.0))
-            .or_else(|| lexers::scan_math_op(&mut self.0))
     }
 }
 
@@ -186,8 +173,8 @@ fn main() {
         match parser.parse(&mut Tokenizer::from_str(&input)) {
             Ok(estate) => {
                 let tree = earley::one_tree(parser.g.start(), &estate);
-                let s = semanter(&tree, &sexpr_actions(), &|_, value: &str| Sexpr::S(value.to_string()));
-                println!("{:?}", s);
+                let mut ctx = HashMap::new();
+                println!("{:?}", seval(&tree, &mut ctx));
             },
             Err(e) => println!("Parse err: {:?}", e)
         }

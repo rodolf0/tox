@@ -214,19 +214,13 @@ impl StateSet {
 
     // push items into the set, merging back-pointer sets
     pub fn push(&mut self, item: Item) {
-        // TODO: super inefficient, just need to merge item's bp into existing
-        // waiting for set API to stabilize
-        if self.dedup.contains(&item) {
-            //let existent = self.dedup.get(item).unwrap();
-            let existent = self.dedup.iter().filter(|&x| **x == item)
-                                     .next().unwrap(); // yuck, need a get method
-            existent.bp.borrow_mut()
-                       .extend(item.bp.into_inner());
-        } else {
-            let item = Rc::new(item);
-            self.order.push(item.clone());
-            self.dedup.insert(item);
+        if let Some(existent) = self.dedup.get(&item) {
+            existent.bp.borrow_mut().extend(item.bp.into_inner());
+            return;
         }
+        let item = Rc::new(item);
+        self.order.push(item.clone());
+        self.dedup.insert(item);
     }
 
     pub fn len(&self) -> usize { self.dedup.len() }

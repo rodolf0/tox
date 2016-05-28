@@ -10,7 +10,7 @@ fn symbol_uniqueness() {
     fn testfn(o: &str) -> bool { o.len() == 1 && "+-".contains(o) }
     assert_eq!(Symbol::nonterm("sym1"), Symbol::nonterm("sym1"));
     // comparing Fn trait (data, vtable) so shouldn't match
-    assert!(Symbol::terminal("+-", testfn) != Symbol::terminal("+-", testfn));
+    assert!(Symbol::terminal("+-", testfn) == Symbol::terminal("+-", testfn));
     assert!(Symbol::terminal("X", |_| true) != Symbol::terminal("X", |_| true));
 
     let rule = {

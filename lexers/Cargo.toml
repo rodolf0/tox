@@ -4,3 +4,4 @@ authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 version = "0.0.3"
 description = "Various string tokenizers"
 license = "MIT"
+repository = "https://github.com/rodolf0/tox"

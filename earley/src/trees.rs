@@ -2,7 +2,7 @@ use types::{Item, Trigger};
 use parser::EarleyState;
 use std::rc::Rc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Subtree {
     Node(String, String),       // ("[+-]", "+")
     SubT(String, Vec<Subtree>), // ("E + E", [("n", "5"), ("[+-]", "+"), ("E * E", [...])])

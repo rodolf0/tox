@@ -1,8 +1,10 @@
 use lexers::{Scanner, DelimTokenizer};
 use types::{Symbol, Rule, Item, StateSet, GrammarBuilder, Grammar};
 use parser::{EarleyParser, ParseError};
-use trees::{one_tree, all_trees};
+use trees::{one_tree, all_trees, Subtree};
 use std::rc::Rc;
+use std::collections::HashSet;
+use std::iter::FromIterator;
 
 #[test]
 fn symbol_uniqueness() {
@@ -87,6 +89,16 @@ fn print_statesets(ss: &Vec<StateSet>) {
     }
 }
 
+fn check_trees(trees: &Vec<Subtree>, expected: Vec<&str>) {
+    assert_eq!(trees.len(), expected.len());
+    let mut expect = HashSet::<&str>::from_iter(expected);
+    for t in trees {
+        let teststr = format!("{:?}", t);
+        assert!(expect.remove(teststr.as_str()));
+    }
+    assert_eq!(0, expect.len());
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test]
@@ -119,10 +131,13 @@ fn grammar_ambiguous() {
     let mut input = DelimTokenizer::from_str("b b b", " ", true);
     let p = EarleyParser::new(gb.into_grammar("S"));
     let ps = p.parse(&mut input).unwrap();
+    // verify
     assert_eq!(ps.states.len(), 4);
-    print_statesets(&ps.states);
-    println!("=== tree ===");
-    for t in all_trees(p.g.start(), &ps) { println!("{:?}", t); }
+    let trees = all_trees(p.g.start(), &ps);
+    check_trees(&trees, vec![
+        r#"SubT("S -> S S", [SubT("S -> S S", [SubT("S -> b", [Node("b", "b")]), SubT("S -> b", [Node("b", "b")])]), SubT("S -> b", [Node("b", "b")])])"#,
+        r#"SubT("S -> S S", [SubT("S -> b", [Node("b", "b")]), SubT("S -> S S", [SubT("S -> b", [Node("b", "b")]), SubT("S -> b", [Node("b", "b")])])])"#,
+    ]);
 }
 
 #[test]
@@ -141,9 +156,11 @@ fn grammar_ambiguous_epsilon() {
     let p = EarleyParser::new(gb.into_grammar("S"));
     let ps = p.parse(&mut input).unwrap();
     assert_eq!(ps.states.len(), 4);
-    print_statesets(&ps.states);
-    println!("=== tree ===");
-    for t in all_trees(p.g.start(), &ps) { println!("{:?}", t); }
+    let trees = all_trees(p.g.start(), &ps);
+    check_trees(&trees, vec![
+        r#"SubT("S -> S S X", [SubT("S -> S S X", [SubT("S -> b", [Node("b", "b")]), SubT("S -> b", [Node("b", "b")]), SubT("X -> ", [])]), SubT("S -> b", [Node("b", "b")]), SubT("X -> ", [])])"#,
+        r#"SubT("S -> S S X", [SubT("S -> b", [Node("b", "b")]), SubT("S -> S S X", [SubT("S -> b", [Node("b", "b")]), SubT("S -> b", [Node("b", "b")]), SubT("X -> ", [])]), SubT("X -> ", [])])"#,
+    ]);
 }
 
 #[test]
@@ -152,9 +169,11 @@ fn math_grammar_test() {
     let mut input = DelimTokenizer::from_str("1+(2*3-4)", "+*-/()", false);
     let ps = p.parse(&mut input).unwrap();
     assert_eq!(ps.states.len(), 10);
-    print_statesets(&ps.states);
-    println!("=== tree ===");
-    println!("{:?}", one_tree(p.g.start(), &ps));
+    let trees = all_trees(p.g.start(), &ps);
+    check_trees(&trees, vec![
+        r#"SubT("Sum -> Sum [+-] Mul", [SubT("Sum -> Mul", [SubT("Mul -> Pow", [SubT("Pow -> Num", [SubT("Num -> Number", [Node("Number", "1")])])])]), Node("[+-]", "+"), SubT("Mul -> Pow", [SubT("Pow -> Num", [SubT("Num -> ( Sum )", [Node("(", "("), SubT("Sum -> Sum [+-] Mul", [SubT("Sum -> Mul", [SubT("Mul -> Mul [*/] Pow", [SubT("Mul -> Pow", [SubT("Pow -> Num", [SubT("Num -> Number", [Node("Number", "2")])])]), Node("[*/]", "*"), SubT("Pow -> Num", [SubT("Num -> Number", [Node("Number", "3")])])])]), Node("[+-]", "-"), SubT("Mul -> Pow", [SubT("Pow -> Num", [SubT("Num -> Number", [Node("Number", "4")])])])]), Node(")", ")")])])])])"#,
+    ]);
+    assert_eq!(one_tree(p.g.start(), &ps), trees[0]);
 }
 
 #[test]
@@ -172,9 +191,10 @@ fn test_left_recurse() {
     let p = EarleyParser::new(gb.into_grammar("S"));
     let mut input = DelimTokenizer::from_str("1+2", "+", false);
     let ps = p.parse(&mut input).unwrap();
-    print_statesets(&ps.states);
-    println!("=== tree ===");
-    println!("{:?}", one_tree(p.g.start(), &ps));
+    let tree = one_tree(p.g.start(), &ps);
+    check_trees(&vec![tree], vec![
+        r#"SubT("S -> S [+] N", [SubT("S -> N", [SubT("N -> [0-9]", [Node("[0-9]", "1")])]), Node("[+]", "+"), SubT("N -> [0-9]", [Node("[0-9]", "2")])])"#,
+    ]);
 }
 
 #[test]
@@ -192,9 +212,10 @@ fn test_right_recurse() {
     let p = EarleyParser::new(gb.into_grammar("P"));
     let mut input = DelimTokenizer::from_str("1^2", "^", false);
     let ps = p.parse(&mut input).unwrap();
-    print_statesets(&ps.states);
-    println!("=== tree ===");
-    println!("{:?}", one_tree(p.g.start(), &ps));
+    let tree = one_tree(p.g.start(), &ps);
+    check_trees(&vec![tree], vec![
+        r#"SubT("P -> N [^] P", [SubT("N -> [0-9]", [Node("[0-9]", "1")]), Node("[^]", "^"), SubT("P -> N", [SubT("N -> [0-9]", [Node("[0-9]", "2")])])])"#,
+    ]);
 }
 
 #[test]
@@ -211,10 +232,8 @@ fn bogus_empty() {
     let p = EarleyParser::new(g);
     let mut input = DelimTokenizer::from_str("", "-", false);
     let ps = p.parse(&mut input).unwrap();
-    print_statesets(&ps.states);
-    // this generates an infinite number of parse trees, don't print them all
-    println!("=== tree ===");
-    println!("{:?}", one_tree(p.g.start(), &ps));
+    // this generates an infinite number of parse trees, don't check/print them all
+    check_trees(&vec![one_tree(p.g.start(), &ps)], vec![r#"SubT("A -> ", [])"#]);
 }
 
 #[test]
@@ -233,10 +252,8 @@ fn bogus_epsilon() {
     let mut input = Scanner::from_buf("".split_whitespace()
                                       .map(|s| s.to_string()));
     let ps = p.parse(&mut input).unwrap();
-    print_statesets(&ps.states);
-    // this generates an infinite number of parse trees, don't print them all
-    println!("=== tree ===");
-    println!("{:?}", one_tree(p.g.start(), &ps));
+    // this generates an infinite number of parse trees, don't check/print them all
+    check_trees(&vec![one_tree(p.g.start(), &ps)], vec![r#"SubT("P -> ", [])"#]);
 }
 
 #[test]
@@ -275,14 +292,55 @@ fn math_ambiguous() {
       .rule("E", vec!["E", "+", "E"])
       .rule("E", vec!["E", "*", "E"])
       .rule("E", vec!["n"]);
-    // parse something ... should return 2 parse trees
+    // number of trees here should match Catalan numbers if same operator
     let p = EarleyParser::new(gb.into_grammar("E"));
-    let mut input = DelimTokenizer::from_str("0*1*2*3*4*5*6", "*", false);
+    let mut input = DelimTokenizer::from_str("0*1*2*3*4*5", "*", false);
     let ps = p.parse(&mut input).unwrap();
-    print_statesets(&ps.states);
-    println!("=== tree ===");
-    for t in all_trees(p.g.start(), &ps) { println!("{:?}", t); }
-    // number of trees here should match Catalan numbers
+    let trees = all_trees(p.g.start(), &ps);
+    check_trees(&trees, vec![
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> n", [Node("n", "1")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "4")]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])])])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "4")]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "4")]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])])]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "4")]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> n", [Node("n", "1")])]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "4")]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "4")]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "4")]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "4")]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])])])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])])]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "4")]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "4")]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> n", [Node("n", "1")])]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> n", [Node("n", "1")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])])]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])])])]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])])]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])])]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> n", [Node("n", "1")])]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> n", [Node("n", "1")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> n", [Node("n", "1")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])])])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])])])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])])])])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])])]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])])])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> n", [Node("n", "1")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "4")]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> n", [Node("n", "1")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> n", [Node("n", "1")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "4")]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> n", [Node("n", "1")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> n", [Node("n", "3")])]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> n", [Node("n", "1")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "2")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "1")]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "4")]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> n", [Node("n", "1")])]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> n", [Node("n", "4")])]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])"#,
+        r#"SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> E * E", [SubT("E -> n", [Node("n", "0")]), Node("*", "*"), SubT("E -> n", [Node("n", "1")])]), Node("*", "*"), SubT("E -> n", [Node("n", "2")])]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "3")]), Node("*", "*"), SubT("E -> E * E", [SubT("E -> n", [Node("n", "4")]), Node("*", "*"), SubT("E -> n", [Node("n", "5")])])])])"#,
+    ]);
 }
 
 #[test]

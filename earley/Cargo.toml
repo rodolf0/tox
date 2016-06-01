@@ -1,5 +1,5 @@
 [package]
-name = "earley"
+name = "toxearley"
 version = "0.0.3"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "An earley parser"

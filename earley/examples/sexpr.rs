@@ -3,7 +3,7 @@
 extern crate linenoise;
 extern crate regex;
 extern crate lexers;
-extern crate earley;
+extern crate toxearley as earley;
 
 use earley::Subtree;
 use std::collections::HashMap;

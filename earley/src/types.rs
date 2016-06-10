@@ -203,7 +203,7 @@ impl fmt::Debug for Item {
 #[derive(Clone)]
 pub struct StateSet {
     order: Vec<Rc<Item>>,
-    dedup: HashSet<Rc<Item>>, // TODO: do we actually need order ?
+    dedup: HashSet<Rc<Item>>,
 }
 
 // Statesets are filled with Item's via push/extend. These are boxed to share BP

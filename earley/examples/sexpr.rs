@@ -8,15 +8,15 @@ extern crate toxearley as earley;
 use earley::Subtree;
 use std::collections::HashMap;
 
-// assign   -> id '=' expr | expr
-// expr     -> expr '[+-]' addpart | addpart
-// addpart  -> addpart '[*%/]' uminus | uminus
-// uminus   -> '-' uminus | mulpart
-// mulpart  -> ufact '^' uminus | ufact
-// ufact    -> ufact '!' | group
-// group    -> num | id | '(' expr ')' | func
-// func     -> id '(' args ')'
-// args     -> args ',' expr | expr | <e>
+// assign -> id '=' expr | expr
+// expr   -> expr '[+-]' term | term
+// term   -> term '[*%/]' factor | factor
+// factor -> '-' factor | power
+// power  -> ufact '^' factor | ufact
+// ufact  -> ufact '!' | group
+// group  -> num | id | '(' expr ')' | func
+// func   -> id '(' args ')'
+// args   -> args ',' expr | expr | <e>
 
 fn build_grammar() -> earley::Grammar {
     use earley::Symbol;
@@ -25,9 +25,9 @@ fn build_grammar() -> earley::Grammar {
     let mut gb = earley::GrammarBuilder::new();
     gb.symbol(Symbol::nonterm("assign"))
       .symbol(Symbol::nonterm("expr"))
-      .symbol(Symbol::nonterm("addpart"))
-      .symbol(Symbol::nonterm("uminus"))
-      .symbol(Symbol::nonterm("mulpart"))
+      .symbol(Symbol::nonterm("term"))
+      .symbol(Symbol::nonterm("factor"))
+      .symbol(Symbol::nonterm("power"))
       .symbol(Symbol::nonterm("ufact"))
       .symbol(Symbol::nonterm("group"))
       .symbol(Symbol::nonterm("func"))
@@ -46,14 +46,14 @@ fn build_grammar() -> earley::Grammar {
       ;
     gb.rule("assign",  vec!["expr"])
       .rule("assign",  vec!["[v]", "[=]", "expr"])
-      .rule("expr",    vec!["addpart"])
-      .rule("expr",    vec!["expr", "[+-]", "addpart"])
-      .rule("addpart", vec!["uminus"])
-      .rule("addpart", vec!["addpart", "[*/%]", "uminus"])
-      .rule("uminus",  vec!["mulpart"])
-      .rule("uminus",  vec!["[-]", "uminus"])
-      .rule("mulpart", vec!["ufact"])
-      .rule("mulpart", vec!["ufact", "[^]", "uminus"])
+      .rule("expr",    vec!["term"])
+      .rule("expr",    vec!["expr", "[+-]", "term"])
+      .rule("term", vec!["factor"])
+      .rule("term", vec!["term", "[*/%]", "factor"])
+      .rule("factor",  vec!["power"])
+      .rule("factor",  vec!["[-]", "factor"])
+      .rule("power", vec!["ufact"])
+      .rule("power", vec!["ufact", "[^]", "factor"])
       .rule("ufact",   vec!["group"])
       .rule("ufact",   vec!["ufact", "[!]"])
       .rule("group",   vec!["[n]"])
@@ -111,23 +111,23 @@ fn xeval(n: &Subtree, ctx: &mut HashMap<String, f64>) -> Vec<f64> {
                 ctx.insert(var, val[0]);
                 val
             },
-            "expr -> addpart" => xeval(&subn[0], ctx),
-            "expr -> expr [+-] addpart" => match &subn[1] {
+            "expr -> term" => xeval(&subn[0], ctx),
+            "expr -> expr [+-] term" => match &subn[1] {
                 &Subtree::Node(_, ref op) if op == "+" => vec![eval0!(&subn[0], ctx) + eval0!(&subn[2], ctx)],
                 &Subtree::Node(_, ref op) if op == "-" => vec![eval0!(&subn[0], ctx) - eval0!(&subn[2], ctx)],
                 _ => unreachable!()
             },
-            "addpart -> uminus" => xeval(&subn[0], ctx),
-            "addpart -> addpart [*/%] uminus" => match &subn[1] {
+            "term -> factor" => xeval(&subn[0], ctx),
+            "term -> term [*/%] factor" => match &subn[1] {
                 &Subtree::Node(_, ref op) if op == "*" => vec![eval0!(&subn[0], ctx) * eval0!(&subn[2], ctx)],
                 &Subtree::Node(_, ref op) if op == "/" => vec![eval0!(&subn[0], ctx) / eval0!(&subn[2], ctx)],
                 &Subtree::Node(_, ref op) if op == "%" => vec![eval0!(&subn[0], ctx) % eval0!(&subn[2], ctx)],
                 _ => unreachable!()
             },
-            "uminus -> mulpart" => xeval(&subn[0], ctx),
-            "uminus -> [-] uminus" => vec![- eval0!(&subn[1], ctx)],
-            "mulpart -> ufact" => xeval(&subn[0], ctx),
-            "mulpart -> ufact [^] uminus" => match &subn[1] {
+            "factor -> power" => xeval(&subn[0], ctx),
+            "factor -> [-] factor" => vec![- eval0!(&subn[1], ctx)],
+            "power -> ufact" => xeval(&subn[0], ctx),
+            "power -> ufact [^] factor" => match &subn[1] {
                 &Subtree::Node(_, ref op) if op == "^" => vec![eval0!(&subn[0], ctx).powf(eval0!(&subn[2], ctx))],
                 _ => unreachable!()
             },

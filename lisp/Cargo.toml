@@ -5,5 +5,5 @@ authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "A lisp like thingy"
 
 [dependencies]
-lexers = { path = "../lexers" }
+lexers = { version = "0.0.4", path = "../lexers" }
 linenoise-rust = "*"

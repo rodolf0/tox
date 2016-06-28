@@ -23,47 +23,48 @@ fn build_grammar() -> earley::Grammar {
     let num = regex::Regex::new(r"^-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?$").unwrap();
     let var = regex::Regex::new(r"^[A-Za-z_]+[A-Za-z0-9_]*$").unwrap();
     let mut gb = earley::GrammarBuilder::new();
-    gb.symbol(Symbol::nonterm("assign"))
-      .symbol(Symbol::nonterm("expr"))
-      .symbol(Symbol::nonterm("term"))
-      .symbol(Symbol::nonterm("factor"))
-      .symbol(Symbol::nonterm("power"))
-      .symbol(Symbol::nonterm("ufact"))
-      .symbol(Symbol::nonterm("group"))
-      .symbol(Symbol::nonterm("func"))
-      .symbol(Symbol::nonterm("args"))
-      .symbol(Symbol::terminal("[n]", move |n: &str| num.is_match(n)))
-      .symbol(Symbol::terminal("[v]", move |n: &str| var.is_match(n)))
-      .symbol(Symbol::terminal("[+-]", |n: &str| n == "+" || n == "-"))
-      .symbol(Symbol::terminal("[*/%]", |n: &str| n == "*" || n == "/" || n == "%"))
-      .symbol(Symbol::terminal("[-]", |n: &str| n == "-"))
-      .symbol(Symbol::terminal("[^]", |n: &str| n == "^"))
-      .symbol(Symbol::terminal("[!]", |n: &str| n == "!"))
-      .symbol(Symbol::terminal("[,]", |n: &str| n == ","))
-      .symbol(Symbol::terminal("[(]", |n: &str| n == "("))
-      .symbol(Symbol::terminal("[)]", |n: &str| n == ")"))
-      .symbol(Symbol::terminal("[=]", |n: &str| n == "="))
-      ;
-    gb.rule("assign",  vec!["expr"])
-      .rule("assign",  vec!["[v]", "[=]", "expr"])
-      .rule("expr",    vec!["term"])
-      .rule("expr",    vec!["expr", "[+-]", "term"])
-      .rule("term", vec!["factor"])
-      .rule("term", vec!["term", "[*/%]", "factor"])
-      .rule("factor",  vec!["power"])
-      .rule("factor",  vec!["[-]", "factor"])
-      .rule("power", vec!["ufact"])
-      .rule("power", vec!["ufact", "[^]", "factor"])
-      .rule("ufact",   vec!["group"])
-      .rule("ufact",   vec!["ufact", "[!]"])
-      .rule("group",   vec!["[n]"])
-      .rule("group",   vec!["[v]"])
-      .rule("group",   vec!["[(]", "expr", "[)]"])
-      .rule("group",   vec!["func"])
-      .rule("func",    vec!["[v]", "[(]", "args", "[)]"])
-      .rule("args",    vec!["expr"])
-      .rule("args",    vec!["args", "[,]", "expr"])
-      .rule("args",    vec![])
+    gb.symbols(vec![
+        Symbol::nonterm("assign"),
+        Symbol::nonterm("expr"),
+        Symbol::nonterm("term"),
+        Symbol::nonterm("factor"),
+        Symbol::nonterm("power"),
+        Symbol::nonterm("ufact"),
+        Symbol::nonterm("group"),
+        Symbol::nonterm("func"),
+        Symbol::nonterm("args"),
+        Symbol::terminal("[n]", move |n: &str| num.is_match(n)),
+        Symbol::terminal("[v]", move |n: &str| var.is_match(n)),
+        Symbol::terminal("[+-]", |n: &str| n == "+" || n == "-"),
+        Symbol::terminal("[*/%]", |n: &str| n == "*" || n == "/" || n == "%"),
+        Symbol::terminal("[-]", |n: &str| n == "-"),
+        Symbol::terminal("[^]", |n: &str| n == "^"),
+        Symbol::terminal("[!]", |n: &str| n == "!"),
+        Symbol::terminal("[,]", |n: &str| n == ","),
+        Symbol::terminal("[(]", |n: &str| n == "("),
+        Symbol::terminal("[)]", |n: &str| n == ")"),
+        Symbol::terminal("[=]", |n: &str| n == "="),
+    ]);
+    gb.rule("assign", vec!["expr"])
+      .rule("assign", vec!["[v]", "[=]", "expr"])
+      .rule("expr",   vec!["term"])
+      .rule("expr",   vec!["expr", "[+-]", "term"])
+      .rule("term",   vec!["factor"])
+      .rule("term",   vec!["term", "[*/%]", "factor"])
+      .rule("factor", vec!["power"])
+      .rule("factor", vec!["[-]", "factor"])
+      .rule("power",  vec!["ufact"])
+      .rule("power",  vec!["ufact", "[^]", "factor"])
+      .rule("ufact",  vec!["group"])
+      .rule("ufact",  vec!["ufact", "[!]"])
+      .rule("group",  vec!["[n]"])
+      .rule("group",  vec!["[v]"])
+      .rule("group",  vec!["[(]", "expr", "[)]"])
+      .rule("group",  vec!["func"])
+      .rule("func",   vec!["[v]", "[(]", "args", "[)]"])
+      .rule("args",   vec!["expr"])
+      .rule("args",   vec!["args", "[,]", "expr"])
+      .rule("args",   vec![])
       ;
     gb.into_grammar("assign")
 }

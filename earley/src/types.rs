@@ -296,6 +296,13 @@ impl GrammarBuilder {
         self
     }
 
+    pub fn symbols<I>(&mut self, symbols: I) -> &mut Self
+            where I: IntoIterator<Item=Symbol> {
+        self.symbols.extend(
+            symbols.into_iter().map(|s| (s.name().to_string(), Rc::new(s))));
+        self
+    }
+
     pub fn rule<S>(&mut self, name: S, spec: Vec<S>) -> &mut Self
             where S: Into<String> + AsRef<str> {
         let rule = Rule::new(

@@ -12,17 +12,10 @@ pub struct EarleyParser {
     pub g: Grammar
 }
 
-#[derive(Debug)]
-pub struct EarleyState {
-    pub states: Vec<StateSet>,
-    pub lexemes: Vec<String>,
-}
-
 impl EarleyParser {
     pub fn new(grammar: Grammar) -> EarleyParser { EarleyParser{g: grammar} }
 
-    pub fn parse(&self, tok: &mut Scanner<String>) -> Result<EarleyState, ParseError> {
-        let mut lexemes = Vec::new();
+    pub fn parse(&self, tok: &mut Scanner<String>) -> Result<Vec<StateSet>, ParseError> {
         let mut states = Vec::new();
         // Populate S0: add items for each rule matching the start symbol
         states.push(self.g.rules(self.g.start())
@@ -62,7 +55,6 @@ impl EarleyParser {
             }
             // Scan input to populate Si+1
             if let Some(lexeme) = tok.next() {
-                lexemes.push(lexeme.clone());
                 let scans = states[state_idx].iter()
                     .filter(|item| item.can_scan(&lexeme))
                     .map(|item| Item::scan_new(&item, state_idx+1, &lexeme))
@@ -83,6 +75,6 @@ impl EarleyParser {
                 return Err(ParseError::BadInput);
             }
         }
-        Ok(EarleyState{states: states, lexemes: lexemes})
+        Ok(states)
     }
 }

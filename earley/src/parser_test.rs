@@ -132,7 +132,7 @@ fn grammar_ambiguous() {
     let p = EarleyParser::new(gb.into_grammar("S"));
     let ps = p.parse(&mut input).unwrap();
     // verify
-    assert_eq!(ps.states.len(), 4);
+    assert_eq!(ps.len(), 4);
     let trees = all_trees(p.g.start(), &ps);
     check_trees(&trees, vec![
         r#"SubT("S -> S S", [SubT("S -> S S", [SubT("S -> b", [Node("b", "b")]), SubT("S -> b", [Node("b", "b")])]), SubT("S -> b", [Node("b", "b")])])"#,
@@ -155,7 +155,7 @@ fn grammar_ambiguous_epsilon() {
     let mut input = DelimTokenizer::from_str("b b b", " ", true);
     let p = EarleyParser::new(gb.into_grammar("S"));
     let ps = p.parse(&mut input).unwrap();
-    assert_eq!(ps.states.len(), 4);
+    assert_eq!(ps.len(), 4);
     let trees = all_trees(p.g.start(), &ps);
     check_trees(&trees, vec![
         r#"SubT("S -> S S X", [SubT("S -> S S X", [SubT("S -> b", [Node("b", "b")]), SubT("S -> b", [Node("b", "b")]), SubT("X -> ", [])]), SubT("S -> b", [Node("b", "b")]), SubT("X -> ", [])])"#,
@@ -168,7 +168,7 @@ fn math_grammar_test() {
     let p = EarleyParser::new(grammar_math());
     let mut input = DelimTokenizer::from_str("1+(2*3-4)", "+*-/()", false);
     let ps = p.parse(&mut input).unwrap();
-    assert_eq!(ps.states.len(), 10);
+    assert_eq!(ps.len(), 10);
     let trees = all_trees(p.g.start(), &ps);
     check_trees(&trees, vec![
         r#"SubT("Sum -> Sum [+-] Mul", [SubT("Sum -> Mul", [SubT("Mul -> Pow", [SubT("Pow -> Num", [SubT("Num -> Number", [Node("Number", "1")])])])]), Node("[+-]", "+"), SubT("Mul -> Pow", [SubT("Pow -> Num", [SubT("Num -> ( Sum )", [Node("(", "("), SubT("Sum -> Sum [+-] Mul", [SubT("Sum -> Mul", [SubT("Mul -> Mul [*/] Pow", [SubT("Mul -> Pow", [SubT("Pow -> Num", [SubT("Num -> Number", [Node("Number", "2")])])]), Node("[*/]", "*"), SubT("Pow -> Num", [SubT("Num -> Number", [Node("Number", "3")])])])]), Node("[+-]", "-"), SubT("Mul -> Pow", [SubT("Pow -> Num", [SubT("Num -> Number", [Node("Number", "4")])])])]), Node(")", ")")])])])])"#,
@@ -356,7 +356,7 @@ fn math_various() {
         println!("============ input: {}", input);
         let mut input = DelimTokenizer::from_str(input, "+*-/()^", false);
         let ps = p.parse(&mut input).unwrap();
-        print_statesets(&ps.states);
+        print_statesets(&ps);
         println!("=== tree ===");
         println!("{:?}", one_tree(p.g.start(), &ps));
     }
@@ -386,7 +386,7 @@ fn chained_terminals() {
         let p = EarleyParser::new(gb.into_grammar("E"));
         let mut input = DelimTokenizer::from_str(tokens, "+", false);
         let ps = p.parse(&mut input).unwrap();
-        print_statesets(&ps.states);
+        print_statesets(&ps);
         println!("=== tree === variant {:?} === input {}", variant, tokens);
         println!("{:?}", one_tree(p.g.start(), &ps));
     }

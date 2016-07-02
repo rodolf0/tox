@@ -1,4 +1,4 @@
-use types::{Symbol, Item, StateSet, Grammar};
+use types::{Symbol, StateSet, Grammar};
 use lexers::Scanner;
 use std::iter::FromIterator;
 
@@ -18,9 +18,8 @@ impl EarleyParser {
     pub fn parse(&self, tok: &mut Scanner<String>) -> Result<Vec<StateSet>, ParseError> {
         let mut states = Vec::new();
         // Populate S0: add items for each rule matching the start symbol
-        states.push(self.g.rules(self.g.start())
-                          .map(|rule| Item::new(rule.clone(), 0, 0, 0))
-                          .collect::<StateSet>());
+        states.push(StateSet::from_iter(self.g.predict_new(&self.g.start(), 0)));
+
         let mut state_idx = 0;
         while states.len() > state_idx {
             loop {
@@ -32,19 +31,14 @@ impl EarleyParser {
                     let item = states[state_idx][item_idx].clone();
                     match item.next_symbol() {
                         // Prediction
-                        Some(&Symbol::NonTerm(ref name)) => {
-                            let predictions = self.g.rules(name.as_ref())
-                                  .map(|rule| Item::predict_new(rule, state_idx));
-                            states[state_idx].extend(predictions);
-                        },
+                        Some(&Symbol::NonTerm(ref name)) =>
+                            states[state_idx].extend(
+                                self.g.predict_new(name.as_ref(), state_idx)),
                         // Completion
                         None => {
                             // go back to state where 'item' started and advance
                             // any item if its next symbol matches the current one's name
-                            let completions = states[item.start()].iter()
-                                .filter(|source| item.can_complete(source))
-                                .map(|source| Item::complete_new(source, &item, state_idx))
-                                .collect::<Vec<_>>();
+                            let completions = states[item.start()].completed_by(&item, state_idx);
                             states[state_idx].extend(completions);
                         },
                         _ => () // process Scans later
@@ -55,10 +49,7 @@ impl EarleyParser {
             }
             // Scan input to populate Si+1
             if let Some(lexeme) = tok.next() {
-                let scans = states[state_idx].iter()
-                    .filter(|item| item.can_scan(&lexeme))
-                    .map(|item| Item::scan_new(&item, state_idx+1, &lexeme))
-                    .collect::<Vec<_>>();
+                let scans = states[state_idx].advanced_by_scan(&lexeme, state_idx+1);
                 states.push(StateSet::from_iter(scans));
                 assert_eq!(states.len(), state_idx + 2);
             }

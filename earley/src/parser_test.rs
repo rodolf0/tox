@@ -1,38 +1,10 @@
 use lexers::{Scanner, DelimTokenizer};
-use types::{Symbol, Item, StateSet, GrammarBuilder, Grammar};
+use types::{Symbol, StateSet, GrammarBuilder, Grammar};
 use parser::{EarleyParser, ParseError};
 use trees::{one_tree, all_trees, Subtree};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
-#[test]
-fn item_dedupness() {
-    // bootstrap just to get a Rule
-    fn testfn(o: &str) -> bool { o.len() == 1 && "+-".contains(o) }
-    let mut g = GrammarBuilder::new();
-    g.symbol("S")
-     .symbol(("+-", testfn))
-     .symbol(("[0-9]", |n: &str| n.chars().all(|c| "1234567890".contains(c))))
-     .rule("S", vec!["S", "+-", "[0-9]"]);
-    let g = g.into_grammar("S");
-    let rule = g.all_rules().next().unwrap();
-
-    // test item comparison
-    assert_eq!(Item::new(rule.clone(), 0, 0, 0), Item::new(rule.clone(), 0, 0, 0));
-    assert!(Item::new(rule.clone(), 0, 0, 0) != Item::new(rule.clone(), 0, 1, 0));
-
-    // check that items are deduped in statesets
-    let mut ss = StateSet::new();
-    ss.push(Item::new(rule.clone(), 0, 0, 0));
-    ss.push(Item::new(rule.clone(), 0, 0, 0));
-    assert_eq!(ss.len(), 1);
-    ss.push(Item::new(rule.clone(), 1, 0, 1));
-    assert_eq!(ss.len(), 2);
-    ss.push(Item::new(rule.clone(), 1, 0, 1));
-    assert_eq!(ss.len(), 2);
-    ss.push(Item::new(rule.clone(), 2, 0, 1));
-    assert_eq!(ss.len(), 3);
-}
 
 // Sum -> Sum + Mul | Mul
 // Mul -> Mul * Pow | Pow
@@ -69,10 +41,6 @@ fn grammar_math() -> Grammar {
       .rule("Num", vec!["Number"]);
 
     let grammar = gb.into_grammar("Sum");
-    assert_eq!(grammar.rules("Sum").count(), 2);
-    assert_eq!(grammar.rules("Mul").count(), 2);
-    assert_eq!(grammar.rules("Pow").count(), 2);
-    assert_eq!(grammar.rules("Num").count(), 2);
     grammar
 }
 

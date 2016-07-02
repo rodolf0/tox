@@ -65,26 +65,10 @@ impl Eq for Symbol {}
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub struct Rule {
+#[derive(Hash, PartialEq, Eq)]
+struct Rule {
     name: String,
     spec: Vec<Rc<Symbol>>,
-}
-
-impl Rule {
-    pub fn new(name: String, spec: Vec<Rc<Symbol>>) -> Rule {
-        Rule{name: name, spec: spec}
-    }
-
-    pub fn name(&self) -> String { self.name.clone() }
-
-    pub fn spec(&self) -> String {
-        self.spec.iter().map(|s| s.name()).collect::<Vec<_>>().join(" ")
-    }
-
-    pub fn spec_parts(&self) -> Vec<String> {
-        self.spec.iter().map(|s| s.name()).collect()
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -100,7 +84,7 @@ pub struct Item {
     rule: Rc<Rule>,
     dot: usize,    // index into the production
     start: usize,  // Earley state where item starts
-    end: usize,    // Earley state where item ends
+    end: usize,    // Earley state where item ends (needed for dedup)
     // backpointers to source of this item: (source-item, trigger)
     bp: RefCell<HashSet<(Rc<Item>, Trigger)>>,
 }
@@ -125,61 +109,53 @@ impl PartialEq for Item {
 impl Eq for Item {}
 
 impl Item {
-    pub fn new(rule: Rc<Rule>, dot: usize, start: usize, end: usize) -> Item {
-        Item{rule: rule, dot: dot, start: start, end: end,
-             bp: RefCell::new(HashSet::new())}
-    }
-
     pub fn start(&self) -> usize { self.start }
     pub fn complete(&self) -> bool { self.dot >= self.rule.spec.len() }
-
     pub fn str_rule(&self) -> String {
-        format!("{} -> {}", self.rule.name(), self.rule.spec())
+        format!("{} -> {}", self.rule.name, self.rule.spec.iter().map(
+                |s| s.name()).collect::<Vec<_>>().join(" "))
     }
-
     pub fn next_symbol<'a>(&'a self) -> Option<&'a Symbol> {
         self.rule.spec.get(self.dot).map(|s| &**s)
     }
+    pub fn back_pointers(&self) -> HashSet<(Rc<Item>, Trigger)> {
+        self.bp.borrow().clone()
+    }
+}
 
+impl Item {
     // check if other item's next-symbol matches our rule's name
-    pub fn can_complete(&self, other: &Rc<Item>) -> bool {
+    fn can_complete(&self, other: &Rc<Item>) -> bool {
         self.complete() && match other.next_symbol() {
-            Some(&Symbol::NonTerm(ref name)) => *name == self.rule.name(),
+            Some(&Symbol::NonTerm(ref name)) => *name == self.rule.name,
             _ => false
         }
     }
-
     // check item's next symbol is a temrinal that scans lexeme
-    pub fn can_scan(&self, lexeme: &str) -> bool {
+    fn can_scan(&self, lexeme: &str) -> bool {
         match self.next_symbol() {
             Some(&Symbol::Terminal(_, ref f)) => f(lexeme),
             _ => false
         }
     }
-
     // build a new Item for a prediction
-    pub fn predict_new(rule: &Rc<Rule>, start: usize) -> Item {
+    fn predict_new(rule: &Rc<Rule>, start: usize) -> Item {
         Item{rule: rule.clone(), dot: 0, start: start, end: start,
              bp: RefCell::new(HashSet::new())}
     }
-
     // produce an Item after scanning using another item as the base
-    pub fn scan_new(source: &Rc<Item>, end: usize, input: &str) -> Item {
+    fn scan_new(source: &Rc<Item>, end: usize, input: &str) -> Item {
         let mut _bp = HashSet::new();
         _bp.insert((source.clone(), Trigger::Scan(input.to_string())));
         Item{rule: source.rule.clone(), dot: source.dot+1,
              start: source.start, end: end, bp: RefCell::new(_bp)}
     }
-
-    pub fn complete_new(source: &Rc<Item>, trigger: &Rc<Item>, end: usize) -> Item {
+    // build a new item completing another one
+    fn complete_new(source: &Rc<Item>, trigger: &Rc<Item>, end: usize) -> Item {
         let mut _bp = HashSet::new();
         _bp.insert((source.clone(), Trigger::Completion(trigger.clone())));
         Item{rule: source.rule.clone(), dot: source.dot+1,
              start: source.start, end: end, bp: RefCell::new(_bp)}
-    }
-
-    pub fn back_pointers(&self) -> HashSet<(Rc<Item>, Trigger)> {
-        self.bp.borrow().clone()
     }
 }
 
@@ -190,7 +166,7 @@ impl fmt::Debug for Item {
         let post = self.rule.spec.iter()
             .skip(self.dot).map(|s| s.name()).collect::<Vec<_>>().join(" ");
         write!(f, "({} - {}) {} -> {} \u{00b7} {} #bp: {}",
-               self.start, self.end, self.rule.name(), pre, post,
+               self.start, self.end, self.rule.name, pre, post,
                self.bp.borrow().len())
     }
 }
@@ -210,7 +186,7 @@ impl StateSet {
     }
 
     // push items into the set, merging back-pointer sets
-    pub fn push(&mut self, item: Item) {
+    fn push(&mut self, item: Item) {
         if let Some(existent) = self.dedup.get(&item) {
             existent.bp.borrow_mut().extend(item.bp.into_inner());
             return;
@@ -228,7 +204,21 @@ impl StateSet {
     pub fn filter_by_rule<'a, S: Into<String>>(&'a self, name: S) ->
            Box<Iterator<Item=&'a Rc<Item>> + 'a> {
         let name = name.into();
-        Box::new(self.order.iter().filter(move |it| it.rule.name() == name))
+        Box::new(self.order.iter().filter(move |it| it.rule.name == name))
+    }
+
+    pub fn completed_by(&self, item: &Rc<Item>, at: usize) -> Vec<Item> {
+        self.order.iter()
+            .filter(|source| item.can_complete(source))
+            .map(|source| Item::complete_new(source, item, at))
+            .collect::<Vec<_>>()
+    }
+
+    pub fn advanced_by_scan(&self, lexeme: &str, end: usize) -> Vec<Item> {
+        self.order.iter()
+            .filter(|item| item.can_scan(lexeme))
+            .map(|item| Item::scan_new(item, end, lexeme))
+            .collect::<Vec<_>>()
     }
 }
 
@@ -259,23 +249,19 @@ impl fmt::Debug for StateSet {
 
 pub struct Grammar {
     start: String,
-    rules: Vec<Rc<Rule>>, // TODO why Rc<Rule>
+    rules: Vec<Rc<Rule>>,
 }
 
 impl Grammar {
-    // get rules filtered by name
-    pub fn rules<'a, S: Into<String>>(&'a self, name: S) ->
-           Box<Iterator<Item=&'a Rc<Rule>> + 'a> {
-        let name = name.into();
-        Box::new(self.rules.iter().filter(move |r| r.name() == name))
-    }
-
-    pub fn all_rules<'a>(&'a self) -> slice::Iter<'a, Rc<Rule>> {
-        self.rules.iter()
-    }
-
     // grammar's start symbol
     pub fn start(&self) -> String { self.start.clone() }
+
+    pub fn predict_new(&self, name: &str, state_idx: usize) -> Vec<Item> {
+        self.rules.iter()
+            .filter(|r| r.name == name)
+            .map(|r| Item::predict_new(r, state_idx))
+            .collect()
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -290,16 +276,6 @@ impl GrammarBuilder {
         GrammarBuilder{ symbols: HashMap::new(), rules: Vec::new()}
     }
 
-    //pub fn symbols<S, I>(&mut self, symbols: I) -> &mut Self
-            //where S: Into<Symbol>, I: IntoIterator<Item=S> {
-        //self.symbols.extend(
-            //symbols.into_iter().map(|s| {
-                //let x = s.into();
-                //(x.name(), Rc::new(x))
-            //}));
-        //self
-    //}
-
     pub fn symbol<S: Into<Symbol>>(&mut self, symbol: S) -> &mut Self {
         let symbol = symbol.into();
         self.symbols.insert(symbol.name(), Rc::new(symbol));
@@ -313,15 +289,56 @@ impl GrammarBuilder {
 // Just use &[S]
     pub fn rule<S>(&mut self, name: S, spec: Vec<S>) -> &mut Self
             where S: AsRef<str> + Into<String> {
-        let rule = Rule::new(
-            name.into(),
-            spec.into_iter().map(|s| self.symbols[s.as_ref()].clone()).collect()
-        );
+        let rule = Rule{
+            name: name.into(),
+            spec: spec.into_iter().map(|s| self.symbols[s.as_ref()].clone()).collect()
+        };
         self.rules.push(Rc::new(rule));
         self
     }
 
     pub fn into_grammar<S: Into<String>>(self, start: S) -> Grammar {
         Grammar{start: start.into(), rules: self.rules}
+    }
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::rc::Rc;
+    use std::collections::HashSet;
+    use std::cell::RefCell;
+    use super::{Rule, Item, Symbol, StateSet};
+
+    fn item(rule: Rc<Rule>, dot: usize, start: usize, end: usize) -> Item {
+        Item{rule: rule, dot: dot, start: start, end: end,
+             bp: RefCell::new(HashSet::new())}
+    }
+
+    #[test]
+    fn item_dedupness() {
+        fn testfn(o: &str) -> bool { o.len() == 1 && "+-".contains(o) }
+        let rule = Rc::new(Rule{name: "S".to_string(), spec: vec![
+                Rc::new(Symbol::from("S")),
+                Rc::new(Symbol::from(("+-", testfn))),
+                Rc::new(Symbol::terminal("[0-9]", |n: &str|
+                                 n.chars().all(|c| "1234567890".contains(c)))),
+        ]});
+        // test item comparison
+        assert_eq!(item(rule.clone(), 0, 0, 0), item(rule.clone(), 0, 0, 0));
+        assert!(item(rule.clone(), 0, 0, 0) != item(rule.clone(), 0, 1, 0));
+        //check that items are deduped in statesets
+        let mut ss = StateSet::new();
+        ss.push(item(rule.clone(), 0, 0, 0));
+        ss.push(item(rule.clone(), 0, 0, 0));
+        assert_eq!(ss.len(), 1);
+        ss.push(item(rule.clone(), 1, 0, 1));
+        assert_eq!(ss.len(), 2);
+        ss.push(item(rule.clone(), 1, 0, 1));
+        assert_eq!(ss.len(), 2);
+        ss.push(item(rule.clone(), 2, 0, 1));
+        assert_eq!(ss.len(), 3);
     }
 }

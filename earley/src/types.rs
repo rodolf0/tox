@@ -10,6 +10,7 @@ pub enum Symbol {
 }
 
 impl Symbol {
+// TODO: remove in favor of From
     pub fn nonterm<S: Into<String>>(s: S) -> Self { Symbol::NonTerm(s.into()) }
 
     pub fn terminal<S, F>(name: S, f: F) -> Self
@@ -17,13 +18,24 @@ impl Symbol {
         Symbol::Terminal(name.into(), Box::new(f))
     }
 
-    pub fn name<'a>(&'a self) -> &'a str {
+    pub fn name(&self) -> String {
         match self {
-            &Symbol::NonTerm(ref name) => name,
-            &Symbol::Terminal(ref name, _) => name,
+            &Symbol::NonTerm(ref name) => name.clone(),
+            &Symbol::Terminal(ref name, _) => name.clone(),
         }
     }
 }
+
+impl<'a> From<&'a str> for Symbol {
+    fn from(from: &str) -> Self { Symbol::NonTerm(from.to_string()) }
+}
+
+//impl<S, F> From<(S, F)> for Symbol
+        //where S: Into<String>, F: 'static + FnMut(&str)->bool {
+    //fn from(from: (S, F)) -> Self {
+        //Symbol::Terminal(from.0.into(), Box::new(from.1))
+    //}
+//}
 
 impl fmt::Debug for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -79,7 +91,7 @@ impl Rule {
         Rule{name: name, spec: spec}
     }
 
-    pub fn name<'a>(&'a self) -> &'a str { self.name.name() }
+    pub fn name(&self) -> String { self.name.name() }
 
     pub fn spec(&self) -> String {
         self.spec.iter().map(|s| s.name()).collect::<Vec<_>>().join(" ")
@@ -147,7 +159,7 @@ impl Item {
     // check if other item's next-symbol matches our rule's name
     pub fn can_complete(&self, other: &Rc<Item>) -> bool {
         self.complete() && match other.next_symbol() {
-            Some(&Symbol::NonTerm(ref name)) => name == self.rule.name(),
+            Some(&Symbol::NonTerm(ref name)) => *name == self.rule.name(),
             _ => false
         }
     }
@@ -228,7 +240,7 @@ impl StateSet {
     pub fn iter<'a>(&'a self) -> slice::Iter<'a, Rc<Item>> { self.order.iter() }
 
     // get all items whose rule name is 'name'
-    pub fn filter_by_rule<'a>(&'a self, name: &'a str) ->
+    pub fn filter_by_rule<'a>(&'a self, name: String) ->
            Box<Iterator<Item=&'a Rc<Item>> + 'a> {
         Box::new(self.order.iter().filter(move |it| it.rule.name() == name))
     }
@@ -266,8 +278,9 @@ pub struct Grammar {
 
 impl Grammar {
     // get rules filtered by name
-    pub fn rules<'a>(&'a self, name: &'a str) ->
+    pub fn rules<'a, S: Into<String>>(&'a self, name: S) ->
            Box<Iterator<Item=&'a Rc<Rule>> + 'a> {
+        let name = name.into();
         Box::new(self.rules.iter().filter(move |r| r.name() == name))
     }
 
@@ -276,7 +289,7 @@ impl Grammar {
     }
 
     // grammar's start symbol
-    pub fn start<'a>(&'a self) -> &'a str { self.start.name() }
+    pub fn start(&self) -> String { self.start.name() }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -291,23 +304,32 @@ impl GrammarBuilder {
         GrammarBuilder{ symbols: HashMap::new(), rules: Vec::new()}
     }
 
-    pub fn symbol(&mut self, symbol: Symbol) -> &mut Self {
-        self.symbols.insert(symbol.name().to_string(), Rc::new(symbol));
-        self
-    }
-
-    pub fn symbols<I>(&mut self, symbols: I) -> &mut Self
-            where I: IntoIterator<Item=Symbol> {
+    pub fn symbols<S, I>(&mut self, symbols: I) -> &mut Self
+            where S: Into<Symbol>, I: IntoIterator<Item=S> {
         self.symbols.extend(
-            symbols.into_iter().map(|s| (s.name().to_string(), Rc::new(s))));
+            symbols.into_iter().map(|s| {
+                let x = s.into();
+                (x.name().to_string(), Rc::new(x))
+            }));
+                                    //(s.name().to_string(), Rc::new(s))));
         self
     }
 
+    pub fn symbol<S: Into<Symbol>>(&mut self, symbol: S) -> &mut Self {
+        let x = symbol.into();
+        self.symbols.insert(x.name().to_string(), Rc::new(x));
+        self
+    }
+
+    //pub fn rule<I, N, S>(&mut self, name: N, spec: I) -> &mut Self
+            //where N: AsRef<str>, S: AsRef<str>,
+                  //I: IntoIterator<Item=S> {
+// &[S]
     pub fn rule<S>(&mut self, name: S, spec: Vec<S>) -> &mut Self
-            where S: Into<String> + AsRef<str> {
+            where S: AsRef<str>, S: AsRef<str> {
         let rule = Rule::new(
             self.symbols[name.as_ref()].clone(),
-            spec.iter().map(|s| self.symbols[s.as_ref()].clone()).collect()
+            spec.into_iter().map(|s| self.symbols[s.as_ref()].clone()).collect()
         );
         self.rules.push(Rc::new(rule));
         self

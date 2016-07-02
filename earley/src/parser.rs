@@ -33,7 +33,7 @@ impl EarleyParser {
                     match item.next_symbol() {
                         // Prediction
                         Some(&Symbol::NonTerm(ref name)) => {
-                            let predictions = self.g.rules(&name)
+                            let predictions = self.g.rules(name.as_ref())
                                   .map(|rule| Item::predict_new(rule, state_idx));
                             states[state_idx].extend(predictions);
                         },

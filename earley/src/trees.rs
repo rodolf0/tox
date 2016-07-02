@@ -8,7 +8,7 @@ pub enum Subtree {
 }
 
 // for non-ambiguous grammars this retreieve the only possible parse
-pub fn one_tree(startsym: &str, pstate: &Vec<StateSet>) -> Subtree {
+pub fn one_tree(startsym: String, pstate: &Vec<StateSet>) -> Subtree {
     pstate.last().unwrap()
           .filter_by_rule(startsym)
           .filter(|it| it.start() == 0 && it.complete())
@@ -43,7 +43,7 @@ fn one_helper(pstate: &Vec<StateSet>, root: &Rc<Item>) -> Subtree {
 }
 
 
-pub fn all_trees(startsym: &str, pstate: &Vec<StateSet>) -> Vec<Subtree> {
+pub fn all_trees(startsym: String, pstate: &Vec<StateSet>) -> Vec<Subtree> {
     pstate.last().unwrap()
           .filter_by_rule(startsym)
           .filter(|it| it.start() == 0 && it.complete())

@@ -10,11 +10,6 @@ pub enum Symbol {
 }
 
 impl Symbol {
-    pub fn terminal<S, F>(name: S, f: F) -> Self
-            where S: Into<String>, F: 'static + Fn(&str)->bool {
-        Symbol::Terminal(name.into(), Box::new(f))
-    }
-
     pub fn name(&self) -> String {
         match self {
             &Symbol::NonTerm(ref name) => name.clone(),
@@ -308,9 +303,7 @@ mod tests {
         let rule = Rc::new(Rule{name: "S".to_string(), spec: vec![
                 Rc::new(Symbol::from("S")),
                 Rc::new(Symbol::from(("+-", testfn))),
-                Rc::new(Symbol::terminal("[0-9]", |n: &str|
-                                 n.chars().all(|c| "1234567890".contains(c)))),
-                Rc::new(Symbol::from(("[a-z]", |n: &str|
+                Rc::new(Symbol::from(("[0-9]", |n: &str|
                                  n.chars().all(|c| "1234567890".contains(c))))),
         ]});
         // test item comparison

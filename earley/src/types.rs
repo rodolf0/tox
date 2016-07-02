@@ -67,16 +67,16 @@ impl Eq for Symbol {}
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct Rule {
-    name: Rc<Symbol>,
+    name: String,
     spec: Vec<Rc<Symbol>>,
 }
 
 impl Rule {
-    pub fn new(name: Rc<Symbol>, spec: Vec<Rc<Symbol>>) -> Rule {
+    pub fn new(name: String, spec: Vec<Rc<Symbol>>) -> Rule {
         Rule{name: name, spec: spec}
     }
 
-    pub fn name(&self) -> String { self.name.name() }
+    pub fn name(&self) -> String { self.name.clone() }
 
     pub fn spec(&self) -> String {
         self.spec.iter().map(|s| s.name()).collect::<Vec<_>>().join(" ")
@@ -259,7 +259,7 @@ impl fmt::Debug for StateSet {
 
 pub struct Grammar {
     start: String,
-    rules: Vec<Rc<Rule>>,
+    rules: Vec<Rc<Rule>>, // TODO why Rc<Rule>
 }
 
 impl Grammar {
@@ -309,11 +309,12 @@ impl GrammarBuilder {
     //pub fn rule<I, N, S>(&mut self, name: N, spec: I) -> &mut Self
             //where N: AsRef<str>, S: AsRef<str>,
                   //I: IntoIterator<Item=S> {
-// &[S]
+
+// Just use &[S]
     pub fn rule<S>(&mut self, name: S, spec: Vec<S>) -> &mut Self
-            where S: AsRef<str>, S: AsRef<str> {
+            where S: AsRef<str> + Into<String> {
         let rule = Rule::new(
-            self.symbols[name.as_ref()].clone(),
+            name.into(),
             spec.into_iter().map(|s| self.symbols[s.as_ref()].clone()).collect()
         );
         self.rules.push(Rc::new(rule));

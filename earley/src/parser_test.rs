@@ -1,21 +1,21 @@
 use lexers::{Scanner, DelimTokenizer};
-use types::{Symbol, Rule, Item, StateSet, GrammarBuilder, Grammar};
+use types::{Symbol, Item, StateSet, GrammarBuilder, Grammar};
 use parser::{EarleyParser, ParseError};
 use trees::{one_tree, all_trees, Subtree};
-use std::rc::Rc;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
 #[test]
 fn item_dedupness() {
+    // bootstrap just to get a Rule
     fn testfn(o: &str) -> bool { o.len() == 1 && "+-".contains(o) }
-    let rule = {
-        let s = Rc::new(Symbol::from("S"));
-        let add_op = Rc::new(Symbol::terminal("+-", testfn));
-        let num = Rc::new(Symbol::terminal("[0-9]", |n: &str| {
-                            n.len() == 1 && "1234567890".contains(n)}));
-        Rc::new(Rule::new(s.clone(), vec![s, add_op, num]))
-    };
+    let mut g = GrammarBuilder::new();
+    g.symbol("S")
+     .symbol(("+-", testfn))
+     .symbol(("[0-9]", |n: &str| n.chars().all(|c| "1234567890".contains(c))))
+     .rule("S", vec!["S", "+-", "[0-9]"]);
+    let g = g.into_grammar("S");
+    let rule = g.all_rules().next().unwrap();
 
     // test item comparison
     assert_eq!(Item::new(rule.clone(), 0, 0, 0), Item::new(rule.clone(), 0, 0, 0));

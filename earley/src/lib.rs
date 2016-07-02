@@ -4,7 +4,7 @@ mod types;
 mod parser;
 mod trees;
 
-pub use types::{Symbol, GrammarBuilder, Grammar, Rule};
+pub use types::{Symbol, GrammarBuilder, Grammar};
 pub use parser::{EarleyParser, ParseError};
 pub use trees::{one_tree, all_trees, Subtree};
 

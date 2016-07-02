@@ -100,6 +100,8 @@ fn grammar_ambiguous() {
         r#"SubT("S -> S S", [SubT("S -> S S", [SubT("S -> b", [Node("b", "b")]), SubT("S -> b", [Node("b", "b")])]), SubT("S -> b", [Node("b", "b")])])"#,
         r#"SubT("S -> S S", [SubT("S -> b", [Node("b", "b")]), SubT("S -> S S", [SubT("S -> b", [Node("b", "b")]), SubT("S -> b", [Node("b", "b")])])])"#,
     ]);
+    println!("=== tree ===");
+    for t in all_trees(p.g.start(), &ps) { println!("{:?}", t); }
 }
 
 #[test]

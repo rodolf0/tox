@@ -34,16 +34,6 @@ impl<'a, F> From<(&'a str, F)> for Symbol
     }
 }
 
-impl fmt::Debug for Symbol {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &Symbol::NonTerm(ref name) => write!(f, "{}", name),
-            &Symbol::Terminal(ref name, _) => write!(f, "'{}'", name),
-        }
-    }
-}
-
-// TODO: move hashness to Rule ?
 impl hash::Hash for Symbol {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {
@@ -282,8 +272,8 @@ impl GrammarBuilder {
         self
     }
 
-    pub fn rule<S>(&mut self, name: S, spec: &[S]) -> &mut Self
-            where S: AsRef<str> + Into<String> {
+    pub fn rule<N>(&mut self, name: N, spec: &[N]) -> &mut Self
+            where N: Into<String> + AsRef<str> {
         let rule = Rule{
             name: name.into(),
             spec: spec.into_iter().map(|s| self.symbols[s.as_ref()].clone()).collect()

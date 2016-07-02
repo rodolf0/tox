@@ -34,8 +34,8 @@ fn one_helper(pstate: &Vec<StateSet>, root: &Rc<Item>) -> Subtree {
                 childs.push(one_helper(pstate, bp_trig)),
             // Eg: E -> E + . E  // prediction is E, trigger +
             &Trigger::Scan(ref input) => {
-                let label = bp_pred.next_symbol().unwrap().name().to_string();
-                childs.push(Subtree::Node(label, input.to_string()));
+                let label = bp_pred.next_symbol().unwrap().name();
+                childs.push(Subtree::Node(label, input.clone()));
             }
         }
     }
@@ -74,8 +74,8 @@ fn all_helper(pstate: &Vec<StateSet>, root: &Rc<Item>) -> Vec<Subtree> {
                         },
                     // Eg: E -> E + . E  // prediction is E, trigger +
                     &Trigger::Scan(ref input) => {
-                        let label = bp_pred.next_symbol().unwrap().name().to_string();
-                        prediction.push(Subtree::Node(label.clone(), input.to_string()));
+                        let label = bp_pred.next_symbol().unwrap().name();
+                        prediction.push(Subtree::Node(label.clone(), input.clone()));
                         trees.push(Subtree::SubT(root.str_rule(), prediction));
                     }
                 }

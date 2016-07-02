@@ -19,32 +19,29 @@ use std::collections::HashMap;
 // args   -> args ',' expr | expr | <e>
 
 fn build_grammar() -> earley::Grammar {
-    use earley::Symbol;
     let num = regex::Regex::new(r"^-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?$").unwrap();
     let var = regex::Regex::new(r"^[A-Za-z_]+[A-Za-z0-9_]*$").unwrap();
     let mut gb = earley::GrammarBuilder::new();
-    gb.symbols(vec![
-        Symbol::nonterm("assign"),
-        Symbol::nonterm("expr"),
-        Symbol::nonterm("term"),
-        Symbol::nonterm("factor"),
-        Symbol::nonterm("power"),
-        Symbol::nonterm("ufact"),
-        Symbol::nonterm("group"),
-        Symbol::nonterm("func"),
-        Symbol::nonterm("args"),
-        Symbol::terminal("[n]", move |n: &str| num.is_match(n)),
-        Symbol::terminal("[v]", move |n: &str| var.is_match(n)),
-        Symbol::terminal("[+-]", |n: &str| n == "+" || n == "-"),
-        Symbol::terminal("[*/%]", |n: &str| n == "*" || n == "/" || n == "%"),
-        Symbol::terminal("[-]", |n: &str| n == "-"),
-        Symbol::terminal("[^]", |n: &str| n == "^"),
-        Symbol::terminal("[!]", |n: &str| n == "!"),
-        Symbol::terminal("[,]", |n: &str| n == ","),
-        Symbol::terminal("[(]", |n: &str| n == "("),
-        Symbol::terminal("[)]", |n: &str| n == ")"),
-        Symbol::terminal("[=]", |n: &str| n == "="),
-    ]);
+    gb.symbol("assign")
+      .symbol("expr")
+      .symbol("term")
+      .symbol("factor")
+      .symbol("power")
+      .symbol("ufact")
+      .symbol("group")
+      .symbol("func")
+      .symbol("args")
+      .symbol(("[n]", move |n: &str| num.is_match(n)))
+      .symbol(("[v]", move |n: &str| var.is_match(n)))
+      .symbol(("[+-]", |n: &str| n == "+" || n == "-"))
+      .symbol(("[*/%]", |n: &str| n == "*" || n == "/" || n == "%"))
+      .symbol(("[-]", |n: &str| n == "-"))
+      .symbol(("[^]", |n: &str| n == "^"))
+      .symbol(("[!]", |n: &str| n == "!"))
+      .symbol(("[,]", |n: &str| n == ","))
+      .symbol(("[(]", |n: &str| n == "("))
+      .symbol(("[)]", |n: &str| n == ")"))
+      .symbol(("[=]", |n: &str| n == "="));
     gb.rule("assign", vec!["expr"])
       .rule("assign", vec!["[v]", "[=]", "expr"])
       .rule("expr",   vec!["term"])

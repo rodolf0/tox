@@ -10,9 +10,6 @@ pub enum Symbol {
 }
 
 impl Symbol {
-// TODO: remove in favor of From
-    pub fn nonterm<S: Into<String>>(s: S) -> Self { Symbol::NonTerm(s.into()) }
-
     pub fn terminal<S, F>(name: S, f: F) -> Self
             where S: Into<String>, F: 'static + Fn(&str)->bool {
         Symbol::Terminal(name.into(), Box::new(f))
@@ -30,12 +27,12 @@ impl<'a> From<&'a str> for Symbol {
     fn from(from: &str) -> Self { Symbol::NonTerm(from.to_string()) }
 }
 
-//impl<S, F> From<(S, F)> for Symbol
-        //where S: Into<String>, F: 'static + FnMut(&str)->bool {
-    //fn from(from: (S, F)) -> Self {
-        //Symbol::Terminal(from.0.into(), Box::new(from.1))
-    //}
-//}
+impl<'a, F> From<(&'a str, F)> for Symbol
+        where F: 'static + Fn(&str)->bool {
+    fn from(from: (&str, F)) -> Self {
+        Symbol::Terminal(from.0.to_string(), Box::new(from.1))
+    }
+}
 
 impl fmt::Debug for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -52,6 +49,7 @@ impl hash::Hash for Symbol {
             &Symbol::NonTerm(ref name) => name.hash(state),
             &Symbol::Terminal(ref name, ref f) => {
                 name.hash(state);
+                // TODO: get rid of checks for fn pointer
                 let (x, y) = unsafe { mem::transmute::<_, (usize, usize)>(&**f) };
                 x.hash(state); y.hash(state);
             }
@@ -98,7 +96,7 @@ impl Rule {
     }
 
     pub fn spec_parts(&self) -> Vec<String> {
-        self.spec.iter().map(|s| s.name().to_string()).collect()
+        self.spec.iter().map(|s| s.name()).collect()
     }
 }
 
@@ -304,20 +302,19 @@ impl GrammarBuilder {
         GrammarBuilder{ symbols: HashMap::new(), rules: Vec::new()}
     }
 
-    pub fn symbols<S, I>(&mut self, symbols: I) -> &mut Self
-            where S: Into<Symbol>, I: IntoIterator<Item=S> {
-        self.symbols.extend(
-            symbols.into_iter().map(|s| {
-                let x = s.into();
-                (x.name().to_string(), Rc::new(x))
-            }));
-                                    //(s.name().to_string(), Rc::new(s))));
-        self
-    }
+    //pub fn symbols<S, I>(&mut self, symbols: I) -> &mut Self
+            //where S: Into<Symbol>, I: IntoIterator<Item=S> {
+        //self.symbols.extend(
+            //symbols.into_iter().map(|s| {
+                //let x = s.into();
+                //(x.name(), Rc::new(x))
+            //}));
+        //self
+    //}
 
     pub fn symbol<S: Into<Symbol>>(&mut self, symbol: S) -> &mut Self {
-        let x = symbol.into();
-        self.symbols.insert(x.name().to_string(), Rc::new(x));
+        let symbol = symbol.into();
+        self.symbols.insert(symbol.name(), Rc::new(symbol));
         self
     }
 

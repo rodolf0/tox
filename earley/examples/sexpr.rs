@@ -1,5 +1,3 @@
-#![cfg(not(test))]
-
 extern crate linenoise;
 extern crate regex;
 extern crate lexers;
@@ -42,26 +40,26 @@ fn build_grammar() -> earley::Grammar {
       .symbol(("[(]", |n: &str| n == "("))
       .symbol(("[)]", |n: &str| n == ")"))
       .symbol(("[=]", |n: &str| n == "="));
-    gb.rule("assign", vec!["expr"])
-      .rule("assign", vec!["[v]", "[=]", "expr"])
-      .rule("expr",   vec!["term"])
-      .rule("expr",   vec!["expr", "[+-]", "term"])
-      .rule("term",   vec!["factor"])
-      .rule("term",   vec!["term", "[*/%]", "factor"])
-      .rule("factor", vec!["power"])
-      .rule("factor", vec!["[-]", "factor"])
-      .rule("power",  vec!["ufact"])
-      .rule("power",  vec!["ufact", "[^]", "factor"])
-      .rule("ufact",  vec!["group"])
-      .rule("ufact",  vec!["ufact", "[!]"])
-      .rule("group",  vec!["[n]"])
-      .rule("group",  vec!["[v]"])
-      .rule("group",  vec!["[(]", "expr", "[)]"])
-      .rule("group",  vec!["func"])
-      .rule("func",   vec!["[v]", "[(]", "args", "[)]"])
-      .rule("args",   vec!["expr"])
-      .rule("args",   vec!["args", "[,]", "expr"])
-      .rule("args",   vec![])
+    gb.rule("assign", &["expr"])
+      .rule("assign", &["[v]", "[=]", "expr"])
+      .rule("expr",   &["term"])
+      .rule("expr",   &["expr", "[+-]", "term"])
+      .rule("term",   &["factor"])
+      .rule("term",   &["term", "[*/%]", "factor"])
+      .rule("factor", &["power"])
+      .rule("factor", &["[-]", "factor"])
+      .rule("power",  &["ufact"])
+      .rule("power",  &["ufact", "[^]", "factor"])
+      .rule("ufact",  &["group"])
+      .rule("ufact",  &["ufact", "[!]"])
+      .rule("group",  &["[n]"])
+      .rule("group",  &["[v]"])
+      .rule("group",  &["[(]", "expr", "[)]"])
+      .rule("group",  &["func"])
+      .rule("func",   &["[v]", "[(]", "args", "[)]"])
+      .rule("args",   &["expr"])
+      .rule("args",   &["args", "[,]", "expr"])
+      .rule("args",   &[])
       ;
     gb.into_grammar("assign")
 }

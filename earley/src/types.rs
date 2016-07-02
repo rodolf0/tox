@@ -282,12 +282,7 @@ impl GrammarBuilder {
         self
     }
 
-    //pub fn rule<I, N, S>(&mut self, name: N, spec: I) -> &mut Self
-            //where N: AsRef<str>, S: AsRef<str>,
-                  //I: IntoIterator<Item=S> {
-
-// Just use &[S]
-    pub fn rule<S>(&mut self, name: S, spec: Vec<S>) -> &mut Self
+    pub fn rule<S>(&mut self, name: S, spec: &[S]) -> &mut Self
             where S: AsRef<str> + Into<String> {
         let rule = Rule{
             name: name.into(),
@@ -325,6 +320,8 @@ mod tests {
                 Rc::new(Symbol::from(("+-", testfn))),
                 Rc::new(Symbol::terminal("[0-9]", |n: &str|
                                  n.chars().all(|c| "1234567890".contains(c)))),
+                Rc::new(Symbol::from(("[a-z]", |n: &str|
+                                 n.chars().all(|c| "1234567890".contains(c))))),
         ]});
         // test item comparison
         assert_eq!(item(rule.clone(), 0, 0, 0), item(rule.clone(), 0, 0, 0));

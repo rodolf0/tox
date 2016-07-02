@@ -1,5 +1,5 @@
 use lexers::{Scanner, DelimTokenizer};
-use types::{Symbol, StateSet, GrammarBuilder, Grammar};
+use types::{StateSet, GrammarBuilder, Grammar};
 use parser::{EarleyParser, ParseError};
 use trees::{one_tree, all_trees, Subtree};
 use std::collections::HashSet;
@@ -18,27 +18,27 @@ fn grammar_math() -> Grammar {
       .symbol("Mul")
       .symbol("Pow")
       .symbol("Num")
-      .symbol(Symbol::terminal("Number", |n: &str| {
+      .symbol(("Number", |n: &str| {
           n.chars().all(|c| "1234567890".contains(c))
         }))
-      .symbol(Symbol::terminal("[+-]", |n: &str| {
+      .symbol(("[+-]", |n: &str| {
           n.len() == 1 && "+-".contains(n)
         }))
-      .symbol(Symbol::terminal("[*/]", |n: &str| {
+      .symbol(("[*/]", |n: &str| {
           n.len() == 1 && "*/".contains(n)
         }))
-      .symbol(Symbol::terminal("[^]", |n: &str| { n == "^" }))
-      .symbol(Symbol::terminal("(", |n: &str| { n == "(" }))
-      .symbol(Symbol::terminal(")", |n: &str| { n == ")" }));
+      .symbol(("[^]", |n: &str| { n == "^" }))
+      .symbol(("(", |n: &str| { n == "(" }))
+      .symbol((")", |n: &str| { n == ")" }));
     // add grammar rules
-    gb.rule("Sum", vec!["Sum", "[+-]", "Mul"])
-      .rule("Sum", vec!["Mul"])
-      .rule("Mul", vec!["Mul", "[*/]", "Pow"])
-      .rule("Mul", vec!["Pow"])
-      .rule("Pow", vec!["Num", "[^]", "Pow"])
-      .rule("Pow", vec!["Num"])
-      .rule("Num", vec!["(", "Sum", ")"])
-      .rule("Num", vec!["Number"]);
+    gb.rule("Sum", &["Sum", "[+-]", "Mul"])
+      .rule("Sum", &["Mul"])
+      .rule("Mul", &["Mul", "[*/]", "Pow"])
+      .rule("Mul", &["Pow"])
+      .rule("Pow", &["Num", "[^]", "Pow"])
+      .rule("Pow", &["Num"])
+      .rule("Num", &["(", "Sum", ")"])
+      .rule("Num", &["Number"]);
 
     let grammar = gb.into_grammar("Sum");
     grammar
@@ -74,8 +74,8 @@ fn test_badparse() {
 fn test_partialparse() {
     let mut gb = GrammarBuilder::new();
     gb.symbol("Start")
-      .symbol(Symbol::terminal("+", |n: &str| n == "+"))
-      .rule("Start", vec!["+", "+"]);
+      .symbol(("+", |n: &str| n == "+"))
+      .rule("Start", &["+", "+"]);
     let mut input = DelimTokenizer::from_str("+++", "+", false);
     let out = EarleyParser::new(gb.into_grammar("Start")).parse(&mut input);
     assert_eq!(out.unwrap_err(), ParseError::BadInput);
@@ -86,9 +86,9 @@ fn grammar_ambiguous() {
     // S -> SS | b
     let mut gb = GrammarBuilder::new();
     gb.symbol("S")
-      .symbol(Symbol::terminal("b", |n: &str| n == "b"))
-      .rule("S", vec!["S", "S"])
-      .rule("S", vec!["b"]);
+      .symbol(("b", |n: &str| n == "b"))
+      .rule("S", &["S", "S"])
+      .rule("S", &["b"]);
     // Earley's corner case that generates spurious trees for bbb
     let mut input = DelimTokenizer::from_str("b b b", " ", true);
     let p = EarleyParser::new(gb.into_grammar("S"));
@@ -109,10 +109,10 @@ fn grammar_ambiguous_epsilon() {
     let mut gb = GrammarBuilder::new();
     gb.symbol("S")
       .symbol("X")
-      .symbol(Symbol::terminal("b", |n: &str| n == "b"))
-      .rule("S", vec!["S", "S", "X"])
-      .rule("X", vec![])
-      .rule("S", vec!["b"]);
+      .symbol(("b", |n: &str| n == "b"))
+      .rule("S", &["S", "S", "X"])
+      .rule("X", &[])
+      .rule("S", &["b"]);
     // Earley's corner case that generates spurious trees for bbb
     let mut input = DelimTokenizer::from_str("b b b", " ", true);
     let p = EarleyParser::new(gb.into_grammar("S"));
@@ -145,11 +145,11 @@ fn test_left_recurse() {
     let mut gb = GrammarBuilder::new();
     gb.symbol("S")
       .symbol("N")
-      .symbol(Symbol::terminal("[+]", |n: &str| n == "+"))
-      .symbol(Symbol::terminal("[0-9]", |n: &str| "1234567890".contains(n)))
-      .rule("S", vec!["S", "[+]", "N"])
-      .rule("S", vec!["N"])
-      .rule("N", vec!["[0-9]"]);
+      .symbol(("[+]", |n: &str| n == "+"))
+      .symbol(("[0-9]", |n: &str| "1234567890".contains(n)))
+      .rule("S", &["S", "[+]", "N"])
+      .rule("S", &["N"])
+      .rule("N", &["[0-9]"]);
     let p = EarleyParser::new(gb.into_grammar("S"));
     let mut input = DelimTokenizer::from_str("1+2", "+", false);
     let ps = p.parse(&mut input).unwrap();
@@ -166,11 +166,11 @@ fn test_right_recurse() {
     let mut gb = GrammarBuilder::new();
     gb.symbol("P")
       .symbol("N")
-      .symbol(Symbol::terminal("[^]", |n: &str| n == "^"))
-      .symbol(Symbol::terminal("[0-9]", |n: &str| "1234567890".contains(n)))
-      .rule("P", vec!["N", "[^]", "P"])
-      .rule("P", vec!["N"])
-      .rule("N", vec!["[0-9]"]);
+      .symbol(("[^]", |n: &str| n == "^"))
+      .symbol(("[0-9]", |n: &str| "1234567890".contains(n)))
+      .rule("P", &["N", "[^]", "P"])
+      .rule("P", &["N"])
+      .rule("N", &["[0-9]"]);
     let p = EarleyParser::new(gb.into_grammar("P"));
     let mut input = DelimTokenizer::from_str("1^2", "^", false);
     let ps = p.parse(&mut input).unwrap();
@@ -187,9 +187,9 @@ fn bogus_empty() {
     let mut gb = GrammarBuilder::new();
     gb.symbol("A")
       .symbol("B")
-      .rule("A", Vec::new())
-      .rule("A", vec!["B"])
-      .rule("B", vec!["A"]);
+      .rule("A", &vec![])
+      .rule("A", &vec!["B"])
+      .rule("B", &vec!["A"]);
     let g = gb.into_grammar("A");
     let p = EarleyParser::new(g);
     let mut input = DelimTokenizer::from_str("", "-", false);
@@ -204,11 +204,11 @@ fn bogus_epsilon() {
     // P  -> '(' P ')' | P P | <epsilon>
     let mut gb = GrammarBuilder::new();
     gb.symbol("P")
-      .symbol(Symbol::terminal("(", |l| l == "("))
-      .symbol(Symbol::terminal(")", |l| l == ")"))
-      .rule("P", vec!["(", "P", ")"])
-      .rule("P", vec!["P", "P"])
-      .rule("P", vec![]);
+      .symbol(("(", |l: &str| l == "("))
+      .symbol((")", |l: &str| l == ")"))
+      .rule("P", &["(", "P", ")"])
+      .rule("P", &["P", "P"])
+      .rule("P", &[]);
     let g = gb.into_grammar("P");
     let p = EarleyParser::new(g);
     let mut input = Scanner::from_buf("".split_whitespace()
@@ -227,15 +227,15 @@ fn grammar_example() {
     let mut gb = GrammarBuilder::new();
     gb.symbol("Program")
       .symbol("Letters")
-      .symbol(Symbol::terminal("oneletter", |l| l.len() == 1 &&
-                               l.chars().next().unwrap().is_alphabetic()))
-      .symbol(Symbol::terminal("m", |l| l == "m"))
-      .symbol(Symbol::terminal("a", |l| l == "a"))
-      .symbol(Symbol::terminal("i", |l| l == "i"))
-      .symbol(Symbol::terminal("n", |l| l == "n"))
-      .rule("Program", vec!["Letters", "m", "a", "i", "n", "Letters"])
-      .rule("Letters", vec!["oneletter", "Letters"])
-      .rule("Letters", vec![]);
+      .symbol(("oneletter", |l: &str| l.len() == 1 &&
+               l.chars().next().unwrap().is_alphabetic()))
+      .symbol(("m", |l: &str| l == "m"))
+      .symbol(("a", |l: &str| l == "a"))
+      .symbol(("i", |l: &str| l == "i"))
+      .symbol(("n", |l: &str| l == "n"))
+      .rule("Program", &["Letters", "m", "a", "i", "n", "Letters"])
+      .rule("Letters", &["oneletter", "Letters"])
+      .rule("Letters", &[]);
     let g = gb.into_grammar("Program");
     let p = EarleyParser::new(g);
     let mut input = Scanner::from_buf("containsmainword".chars().map(|c| c.to_string()));
@@ -247,13 +247,13 @@ fn math_ambiguous() {
     // E -> E + E | E * E | n
     let mut gb = GrammarBuilder::new();
     gb.symbol("E")
-      .symbol(Symbol::terminal("+", |n: &str| n == "+"))
-      .symbol(Symbol::terminal("*", |n: &str| n == "*"))
-      .symbol(Symbol::terminal("n", |n: &str|
+      .symbol(("+", |n: &str| n == "+"))
+      .symbol(("*", |n: &str| n == "*"))
+      .symbol(("n", |n: &str|
           n.chars().all(|c| "1234567890".contains(c))))
-      .rule("E", vec!["E", "+", "E"])
-      .rule("E", vec!["E", "*", "E"])
-      .rule("E", vec!["n"]);
+      .rule("E", &["E", "+", "E"])
+      .rule("E", &["E", "*", "E"])
+      .rule("E", &["n"]);
     // number of trees here should match Catalan numbers if same operator
     let p = EarleyParser::new(gb.into_grammar("E"));
     let mut input = DelimTokenizer::from_str("0*1*2*3*4*5", "*", false);
@@ -342,9 +342,9 @@ fn chained_terminals() {
         let mut gb = GrammarBuilder::new();
         gb.symbol("E")
           .symbol("X")
-          .symbol(Symbol::terminal("+", |n: &str| n == "+"))
-          .rule("E", variant.clone())
-          .rule("X", Vec::new());
+          .symbol(("+", |n: &str| n == "+"))
+          .rule("E", &variant)
+          .rule("X", &[]);
         let p = EarleyParser::new(gb.into_grammar("E"));
         let mut input = DelimTokenizer::from_str(tokens, "+", false);
         let ps = p.parse(&mut input).unwrap();
@@ -357,33 +357,33 @@ fn chained_terminals() {
 #[test]
 fn natural_lang() {
     let mut gb = GrammarBuilder::new();
-    gb.symbol(Symbol::terminal("N", |n: &str| {
+    gb.symbol(("N", |n: &str| {
         n == "time" || n == "flight" || n == "banana" ||
         n == "flies" || n == "boy" || n == "telescope"
       }))
-      .symbol(Symbol::terminal("D", |n: &str| {
+      .symbol(("D", |n: &str| {
         n == "the" || n == "a" || n == "an"
       }))
-      .symbol(Symbol::terminal("V", |n: &str| {
+      .symbol(("V", |n: &str| {
         n == "book" || n == "eat" || n == "sleep" || n == "saw"
       }))
-      .symbol(Symbol::terminal("P", |n: &str| {
+      .symbol(("P", |n: &str| {
         n == "with" || n == "in" || n == "on" || n == "at" || n == "through"
       }))
-      .symbol(Symbol::terminal("[name]", |n: &str| n == "john" || n == "houston"))
+      .symbol(("[name]", |n: &str| n == "john" || n == "houston"))
       .symbol("PP")
       .symbol("NP")
       .symbol("VP")
       .symbol("VP")
       .symbol("S");
-    gb.rule("NP", vec!["D", "N"])
-      .rule("NP", vec!["[name]"])
-      .rule("NP", vec!["NP", "PP"])
-      .rule("PP", vec!["P", "NP"])
-      .rule("VP", vec!["V", "NP"])
-      .rule("VP", vec!["VP", "PP"])
-      .rule("S", vec!["NP", "VP"])
-      .rule("S", vec!["VP"]);
+    gb.rule("NP", &["D", "N"])
+      .rule("NP", &["[name]"])
+      .rule("NP", &["NP", "PP"])
+      .rule("PP", &["P", "NP"])
+      .rule("VP", &["V", "NP"])
+      .rule("VP", &["VP", "PP"])
+      .rule("S", &["NP", "VP"])
+      .rule("S", &["VP"]);
     let p = EarleyParser::new(gb.into_grammar("S"));
     let inputs = vec![
         "book the flight through houston",

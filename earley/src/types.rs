@@ -1,6 +1,6 @@
 use std::collections::{HashSet, HashMap};
 use std::ops::Index;
-use std::{fmt, hash, mem, iter, slice};
+use std::{fmt, hash, iter, slice};
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -43,37 +43,24 @@ impl fmt::Debug for Symbol {
     }
 }
 
+// TODO: move hashness to Rule ?
 impl hash::Hash for Symbol {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {
             &Symbol::NonTerm(ref name) => name.hash(state),
-            &Symbol::Terminal(ref name, ref f) => {
-                name.hash(state);
-                // TODO: get rid of checks for fn pointer
-                let (x, y) = unsafe { mem::transmute::<_, (usize, usize)>(&**f) };
-                x.hash(state); y.hash(state);
-            }
+            &Symbol::Terminal(ref name, _) => name.hash(state)
         }
     }
 }
-
 impl PartialEq for Symbol {
     fn eq(&self, other: &Symbol) -> bool {
         match (self, other) {
             (&Symbol::NonTerm(ref a), &Symbol::NonTerm(ref b)) => a == b,
-            (&Symbol::Terminal(ref name_a, ref func_a),
-             &Symbol::Terminal(ref name_b, ref func_b)) => {
-                name_a == name_b && unsafe {
-                    let a = mem::transmute::<_, (usize, usize)>(&**func_a);
-                    let b = mem::transmute::<_, (usize, usize)>(&**func_b);
-                    a == b
-                }
-            },
+            (&Symbol::Terminal(ref a, _), &Symbol::Terminal(ref b, _)) => a == b,
             _ => false,
         }
     }
 }
-
 impl Eq for Symbol {}
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -238,8 +225,9 @@ impl StateSet {
     pub fn iter<'a>(&'a self) -> slice::Iter<'a, Rc<Item>> { self.order.iter() }
 
     // get all items whose rule name is 'name'
-    pub fn filter_by_rule<'a>(&'a self, name: String) ->
+    pub fn filter_by_rule<'a, S: Into<String>>(&'a self, name: S) ->
            Box<Iterator<Item=&'a Rc<Item>> + 'a> {
+        let name = name.into();
         Box::new(self.order.iter().filter(move |it| it.rule.name() == name))
     }
 }
@@ -270,7 +258,7 @@ impl fmt::Debug for StateSet {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct Grammar {
-    start: Rc<Symbol>,
+    start: String,
     rules: Vec<Rc<Rule>>,
 }
 
@@ -287,7 +275,7 @@ impl Grammar {
     }
 
     // grammar's start symbol
-    pub fn start(&self) -> String { self.start.name() }
+    pub fn start(&self) -> String { self.start.clone() }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -332,10 +320,7 @@ impl GrammarBuilder {
         self
     }
 
-    pub fn into_grammar<S: AsRef<str>>(self, start: S) -> Grammar {
-        Grammar{
-            start: self.symbols[start.as_ref()].clone(),
-            rules: self.rules,
-        }
+    pub fn into_grammar<S: Into<String>>(self, start: S) -> Grammar {
+        Grammar{start: start.into(), rules: self.rules}
     }
 }

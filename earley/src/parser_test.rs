@@ -7,16 +7,8 @@ use std::collections::HashSet;
 use std::iter::FromIterator;
 
 #[test]
-fn symbol_uniqueness() {
-    // TODO: wtf cares about symbol uniquness ??
-    //
-    // test equalty operators
+fn item_dedupness() {
     fn testfn(o: &str) -> bool { o.len() == 1 && "+-".contains(o) }
-    assert_eq!(Symbol::from("sym1"), Symbol::from("sym1"));
-    // comparing Fn trait (data, vtable) so shouldn't match
-    assert!(Symbol::terminal("+-", testfn) == Symbol::terminal("+-", testfn));
-    assert!(Symbol::terminal("X", |_| true) != Symbol::terminal("X", |_| true));
-
     let rule = {
         let s = Rc::new(Symbol::from("S"));
         let add_op = Rc::new(Symbol::terminal("+-", testfn));

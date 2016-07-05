@@ -2,6 +2,7 @@ extern crate linenoise;
 extern crate regex;
 extern crate lexers;
 extern crate toxearley as earley;
+extern crate time;
 
 use std::iter::FromIterator;
 use std::collections::HashSet;
@@ -43,9 +44,15 @@ fn build_grammar() -> earley::Grammar {
       .symbol(("ordinal (names)", ordinals))
       .symbol(("ordinal", |n: &str| ordinals(n) || ordinal_digits(n)))
       .symbol(("month", month))
-    ;
+      ;
+
     gb.symbol(("this|next", |n: &str| n == "this" || n == "next"))
       .symbol(("the", |n: &str| n == "the"))
+      ;
+
+    gb.symbol("this|next <day-of-week>")
+      .symbol("the <day-of-month> (ordinal)")
+      .symbol("<named-month> <day-of-month> (ordinal)")
       ;
 
     gb.rule("this|next <day-of-week>", &["this|next", "named-day"])    // next tuesday
@@ -53,8 +60,48 @@ fn build_grammar() -> earley::Grammar {
       .rule("<named-month> <day-of-month> (ordinal)", &["month", "ordinal"])
       ;
 
-    gb.into_grammar("start")
+    // tie rules to start symbol
+    gb.rule("S", &["this|next <day-of-week>"])
+      .rule("S", &["the <day-of-month> (ordinal)"])
+      .rule("S", &["<named-month> <day-of-month> (ordinal)"])
+      ;
+
+    gb.into_grammar("S")
 }
+
+struct TimeRange {
+    start: time::Tm,
+    end: time::Tm,
+}
+
+//impl TimeRange {
+    //fn today() -> TimeRange {
+    //}
+//}
+
+struct TimeContext;
+
+impl TimeContext {
+    fn eval(&mut self, n: &Subtree) -> Option<TimeRange> {
+        None
+    }
+}
+
+//trait TimeMod {
+    //fn apply(ctx: &Context, n: &Subtree);
+//}
+
+//struct NCycle();
+
+//impl TimeMode for NCycle {
+    //fn apply(ctx: &Context, n: &Subtree) {
+    //}
+//}
+
+fn semantics() {
+    //""
+}
+
 
 
 fn dotprinter(node: &Subtree, n: usize) {
@@ -71,32 +118,13 @@ fn dotprinter(node: &Subtree, n: usize) {
     }
 }
 
-
-struct Tokenizer(lexers::Scanner<char>);
-
-impl lexers::Nexter<String> for Tokenizer {
-    fn get_item(&mut self) -> Option<String> {
-        self.0.ignore_ws();
-        lexers::scan_math_op(&mut self.0)
-            .or_else(|| lexers::scan_number(&mut self.0))
-            .or_else(|| lexers::scan_identifier(&mut self.0))
-    }
-}
-
-impl Tokenizer {
-    fn from_str(input: &str) -> lexers::Scanner<String> {
-        lexers::Scanner::new(
-            Box::new(Tokenizer(lexers::Scanner::from_str(&input))))
-    }
-}
-
 fn main() {
     let parser = earley::EarleyParser::new(build_grammar());
 
     if std::env::args().len() > 1 {
         let input = std::env::args().skip(1).
             collect::<Vec<String>>().join(" ");
-        match parser.parse(&mut Tokenizer::from_str(&input)) {
+        match parser.parse(&mut lexers::DelimTokenizer::from_str(&input, " ", true)) {
             Ok(estate) => {
                 let tree = earley::one_tree(parser.g.start(), &estate);
                 println!("digraph x {{");
@@ -107,4 +135,17 @@ fn main() {
         }
         return;
     }
+
+    //let mut ctx = HashMap::new();
+    //while let Some(input) = linenoise::input("~> ") {
+        //linenoise::history_add(&input[..]);
+        //match parser.parse(&mut lexers::DelimTokenizer::from_str(&input, " ", true)) {
+            //Ok(estate) => {
+                //let tree = earley::one_tree(parser.g.start(), &estate);
+                //let val = xeval(&tree, &mut ctx)[0];
+                //println!("{:?}", val);
+            //},
+            //Err(e) => println!("Parse err: {:?}", e)
+        //}
+    //}
 }

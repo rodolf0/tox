@@ -271,7 +271,10 @@ impl GrammarBuilder {
             where N: Into<String> + AsRef<str> {
         let rule = Rule{
             name: name.into(),
-            spec: spec.into_iter().map(|s| self.symbols[s.as_ref()].clone()).collect()
+            spec: spec.into_iter().map(|s| match self.symbols.get(s.as_ref()) {
+                Some(s) => s.clone(),
+                None => panic!("Missing symbol: {}", s.as_ref())
+            }).collect()
         };
         self.rules.push(Rc::new(rule));
         self

@@ -281,7 +281,11 @@ impl GrammarBuilder {
     }
 
     pub fn into_grammar<S: Into<String>>(self, start: S) -> Grammar {
-        Grammar{start: start.into(), rules: self.rules}
+        let start = start.into();
+        match self.symbols.contains_key(&start) {
+            true => Grammar{start: start, rules: self.rules},
+            false => panic!("Missing symbol: {}", start),
+        }
     }
 }
 

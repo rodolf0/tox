@@ -11,7 +11,8 @@ use regex::Regex;
 
 fn day_of_week(d: &str) -> bool {
     let days = HashSet::<&str>::from_iter(vec![
-        "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"
+        "monday", "tuesday", "wednesday", "thursday",
+        "friday", "saturday", "sunday"
     ]);
     days.contains(d)
 }
@@ -24,10 +25,16 @@ fn month(m: &str) -> bool {
     months.contains(m)
 }
 
+
 fn ordinals(n: &str) -> bool {
     let ord = HashSet::<&str>::from_iter(vec![
-        "first", "second", "third", "fourth", "fifth", "sixth",
-    ]);
+        "first", "second", "third", "fourth", "fifth", "sixth", "seventh",
+        "eigth", "ninth", "thenth", "eleventh", "twelveth", "thirteenth",
+        "fourteenth", "fifteenth", "sixteenth", "seventeenth", "eighteenth",
+        "nineteenth", "twentieth", "twenty-first", "twenty-second",
+        "twenty-third", "twenty-fourth", "twenty-fith", "twenty-sixth",
+        "twenty-seventh", "twenty-eigth", "twenty-ninth", "thirtieth",
+        "thirty-first"]);
     ord.contains(n)
 }
 
@@ -39,34 +46,38 @@ fn ordinal_digits(n: &str) -> bool {
 // https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj
 fn build_grammar() -> earley::Grammar {
     let mut gb = earley::GrammarBuilder::new();
-    gb.symbol(("named-day", day_of_week))
-      .symbol(("ordinal (digits)", ordinal_digits))
-      .symbol(("ordinal (names)", ordinals))
-      .symbol(("ordinal", |n: &str| ordinals(n) || ordinal_digits(n)))
-      .symbol(("month", month))
+    gb.symbol(("<named-day>", day_of_week))
+      .symbol(("<ordinal (digit)>", ordinal_digits))
+      .symbol(("<ordinal (names)>", ordinals))
+      .symbol(("<ordinal>", |n: &str| ordinals(n) || ordinal_digits(n)))
+      .symbol(("<named-month>", month))
       ;
-
+    // misc symbols
     gb.symbol(("this|next", |n: &str| n == "this" || n == "next"))
       .symbol(("the", |n: &str| n == "the"))
+      .symbol(("last", |n: &str| n == "last"))
+      .symbol(("of", |n: &str| n == "of"))
+      .symbol(("now", |n: &str| n == "now"))
+      .symbol(("today", |n: &str| n == "today"))
+      .symbol(("tomorrow", |n: &str| n == "tomorrow"))
+      .symbol(("yesterday", |n: &str| n == "yesterday"))
       ;
 
-    gb.symbol("this|next <day-of-week>")
-      .symbol("the <day-of-month> (ordinal)")
-      .symbol("<named-month> <day-of-month> (ordinal)")
+    gb.symbol("<time>")
       ;
 
-    gb.rule("this|next <day-of-week>", &["this|next", "named-day"])    // next tuesday
-      .rule("the <day-of-month> (ordinal)", &["the", "ordinal"])       // the 2nd
-      .rule("<named-month> <day-of-month> (ordinal)", &["month", "ordinal"])
+    gb.rule("<time>", &["<time>", "<time>"])           // intersect 2 times // TODO: non-latent-time?
+      .rule("<time>", &["<named-month>"])            // march
+      .rule("<time>", &["<named-day>"])              // march
+      .rule("<time>", &["this|next", "<named-day>"]) // next tuesday
+      .rule("<time>", &["last", "<time>"]) // last week | last sunday | last friday
+      .rule("<time>", &["the", "<ordinal>"])         // the 2nd
+      .rule("<time>", &["<named-month>", "<ordinal>"])
+      .rule("<time>", &["<ordinal>", "<time>", "of", "<time>"])
       ;
 
-    // tie rules to start symbol
-    gb.rule("S", &["this|next <day-of-week>"])
-      .rule("S", &["the <day-of-month> (ordinal)"])
-      .rule("S", &["<named-month> <day-of-month> (ordinal)"])
-      ;
 
-    gb.into_grammar("S")
+    gb.into_grammar("<time>")
 }
 
 struct TimeRange {

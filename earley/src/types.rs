@@ -261,13 +261,13 @@ impl GrammarBuilder {
         GrammarBuilder{ symbols: HashMap::new(), rules: Vec::new()}
     }
 
-    pub fn symbol<S: Into<Symbol>>(&mut self, symbol: S) -> &mut Self {
+    pub fn symbol<S: Into<Symbol>>(mut self, symbol: S) -> Self {
         let symbol = symbol.into();
         self.symbols.insert(symbol.name(), Rc::new(symbol));
         self
     }
 
-    pub fn rule<N>(&mut self, name: N, spec: &[N]) -> &mut Self
+    pub fn rule<N>(mut self, name: N, spec: &[N]) -> Self
             where N: Into<String> + AsRef<str> {
         let rule = Rule{
             name: name.into(),

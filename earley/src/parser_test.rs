@@ -12,9 +12,9 @@ use std::iter::FromIterator;
 // Num -> Number | ( Sum )
 
 fn grammar_math() -> Grammar {
-    let mut gb = GrammarBuilder::new();
-    // register some symbols
-    gb.symbol("Sum")
+    GrammarBuilder::new()
+      // register some symbols
+      .symbol("Sum")
       .symbol("Mul")
       .symbol("Pow")
       .symbol("Num")
@@ -29,19 +29,17 @@ fn grammar_math() -> Grammar {
         }))
       .symbol(("[^]", |n: &str| { n == "^" }))
       .symbol(("(", |n: &str| { n == "(" }))
-      .symbol((")", |n: &str| { n == ")" }));
-    // add grammar rules
-    gb.rule("Sum", &["Sum", "[+-]", "Mul"])
+      .symbol((")", |n: &str| { n == ")" }))
+      // add grammar rules
+      .rule("Sum", &["Sum", "[+-]", "Mul"])
       .rule("Sum", &["Mul"])
       .rule("Mul", &["Mul", "[*/]", "Pow"])
       .rule("Mul", &["Pow"])
       .rule("Pow", &["Num", "[^]", "Pow"])
       .rule("Pow", &["Num"])
       .rule("Num", &["(", "Sum", ")"])
-      .rule("Num", &["Number"]);
-
-    let grammar = gb.into_grammar("Sum");
-    grammar
+      .rule("Num", &["Number"])
+      .into_grammar("Sum")
 }
 
 fn print_statesets(ss: &Vec<StateSet>) {
@@ -72,8 +70,8 @@ fn test_badparse() {
 
 #[test]
 fn test_partialparse() {
-    let mut gb = GrammarBuilder::new();
-    gb.symbol("Start")
+    let gb = GrammarBuilder::new()
+      .symbol("Start")
       .symbol(("+", |n: &str| n == "+"))
       .rule("Start", &["+", "+"]);
     let mut input = DelimTokenizer::from_str("+++", "+", false);
@@ -84,8 +82,8 @@ fn test_partialparse() {
 #[test]
 fn grammar_ambiguous() {
     // S -> SS | b
-    let mut gb = GrammarBuilder::new();
-    gb.symbol("S")
+    let gb = GrammarBuilder::new()
+      .symbol("S")
       .symbol(("b", |n: &str| n == "b"))
       .rule("S", &["S", "S"])
       .rule("S", &["b"]);
@@ -108,8 +106,8 @@ fn grammar_ambiguous() {
 fn grammar_ambiguous_epsilon() {
     // S -> SSX | b
     // X -> <e>
-    let mut gb = GrammarBuilder::new();
-    gb.symbol("S")
+    let gb = GrammarBuilder::new()
+      .symbol("S")
       .symbol("X")
       .symbol(("b", |n: &str| n == "b"))
       .rule("S", &["S", "S", "X"])
@@ -144,8 +142,8 @@ fn math_grammar_test() {
 fn test_left_recurse() {
     // S -> S + N | N
     // N -> [0-9]
-    let mut gb = GrammarBuilder::new();
-    gb.symbol("S")
+    let gb = GrammarBuilder::new()
+      .symbol("S")
       .symbol("N")
       .symbol(("[+]", |n: &str| n == "+"))
       .symbol(("[0-9]", |n: &str| "1234567890".contains(n)))
@@ -165,8 +163,8 @@ fn test_left_recurse() {
 fn test_right_recurse() {
     // P -> N ^ P | N
     // N -> [0-9]
-    let mut gb = GrammarBuilder::new();
-    gb.symbol("P")
+    let gb = GrammarBuilder::new()
+      .symbol("P")
       .symbol("N")
       .symbol(("[^]", |n: &str| n == "^"))
       .symbol(("[0-9]", |n: &str| "1234567890".contains(n)))
@@ -186,8 +184,8 @@ fn test_right_recurse() {
 fn bogus_empty() {
     // A -> <empty> | B
     // B -> A
-    let mut gb = GrammarBuilder::new();
-    gb.symbol("A")
+    let gb = GrammarBuilder::new()
+      .symbol("A")
       .symbol("B")
       .rule("A", &vec![])
       .rule("A", &vec!["B"])
@@ -204,8 +202,8 @@ fn bogus_empty() {
 fn bogus_epsilon() {
     // Grammar for balanced parenthesis
     // P  -> '(' P ')' | P P | <epsilon>
-    let mut gb = GrammarBuilder::new();
-    gb.symbol("P")
+    let gb = GrammarBuilder::new()
+      .symbol("P")
       .symbol(("(", |l: &str| l == "("))
       .symbol((")", |l: &str| l == ")"))
       .rule("P", &["(", "P", ")"])
@@ -226,8 +224,8 @@ fn grammar_example() {
     // Program   -> Letters 'm' 'a' 'i' 'n' Letters
     // Letters   -> oneletter Letters | <epsilon>
     // oneletter -> [a-zA-Z]
-    let mut gb = GrammarBuilder::new();
-    gb.symbol("Program")
+    let gb = GrammarBuilder::new()
+      .symbol("Program")
       .symbol("Letters")
       .symbol(("oneletter", |l: &str| l.len() == 1 &&
                l.chars().next().unwrap().is_alphabetic()))
@@ -238,8 +236,7 @@ fn grammar_example() {
       .rule("Program", &["Letters", "m", "a", "i", "n", "Letters"])
       .rule("Letters", &["oneletter", "Letters"])
       .rule("Letters", &[]);
-    let g = gb.into_grammar("Program");
-    let p = EarleyParser::new(g);
+    let p = EarleyParser::new(gb.into_grammar("Program"));
     let mut input = Scanner::from_buf("containsmainword".chars().map(|c| c.to_string()));
     assert!(p.parse(&mut input).is_ok());
 }
@@ -247,8 +244,8 @@ fn grammar_example() {
 #[test]
 fn math_ambiguous() {
     // E -> E + E | E * E | n
-    let mut gb = GrammarBuilder::new();
-    gb.symbol("E")
+    let gb = GrammarBuilder::new()
+      .symbol("E")
       .symbol(("+", |n: &str| n == "+"))
       .symbol(("*", |n: &str| n == "*"))
       .symbol(("n", |n: &str|
@@ -341,8 +338,8 @@ fn chained_terminals() {
         let tokens = match variant.len() {
             2 => "+", 3 => "++", _ => unreachable!()
         };
-        let mut gb = GrammarBuilder::new();
-        gb.symbol("E")
+        let gb = GrammarBuilder::new()
+          .symbol("E")
           .symbol("X")
           .symbol(("+", |n: &str| n == "+"))
           .rule("E", &variant)
@@ -358,8 +355,8 @@ fn chained_terminals() {
 
 #[test]
 fn natural_lang() {
-    let mut gb = GrammarBuilder::new();
-    gb.symbol(("N", |n: &str| {
+    let gb = GrammarBuilder::new()
+      .symbol(("N", |n: &str| {
         n == "time" || n == "flight" || n == "banana" ||
         n == "flies" || n == "boy" || n == "telescope"
       }))
@@ -377,8 +374,8 @@ fn natural_lang() {
       .symbol("NP")
       .symbol("VP")
       .symbol("VP")
-      .symbol("S");
-    gb.rule("NP", &["D", "N"])
+      .symbol("S")
+      .rule("NP", &["D", "N"])
       .rule("NP", &["[name]"])
       .rule("NP", &["NP", "PP"])
       .rule("PP", &["P", "NP"])

@@ -19,8 +19,8 @@ use std::collections::HashMap;
 fn build_grammar() -> earley::Grammar {
     let num = regex::Regex::new(r"^-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?$").unwrap();
     let var = regex::Regex::new(r"^[A-Za-z_]+[A-Za-z0-9_]*$").unwrap();
-    let mut gb = earley::GrammarBuilder::new();
-    gb.symbol("assign")
+    earley::GrammarBuilder::new()
+      .symbol("assign")
       .symbol("expr")
       .symbol("term")
       .symbol("factor")
@@ -39,8 +39,8 @@ fn build_grammar() -> earley::Grammar {
       .symbol(("[,]", |n: &str| n == ","))
       .symbol(("[(]", |n: &str| n == "("))
       .symbol(("[)]", |n: &str| n == ")"))
-      .symbol(("[=]", |n: &str| n == "="));
-    gb.rule("assign", &["expr"])
+      .symbol(("[=]", |n: &str| n == "="))
+      .rule("assign", &["expr"])
       .rule("assign", &["[v]", "[=]", "expr"])
       .rule("expr",   &["term"])
       .rule("expr",   &["expr", "[+-]", "term"])
@@ -60,8 +60,7 @@ fn build_grammar() -> earley::Grammar {
       .rule("args",   &["expr"])
       .rule("args",   &["args", "[,]", "expr"])
       .rule("args",   &[])
-      ;
-    gb.into_grammar("assign")
+      .into_grammar("assign")
 }
 
 fn dotprinter(node: &Subtree, n: usize) {

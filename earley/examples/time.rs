@@ -129,7 +129,6 @@ struct Range(DateTime<UTC>, Duration);
 // need Rc cause I want to clone sequences
 type Seq = Rc<Fn()->Box<Iterator<Item=Range>>>;
 
-// TODO: yuck
 fn seq_dow(dow: usize) -> Seq {
     Rc::new(move || {
         let reftime = UTC::now();
@@ -162,25 +161,23 @@ fn seq_dow(dow: usize) -> Seq {
 // the first is a sequence that we can ask
 fn seq_nth(n: usize, win: Seq, within: Seq) -> Seq {
     // 1. take an instance of <within>
-    // 2. cycle to the n-th range of granularity <grain>
+    // 2. cycle to the n-th instance if <win> within <within>
     Rc::new(move || {
-            //// look for 1st entry of <win> within the subinterval <p>
-            //// TODO: need to clone <win> sequence
+        const fuse: usize = 10000;
         let win = win.clone();
-        Box::new(within().map(move |p| {
-            win().skip_while(|w| w.0 < p.0) // TODO limit max iterations, TODO: clone win to avoid consuming?
-               .nth(n - 1).unwrap()
+        Box::new(within().take(fuse).filter_map(move |p| {
+            let x = win().skip_while(|w| w.0 < p.0).nth(n - 1).unwrap();
+            match (x.0 + x.1) < (p.0 + p.1) {
+                true => Some(x),
+                false => None
+            }
         }))
-
     })
 }
 
 fn seq_day() -> Seq {
     Rc::new(|| {
-        let reftime = UTC::now().date()
-            .with_day(1).unwrap() // TODO: side effect of now backward time yet
-            .with_month(1).unwrap() // TODO: side effect of now backward time yet
-            .and_hms(0, 0, 0);
+        let reftime = UTC::now().date().and_hms(0, 0, 0);
         Box::new((0..).map(move |x| {
             Range(reftime + Duration::days(x), Duration::days(1))
         }))
@@ -233,14 +230,6 @@ pub enum Telem {
 
 #[derive(Debug)]
 pub struct TimeContext(Vec<Telem>);
-
-pub fn nth() {}
-pub fn intersect() {}
-pub fn shift() {}
-pub fn next() {}
-pub fn prev() {}
-pub fn nearest_fwd() {}
-pub fn nearset_bck() {}
 
 
 pub fn eval(ctx: &mut TimeContext, n: &Subtree) -> Option<Telem> {
@@ -295,16 +284,14 @@ fn dotprinter(node: &Subtree, n: usize) {
 }
 
 fn main() {
-// x = 2nd hour of the day
-// 3rd x of the week
-// the 3rd 2nd-hour-of-the-day of the week
     //let y = seq_nth(10, seq_day(), seq_month());
     //for x in seq_nth(5, y, seq_year())().take(5) {
     //for x in seq_day()().take(5) {
     //for x in seq_nth(5, seq_month(), seq_year())().take(5) {
     //let y = seq_dow(2); // tuesday
     //for x in seq_nth(2, seq_dow(2), seq_month())().take(5) {
-    let y = seq_dow(3);
+    let y = seq_nth(3, seq_dow(4), seq_month());
+    //let y = seq_nth(4, y, seq_year());
     for x in y().take(5) {
         println!("{} - {} - {}", x.0, x.1, (x.0 + x.1));
     }

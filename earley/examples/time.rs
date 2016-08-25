@@ -2,6 +2,7 @@ extern crate linenoise;
 extern crate regex;
 extern crate lexers;
 extern crate toxearley as earley;
+extern crate chrono;
 extern crate time;
 
 use earley::Subtree;
@@ -10,6 +11,9 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::str::FromStr;
+use std::rc::Rc;
+
+use chrono::*;
 
 fn day_of_week(d: &str) -> Option<usize> {
     let days: HashMap<&'static str, usize> = HashMap::from_iter(vec![
@@ -102,7 +106,8 @@ fn build_grammar() -> earley::Grammar {
 }
 
 
-pub enum Duration {
+#[derive(PartialEq)]
+pub enum Granularity {
     Second,
     Minute,
     Hour,
@@ -119,37 +124,104 @@ pub enum Duration {
     TempD, // constante dependent duration
 }
 
-pub struct Range(time::Tm, time::Tm);
+struct Range(DateTime<UTC>, Duration);
 
-// time functions
-fn seq(g: Duration) -> Box<Iterator<Item=Range>> {
-    // return a function that returns ranges? (ie: for a Duration::Day return a func that
-    // returns day intervals
-    panic!("not implemented")
+// need Rc cause I want to clone sequences
+type Seq = Rc<Fn()->Box<Iterator<Item=Range>>>;
+
+// TODO: yuck
+fn seq_dow(dow: usize) -> Seq {
+    Rc::new(move || {
+        let reftime = UTC::now();
+        let dow_reftime = reftime.weekday().num_days_from_sunday() as i32;
+        let diff = if (dow as i32) < dow_reftime {
+            ((7 + dow as i32) - dow_reftime) % 7
+        } else {
+            dow as i32 - dow_reftime
+        };
+        let reftime = reftime.date().with_day(reftime.day() + diff as u32).unwrap().and_hms(0, 0, 0);
+        Box::new((0..).map(move |x| {
+            Range(reftime + Duration::days(x * 7), Duration::days(1))
+        }))
+    })
 }
 
-fn trunctm(mut t: time::Tm, g: Duration) -> time::Tm {
-    t.tm_sec = 0;
-    t.tm_min = 0;
-    t.tm_hour = 0;
-    t.tm_nsec = 0;
-    t
+// ej: 28th day of month
+// ej: 28th day of year
+// ej: 28th week of year
+
+// x = 2nd hour of the day
+// 3rd x of the week
+// the 3rd 2nd-hour-of-the-day of the week
+
+// ej: 2nd 3-hour window within a fortnight
+// ej: 2nd 28th-of-june a century
+// needs sequences as arguments (instead of duraionts/granularities) because it returns sequences
+// that can keep on yielding, example:
+// 5th minute within an hour != 5th minute within 'this' hour
+// the first is a sequence that we can ask
+fn seq_nth(n: usize, win: Seq, within: Seq) -> Seq {
+    // 1. take an instance of <within>
+    // 2. cycle to the n-th range of granularity <grain>
+    Rc::new(move || {
+            //// look for 1st entry of <win> within the subinterval <p>
+            //// TODO: need to clone <win> sequence
+        let win = win.clone();
+        Box::new(within().map(move |p| {
+            win().skip_while(|w| w.0 < p.0) // TODO limit max iterations, TODO: clone win to avoid consuming?
+               .nth(n - 1).unwrap()
+        }))
+
+    })
 }
 
-type Seq = Iterator<Item=(time::Tm, time::Tm)>;
-
-fn seq_dow(dow: usize) -> Box<Seq> {
-    let reftime = time::now();
-    let diff = (dow as i32 - reftime.tm_wday) % 7;
-    let reftime = trunctm(reftime + time::Duration::days(diff as i64), Duration::Day);
-    Box::new((0..).map(move |x| {
-        (reftime + time::Duration::days(x * 7), reftime + time::Duration::days(x * 7 + 1))
-    }))
+fn seq_day() -> Seq {
+    Rc::new(|| {
+        let reftime = UTC::now().date()
+            .with_day(1).unwrap() // TODO: side effect of now backward time yet
+            .with_month(1).unwrap() // TODO: side effect of now backward time yet
+            .and_hms(0, 0, 0);
+        Box::new((0..).map(move |x| {
+            Range(reftime + Duration::days(x), Duration::days(1))
+        }))
+    })
 }
 
-//fn deq_nth(n: usize, )
+fn next_month<Tz: TimeZone>(mut d: Date<Tz>) -> Date<Tz> {
+    let thismonth = d.month();
+    while thismonth == d.month() { d = d.succ(); }
+    d
+}
 
-//pub Monday = Sequence{granularity: Duration::Day, gen: XX};
+fn next_year<Tz: TimeZone>(mut d: Date<Tz>) -> Date<Tz> {
+    let thisyear = d.year();
+    while thisyear == d.year() { d = d.succ(); }
+    d
+}
+
+fn seq_month() -> Seq {
+    Rc::new(|| { // TODO: this_month should be passed in probably
+        let mut this_month = UTC::now().date().with_day(1).unwrap();
+        Box::new((0..).map(move |x| {
+            let t0 = this_month.and_hms(0, 0, 0);
+            this_month = next_month(this_month);
+            let d0 = this_month.and_hms(0, 0, 0) - t0;
+            Range(t0, d0)
+        }))
+    })
+}
+
+fn seq_year() -> Seq {
+    Rc::new(|| { // TODO: this_month should be passed in probably
+        let mut this_year = UTC::now().date().with_day(1).unwrap().with_month(1).unwrap();
+        Box::new((0..).map(move |x| {
+            let t0 = this_year.and_hms(0, 0, 0);
+            this_year = next_year(this_year);
+            let d0 = this_year.and_hms(0, 0, 0) - t0;
+            Range(t0, d0)
+        }))
+    })
+}
 
 #[derive(Debug)]
 pub enum Telem {
@@ -223,8 +295,18 @@ fn dotprinter(node: &Subtree, n: usize) {
 }
 
 fn main() {
-    for x in seq_dow(2).take(5) {
-        println!("{} - {}", x.0.asctime(), x.1.asctime());
+// x = 2nd hour of the day
+// 3rd x of the week
+// the 3rd 2nd-hour-of-the-day of the week
+    //let y = seq_nth(10, seq_day(), seq_month());
+    //for x in seq_nth(5, y, seq_year())().take(5) {
+    //for x in seq_day()().take(5) {
+    //for x in seq_nth(5, seq_month(), seq_year())().take(5) {
+    //let y = seq_dow(2); // tuesday
+    //for x in seq_nth(2, seq_dow(2), seq_month())().take(5) {
+    let y = seq_dow(3);
+    for x in y().take(5) {
+        println!("{} - {} - {}", x.0, x.1, (x.0 + x.1));
     }
 
     let parser = earley::EarleyParser::new(build_grammar());

@@ -20,4 +20,5 @@ path = "examples/time.rs"
 [dev-dependencies]
 linenoise-rust = "0.2"
 regex = "0.1"
+chrono = "0.2"
 time = "0.1"

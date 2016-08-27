@@ -3,7 +3,6 @@ extern crate regex;
 extern crate lexers;
 extern crate toxearley as earley;
 extern crate chrono;
-extern crate time;
 
 use earley::Subtree;
 use regex::Regex;
@@ -124,16 +123,22 @@ pub enum Granularity {
     TempD, // constante dependent duration
 }
 
-#[derive(Clone)]
-struct Range(DateTime<UTC>, Duration);
+#[derive(Clone, Debug)]
+pub struct Range(DateTime<UTC>, Duration);
+
+//struct Range<Tz: TimeZone> {
+    //o: DateTime<UTC>, // origin
+    //d: Duration,
+    //g: Granularity,
+//}
 
 // need Rc cause I want to clone sequences
-type Seq = Rc<Fn()->Box<Iterator<Item=Range>>>;
+pub type Seq = Rc<Fn()->Box<Iterator<Item=Range>>>;
 
-fn seq_dow(dow: u32) -> Seq {
+fn seq_dow(dow: usize) -> Seq {
     Rc::new(move || {
         let mut reftime = UTC::now().date();
-        let dow_reftime = reftime.weekday().num_days_from_sunday();
+        let dow_reftime = reftime.weekday().num_days_from_sunday() as usize;
         let diff = if dow < dow_reftime {
             (7 + dow - dow_reftime) % 7
         } else {
@@ -147,11 +152,11 @@ fn seq_dow(dow: u32) -> Seq {
     })
 }
 
-fn seq_month_of_year(moy: u32) -> Seq {
+fn seq_month_of_year(moy: usize) -> Seq {
     Rc::new(move || {
         let mut a_month = UTC::now().date();
         Box::new((0..).map(move |_| {
-            while moy != a_month.month() { a_month = next_month(a_month); }
+            while (moy as u32) != a_month.month() { a_month = next_month(a_month); }
             let t0 = a_month.and_hms(0, 0, 0);
             a_month = next_month(a_month); // force advance
             let d0 = a_month.and_hms(0, 0, 0) - t0;
@@ -159,6 +164,10 @@ fn seq_month_of_year(moy: u32) -> Seq {
         }))
     })
 }
+
+// 2 weeks after June 28th
+//fn shift(origin: Seq, delta: Duration, g: Granularity) -> Seq {
+//}
 
 // ej: 28th day of month
 // ej: 28th day of year
@@ -192,20 +201,6 @@ fn seq_nth(n: usize, win: Seq, within: Seq) -> Seq {
         }))
     })
 }
-
-        //let x = a.clone()().next().unwrap();
-        //let y = b.clone()().next().unwrap();
-        //let (a, b) = match y.1 < x.1 {
-            //true => (b, a),
-            //false => (a, b)
-        //};
-        //// TODO: not reseting <a> (and skipping to sync with next <b>) should we?
-        //Box::new(b().map(move |x| {
-            //let u = a().next();
-            //Range(UTC::now(), Duration::days(1))
-            ////a.skip_while(|y| y.0 < x.0)
-             ////.take_while(|y| (y.0 + y.1) <= (x.0 + x.1))
-        //}))
 
 fn intersect(a: Seq, b: Seq) -> Seq {
     Rc::new(move || {
@@ -280,48 +275,46 @@ fn seq_year() -> Seq {
 }
 
 
-#[derive(Debug)]
-pub enum Telem {
-    Duration(String),
-    Sequence(String), // set of ranges with identical granularity, eg: thursday (all possible thursdays)
-    Range(time::Tm, time::Tm),
-    Number(i32),
+//#[derive(Debug)]
+pub enum Tobj {
+    Duration(Duration),
+    Seq(Seq),
+    Range(Range),
+    Num(i32),
 }
 
-#[derive(Debug)]
-pub struct TimeContext(Vec<Telem>);
+//#[derive(Debug)]
+pub struct TimeContext(Vec<Tobj>);
 
 
-pub fn eval(ctx: &mut TimeContext, n: &Subtree) -> Option<Telem> {
+pub fn eval(ctx: &mut TimeContext, n: &Subtree) -> Tobj {
     match n {
         &Subtree::Node(ref sym, ref lexeme) => match sym.as_ref() {
             "<day-of-week>" => {
-                //let dow = day_of_week(lexeme).unwrap();
-                //seq(Duration::Day, )
-                Some(Telem::Sequence(lexeme.clone()))
+                let dow = day_of_week(lexeme).unwrap();
+                Tobj::Seq(seq_dow(dow ))
             },
             "<ordinal>" => {
                 let num = ordinals(lexeme).or(ordinal_digits(lexeme)).unwrap();
-                Some(Telem::Number(num as i32))
+                Tobj::Num(num as i32)
             },
             "<named-month>" => {
-                Some(Telem::Sequence(lexeme.clone()))
+                let month = month(lexeme).unwrap();
+                Tobj::Seq(seq_month_of_year(month))
             },
             _ => panic!()
         },
         &Subtree::SubT(ref spec, ref subn) => match spec.as_ref() {
-            "<time> -> this <day-of-week>" |
-            "<time> -> next <day-of-week>" => {
-                panic!()
-            },
-            "<time> -> <day-of-week>" => {
-                panic!()
-            },
             "<time> -> <named-month> <ordinal>" => {
-                let m = eval(ctx, &subn[0]).unwrap();
-                let d = eval(ctx, &subn[1]).unwrap();
-                Some(m)
-                //println!("what !! {:?} {:?}", m, d);
+                let m = match eval(ctx, &subn[0]) {
+                    Tobj::Seq(s) => s,
+                    _ => panic!(),
+                };
+                let d = match eval(ctx, &subn[1]) {
+                    Tobj::Num(n) => n,
+                    _ => panic!(),
+                };
+                Tobj::Seq(intersect(m, seq_nth(d as usize, seq_day(), seq_month())))
             },
             _ => panic!()
         }
@@ -351,16 +344,17 @@ fn main() {
     //let y = seq_dow(4);
     //for x in seq_nth(2, seq_dow(2), seq_month())().take(5) {
     //let y = seq_nth(3, seq_dow(4), seq_month());
-    let a = seq_month_of_year(8);
-    let b = seq_nth(3, seq_dow(4), seq_month());
-    let y = intersect(a, b);
-    for x in y().take(5) {
-        println!("{} - {} - {}", x.0, x.1, (x.0 + x.1));
-    }
-    println!("=========");
-    for x in y().take(5) {
-        println!("{} - {} - {}", x.0, x.1, (x.0 + x.1));
-    }
+    //let a = seq_month_of_year(8);
+    //let b = seq_nth(3, seq_dow(4), seq_month());
+    //let b = seq_nth(28, seq_day(), seq_month());
+    //let y = intersect(a, b);
+    //for x in y().take(5) {
+        //println!("{} - {} - {}", x.0, x.1, (x.0 + x.1));
+    //}
+    //println!("=========");
+    //for x in y().take(5) {
+        //println!("{} - {} - {}", x.0, x.1, (x.0 + x.1));
+    //}
 
     let parser = earley::EarleyParser::new(build_grammar());
 
@@ -376,7 +370,12 @@ fn main() {
                     println!("}}");
 
                     let mut ctx = TimeContext(Vec::new());
-                    println!("{:?}", eval(&mut ctx, &tree));
+                    match eval(&mut ctx, &tree) {
+                        Tobj::Seq(s) => {
+                            println!("{:?}", s().next().unwrap());
+                        },
+                        _ => panic!()
+                    }
                 }
             },
             Err(e) => println!("Parse err: {:?}", e)

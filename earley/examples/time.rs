@@ -124,23 +124,38 @@ pub enum Granularity {
     TempD, // constante dependent duration
 }
 
+#[derive(Clone)]
 struct Range(DateTime<UTC>, Duration);
 
 // need Rc cause I want to clone sequences
 type Seq = Rc<Fn()->Box<Iterator<Item=Range>>>;
 
-fn seq_dow(dow: usize) -> Seq {
+fn seq_dow(dow: u32) -> Seq {
     Rc::new(move || {
-        let reftime = UTC::now();
-        let dow_reftime = reftime.weekday().num_days_from_sunday() as i32;
-        let diff = if (dow as i32) < dow_reftime {
-            ((7 + dow as i32) - dow_reftime) % 7
+        let mut reftime = UTC::now().date();
+        let dow_reftime = reftime.weekday().num_days_from_sunday();
+        let diff = if dow < dow_reftime {
+            (7 + dow - dow_reftime) % 7
         } else {
-            dow as i32 - dow_reftime
+            dow - dow_reftime
         };
-        let reftime = reftime.date().with_day(reftime.day() + diff as u32).unwrap().and_hms(0, 0, 0);
+        for _ in 0..diff { reftime = reftime.succ(); }
+        let reftime = reftime.and_hms(0, 0, 0);
         Box::new((0..).map(move |x| {
             Range(reftime + Duration::days(x * 7), Duration::days(1))
+        }))
+    })
+}
+
+fn seq_month_of_year(moy: u32) -> Seq {
+    Rc::new(move || {
+        let mut a_month = UTC::now().date();
+        Box::new((0..).map(move |_| {
+            while moy != a_month.month() { a_month = next_month(a_month); }
+            let t0 = a_month.and_hms(0, 0, 0);
+            a_month = next_month(a_month); // force advance
+            let d0 = a_month.and_hms(0, 0, 0) - t0;
+            Range(t0, d0)
         }))
     })
 }
@@ -162,15 +177,59 @@ fn seq_dow(dow: usize) -> Seq {
 fn seq_nth(n: usize, win: Seq, within: Seq) -> Seq {
     // 1. take an instance of <within>
     // 2. cycle to the n-th instance if <win> within <within>
+    // TODO: panic on win.duration > within.duration
     Rc::new(move || {
         const fuse: usize = 10000;
+        // TODO: do we have to reset the <win> each time? maybe more efficient to carry on
         let win = win.clone();
         Box::new(within().take(fuse).filter_map(move |p| {
             let x = win().skip_while(|w| w.0 < p.0).nth(n - 1).unwrap();
-            match (x.0 + x.1) < (p.0 + p.1) {
+            // TODO: restricting to sub-interval: change to takw_while?
+            match (x.0 + x.1) <= (p.0 + p.1) {
                 true => Some(x),
                 false => None
             }
+        }))
+    })
+}
+
+        //let x = a.clone()().next().unwrap();
+        //let y = b.clone()().next().unwrap();
+        //let (a, b) = match y.1 < x.1 {
+            //true => (b, a),
+            //false => (a, b)
+        //};
+        //// TODO: not reseting <a> (and skipping to sync with next <b>) should we?
+        //Box::new(b().map(move |x| {
+            //let u = a().next();
+            //Range(UTC::now(), Duration::days(1))
+            ////a.skip_while(|y| y.0 < x.0)
+             ////.take_while(|y| (y.0 + y.1) <= (x.0 + x.1))
+        //}))
+
+fn intersect(a: Seq, b: Seq) -> Seq {
+    Rc::new(move || {
+        // make a the seq with shortest elem duration, b the one where these are largest
+        //let mut a = a().peekable();
+        //let mut b = b().peekable();
+        //let (mut a, mut b) = match b.peek().unwrap().1 < a.peek().unwrap().1 {
+            //true => (b, a),
+            //false => (a, b)
+        //};
+        // TODO: verify not consuming 1st elem
+        let x = a.clone()().next().unwrap();
+        let y = b.clone()().next().unwrap();
+        let (a, b) = match y.1 < x.1 {
+            true => (b.clone(), a.clone()),
+            false => (a.clone(), b.clone())
+        };
+        //unreachable!();
+        //let a = a.clone();
+        // TODO: not reseting <a> (and skipping to sync with next <b>) should we?
+        Box::new(b().flat_map(move |x| {
+            let x2 = x.clone();
+            a().skip_while(move |y| y.0 < x.0)
+             .take_while(move |y| (y.0 + y.1) <= (x2.0 + x2.1))
         }))
     })
 }
@@ -199,7 +258,7 @@ fn next_year<Tz: TimeZone>(mut d: Date<Tz>) -> Date<Tz> {
 fn seq_month() -> Seq {
     Rc::new(|| { // TODO: this_month should be passed in probably
         let mut this_month = UTC::now().date().with_day(1).unwrap();
-        Box::new((0..).map(move |x| {
+        Box::new((0..).map(move |_| {
             let t0 = this_month.and_hms(0, 0, 0);
             this_month = next_month(this_month);
             let d0 = this_month.and_hms(0, 0, 0) - t0;
@@ -219,6 +278,7 @@ fn seq_year() -> Seq {
         }))
     })
 }
+
 
 #[derive(Debug)]
 pub enum Telem {
@@ -288,10 +348,16 @@ fn main() {
     //for x in seq_nth(5, y, seq_year())().take(5) {
     //for x in seq_day()().take(5) {
     //for x in seq_nth(5, seq_month(), seq_year())().take(5) {
-    //let y = seq_dow(2); // tuesday
+    //let y = seq_dow(4);
     //for x in seq_nth(2, seq_dow(2), seq_month())().take(5) {
-    let y = seq_nth(3, seq_dow(4), seq_month());
-    //let y = seq_nth(4, y, seq_year());
+    //let y = seq_nth(3, seq_dow(4), seq_month());
+    let a = seq_month_of_year(8);
+    let b = seq_nth(3, seq_dow(4), seq_month());
+    let y = intersect(a, b);
+    for x in y().take(5) {
+        println!("{} - {} - {}", x.0, x.1, (x.0 + x.1));
+    }
+    println!("=========");
     for x in y().take(5) {
         println!("{} - {} - {}", x.0, x.1, (x.0 + x.1));
     }

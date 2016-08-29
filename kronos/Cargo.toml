@@ -1,0 +1,18 @@
+[package]
+name = "kronos"
+version = "0.0.1"
+authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
+description = "tools to manipulate time expressions"
+license = "MIT"
+repository = "https://github.com/rodolf0/tox"
+
+[dependencies]
+chrono = "0.2"
+
+[[example]]
+name = "time"
+path = "examples/time.rs"
+
+[dev-dependencies]
+toxearley = { version = "0.0.3", path = "../earley" }
+linenoise-rust = "0.2"

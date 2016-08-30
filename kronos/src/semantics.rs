@@ -110,7 +110,7 @@ pub fn month() -> Seq {
 pub fn year() -> Seq {
     Rc::new(|tm| {
         let mut tm = Date::from_ymd(tm.year(), 1, 1);
-        Box::new((0..).map(move |x| {
+        Box::new((0..).map(move |_| {
             let t0 = tm;
             tm = utils::startof_next_year(tm);
             Range{

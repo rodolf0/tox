@@ -1,4 +1,4 @@
-fn weekday(d: &str) -> Option<usize> {
+pub fn weekday(d: &str) -> Option<usize> {
     match d {
         "sunday"    |  "sun" => Some(0),
         "monday"    |  "mon" => Some(1),

@@ -9,10 +9,7 @@ repository = "https://github.com/rodolf0/tox"
 [dependencies]
 chrono = "0.2"
 
-[[example]]
-name = "time"
-path = "examples/time.rs"
-
 [dev-dependencies]
+lexers = { version = "0.0.4", path = "../lexers" }
 toxearley = { version = "0.0.3", path = "../earley" }
 linenoise-rust = "0.2"

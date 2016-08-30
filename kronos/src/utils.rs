@@ -11,6 +11,7 @@ pub fn startof_next_month(d: Date) -> Date {
     next_month
 }
 
+// TODO: could be intelligent about the loop
 pub fn startof_next_year(mut d: Date) -> Date {
     let y = d.year();
     let mut next_year = d.clone();

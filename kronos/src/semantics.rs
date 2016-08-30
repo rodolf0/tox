@@ -122,24 +122,30 @@ pub fn year(tm: DateTime) -> Seq {
     })
 }
 
-//fn seq_nth(n: usize, win: Seq, within: Seq) -> Seq {
-    //// 1. take an instance of <within>
-    //// 2. cycle to the n-th instance if <win> within <within>
-    //// TODO: panic on win.duration > within.duration
-    //Rc::new(move || {
-        //const fuse: usize = 10000;
-        //// TODO: do we have to reset the <win> each time? maybe more efficient to carry on
-        //let win = win.clone();
-        //Box::new(within().take(fuse).filter_map(move |p| {
-            //let x = win().skip_while(|w| w.0 < p.0).nth(n - 1).unwrap();
-            //// TODO: restricting to sub-interval: change to takw_while?
-            //match (x.0 + x.1) <= (p.0 + p.1) {
-                //true => Some(x),
-                //false => None
-            //}
-        //}))
-    //})
-//}
+// useful for sequence alignment
+pub fn seq_start(s: Seq) -> DateTime {
+    s().next().unwrap().start
+}
+
+pub fn nth(n: usize, win: Seq, within: Seq) -> Seq {
+    // For a predictable outcome you probably want aligned sequences
+    // 1. take an instance of <within>
+    // 2. cycle to the n-th instance if <win> within <within>
+    // TODO: panic on win.duration > within.duration (currently will return empty seq?)
+    Rc::new(move || {
+        const FUSE: usize = 10000;
+        // TODO: do we have to reset the <win> each time? maybe more efficient to carry on
+        let win = win.clone();
+        Box::new(within().take(FUSE).filter_map(move |outer| {
+            let x = win().skip_while(|inner| inner.start < outer.start)
+                         .nth(n - 1).unwrap();
+            match x.start >= outer.start && x.end <= outer.end {
+                true => Some(x),
+                false => None
+            }
+        }))
+    })
+}
 
 //fn intersect(a: Seq, b: Seq) -> Seq {
     //Rc::new(move || {
@@ -157,5 +163,3 @@ pub fn year(tm: DateTime) -> Seq {
         //}))
     //})
 //}
-
-

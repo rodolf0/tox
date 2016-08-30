@@ -187,3 +187,11 @@ fn test_nth_5() {
                 end: Date::from_ymd(2016, 5, 11).and_hms(0, 0, 0),
                 grain: Granularity::Day});
 }
+
+#[test] #[ignore] // expensive test
+fn test_nth_6() {
+    let reftime = Date::from_ymd(2016, 9, 1).and_hms(0, 0, 0);
+    // BAD test: 2nd month of the day
+    let mut flawed = s::nth(2, s::month(reftime), s::day(reftime))();
+    assert_eq!(flawed.next(), None);
+}

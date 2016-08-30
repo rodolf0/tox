@@ -134,7 +134,8 @@ pub fn nth(n: usize, win: Seq, within: Seq) -> Seq {
     // TODO: panic on win.duration > within.duration (currently will return empty seq?)
     Rc::new(move || {
         const FUSE: usize = 10000;
-        // TODO: do we have to reset the <win> each time? maybe more efficient to carry on
+        // we need a clone of win each time instead of continuing because we could have
+        // overflowed the outer <within> interval and we don't want to miss items
         let win = win.clone();
         Box::new(within().take(FUSE).filter_map(move |outer| {
             let x = win().skip_while(|inner| inner.start < outer.start)

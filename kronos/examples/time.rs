@@ -3,11 +3,13 @@ extern crate lexers;
 extern crate kronos;
 extern crate chrono;
 
+use kronos::constants as k;
+
 // https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj
 fn build_grammar() -> earley::Grammar {
     earley::GrammarBuilder::new()
       .symbol("<time>")
-      .symbol(("<day-of-week>", |d: &str| kronos::weekday(d).is_some()))
+      .symbol(("<day-of-week>", |d: &str| k::weekday(d).is_some()))
       //.symbol(("<ordinal (digit)>", |d: &str| ordinal_digits(d).is_some()))
       //.symbol(("<ordinal (names)>", |d: &str| ordinals(d).is_some()))
       //.symbol(("<ordinal>", |n: &str| ordinals(n).is_some() || ordinal_digits(n).is_some()))
@@ -59,7 +61,7 @@ pub fn eval(n: &earley::Subtree) -> Tobj {
     match n {
         &earley::Subtree::Node(ref sym, ref lexeme) => match sym.as_ref() {
             "<day-of-week>" => {
-                let dow = kronos::weekday(lexeme).unwrap();
+                let dow = k::weekday(lexeme).unwrap();
                 Tobj::Seq(kronos::day_of_week(dow))
             },
             //"<ordinal>" => {

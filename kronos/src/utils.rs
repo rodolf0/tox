@@ -1,6 +1,7 @@
 use chrono::naive::date::NaiveDate as Date;
 use chrono::Datelike;
 
+// TODO: could be intelligent about the loop
 pub fn startof_next_month(d: Date) -> Date {
     let m = d.month();
     let mut next_month = d.clone();
@@ -11,7 +12,10 @@ pub fn startof_next_month(d: Date) -> Date {
 }
 
 pub fn startof_next_year(mut d: Date) -> Date {
-    let thisyear = d.year();
-    while thisyear == d.year() { d = d.succ(); }
-    d
+    let y = d.year();
+    let mut next_year = d.clone();
+    while y == next_year.year() {
+        next_year = startof_next_month(next_year);
+    }
+    next_year
 }

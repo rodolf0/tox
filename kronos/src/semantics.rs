@@ -18,7 +18,7 @@ pub enum Granularity {
     //Quarter,
     //Weekend,
     //Week,
-    //Year,
+    Year,
     //Decade,
     //Century,
     //TempD, // constante dependent duration
@@ -69,7 +69,6 @@ pub fn month_of_year(tm: DateTime, moy: usize) -> Seq {
                 tm = utils::startof_next_month(tm);
             }
             let t0 = tm;
-            // get end of interval and advance to next cycle
             tm = utils::startof_next_month(tm);
             Range{
                 start: t0.and_hms(0, 0, 0),
@@ -80,9 +79,48 @@ pub fn month_of_year(tm: DateTime, moy: usize) -> Seq {
     })
 }
 
+pub fn day(tm: DateTime) -> Seq {
+    Rc::new(move || {
+        let tm = tm.date().and_hms(0, 0, 0);
+        Box::new((0..).map(move |x| {
+            Range{
+                start: tm + Duration::days(x),
+                end: tm + Duration::days(x+1),
+                grain: Granularity::Day
+            }
+        }))
+    })
+}
 
+pub fn month(tm: DateTime) -> Seq {
+    Rc::new(move || {
+        let mut tm = Date::from_ymd(tm.year(), tm.month(), 1);
+        Box::new((0..).map(move |_| {
+            let t0 = tm;
+            tm = utils::startof_next_month(tm);
+            Range{
+                start: t0.and_hms(0, 0, 0),
+                end: tm.and_hms(0, 0, 0),
+                grain: Granularity::Month
+            }
+        }))
+    })
+}
 
-
+pub fn year(tm: DateTime) -> Seq {
+    Rc::new(move || {
+        let mut tm = Date::from_ymd(tm.year(), 1, 1);
+        Box::new((0..).map(move |x| {
+            let t0 = tm;
+            tm = utils::startof_next_year(tm);
+            Range{
+                start: t0.and_hms(0, 0, 0),
+                end: tm.and_hms(0, 0, 0),
+                grain: Granularity::Year
+            }
+        }))
+    })
+}
 
 //fn seq_nth(n: usize, win: Seq, within: Seq) -> Seq {
     //// 1. take an instance of <within>
@@ -120,35 +158,4 @@ pub fn month_of_year(tm: DateTime, moy: usize) -> Seq {
     //})
 //}
 
-//fn seq_day() -> Seq {
-    //Rc::new(|| {
-        //let reftime = UTC::now().date().and_hms(0, 0, 0);
-        //Box::new((0..).map(move |x| {
-            //Range(reftime + Duration::days(x), Duration::days(1))
-        //}))
-    //})
-//}
 
-//fn seq_month() -> Seq {
-    //Rc::new(|| { // TODO: this_month should be passed in probably
-        //let mut this_month = UTC::now().date().with_day(1).unwrap();
-        //Box::new((0..).map(move |_| {
-            //let t0 = this_month.and_hms(0, 0, 0);
-            //this_month = next_month(this_month);
-            //let d0 = this_month.and_hms(0, 0, 0) - t0;
-            //Range(t0, d0)
-        //}))
-    //})
-//}
-
-//fn seq_year() -> Seq {
-    //Rc::new(|| { // TODO: this_month should be passed in probably
-        //let mut this_year = UTC::now().date().with_day(1).unwrap().with_month(1).unwrap();
-        //Box::new((0..).map(move |x| {
-            //let t0 = this_year.and_hms(0, 0, 0);
-            //this_year = next_year(this_year);
-            //let d0 = this_year.and_hms(0, 0, 0) - t0;
-            //Range(t0, d0)
-        //}))
-    //})
-//}

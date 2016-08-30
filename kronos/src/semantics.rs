@@ -148,19 +148,20 @@ pub fn nth(n: usize, win: Seq, within: Seq) -> Seq {
     })
 }
 
-//fn intersect(a: Seq, b: Seq) -> Seq {
-    //Rc::new(move || {
-        //let x = a.clone()().next().unwrap();
-        //let y = b.clone()().next().unwrap();
-        //let (a, b) = match y.1 < x.1 {
-            //true => (b.clone(), a.clone()),
-            //false => (a.clone(), b.clone())
-        //};
-        //// TODO: not reseting <a> (and skipping to sync with next <b>) should we?
-        //Box::new(b().flat_map(move |x| {
-            //let x2 = x.clone();
-            //a().skip_while(move |y| y.0 < x.0)
-             //.take_while(move |y| (y.0 + y.1) <= (x2.0 + x2.1))
-        //}))
-    //})
-//}
+pub fn intersect(a: Seq, b: Seq) -> Seq {
+    Rc::new(move || {
+        let x = a.clone()().next().unwrap();
+        let y = b.clone()().next().unwrap();
+        let (a, b) = match (y.end - y.start) < (x.end - x.start) {
+            true => (b.clone(), a.clone()),
+            false => (a.clone(), b.clone())
+        };
+        // we need a clone of win each time instead of continuing because we could have
+        // overflowed the outer <within> interval and we don't want to miss items
+        Box::new(b().flat_map(move |outer| {
+            let outer2 = outer.clone();
+            a().skip_while(move |inner| inner.start < outer.start)
+               .take_while(move |inner| inner.end <= outer2.end)
+        }))
+    })
+}

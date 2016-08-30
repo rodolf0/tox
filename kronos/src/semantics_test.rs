@@ -195,3 +195,22 @@ fn test_nth_6() {
     let mut flawed = s::nth(2, s::month(reftime), s::day(reftime))();
     assert_eq!(flawed.next(), None);
 }
+
+#[test]
+fn test_intersect_1() {
+    let reftime = Date::from_ymd(2016, 2, 25).and_hms(0, 0, 0);
+    // 28th of june
+    let mut jun28th = s::intersect(
+        s::month_of_year(reftime, 6),
+        s::nth(28, s::day(reftime), s::month(reftime)))();
+    assert_eq!(jun28th.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2016, 6, 28).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 6, 29).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+    assert_eq!(jun28th.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2017, 6, 28).and_hms(0, 0, 0),
+                end: Date::from_ymd(2017, 6, 29).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+}

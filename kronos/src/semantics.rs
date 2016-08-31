@@ -133,10 +133,6 @@ pub fn year() -> Seq {
     })
 }
 
-fn startof_seq(s: Seq, reftime: DateTime) -> DateTime {
-    s(reftime).next().unwrap().start
-}
-
 pub fn nth(n: usize, win: Seq, within: Seq) -> Seq {
     // For a predictable outcome you probably want aligned sequences
     // 1. take an instance of <within>
@@ -167,20 +163,21 @@ pub fn nth(n: usize, win: Seq, within: Seq) -> Seq {
 }
 
 pub fn intersect(a: Seq, b: Seq) -> Seq {
-    Rc::new(move |tm| {
-        // TODO: this looks ugly
-        let x = a(tm).next().unwrap();
-        let y = b(tm).next().unwrap();
-        let (a, b) = match (y.end - y.start) < (x.end - x.start) {
-            true => (b.clone(), a.clone()),
-            false => (a.clone(), b.clone())
-        };
-        // we need a clone of win each time instead of continuing because we could have
-        // overflowed the outer <within> interval and we don't want to miss items
-        Box::new(b(tm).flat_map(move |outer| {
-            a(tm).skip_while(move |inner| inner.start < outer.start)
-                 .take_while(move |inner| inner.end <= outer.end)
-        }))
+    let (a, b) = { // a is the seq with shortest duration items
+        let testtm = Date::from_ymd(2000, 1, 1).and_hms(0, 0, 0);
+        let x = a(testtm).next().unwrap();
+        let y = b(testtm).next().unwrap();
+        match (y.end - y.start) < (x.end - x.start) {
+            true => (b, a), false => (a, b)
+        }
+    };
+    Rc::new(move |reftime| {
+        let a = a.clone();
+        let align = b(reftime).next().unwrap().start;
+        Box::new(b(reftime).flat_map(move |outer| {
+            a(align).skip_while(move |inner| inner.start < outer.start)
+                    .take_while(move |inner| inner.end <= outer.end)
+        }).skip_while(move |range| range.end < reftime)) // overcome alignment
     })
 }
 

@@ -4,8 +4,6 @@ extern crate kronos;
 extern crate chrono;
 
 use chrono::naive::datetime::NaiveDateTime as DateTime;
-use chrono::naive::date::NaiveDate as Date;
-use chrono::Datelike;
 use kronos::constants as k;
 
 // https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj
@@ -77,6 +75,7 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
         },
         &earley::Subtree::SubT(ref spec, ref subn) => match spec.as_ref() {
             "<time> -> <day-of-week>" => {
+                // TODO: create macro to wrap all this crap
                 match eval(reftime, &subn[0]) {
                     Tobj::Seq(s) => Tobj::Range(s(reftime).next().unwrap()),
                     _ => panic!(),

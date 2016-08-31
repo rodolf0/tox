@@ -215,3 +215,60 @@ fn test_intersect_1() {
                 end: Date::from_ymd(2017, 6, 29).and_hms(0, 0, 0),
                 grain: Granularity::Day});
 }
+
+#[test]
+fn test_intersect_2() {
+    let reftime = Date::from_ymd(2016, 2, 25).and_hms(0, 0, 0);
+    // monday 28th
+    let mut mon28th = s::intersect(
+        s::day_of_week(1),
+        s::nth(28, s::day(), s::month()))(reftime);
+    assert_eq!(mon28th.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2016, 3, 28).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 3, 29).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+    assert_eq!(mon28th.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2016, 11, 28).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 11, 29).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+}
+
+#[test]
+fn test_intersect_3() {
+    let reftime = Date::from_ymd(2016, 2, 25).and_hms(0, 0, 0);
+    // thursdays of june
+    let junthurs = s::intersect(s::day_of_week(4), s::month_of_year(6));
+    let mut junthurs = junthurs(reftime);
+    assert_eq!(junthurs.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2016, 6, 2).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 6, 3).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+    assert_eq!(junthurs.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2016, 6, 9).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 6, 10).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+    assert_eq!(junthurs.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2016, 6, 16).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 6, 17).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+    assert_eq!(junthurs.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2016, 6, 23).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 6, 24).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+    assert_eq!(junthurs.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2016, 6, 30).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 7, 1).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+    assert_eq!(junthurs.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2017, 6, 1).and_hms(0, 0, 0),
+                end: Date::from_ymd(2017, 6, 2).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+}

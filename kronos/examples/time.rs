@@ -87,10 +87,8 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
                     Tobj::Num(n) => n,
                     _ => panic!(),
                 } as usize;
-                // need month alignment
-                let align = Date::from_ymd(reftime.year(), reftime.month(), 1);
                 let s = kronos::nth(n, kronos::day(), kronos::month());
-                Tobj::Range(s(align.and_hms(0, 0, 0)).next().unwrap())
+                Tobj::Range(s(reftime).next().unwrap())
             },
             //"<time> -> <named-month> <ordinal>" => {
                 //let m = match eval(ctx, &subn[0]) {

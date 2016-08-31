@@ -96,7 +96,7 @@ fn test_year() {
 
 #[test]
 fn test_nth_1() {
-    let reftime = Date::from_ymd(2016, 2, 1).and_hms(0, 0, 0);
+    let reftime = Date::from_ymd(2016, 2, 2).and_hms(0, 0, 0);
     // 3rd day of the month
     let mut day3 = s::nth(3, s::day(), s::month())(reftime);
     assert_eq!(day3.next().unwrap(),
@@ -113,8 +113,7 @@ fn test_nth_1() {
 
 #[test]
 fn test_nth_2() {
-    // reftime has to generate aligned weekday and month seqs
-    let reftime = Date::from_ymd(2016, 2, 1).and_hms(0, 0, 0);
+    let reftime = Date::from_ymd(2016, 2, 10).and_hms(0, 0, 0);
     // 3rd tuesday of the month
     let mut tue3mo = s::nth(3, s::day_of_week(2), s::month())(reftime);
     assert_eq!(tue3mo.next().unwrap(),
@@ -131,8 +130,7 @@ fn test_nth_2() {
 
 #[test]
 fn test_nth_3() {
-    // reftime has to generate aligned month and year sequence
-    let reftime = Date::from_ymd(2016, 1, 1).and_hms(0, 0, 0);
+    let reftime = Date::from_ymd(2016, 2, 23).and_hms(0, 0, 0);
     // 4th month of the year
     let mut years4thmo = s::nth(4, s::month(), s::year())(reftime);
     assert_eq!(years4thmo.next().unwrap(),
@@ -166,7 +164,7 @@ fn test_nth_4() {
 
 #[test]
 fn test_nth_5() {
-    let reftime = Date::from_ymd(2015, 1, 1).and_hms(0, 0, 0);
+    let reftime = Date::from_ymd(2015, 3, 11).and_hms(0, 0, 0);
     let mo10th = s::nth(10, s::day(), s::month());
     // the 5th 10th-day-of-the-month (each year)
     let mut y5th10thday = s::nth(5, mo10th, s::year())(reftime);
@@ -182,12 +180,21 @@ fn test_nth_5() {
                 grain: Granularity::Day});
 }
 
-#[test] #[ignore] // expensive test
+#[test]
 fn test_nth_6() {
-    let reftime = Date::from_ymd(2016, 9, 1).and_hms(0, 0, 0);
-    // BAD test: 2nd month of the day
-    let mut flawed = s::nth(2, s::month(), s::day())(reftime);
-    assert_eq!(flawed.next(), None);
+    let reftime = Date::from_ymd(2016, 8, 31).and_hms(0, 0, 0);
+    let mut first = s::nth(1, s::day(), s::month())(reftime);
+    assert_eq!(first.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2016, 9, 1).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 9, 2).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+    let mut thirtyfirst = s::nth(31, s::day(), s::month())(reftime);
+    assert_eq!(thirtyfirst.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2016, 8, 31).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 9, 1).and_hms(0, 0, 0),
+                grain: Granularity::Day});
 }
 
 #[test]

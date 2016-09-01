@@ -22,6 +22,7 @@ fn build_grammar() -> earley::Grammar {
       .rule("<time>", &["the", "<ordinal>"])                 // the 2nd
       .rule("<time>", &["<day-of-week>"])                    // thursday
       .rule("<time>", &["<named-month>"])                    // march
+      .rule("<time>", &["<named-month>", "<ordinal>"])
 
       //.rule("<time>", &["<time>", "<time>"])        // intersect 2 times
       //.rule("<time>", &["year"])                             // march
@@ -29,7 +30,6 @@ fn build_grammar() -> earley::Grammar {
       //.rule("<time>", &["next", "<day-of-week>"])            // next tuesday
       //.rule("<time>", &["last", "<time>"])                   // last week | last sunday | last friday
       //.rule("<time>", &["next", "<time>"])                   // last week | last sunday | last friday
-      //.rule("<time>", &["<named-month>", "<ordinal>"])
       //.rule("<time>", &["<ordinal>", "<time>", "of", "<time>"])
       //.rule("<time>", &["<time>", "before", "last"])
       //.rule("<time>", &["<time>", "after", "next"])
@@ -41,12 +41,25 @@ fn build_grammar() -> earley::Grammar {
 }
 
 
-//#[derive(Debug)]
 pub enum Tobj {
     //Duration(Duration),
     Seq(kronos::Seq),
     Range(kronos::Range),
     Num(i32),
+}
+
+macro_rules! xtract {
+    ($p:path, $e:expr) => (match $e {$p(x) => x, _ => panic!()})
+}
+
+macro_rules! seq_next {
+    ($s:expr, $reftime:expr) => (Tobj::Range($s($reftime).next().unwrap()))
+}
+
+macro_rules! next_eval_seq {
+    ($reftime:expr, $subtree:expr) => (
+        seq_next!(xtract!(Tobj::Seq, eval($reftime, &$subtree)), $reftime)
+    )
 }
 
 pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
@@ -68,37 +81,18 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
         },
         &earley::Subtree::SubT(ref spec, ref subn) => match spec.as_ref() {
             "<time> -> the <ordinal>" => {
-                let n = match eval(reftime, &subn[1]) {
-                    Tobj::Num(n) => n,
-                    _ => panic!(),
-                } as usize;
-                let s = kronos::nth(n, kronos::day(), kronos::month());
-                Tobj::Range(s(reftime).next().unwrap())
+                let n = xtract!(Tobj::Num, eval(reftime, &subn[1])) as usize;
+                seq_next!(kronos::nth(n, kronos::day(), kronos::month()), reftime)
             },
-            "<time> -> <day-of-week>" => {
-                // TODO: create macro to wrap all this crap
-                match eval(reftime, &subn[0]) {
-                    Tobj::Seq(s) => Tobj::Range(s(reftime).next().unwrap()),
-                    _ => panic!(),
-                }
+            "<time> -> <day-of-week>" => next_eval_seq!(reftime, &subn[0]),
+            "<time> -> <named-month>" => next_eval_seq!(reftime, &subn[0]),
+            "<time> -> <named-month> <ordinal>" => {
+                let m = xtract!(Tobj::Seq, eval(reftime, &subn[0]));
+                let d = xtract!(Tobj::Num, eval(reftime, &subn[1])) as usize;
+                seq_next!(kronos::intersect(m,
+                            kronos::nth(d, kronos::day(), kronos::month())),
+                          reftime)
             },
-            "<time> -> <named-month>" => {
-                match eval(reftime, &subn[0]) {
-                    Tobj::Seq(s) => Tobj::Range(s(reftime).next().unwrap()),
-                    _ => panic!(),
-                }
-            },
-            //"<time> -> <named-month> <ordinal>" => {
-                //let m = match eval(ctx, &subn[0]) {
-                    //Tobj::Seq(s) => s,
-                    //_ => panic!(),
-                //};
-                //let d = match eval(ctx, &subn[1]) {
-                    //Tobj::Num(n) => n,
-                    //_ => panic!(),
-                //};
-                //Tobj::Seq(intersect(m, seq_nth(d as usize, seq_day(), seq_month())))
-            //},
             _ => panic!()
         }
     }

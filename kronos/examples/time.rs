@@ -9,7 +9,7 @@ use kronos::constants as k;
 // https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj
 fn build_grammar() -> earley::Grammar {
     static STOP_WORDS: &'static [&'static str] = &[
-        "this", "next", "the", "last", "before", "after", "of"
+        "this", "next", "the", "last", "before", "after", "of", "on"
     ];
     let mut gb = earley::GrammarBuilder::new();
     for sw in STOP_WORDS { gb = gb.symbol((*sw, move |n: &str| n == *sw)); }
@@ -17,12 +17,13 @@ fn build_grammar() -> earley::Grammar {
     gb.symbol("<time>")
       .symbol(("<day-of-week>", |d: &str| k::weekday(d).is_some()))
       .symbol(("<ordinal>", |n: &str| k::ordinal(n).or(k::short_ordinal(n)).is_some()))
-      //.symbol(("<named-month>", |m: &str| month(m).is_some()))
+      .symbol(("<named-month>", |m: &str| k::month(m).is_some()))
 
-      .rule("<time>", &["<day-of-week>"])                    // thursday
       .rule("<time>", &["the", "<ordinal>"])                 // the 2nd
+      .rule("<time>", &["<day-of-week>"])                    // thursday
+      .rule("<time>", &["<named-month>"])                    // march
+
       //.rule("<time>", &["<time>", "<time>"])        // intersect 2 times
-      //.rule("<time>", &["<named-month>"])                    // march
       //.rule("<time>", &["year"])                             // march
       //.rule("<time>", &["this", "<day-of-week>"])            // next tuesday
       //.rule("<time>", &["next", "<day-of-week>"])            // next tuesday
@@ -59,20 +60,13 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
                 let num = k::ordinal(lexeme).or(k::short_ordinal(lexeme)).unwrap();
                 Tobj::Num(num as i32)
             },
-            //"<named-month>" => {
-                //let month = month(lexeme).unwrap();
-                //Tobj::Seq(seq_month_of_year(month))
-            //},
+            "<named-month>" => {
+                let month = k::month(lexeme).unwrap();
+                Tobj::Seq(kronos::month_of_year(month))
+            },
             _ => panic!()
         },
         &earley::Subtree::SubT(ref spec, ref subn) => match spec.as_ref() {
-            "<time> -> <day-of-week>" => {
-                // TODO: create macro to wrap all this crap
-                match eval(reftime, &subn[0]) {
-                    Tobj::Seq(s) => Tobj::Range(s(reftime).next().unwrap()),
-                    _ => panic!(),
-                }
-            },
             "<time> -> the <ordinal>" => {
                 let n = match eval(reftime, &subn[1]) {
                     Tobj::Num(n) => n,
@@ -80,6 +74,19 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
                 } as usize;
                 let s = kronos::nth(n, kronos::day(), kronos::month());
                 Tobj::Range(s(reftime).next().unwrap())
+            },
+            "<time> -> <day-of-week>" => {
+                // TODO: create macro to wrap all this crap
+                match eval(reftime, &subn[0]) {
+                    Tobj::Seq(s) => Tobj::Range(s(reftime).next().unwrap()),
+                    _ => panic!(),
+                }
+            },
+            "<time> -> <named-month>" => {
+                match eval(reftime, &subn[0]) {
+                    Tobj::Seq(s) => Tobj::Range(s(reftime).next().unwrap()),
+                    _ => panic!(),
+                }
             },
             //"<time> -> <named-month> <ordinal>" => {
                 //let m = match eval(ctx, &subn[0]) {

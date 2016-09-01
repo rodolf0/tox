@@ -63,6 +63,22 @@ fn test_day() {
 }
 
 #[test]
+fn test_week() {
+    let reftime = Date::from_ymd(2016, 1, 1).and_hms(0, 0, 0);
+    let mut days = s::week()(reftime);
+    assert_eq!(days.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2015, 12, 28).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 1, 4).and_hms(0, 0, 0),
+                grain: Granularity::Week});
+    assert_eq!(days.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2016, 1, 4).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 1, 11).and_hms(0, 0, 0),
+                grain: Granularity::Week});
+}
+
+#[test]
 fn test_month() {
     let reftime = Date::from_ymd(2015, 2, 27).and_hms(0, 0, 0);
     let mut months = s::month()(reftime);

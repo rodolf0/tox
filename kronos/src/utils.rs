@@ -12,6 +12,16 @@ pub fn startof_next_month(d: Date) -> Date {
 }
 
 // TODO: could be intelligent about the loop
+pub fn startof_next_week(d: Date) -> Date {
+    let week = d.isoweekdate().1;
+    let mut next_week = d.clone();
+    while week == next_week.isoweekdate().1 {
+        next_week = next_week.succ();
+    }
+    next_week
+}
+
+// TODO: could be intelligent about the loop
 pub fn startof_next_year(d: Date) -> Date {
     let y = d.year();
     let mut next_year = d.clone();

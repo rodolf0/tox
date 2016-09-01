@@ -1,4 +1,4 @@
-use chrono::{Duration, Datelike};
+use chrono::{Duration, Datelike, Weekday};
 use chrono::naive::datetime::NaiveDateTime as DateTime;
 use chrono::naive::date::NaiveDate as Date;
 
@@ -20,7 +20,7 @@ pub enum Granularity {
     //Season,
     //Quarter,
     //Weekend,
-    //Week,
+    Week,
     Year,
     //Decade,
     //Century,
@@ -96,6 +96,24 @@ pub fn day() -> Seq {
                 start: tm + Duration::days(x),
                 end: tm + Duration::days(x+1),
                 grain: Granularity::Day
+            }
+        }))
+    })
+}
+
+pub fn week() -> Seq {
+    Rc::new(|reftime| {
+        // X-precondition: (endtime = tm + 1 week) > reftime
+        let mut tm = Date::from_isoywd(reftime.isoweekdate().0,
+                                       reftime.isoweekdate().1,
+                                       Weekday::Mon);
+        Box::new((0..).map(move |_| {
+            let t0 = tm;
+            tm = utils::startof_next_week(tm);
+            Range{
+                start: t0.and_hms(0, 0, 0),
+                end: tm.and_hms(0, 0, 0),
+                grain: Granularity::Week
             }
         }))
     })

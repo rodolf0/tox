@@ -8,24 +8,16 @@ use kronos::constants as k;
 
 // https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj
 fn build_grammar() -> earley::Grammar {
-    earley::GrammarBuilder::new()
-      .symbol("<time>")
+    static STOP_WORDS: &'static [&'static str] = &[
+        "this", "next", "the", "last", "before", "after", "of"
+    ];
+    let mut gb = earley::GrammarBuilder::new();
+    for sw in STOP_WORDS { gb = gb.symbol((*sw, move |n: &str| n == *sw)); }
+
+    gb.symbol("<time>")
       .symbol(("<day-of-week>", |d: &str| k::weekday(d).is_some()))
       .symbol(("<ordinal>", |n: &str| k::ordinal(n).or(k::short_ordinal(n)).is_some()))
       //.symbol(("<named-month>", |m: &str| month(m).is_some()))
-
-      //.symbol(("this", |n: &str| n == "this"))
-      //.symbol(("next", |n: &str| n == "next"))
-      .symbol(("the", |n: &str| n == "the"))
-      //.symbol(("last", |n: &str| n == "last"))
-      //.symbol(("before", |n: &str| n == "before"))
-      //.symbol(("after", |n: &str| n == "after"))
-      //.symbol(("of", |n: &str| n == "of"))
-      //.symbol(("now", |n: &str| n == "now"))
-      //.symbol(("today", |n: &str| n == "today"))
-      //.symbol(("tomorrow", |n: &str| n == "tomorrow"))
-      //.symbol(("yesterday", |n: &str| n == "yesterday"))
-      //.symbol(("year", |n: &str| n == "year"))
 
       .rule("<time>", &["<day-of-week>"])                    // thursday
       .rule("<time>", &["the", "<ordinal>"])                 // the 2nd

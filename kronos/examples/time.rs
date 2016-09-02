@@ -10,7 +10,8 @@ use std::str::FromStr;
 // https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj
 fn build_grammar() -> earley::Grammar {
     static STOP_WORDS: &'static [&'static str] = &[
-        "this", "next", "the", "last", "before", "after", "of", "on", "weekend"
+        "this", "next", "the", "last", "before", "after", "of", "on",
+        "weekend", "summer", "autumn", "spring", "winter",
     ];
     let mut gb = earley::GrammarBuilder::new();
     for sw in STOP_WORDS { gb = gb.symbol((*sw, move |n: &str| n == *sw)); }
@@ -32,13 +33,21 @@ fn build_grammar() -> earley::Grammar {
 
       .rule("<time>", &["<time>", "<time>"])                 // intersect 2 times
       .rule("<time>", &["<ordinal>", "<time>", "of", "<time>"])
+      .rule("<time>", &["the", "<ordinal>", "<time>", "of", "<time>"])
+
+      // TODO: requires Seq-interval
+      //.rule("<time>", &["summer"])
+      //.rule("<time>", &["spring"])
+      //.rule("<time>", &["autumn"])
+      //.rule("<time>", &["winter"])
+
+      //.rule("<grain/range>", &["weeks"]) | "days" ...
+      //.rule("<time>", &["in" , "<number>", "<grain/range>"])
 
       //.rule("<time>", &["last", "<time>"])                   // last week | last sunday | last friday
       //.rule("<time>", &["<time>", "before", "last"])
       //.rule("<time>", &["<time>", "after", "next"])
       //.rule("<time>", &["<ordinal>", "<time>", "after", "<time>"])
-      //.rule("<time>", &["<ordinal>", "<time>", "of", "<time>"])
-      //.rule("<time>", &["the", "<ordinal>", "<time>", "of", "<time>"])
 
       .into_grammar("<time>")
 }
@@ -86,7 +95,6 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
             "<time> -> <day-of-week> <number>" => {
                 let m = xtract!(Tobj::Seq, eval(reftime, &subn[0]));
                 let d = xtract!(Tobj::Num, eval(reftime, &subn[1])) as usize;
-                // TODO: assert 1 <= d <= days-in-month
                 Tobj::Seq(kronos::intersect(m, kronos::nth(d, kronos::day(), kronos::month())))
             },
             "<time> -> weekend" => Tobj::Seq(kronos::weekend()),
@@ -120,6 +128,7 @@ fn main() {
         Ok(state) => for tree in earley::all_trees(parser.g.start(), &state) {
             let reftime = chrono::Local::now().naive_local();
             let r = xtract!(Tobj::Seq, eval(reftime, &tree));
+            // TODO: fuse after max-n elements
             println!("{:?}", r(reftime).next().unwrap());
         },
         Err(e) => println!("Parse err: {:?}", e)

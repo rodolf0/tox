@@ -197,6 +197,8 @@ pub fn nth(n: usize, win: Seq, within: Seq) -> Seq {
     })
 }
 
+// TODO: add fn lastof(win: Seq, within: Seq) -> Seq
+
 pub fn intersect(a: Seq, b: Seq) -> Seq {
     let (a, b) = { // a is the seq with shortest duration items
         let testtm = Date::from_ymd(2000, 1, 1).and_hms(0, 0, 0);

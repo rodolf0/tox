@@ -19,7 +19,7 @@ pub enum Granularity {
     Month,
     //Season,
     //Quarter,
-    //Weekend,
+    Weekend,
     Week,
     Year,
     //Decade,
@@ -96,6 +96,23 @@ pub fn day() -> Seq {
                 start: tm + Duration::days(x),
                 end: tm + Duration::days(x+1),
                 grain: Granularity::Day
+            }
+        }))
+    })
+}
+
+pub fn weekend() -> Seq {
+    Rc::new(|reftime| {
+        let mut tm = reftime.date();
+        while tm.weekday() != Weekday::Sat {
+            tm = tm.succ();
+        }
+        let tm = tm.and_hms(0, 0, 0);
+        Box::new((0..).map(move |x| {
+            Range{
+                start: tm + Duration::days(x * 7),
+                end: tm + Duration::days(x * 7 + 2),
+                grain: Granularity::Weekend
             }
         }))
     })

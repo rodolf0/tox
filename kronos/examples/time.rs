@@ -10,7 +10,7 @@ use std::str::FromStr;
 // https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj
 fn build_grammar() -> earley::Grammar {
     static STOP_WORDS: &'static [&'static str] = &[
-        "this", "next", "the", "last", "before", "after", "of", "on"
+        "this", "next", "the", "last", "before", "after", "of", "on", "weekend"
     ];
     let mut gb = earley::GrammarBuilder::new();
     for sw in STOP_WORDS { gb = gb.symbol((*sw, move |n: &str| n == *sw)); }
@@ -24,7 +24,8 @@ fn build_grammar() -> earley::Grammar {
       .rule("<time>", &["the", "<ordinal>"])                 // the 2nd
       .rule("<time>", &["<day-of-week>"])                    // thursday
       .rule("<time>", &["<named-month>"])                    // march
-      .rule("<time>", &["<number>"])                         // 1984 (year)
+      .rule("<time>", &["<number>"])                         // TODO: 1984 (year)
+      .rule("<time>", &["weekend"])                          // weekend
       .rule("<time>", &["<named-month>", "<ordinal>"])
       .rule("<time>", &["<named-month>", "<number>"])
       .rule("<time>", &["<day-of-week>", "<ordinal>"])
@@ -104,6 +105,7 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
                             kronos::nth(d, kronos::day(), kronos::month())),
                           reftime)
             },
+            "<time> -> weekend" => seq_next!(kronos::weekend(), reftime),
             _ => panic!()
         }
     }

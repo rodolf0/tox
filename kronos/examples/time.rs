@@ -24,19 +24,15 @@ fn build_grammar() -> earley::Grammar {
       .rule("<time>", &["the", "<ordinal>"])                 // the 2nd
       .rule("<time>", &["<day-of-week>"])                    // thursday
       .rule("<time>", &["<named-month>"])                    // march
-      .rule("<time>", &["<number>"])                         // TODO: 1984 (year)
       .rule("<time>", &["weekend"])                          // weekend
       .rule("<time>", &["<named-month>", "<ordinal>"])
       .rule("<time>", &["<named-month>", "<number>"])
       .rule("<time>", &["<day-of-week>", "<ordinal>"])
       .rule("<time>", &["<day-of-week>", "<number>"])
 
-      //.rule("<time>", &["<time>", "<time>"])        // intersect 2 times
-      //.rule("<time>", &["year"])                             // march
-      //.rule("<time>", &["this", "<day-of-week>"])            // next tuesday
-      //.rule("<time>", &["next", "<day-of-week>"])            // next tuesday
+      .rule("<time>", &["<time>", "<time>"])                 // intersect 2 times
+
       //.rule("<time>", &["last", "<time>"])                   // last week | last sunday | last friday
-      //.rule("<time>", &["next", "<time>"])                   // last week | last sunday | last friday
       //.rule("<time>", &["<ordinal>", "<time>", "of", "<time>"])
       //.rule("<time>", &["<time>", "before", "last"])
       //.rule("<time>", &["<time>", "after", "next"])
@@ -57,16 +53,6 @@ pub enum Tobj {
 
 macro_rules! xtract {
     ($p:path, $e:expr) => (match $e {$p(x) => x, _ => panic!()})
-}
-
-macro_rules! seq_next {
-    ($s:expr, $reftime:expr) => (Tobj::Range($s($reftime).next().unwrap()))
-}
-
-macro_rules! next_eval_seq {
-    ($reftime:expr, $subtree:expr) => (
-        seq_next!(xtract!(Tobj::Seq, eval($reftime, &$subtree)), $reftime)
-    )
 }
 
 pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
@@ -90,10 +76,10 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
         &earley::Subtree::SubT(ref spec, ref subn) => match spec.as_ref() {
             "<time> -> the <ordinal>" => {
                 let n = xtract!(Tobj::Num, eval(reftime, &subn[1])) as usize;
-                seq_next!(kronos::nth(n, kronos::day(), kronos::month()), reftime)
+                Tobj::Seq(kronos::nth(n, kronos::day(), kronos::month()))
             },
             "<time> -> <day-of-week>" |
-            "<time> -> <named-month>" => next_eval_seq!(reftime, &subn[0]),
+            "<time> -> <named-month>" => eval(reftime, &subn[0]),
             "<time> -> <named-month> <ordinal>" |
             "<time> -> <named-month> <number>" |
             "<time> -> <day-of-week> <ordinal>" |
@@ -101,11 +87,14 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
                 let m = xtract!(Tobj::Seq, eval(reftime, &subn[0]));
                 let d = xtract!(Tobj::Num, eval(reftime, &subn[1])) as usize;
                 // TODO: assert 1 <= d <= days-in-month
-                seq_next!(kronos::intersect(m,
-                            kronos::nth(d, kronos::day(), kronos::month())),
-                          reftime)
+                Tobj::Seq(kronos::intersect(m, kronos::nth(d, kronos::day(), kronos::month())))
             },
-            "<time> -> weekend" => seq_next!(kronos::weekend(), reftime),
+            "<time> -> weekend" => Tobj::Seq(kronos::weekend()),
+            "<time> -> <time> <time>" => {
+                let s1 = xtract!(Tobj::Seq, eval(reftime, &subn[0]));
+                let s2 = xtract!(Tobj::Seq, eval(reftime, &subn[1]));
+                Tobj::Seq(kronos::intersect(s1, s2))
+            },
             _ => panic!()
         }
     }
@@ -124,12 +113,8 @@ fn main() {
     match parser.parse(&mut tokenizer) {
         Ok(state) => for tree in earley::all_trees(parser.g.start(), &state) {
             let reftime = chrono::Local::now().naive_local();
-            match eval(reftime, &tree) {
-                Tobj::Range(r) => {
-                    println!("{:?}", r);
-                },
-                _ => panic!()
-            }
+            let r = xtract!(Tobj::Seq, eval(reftime, &tree));
+            println!("{:?}", r(reftime).next().unwrap());
         },
         Err(e) => println!("Parse err: {:?}", e)
     }

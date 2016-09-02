@@ -31,9 +31,9 @@ fn build_grammar() -> earley::Grammar {
       .rule("<time>", &["<day-of-week>", "<number>"])
 
       .rule("<time>", &["<time>", "<time>"])                 // intersect 2 times
+      .rule("<time>", &["<ordinal>", "<time>", "of", "<time>"])
 
       //.rule("<time>", &["last", "<time>"])                   // last week | last sunday | last friday
-      //.rule("<time>", &["<ordinal>", "<time>", "of", "<time>"])
       //.rule("<time>", &["<time>", "before", "last"])
       //.rule("<time>", &["<time>", "after", "next"])
       //.rule("<time>", &["<ordinal>", "<time>", "after", "<time>"])
@@ -71,7 +71,7 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
                 Tobj::Num(num as i32)
             },
             "<number>" => Tobj::Num(i32::from_str(lexeme).unwrap()),
-            _ => panic!()
+            _ => panic!("Unknown sym={:?} lexeme={:?}", sym, lexeme)
         },
         &earley::Subtree::SubT(ref spec, ref subn) => match spec.as_ref() {
             "<time> -> the <ordinal>" => {
@@ -94,6 +94,12 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
                 let s1 = xtract!(Tobj::Seq, eval(reftime, &subn[0]));
                 let s2 = xtract!(Tobj::Seq, eval(reftime, &subn[1]));
                 Tobj::Seq(kronos::intersect(s1, s2))
+            },
+            "<time> -> <ordinal> <time> of <time>" => {
+                let n = xtract!(Tobj::Num, eval(reftime, &subn[0])) as usize;
+                let s1 = xtract!(Tobj::Seq, eval(reftime, &subn[1]));
+                let s2 = xtract!(Tobj::Seq, eval(reftime, &subn[3]));
+                Tobj::Seq(kronos::nth(n, s1, s2))
             },
             _ => panic!()
         }

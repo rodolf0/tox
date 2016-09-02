@@ -5,6 +5,7 @@ extern crate chrono;
 
 use chrono::naive::datetime::NaiveDateTime as DateTime;
 use kronos::constants as k;
+use std::str::FromStr;
 
 // https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj
 fn build_grammar() -> earley::Grammar {
@@ -16,13 +17,18 @@ fn build_grammar() -> earley::Grammar {
 
     gb.symbol("<time>")
       .symbol(("<day-of-week>", |d: &str| k::weekday(d).is_some()))
-      .symbol(("<ordinal>", |n: &str| k::ordinal(n).or(k::short_ordinal(n)).is_some()))
       .symbol(("<named-month>", |m: &str| k::month(m).is_some()))
+      .symbol(("<ordinal>", |n: &str| k::ordinal(n).or(k::short_ordinal(n)).is_some()))
+      .symbol(("<number>", |n: &str| i32::from_str(n).is_ok()))
 
       .rule("<time>", &["the", "<ordinal>"])                 // the 2nd
       .rule("<time>", &["<day-of-week>"])                    // thursday
       .rule("<time>", &["<named-month>"])                    // march
+      .rule("<time>", &["<number>"])                         // 1984 (year)
       .rule("<time>", &["<named-month>", "<ordinal>"])
+      .rule("<time>", &["<named-month>", "<number>"])
+      .rule("<time>", &["<day-of-week>", "<ordinal>"])
+      .rule("<time>", &["<day-of-week>", "<number>"])
 
       //.rule("<time>", &["<time>", "<time>"])        // intersect 2 times
       //.rule("<time>", &["year"])                             // march
@@ -69,14 +75,15 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
                 let dow = k::weekday(lexeme).unwrap();
                 Tobj::Seq(kronos::day_of_week(dow))
             },
-            "<ordinal>" => {
-                let num = k::ordinal(lexeme).or(k::short_ordinal(lexeme)).unwrap();
-                Tobj::Num(num as i32)
-            },
             "<named-month>" => {
                 let month = k::month(lexeme).unwrap();
                 Tobj::Seq(kronos::month_of_year(month))
             },
+            "<ordinal>" => {
+                let num = k::ordinal(lexeme).or(k::short_ordinal(lexeme)).unwrap();
+                Tobj::Num(num as i32)
+            },
+            "<number>" => Tobj::Num(i32::from_str(lexeme).unwrap()),
             _ => panic!()
         },
         &earley::Subtree::SubT(ref spec, ref subn) => match spec.as_ref() {
@@ -84,11 +91,15 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
                 let n = xtract!(Tobj::Num, eval(reftime, &subn[1])) as usize;
                 seq_next!(kronos::nth(n, kronos::day(), kronos::month()), reftime)
             },
-            "<time> -> <day-of-week>" => next_eval_seq!(reftime, &subn[0]),
+            "<time> -> <day-of-week>" |
             "<time> -> <named-month>" => next_eval_seq!(reftime, &subn[0]),
-            "<time> -> <named-month> <ordinal>" => {
+            "<time> -> <named-month> <ordinal>" |
+            "<time> -> <named-month> <number>" |
+            "<time> -> <day-of-week> <ordinal>" |
+            "<time> -> <day-of-week> <number>" => {
                 let m = xtract!(Tobj::Seq, eval(reftime, &subn[0]));
                 let d = xtract!(Tobj::Num, eval(reftime, &subn[1])) as usize;
+                // TODO: assert 1 <= d <= days-in-month
                 seq_next!(kronos::intersect(m,
                             kronos::nth(d, kronos::day(), kronos::month())),
                           reftime)

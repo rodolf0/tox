@@ -11,7 +11,7 @@ use std::str::FromStr;
 fn build_grammar() -> earley::Grammar {
     static STOP_WORDS: &'static [&'static str] = &[
         "this", "next", "the", "last", "before", "after", "of", "on",
-        "weekend", "summer", "autumn", "spring", "winter",
+        "weekend", "summer", "autumn", "spring", "winter", "quarter", "year",
     ];
     let mut gb = earley::GrammarBuilder::new();
     for sw in STOP_WORDS { gb = gb.symbol((*sw, move |n: &str| n == *sw)); }
@@ -26,6 +26,8 @@ fn build_grammar() -> earley::Grammar {
       .rule("<time>", &["<day-of-week>"])                    // thursday
       .rule("<time>", &["<named-month>"])                    // march
       .rule("<time>", &["weekend"])                          // weekend
+      .rule("<time>", &["quarter"])
+      .rule("<time>", &["<number>"])                         // year
       .rule("<time>", &["<named-month>", "<ordinal>"])
       .rule("<time>", &["<named-month>", "<number>"])
       .rule("<time>", &["<day-of-week>", "<ordinal>"])
@@ -64,9 +66,9 @@ macro_rules! xtract {
     ($p:path, $e:expr) => (match $e {$p(x) => x, _ => panic!()})
 }
 
-pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
-    match n {
-        &earley::Subtree::Node(ref sym, ref lexeme) => match sym.as_ref() {
+pub fn leafeval(n: &earley::Subtree) -> Tobj {
+    if let &earley::Subtree::Node(ref sym, ref lexeme) = n {
+        match sym.as_ref() {
             "<day-of-week>" => {
                 let dow = k::weekday(lexeme).unwrap();
                 Tobj::Seq(kronos::day_of_week(dow))
@@ -81,36 +83,47 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
             },
             "<number>" => Tobj::Num(i32::from_str(lexeme).unwrap()),
             _ => panic!("Unknown sym={:?} lexeme={:?}", sym, lexeme)
-        },
-        &earley::Subtree::SubT(ref spec, ref subn) => match spec.as_ref() {
+        }
+    } else {
+        panic!("Couldn't evaluate terminal {:?}", n);
+    }
+}
+
+pub fn eval(reftime: DateTime, n: &earley::Subtree) -> kronos::Seq {
+    if let &earley::Subtree::SubT(ref spec, ref subn) = n {
+        match spec.as_ref() {
             "<time> -> the <ordinal>" => {
-                let n = xtract!(Tobj::Num, eval(reftime, &subn[1])) as usize;
-                Tobj::Seq(kronos::nth(n, kronos::day(), kronos::month()))
+                let n = xtract!(Tobj::Num, leafeval(&subn[1])) as usize;
+                kronos::nth(n, kronos::day(), kronos::month())
             },
             "<time> -> <day-of-week>" |
-            "<time> -> <named-month>" => eval(reftime, &subn[0]),
+            "<time> -> <named-month>" => xtract!(Tobj::Seq, leafeval(&subn[0])),
             "<time> -> <named-month> <ordinal>" |
             "<time> -> <named-month> <number>" |
             "<time> -> <day-of-week> <ordinal>" |
             "<time> -> <day-of-week> <number>" => {
-                let m = xtract!(Tobj::Seq, eval(reftime, &subn[0]));
-                let d = xtract!(Tobj::Num, eval(reftime, &subn[1])) as usize;
-                Tobj::Seq(kronos::intersect(m, kronos::nth(d, kronos::day(), kronos::month())))
+                let m = xtract!(Tobj::Seq, leafeval(&subn[0]));
+                let d = xtract!(Tobj::Num, leafeval(&subn[1])) as usize;
+                kronos::intersect(m, kronos::nth(d, kronos::day(), kronos::month()))
             },
-            "<time> -> weekend" => Tobj::Seq(kronos::weekend()),
+            "<time> -> weekend" => kronos::weekend(),
+            "<time> -> quarter" => kronos::quarter(),
+            "<time> -> <number>" => {
+                panic!("broken because of evaluation of intersections with current-time");
+                let y = xtract!(Tobj::Num, leafeval(&subn[0])) as usize;
+                kronos::a_year(y)
+            },
             "<time> -> <time> <time>" => {
-                let s1 = xtract!(Tobj::Seq, eval(reftime, &subn[0]));
-                let s2 = xtract!(Tobj::Seq, eval(reftime, &subn[1]));
-                Tobj::Seq(kronos::intersect(s1, s2))
+                kronos::intersect(eval(reftime, &subn[0]), eval(reftime, &subn[1]))
             },
             "<time> -> <ordinal> <time> of <time>" => {
-                let n = xtract!(Tobj::Num, eval(reftime, &subn[0])) as usize;
-                let s1 = xtract!(Tobj::Seq, eval(reftime, &subn[1]));
-                let s2 = xtract!(Tobj::Seq, eval(reftime, &subn[3]));
-                Tobj::Seq(kronos::nth(n, s1, s2))
+                let n = xtract!(Tobj::Num, leafeval(&subn[0])) as usize;
+                kronos::nth(n, eval(reftime, &subn[1]), eval(reftime, &subn[3]))
             },
             _ => panic!("Unknown spec={:?}", spec)
         }
+    } else {
+        unreachable!("what!");
     }
 }
 
@@ -127,11 +140,8 @@ fn main() {
     match parser.parse(&mut tokenizer) {
         Ok(state) => for tree in earley::all_trees(parser.g.start(), &state) {
             let reftime = chrono::Local::now().naive_local();
-            match eval(reftime, &tree) {
-                Tobj::Seq(s) => println!("{:?}", s(reftime).next().unwrap()),
-                Tobj::Range(r) => println!("{:?}", r),
-                _ => panic!("don't know how to print this yet")
-            }
+            let seq = eval(reftime, &tree);
+            println!("{:?}", seq(reftime).next().unwrap());
         },
         Err(e) => println!("Parse err: {:?}", e)
     }

@@ -111,6 +111,22 @@ fn test_month() {
 }
 
 #[test]
+fn test_quarter() {
+    let reftime = Date::from_ymd(2015, 2, 27).and_hms(0, 0, 0);
+    let mut quarters = s::quarter()(reftime);
+    assert_eq!(quarters.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2015, 1, 1).and_hms(0, 0, 0),
+                end: Date::from_ymd(2015, 4, 1).and_hms(0, 0, 0),
+                grain: Granularity::Quarter});
+    assert_eq!(quarters.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2015, 4, 1).and_hms(0, 0, 0),
+                end: Date::from_ymd(2015, 7, 1).and_hms(0, 0, 0),
+                grain: Granularity::Quarter});
+}
+
+#[test]
 fn test_year() {
     let reftime = Date::from_ymd(2015, 2, 27).and_hms(0, 0, 0);
     let mut years = s::year()(reftime);

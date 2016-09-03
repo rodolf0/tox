@@ -18,7 +18,7 @@ pub enum Granularity {
     Day,
     Month,
     //Season,
-    //Quarter,
+    Quarter,
     Weekend,
     Week,
     Year,
@@ -152,6 +152,26 @@ pub fn month() -> Seq {
     })
 }
 
+pub fn quarter() -> Seq {
+    Rc::new(|reftime| {
+        // X-precondition: (endtime = tm + 1 quarter) > reftime
+        let mut qstart = 1 + 3 * (reftime.month()/4);
+        let mut tm = Date::from_ymd(reftime.year(), qstart, 1);
+        Box::new((0..).map(move |_| {
+            let t0 = tm;
+            qstart = (qstart + 3) % 12;
+            while tm.month() != qstart {
+                tm = utils::startof_next_month(tm);
+            }
+            Range{
+                start: t0.and_hms(0, 0, 0),
+                end: tm.and_hms(0, 0, 0),
+                grain: Granularity::Quarter
+            }
+        }))
+    })
+}
+
 pub fn year() -> Seq {
     Rc::new(|reftime| {
         // X-precondition: (endtime = tm + 1 year) > reftime
@@ -162,6 +182,19 @@ pub fn year() -> Seq {
             Range{
                 start: t0.and_hms(0, 0, 0),
                 end: tm.and_hms(0, 0, 0),
+                grain: Granularity::Year
+            }
+        }))
+    })
+}
+
+pub fn a_year(y: usize) -> Seq {
+    Rc::new(move |_| {
+        let y = y as i32;
+        Box::new((0..).map(move |_| {
+            Range{
+                start: Date::from_ymd(y, 1, 1).and_hms(0, 0, 0),
+                end: Date::from_ymd(y + 1, 1, 1).and_hms(0, 0, 0),
                 grain: Granularity::Year
             }
         }))

@@ -218,4 +218,5 @@ pub fn intersect(a: Seq, b: Seq) -> Seq {
     })
 }
 
-//fn fn take_n() -> Seq {} // or first 3 weeks ?
+// TODO: intervals, https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj#L572
+// https://github.com/wit-ai/duckling/blob/6b7e2e1bdbd50299cee4075ff48d7323c05758bc/src/duckling/time/pred.clj#L333

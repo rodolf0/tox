@@ -109,7 +109,7 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> Tobj {
                 let s2 = xtract!(Tobj::Seq, eval(reftime, &subn[3]));
                 Tobj::Seq(kronos::nth(n, s1, s2))
             },
-            _ => panic!()
+            _ => panic!("Unknown spec={:?}", spec)
         }
     }
 }
@@ -127,9 +127,11 @@ fn main() {
     match parser.parse(&mut tokenizer) {
         Ok(state) => for tree in earley::all_trees(parser.g.start(), &state) {
             let reftime = chrono::Local::now().naive_local();
-            let r = xtract!(Tobj::Seq, eval(reftime, &tree));
-            // TODO: fuse after max-n elements
-            println!("{:?}", r(reftime).next().unwrap());
+            match eval(reftime, &tree) {
+                Tobj::Seq(s) => println!("{:?}", s(reftime).next().unwrap()),
+                Tobj::Range(r) => println!("{:?}", r),
+                _ => panic!("don't know how to print this yet")
+            }
         },
         Err(e) => println!("Parse err: {:?}", e)
     }

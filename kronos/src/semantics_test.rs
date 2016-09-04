@@ -143,6 +143,33 @@ fn test_year() {
 }
 
 #[test]
+fn test_mergen() {
+    let reftime = Date::from_ymd(2015, 2, 27).and_hms(0, 0, 0);
+    let mut twoweeks = s::mergen(2, s::week())(reftime);
+    assert_eq!(twoweeks.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2015, 2, 23).and_hms(0, 0, 0),
+                end: Date::from_ymd(2015, 3, 9).and_hms(0, 0, 0),
+                grain: Granularity::Week});
+    assert_eq!(twoweeks.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2015, 3, 9).and_hms(0, 0, 0),
+                end: Date::from_ymd(2015, 3, 23).and_hms(0, 0, 0),
+                grain: Granularity::Week});
+    let mut threedays= s::mergen(3, s::day())(reftime);
+    assert_eq!(threedays.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2015, 2, 27).and_hms(0, 0, 0),
+                end: Date::from_ymd(2015, 3, 2).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+    assert_eq!(threedays.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2015, 3, 2).and_hms(0, 0, 0),
+                end: Date::from_ymd(2015, 3, 5).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+}
+
+#[test]
 fn test_nth_1() {
     let reftime = Date::from_ymd(2016, 2, 2).and_hms(0, 0, 0);
     // 3rd day of the month
@@ -245,6 +272,18 @@ fn test_nth_6() {
                 grain: Granularity::Day});
 }
 
+
+#[test] #[ignore] // TODO: fix this
+fn test_nth_7() {
+    let reftime = Date::from_ymd(2016, 9, 4).and_hms(0, 0, 0);
+    let mut thirdwkjune = s::nth(3, s::week(), s::month_of_year(6))(reftime);
+    assert_eq!(thirdwkjune.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2017, 6, 12).and_hms(0, 0, 0),
+                end: Date::from_ymd(2017, 6, 19).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+}
+
 #[test]
 fn test_intersect_1() {
     let reftime = Date::from_ymd(2016, 2, 25).and_hms(0, 0, 0);
@@ -318,5 +357,66 @@ fn test_intersect_3() {
                Range{
                 start: Date::from_ymd(2017, 6, 1).and_hms(0, 0, 0),
                 end: Date::from_ymd(2017, 6, 2).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+}
+
+#[test]
+fn test_this() {
+    let reftime = Date::from_ymd(2016, 2, 25).and_hms(0, 0, 0);
+    assert_eq!(s::this(s::month(), reftime),
+               Range{
+                start: Date::from_ymd(2016, 2, 1).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 3, 1).and_hms(0, 0, 0),
+                grain: Granularity::Month});
+    assert_eq!(s::this(s::day_of_week(5), reftime),
+               Range{
+                start: Date::from_ymd(2016, 2, 26).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 2, 27).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+    let mon28th = s::intersect(
+        s::day_of_week(1), s::nth(28, s::day(), s::month()));
+    assert_eq!(s::this(mon28th, reftime),
+               Range{
+                start: Date::from_ymd(2016, 3, 28).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 3, 29).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+    assert_eq!(s::this(s::weekend(), reftime),
+               Range{
+                start: Date::from_ymd(2016, 2, 27).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 2, 29).and_hms(0, 0, 0),
+                grain: Granularity::Weekend});
+}
+
+#[test]
+fn test_next() {
+    let reftime = Date::from_ymd(2016, 2, 25).and_hms(0, 0, 0);
+    assert_eq!(s::next(s::month(), reftime, 1),
+               Range{
+                start: Date::from_ymd(2016, 3, 1).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 4, 1).and_hms(0, 0, 0),
+                grain: Granularity::Month});
+    assert_eq!(s::next(s::day_of_week(4), reftime, 1),
+               Range{
+                start: Date::from_ymd(2016, 3, 3).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 3, 4).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+    assert_eq!(s::next(s::day_of_week(5), reftime, 1),
+               Range{
+                start: Date::from_ymd(2016, 2, 26).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 2, 27).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+    let mon28th = s::intersect(
+        s::day_of_week(1), s::nth(28, s::day(), s::month()));
+    assert_eq!(s::next(mon28th, reftime, 1),
+               Range{
+                start: Date::from_ymd(2016, 3, 28).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 3, 29).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+    let thu25th = s::intersect(
+        s::day_of_week(4), s::nth(25, s::day(), s::month()));
+    assert_eq!(s::next(thu25th, reftime, 1),
+               Range{
+                start: Date::from_ymd(2016, 8, 25).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 8, 26).and_hms(0, 0, 0),
                 grain: Granularity::Day});
 }

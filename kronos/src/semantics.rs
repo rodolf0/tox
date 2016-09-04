@@ -104,6 +104,9 @@ pub fn day() -> Seq {
 pub fn weekend() -> Seq {
     Rc::new(|reftime| {
         let mut tm = reftime.date();
+        if tm.weekday() == Weekday::Sun {
+            tm = tm.pred();
+        }
         while tm.weekday() != Weekday::Sat {
             tm = tm.succ();
         }
@@ -201,6 +204,29 @@ pub fn a_year(y: usize) -> Seq {
     })
 }
 
+pub fn mergen(n: usize, s: Seq) -> Seq {
+    struct MergeIt {
+        it: Box<Iterator<Item=Range>>,
+        tend: Range,
+        n: usize,
+    };
+    impl Iterator for MergeIt {
+        type Item = Range;
+        fn next(&mut self) -> Option<Range> {
+            let t0 = self.tend;
+            for _ in 0..self.n {
+                self.tend = self.it.next().unwrap();
+            }
+            Some(Range{start: t0.start, end: self.tend.start, grain: t0.grain})
+        }
+    }
+    Rc::new(move |reftime| {
+        let mut ns = s(reftime);
+        let tend = ns.next().unwrap();
+        Box::new(MergeIt{it: ns, tend: tend, n: n})
+    })
+}
+
 pub fn nth(n: usize, win: Seq, within: Seq) -> Seq {
     // For a predictable outcome you probably want aligned sequences
     // 1. take an instance of <within>
@@ -230,8 +256,6 @@ pub fn nth(n: usize, win: Seq, within: Seq) -> Seq {
     })
 }
 
-// TODO: add fn lastof(win: Seq, within: Seq) -> Seq
-
 pub fn intersect(a: Seq, b: Seq) -> Seq {
     let (a, b) = { // a is the seq with shortest duration items
         let testtm = Date::from_ymd(2000, 1, 1).and_hms(0, 0, 0);
@@ -253,3 +277,24 @@ pub fn intersect(a: Seq, b: Seq) -> Seq {
 
 // TODO: intervals, https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj#L572
 // https://github.com/wit-ai/duckling/blob/6b7e2e1bdbd50299cee4075ff48d7323c05758bc/src/duckling/time/pred.clj#L333
+
+pub fn this(s: Seq, r: DateTime) -> Range {
+    s(r).next().unwrap()
+}
+
+pub fn next(s: Seq, r: DateTime, n: usize) -> Range {
+    assert!(n > 0);
+    let mut seq = s(r);
+    let mut nxt = seq.next();
+    if nxt.unwrap().start <= r {
+        // if <r> is included in <nxt> then we want the following
+        nxt = seq.next()
+    }
+    for _ in 0..n-1 {
+        nxt = seq.next()
+    }
+    nxt.unwrap()
+}
+
+//pub fn shift(r: Range, d: Duration) -> Range {
+//}

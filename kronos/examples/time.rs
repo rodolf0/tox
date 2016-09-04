@@ -59,6 +59,7 @@ fn build_grammar() -> earley::Grammar {
       .rule("<time>", &["<seq>"]) // grab first item of seq
       .rule("<time>", &["this", "<seq>"])
       .rule("<time>", &["next", "<seq>"])
+      .rule("<time>", &["next", "<number>", "<seq>"]) // next 3 weeks
       .rule("<time>", &["<seq>", "after", "next"])
       // ranges shifted by duration
       .rule("<time>", &["<duration>", "after", "<time>"]) // 2 days after xx
@@ -67,11 +68,10 @@ fn build_grammar() -> earley::Grammar {
       //.rule("<time>", &["last", "<time>"])                   // last week | last sunday | last friday
       //.rule("<time>", &["<time>", "before", "last"])
 
-      // how do i write
-      // * the next 3 weeks
+      // TODO
+      // * the next 3 weeks // unexpected
       // * between monday and thursday
       // * the last week of november
-      // * next winter
       // * in 3 days / 3 days from now
       // * in 2 months (feb?) (when its 13th of june)
 
@@ -79,6 +79,7 @@ fn build_grammar() -> earley::Grammar {
 }
 
 
+// TODO: replace this and xtract macro with 3 functions directly
 pub enum Tobj {
     //Duration(Duration),
     Seq(kronos::Seq),
@@ -192,10 +193,16 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> kronos::Range {
             "<time> -> next <seq>" => {
                 kronos::next(eval_seq(reftime, &subn[1]), 1, reftime)
             },
+            "<time> -> next <number> <seq>" => {
+                let n = xtract!(Tobj::Num, eval_terminal(&subn[1])) as usize;
+                let r0 = kronos::next(eval_seq(reftime, &subn[2]), 1, reftime);
+                let r1 = kronos::next(eval_seq(reftime, &subn[2]), n, reftime);
+                kronos::Range{start: r0.start, end: r1.end, grain: r0.grain}
+            },
             "<time> -> <seq> after next" => {
                 kronos::next(eval_seq(reftime, &subn[0]), 2, reftime)
             },
-            //"<time> -> in <number> <duration>" => {
+            //"<time> -> in <duration>" => {
             //},
             _ => panic!("Unknown [eval] spec={:?}", spec)
         }

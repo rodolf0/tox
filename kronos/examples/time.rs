@@ -10,7 +10,7 @@ use std::str::FromStr;
 // https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj
 fn build_grammar() -> earley::Grammar {
     static STOP_WORDS: &'static [&'static str] = &[
-        "the", "of", "a", "and", "next", "this", "after", "weekend",
+        "the", "of", "a", "and", "next", "this", "after", "weekend", "in",
     ];
     let mut gb = earley::GrammarBuilder::new();
     for sw in STOP_WORDS { gb = gb.symbol((*sw, move |n: &str| n == *sw)); }
@@ -57,10 +57,7 @@ fn build_grammar() -> earley::Grammar {
       .rule("<time>", &["next", "<seq>"])
       .rule("<time>", &["<seq>", "after", "next"])
 
-
-      //.rule("<grain/range>", &["weeks"]) | "days" ...
-      //"<duration> -> <number> <duration>" =>  number * duration
-      //.rule("<time>", &["in" , "<number>", "<grain/range>"])
+      .rule("<time>", &["in", "<number>", "<seq>"]) // shift !?
 
       //.rule("<time>", &["last", "<time>"])                   // last week | last sunday | last friday
       //.rule("<time>", &["<time>", "before", "last"])

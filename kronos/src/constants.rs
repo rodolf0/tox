@@ -1,12 +1,12 @@
 pub fn weekday(d: &str) -> Option<usize> {
     match d {
-        "sunday"    |  "sun" => Some(0),
-        "monday"    |  "mon" => Some(1),
-        "tuesday"   |  "tue" => Some(2),
-        "wednesday" |  "wed" => Some(3),
-        "thursday"  |  "thu" => Some(4),
-        "friday"    |  "fri" => Some(5),
-        "saturday"  |  "sat" => Some(6),
+        "sunday"    | "sundays"    | "sun" => Some(0),
+        "monday"    | "mondays"    | "mon" => Some(1),
+        "tuesday"   | "tuesdays"   | "tue" => Some(2),
+        "wednesday" | "wednesdays" | "wed" => Some(3),
+        "thursday"  | "thursdays"  | "thu" => Some(4),
+        "friday"    | "fridays"    | "fri" => Some(5),
+        "saturday"  | "saturdays"  | "sat" => Some(6),
         _           => None
     }
 }

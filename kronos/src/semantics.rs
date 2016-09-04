@@ -1,10 +1,9 @@
-use chrono::{Duration, Datelike, Weekday};
+use chrono::{Datelike, Weekday};
 use chrono::naive::datetime::NaiveDateTime as DateTime;
 use chrono::naive::date::NaiveDate as Date;
-
-use utils;
-
 use std::rc::Rc;
+use chrono;
+use utils;
 
 // shortcircuit bad sequences
 const SEQFUSE: usize = 10000;
@@ -37,6 +36,11 @@ pub struct Range {
 // A generator of Ranges
 pub type Seq = Rc<Fn(DateTime)->Box<Iterator<Item=Range>>>;
 
+pub enum Duration {
+    Grain(Granularity),
+    Dur(chrono::Duration),
+}
+
 //enum TmDir {
     //Future,
     //Past,
@@ -47,7 +51,9 @@ pub type Seq = Rc<Fn(DateTime)->Box<Iterator<Item=Range>>>;
     //dir: TmDir,
 //}
 
-// X: Sequences generate Ranges that have ENDtime after reference-time
+// NOTES
+// X: Sequences generate Ranges that have ENDtime after reference-time,
+//    they may contain the reference time or start after if discontinuous.
 // see duckling http://goo.gl/gxU1Jo
 
 pub fn day_of_week(dow: usize) -> Seq {
@@ -60,8 +66,8 @@ pub fn day_of_week(dow: usize) -> Seq {
         let tm = tm.and_hms(0, 0, 0);
         Box::new((0..).map(move |x| {
             Range{
-                start: tm + Duration::days(x * 7),
-                end: tm + Duration::days(x * 7 + 1),
+                start: tm + chrono::Duration::days(x * 7),
+                end: tm + chrono::Duration::days(x * 7 + 1),
                 grain: Granularity::Day
             }
         }))
@@ -93,8 +99,8 @@ pub fn day() -> Seq {
         let tm = reftime.date().and_hms(0, 0, 0);
         Box::new((0..).map(move |x| {
             Range{
-                start: tm + Duration::days(x),
-                end: tm + Duration::days(x+1),
+                start: tm + chrono::Duration::days(x),
+                end: tm + chrono::Duration::days(x+1),
                 grain: Granularity::Day
             }
         }))
@@ -113,8 +119,8 @@ pub fn weekend() -> Seq {
         let tm = tm.and_hms(0, 0, 0);
         Box::new((0..).map(move |x| {
             Range{
-                start: tm + Duration::days(x * 7),
-                end: tm + Duration::days(x * 7 + 2),
+                start: tm + chrono::Duration::days(x * 7),
+                end: tm + chrono::Duration::days(x * 7 + 2),
                 grain: Granularity::Weekend
             }
         }))
@@ -286,13 +292,9 @@ pub fn next(s: Seq, r: DateTime, n: usize) -> Range {
     assert!(n > 0);
     let mut seq = s(r);
     let mut nxt = seq.next();
-    if nxt.unwrap().start <= r {
-        // if <r> is included in <nxt> then we want the following
-        nxt = seq.next()
-    }
-    for _ in 0..n-1 {
-        nxt = seq.next()
-    }
+    // see X note above
+    if nxt.unwrap().start <= r { nxt = seq.next(); }
+    for _ in 0..n-1 { nxt = seq.next(); }
     nxt.unwrap()
 }
 

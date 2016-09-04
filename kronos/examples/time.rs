@@ -10,7 +10,7 @@ use std::str::FromStr;
 // https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj
 fn build_grammar() -> earley::Grammar {
     static STOP_WORDS: &'static [&'static str] = &[
-        "the", "of", "a", "next", "this", "after", "weekend", "in",
+        "the", "of", "a", "next", "this", "after", "weekend", "in", "to",
     ];
     let mut gb = earley::GrammarBuilder::new();
     for sw in STOP_WORDS { gb = gb.symbol((*sw, move |n: &str| n == *sw)); }
@@ -51,6 +51,7 @@ fn build_grammar() -> earley::Grammar {
       .rule("<seq>", &["<seq>", "<seq>"])
       // nthofs
       .rule("<seq>", &["<ordinal>", "<seq>", "of", "<seq>"])
+      .rule("<seq>", &["<seq>", "to", "<seq>"])
 
       //// Ranges
       .symbol("<time>")
@@ -65,15 +66,14 @@ fn build_grammar() -> earley::Grammar {
       .rule("<time>", &["<duration>", "after", "<time>"]) // 2 days after xx
       .rule("<time>", &["in", "<duration>"])  // in a week, in 6 days
 
-      //.rule("<time>", &["last", "<time>"])                   // last week | last sunday | last friday
-      //.rule("<time>", &["<time>", "before", "last"])
-
       // TODO
-      // * the next 3 weeks // unexpected
-      // * between monday and thursday
       // * the last week of november
       // * in 3 days / 3 days from now
       // * in 2 months (feb?) (when its 13th of june)
+      //
+      //.rule("<time>", &["last", "<time>"])                   // last week | last sunday | last friday
+      //.rule("<time>", &["<time>", "before", "last"])
+
 
       .into_grammar("<time>")
 }
@@ -126,7 +126,7 @@ fn duration_to_seq(reftime: DateTime, n: &earley::Subtree) -> kronos::Seq {
             "<duration> -> a <duration>" => duration_to_seq(reftime, &subn[1]),
             "<duration> -> <number> <duration>" => {
                 let n = xtract!(Tobj::Num, eval_terminal(&subn[0])) as usize;
-                kronos::mergen(n, duration_to_seq(reftime, &subn[1]))
+                kronos::merge(n, duration_to_seq(reftime, &subn[1]))
             },
             _ => panic!("Unknown duration rule={:?}", spec)
         }
@@ -162,7 +162,9 @@ pub fn eval_seq(reftime: DateTime, n: &earley::Subtree) -> kronos::Seq {
                 let n = xtract!(Tobj::Num, eval_terminal(&subn[0])) as usize;
                 kronos::nthof(n, eval_seq(reftime, &subn[1]), eval_seq(reftime, &subn[3]))
             },
-
+            "<seq> -> <seq> to <seq>" => {
+                kronos::interval(eval_seq(reftime, &subn[0]), eval_seq(reftime, &subn[2]))
+            },
             _ => panic!("Unknown [eval_seq] spec={:?}", spec)
         }
     } else {

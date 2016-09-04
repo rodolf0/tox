@@ -189,7 +189,7 @@ pub fn year() -> Seq {
     })
 }
 
-pub fn mergen(n: usize, s: Seq) -> Seq {
+pub fn merge(n: usize, s: Seq) -> Seq {
     struct MergeIt {
         it: Box<Iterator<Item=Range>>,
         tend: Range,
@@ -260,8 +260,25 @@ pub fn intersect(a: Seq, b: Seq) -> Seq {
     })
 }
 
-// TODO: intervals, https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj#L572
-// https://github.com/wit-ai/duckling/blob/6b7e2e1bdbd50299cee4075ff48d7323c05758bc/src/duckling/time/pred.clj#L333
+// duckling intervals http://tinyurl.com/hk2vu34
+pub fn interval(a: Seq, b: Seq) -> Seq {
+    struct IntervalIt {
+        s: Box<Iterator<Item=Range>>,
+        e: Box<Iterator<Item=Range>>,
+    };
+    impl Iterator for IntervalIt {
+        type Item = Range;
+        fn next(&mut self) -> Option<Range> {
+            let t0 = self.s.next().unwrap();
+            let t1 = self.e.next().unwrap();
+            Some(Range{start: t0.start, end: t1.end, grain: t0.grain})
+        }
+    }
+    Rc::new(move |reftime| {
+        let align = a(reftime).next().unwrap().start;
+        Box::new(IntervalIt{s: a(reftime), e: b(align)})
+    })
+}
 
 pub fn a_year(y: usize) -> Range {
     Range{

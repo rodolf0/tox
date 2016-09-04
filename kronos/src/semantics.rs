@@ -10,20 +10,11 @@ const SEQFUSE: usize = 10000;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Granularity {
-    //Second,
-    //Minute,
-    //Hour,
-    //TimeOfDay, // ??
     Day,
-    Month,
-    //Season,
-    Quarter,
-    Weekend,
     Week,
+    Month,
+    Quarter,
     Year,
-    //Decade,
-    //Century,
-    //TempD, // constante dependent duration
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -36,10 +27,10 @@ pub struct Range {
 // A generator of Ranges
 pub type Seq = Rc<Fn(DateTime)->Box<Iterator<Item=Range>>>;
 
-pub enum Duration {
-    Grain(Granularity),
-    Dur(chrono::Duration),
-}
+//pub enum Duration {
+    //Grain(Granularity),
+    //Dur(chrono::Duration),
+//}
 
 //enum TmDir {
     //Future,
@@ -121,7 +112,7 @@ pub fn weekend() -> Seq {
             Range{
                 start: tm + chrono::Duration::days(x * 7),
                 end: tm + chrono::Duration::days(x * 7 + 2),
-                grain: Granularity::Weekend
+                grain: Granularity::Day
             }
         }))
     })
@@ -233,7 +224,7 @@ pub fn mergen(n: usize, s: Seq) -> Seq {
     })
 }
 
-pub fn nth(n: usize, win: Seq, within: Seq) -> Seq {
+pub fn nthof(n: usize, win: Seq, within: Seq) -> Seq {
     // For a predictable outcome you probably want aligned sequences
     // 1. take an instance of <within>
     // 2. cycle to the n-th instance if <win> within <within>
@@ -288,7 +279,7 @@ pub fn this(s: Seq, r: DateTime) -> Range {
     s(r).next().unwrap()
 }
 
-pub fn next(s: Seq, r: DateTime, n: usize) -> Range {
+pub fn next(s: Seq, n: usize, r: DateTime) -> Range {
     assert!(n > 0);
     let mut seq = s(r);
     let mut nxt = seq.next();
@@ -298,5 +289,6 @@ pub fn next(s: Seq, r: DateTime, n: usize) -> Range {
     nxt.unwrap()
 }
 
+// add a duration to a range
 //pub fn shift(r: Range, d: Duration) -> Range {
 //}

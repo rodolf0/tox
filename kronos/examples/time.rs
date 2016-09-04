@@ -10,7 +10,7 @@ use std::str::FromStr;
 // https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj
 fn build_grammar() -> earley::Grammar {
     static STOP_WORDS: &'static [&'static str] = &[
-        "the", "of", "a", "and", "next", "this", "after", "weekend", "in",
+        "the", "of", "a", "next", "this", "after", "weekend", "in",
     ];
     let mut gb = earley::GrammarBuilder::new();
     for sw in STOP_WORDS { gb = gb.symbol((*sw, move |n: &str| n == *sw)); }
@@ -136,7 +136,7 @@ pub fn eval_seq(reftime: DateTime, n: &earley::Subtree) -> kronos::Seq {
             "<seq> -> <day-of-week>" => xtract!(Tobj::Seq, eval_terminal(&subn[0])),
             "<seq> -> the <ordinal>" => {
                 let n = xtract!(Tobj::Num, eval_terminal(&subn[1])) as usize;
-                kronos::nth(n, kronos::day(), kronos::month())
+                kronos::nthof(n, kronos::day(), kronos::month())
             },
             "<seq> -> weekend" => kronos::weekend(),
             "<seq> -> <named-month> <ordinal>" |
@@ -145,14 +145,14 @@ pub fn eval_seq(reftime: DateTime, n: &earley::Subtree) -> kronos::Seq {
             "<seq> -> <day-of-week> <number>" => {
                 let m = xtract!(Tobj::Seq, eval_terminal(&subn[0]));
                 let d = xtract!(Tobj::Num, eval_terminal(&subn[1])) as usize;
-                kronos::intersect(m, kronos::nth(d, kronos::day(), kronos::month()))
+                kronos::intersect(m, kronos::nthof(d, kronos::day(), kronos::month()))
             },
             "<seq> -> <seq> <seq>" => {
                 kronos::intersect(eval_seq(reftime, &subn[0]), eval_seq(reftime, &subn[1]))
             },
             "<seq> -> <ordinal> <seq> of <seq>" => {
                 let n = xtract!(Tobj::Num, eval_terminal(&subn[0])) as usize;
-                kronos::nth(n, eval_seq(reftime, &subn[1]), eval_seq(reftime, &subn[3]))
+                kronos::nthof(n, eval_seq(reftime, &subn[1]), eval_seq(reftime, &subn[3]))
             },
 
             _ => panic!("Unknown [eval_seq] spec={:?}", spec)
@@ -173,10 +173,10 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> kronos::Range {
                 kronos::this(eval_seq(reftime, &subn[1]), reftime)
             },
             "<time> -> next <seq>" => {
-                kronos::next(eval_seq(reftime, &subn[1]), reftime, 1)
+                kronos::next(eval_seq(reftime, &subn[1]), 1, reftime)
             },
             "<time> -> <seq> after next" => {
-                kronos::next(eval_seq(reftime, &subn[0]), reftime, 2)
+                kronos::next(eval_seq(reftime, &subn[0]), 2, reftime)
             },
             _ => panic!("Unknown [eval] spec={:?}", spec)
         }

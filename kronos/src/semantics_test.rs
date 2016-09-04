@@ -272,7 +272,7 @@ fn test_nth_6() {
                 grain: Granularity::Day});
 }
 
-#[test] #[ignore] // TODO: fix this
+#[test]
 fn test_nth_7() {
     let reftime = Date::from_ymd(2016, 9, 4).and_hms(0, 0, 0);
     let mut thirdwkjune = s::nthof(3, s::week(), s::month_of_year(6))(reftime);
@@ -280,10 +280,10 @@ fn test_nth_7() {
                Range{
                 start: Date::from_ymd(2017, 6, 12).and_hms(0, 0, 0),
                 end: Date::from_ymd(2017, 6, 19).and_hms(0, 0, 0),
-                grain: Granularity::Day});
+                grain: Granularity::Week});
 }
 
-#[test] #[ignore] // TODO: fix this
+#[test]
 fn test_nth_8() {
     let reftime = Date::from_ymd(2016, 9, 4).and_hms(0, 0, 0);
     let mut firstwkendjan = s::nthof(1, s::weekend(), s::month_of_year(1))(reftime);

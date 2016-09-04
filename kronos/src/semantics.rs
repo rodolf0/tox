@@ -237,18 +237,19 @@ pub fn nthof(n: usize, win: Seq, within: Seq) -> Seq {
     Rc::new(move |reftime| {
         let win = win.clone();
         let align = within(reftime).next().unwrap().start;
+        //println!("ref={:?} align={:?}, win={:?}",
+                 //reftime, align, win(align).next().unwrap());
         Box::new(within(reftime)
-                    .take(SEQFUSE) // TODO: panic ? looks like wrong place
+                    .take(SEQFUSE) // TODO: panic here ? looks like wrong place
                     .filter_map(move |outer| {
             // we restart <win> each time instead of continuing because we
             // could have overflowed the outer interval and we cant miss items
-            let x = win(align).skip_while(|inner| inner.start < outer.start)
+            // See note X on the skip_while filter, could be inner.start < outer.start
+            let x = win(align).skip_while(|inner| inner.end <= outer.start)
                               .nth(n - 1).unwrap();
             // if there's no n-th item in this <within> instance, try next
-            match x.start >= outer.start && x.end <= outer.end {
-                true => Some(x),
-                false => None
-            }
+            // Could enforce x.start >= outer.start
+            match x.end <= outer.end { true => Some(x), false => None }
         }).skip_while(move |range| range.end < reftime)) // overcome alignment
     })
 }

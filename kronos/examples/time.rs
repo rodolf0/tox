@@ -18,6 +18,7 @@ fn build_grammar() -> earley::Grammar {
     gb.symbol(("<ordinal>", |n: &str| k::ordinal(n).or(k::short_ordinal(n)).is_some()))
       .symbol(("<number>", |n: &str| i32::from_str(n).is_ok()))
 
+      //// Durations
       .symbol("<duration>")
       .symbol(("<dur-day>", |d: &str| d == "day" || d == "days"))
       .symbol(("<dur-week>", |d: &str| d == "week" || d == "weeks"))
@@ -32,32 +33,36 @@ fn build_grammar() -> earley::Grammar {
       .rule("<duration>", &["a", "<duration>"]) // a week
       .rule("<duration>", &["<number>", "<duration>"]) // 2 days
 
+      //// Sequences
       .symbol("<seq>")
       .symbol(("<day-of-week>", |d: &str| k::weekday(d).is_some()))
       .symbol(("<named-month>", |m: &str| k::month(m).is_some()))
       // basic sequences
       .rule("<seq>", &["<duration>"])
-      .rule("<seq>", &["weekend"])
+      .rule("<seq>", &["<named-month>"])
       .rule("<seq>", &["<day-of-week>"])
       .rule("<seq>", &["the", "<ordinal>"]) // (day of the month)
-      .rule("<seq>", &["<named-month>"])
-      //.rule("<seq>", &["<number>"]) // years
-      //
+      .rule("<seq>", &["weekend"])
+      // intersections
       .rule("<seq>", &["<named-month>", "<ordinal>"])
       .rule("<seq>", &["<named-month>", "<number>"])
       .rule("<seq>", &["<day-of-week>", "<ordinal>"])
       .rule("<seq>", &["<day-of-week>", "<number>"])
+      .rule("<seq>", &["<seq>", "<seq>"])
+      // nthofs
+      .rule("<seq>", &["<ordinal>", "<seq>", "of", "<seq>"])
 
-      .rule("<seq>", &["<seq>", "<seq>"]) // intersect 2 sequences
-      .rule("<seq>", &["<ordinal>", "<seq>", "of", "<seq>"]) // nth duration of containing
-
+      //// Ranges
       .symbol("<time>")
-      .rule("<time>", &["<seq>"])
+      .rule("<time>", &["<number>"]) // year
+      .rule("<time>", &["<named-month>", "<number>"]) // july 1994
+      .rule("<time>", &["<seq>"]) // grab first item of seq
       .rule("<time>", &["this", "<seq>"])
       .rule("<time>", &["next", "<seq>"])
       .rule("<time>", &["<seq>", "after", "next"])
-
-      .rule("<time>", &["in", "<number>", "<seq>"]) // shift !?
+      // ranges shifted by duration
+      .rule("<time>", &["<duration>", "after", "<time>"]) // 2 days after xx
+      .rule("<time>", &["in", "<duration>"])  // in a week, in 6 days
 
       //.rule("<time>", &["last", "<time>"])                   // last week | last sunday | last friday
       //.rule("<time>", &["<time>", "before", "last"])
@@ -110,6 +115,7 @@ fn eval_terminal(n: &earley::Subtree) -> Tobj {
 
 fn duration_to_seq(reftime: DateTime, n: &earley::Subtree) -> kronos::Seq {
     if let &earley::Subtree::SubT(ref spec, ref subn) = n {
+        println!("* {:?}", spec); // trace
         match spec.as_ref() {
             "<duration> -> <dur-day>" => kronos::day(),
             "<duration> -> <dur-week>" => kronos::week(),
@@ -130,6 +136,7 @@ fn duration_to_seq(reftime: DateTime, n: &earley::Subtree) -> kronos::Seq {
 
 pub fn eval_seq(reftime: DateTime, n: &earley::Subtree) -> kronos::Seq {
     if let &earley::Subtree::SubT(ref spec, ref subn) = n {
+        println!("* {:?}", spec); // trace
         match spec.as_ref() {
             "<seq> -> <duration>" => duration_to_seq(reftime, &subn[0]),
             "<seq> -> <named-month>" |
@@ -165,7 +172,17 @@ pub fn eval_seq(reftime: DateTime, n: &earley::Subtree) -> kronos::Seq {
 
 pub fn eval(reftime: DateTime, n: &earley::Subtree) -> kronos::Range {
     if let &earley::Subtree::SubT(ref spec, ref subn) = n {
+        println!("* {:?}", spec);
         match spec.as_ref() {
+            "<time> -> <number>" => {
+                let n = xtract!(Tobj::Num, eval_terminal(&subn[0])) as usize;
+                kronos::a_year(n)
+            },
+            "<time> -> <named-month> <number>" => {
+                let month = xtract!(Tobj::Seq, eval_terminal(&subn[0]));
+                let n = xtract!(Tobj::Num, eval_terminal(&subn[1])) as usize;
+                kronos::this(month, kronos::a_year(n).start)
+            },
             "<time> -> <seq>" => {
                 kronos::this(eval_seq(reftime, &subn[0]), reftime)
             },
@@ -178,6 +195,8 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> kronos::Range {
             "<time> -> <seq> after next" => {
                 kronos::next(eval_seq(reftime, &subn[0]), 2, reftime)
             },
+            //"<time> -> in <number> <duration>" => {
+            //},
             _ => panic!("Unknown [eval] spec={:?}", spec)
         }
     } else {

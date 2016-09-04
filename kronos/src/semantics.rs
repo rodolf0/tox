@@ -6,7 +6,7 @@ use chrono;
 use utils;
 
 // shortcircuit bad sequences
-const SEQFUSE: usize = 10000;
+const SEQFUSE: usize = 1000;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Granularity {
@@ -17,6 +17,7 @@ pub enum Granularity {
     Year,
 }
 
+// TODO: implement Display for Range to show based on grain
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Range {
     pub start: DateTime,
@@ -188,19 +189,6 @@ pub fn year() -> Seq {
     })
 }
 
-pub fn a_year(y: usize) -> Seq {
-    Rc::new(move |_| {
-        let y = y as i32;
-        Box::new((0..).map(move |_| {
-            Range{
-                start: Date::from_ymd(y, 1, 1).and_hms(0, 0, 0),
-                end: Date::from_ymd(y + 1, 1, 1).and_hms(0, 0, 0),
-                grain: Granularity::Year
-            }
-        }))
-    })
-}
-
 pub fn mergen(n: usize, s: Seq) -> Seq {
     struct MergeIt {
         it: Box<Iterator<Item=Range>>,
@@ -245,11 +233,10 @@ pub fn nthof(n: usize, win: Seq, within: Seq) -> Seq {
             // we restart <win> each time instead of continuing because we
             // could have overflowed the outer interval and we cant miss items
             // See note X on the skip_while filter, could be inner.start < outer.start
-            let x = win(align).skip_while(|inner| inner.end <= outer.start)
-                              .nth(n - 1).unwrap();
-            // if there's no n-th item in this <within> instance, try next
-            // Could enforce x.start >= outer.start
-            match x.end <= outer.end { true => Some(x), false => None }
+            win(align).skip_while(|inner| inner.end <= outer.start)
+                      // Could enforce x.start >= outer.start
+                      .take_while(|inner| inner.end <= outer.end)
+                      .nth(n - 1)
         }).skip_while(move |range| range.end < reftime)) // overcome alignment
     })
 }
@@ -275,6 +262,14 @@ pub fn intersect(a: Seq, b: Seq) -> Seq {
 
 // TODO: intervals, https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj#L572
 // https://github.com/wit-ai/duckling/blob/6b7e2e1bdbd50299cee4075ff48d7323c05758bc/src/duckling/time/pred.clj#L333
+
+pub fn a_year(y: usize) -> Range {
+    Range{
+        start: Date::from_ymd(y as i32, 1, 1).and_hms(0, 0, 0),
+        end: Date::from_ymd(y as i32 + 1, 1, 1).and_hms(0, 0, 0),
+        grain: Granularity::Year
+    }
+}
 
 pub fn this(s: Seq, r: DateTime) -> Range {
     s(r).next().unwrap()

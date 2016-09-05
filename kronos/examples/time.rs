@@ -68,9 +68,6 @@ fn build_grammar() -> earley::Grammar {
 
       // TODO
       // * the last week of november
-      // * in 3 days / 3 days from now
-      // * in 2 months (feb?) (when its 13th of june)
-      //
       //.rule("<time>", &["last", "<time>"])                   // last week | last sunday | last friday
       //.rule("<time>", &["<time>", "before", "last"])
 
@@ -127,6 +124,28 @@ fn duration_to_seq(reftime: DateTime, n: &earley::Subtree) -> kronos::Seq {
             "<duration> -> <number> <duration>" => {
                 let n = xtract!(Tobj::Num, eval_terminal(&subn[0])) as usize;
                 kronos::merge(n, duration_to_seq(reftime, &subn[1]))
+            },
+            _ => panic!("Unknown duration rule={:?}", spec)
+        }
+    } else {
+        unreachable!("what!!")
+    }
+}
+
+fn duration_to_grain(n: &earley::Subtree) -> (kronos::Granularity, i32) {
+    if let &earley::Subtree::SubT(ref spec, ref subn) = n {
+        println!("* {:?}", spec); // trace
+        match spec.as_ref() {
+            "<duration> -> <dur-day>" => (kronos::Granularity::Day, 1),
+            "<duration> -> <dur-week>" => (kronos::Granularity::Week, 1),
+            "<duration> -> <dur-month>" => (kronos::Granularity::Month, 1),
+            "<duration> -> <dur-quarter>" => (kronos::Granularity::Quarter, 1),
+            "<duration> -> <dur-year>" => (kronos::Granularity::Year, 1),
+            "<duration> -> a <duration>" => duration_to_grain(&subn[1]),
+            "<duration> -> <number> <duration>" => {
+                let n = xtract!(Tobj::Num, eval_terminal(&subn[0]));
+                let (g, n2) = duration_to_grain(&subn[1]);
+                (g, n * n2)
             },
             _ => panic!("Unknown duration rule={:?}", spec)
         }
@@ -204,8 +223,20 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> kronos::Range {
             "<time> -> <seq> after next" => {
                 kronos::next(eval_seq(reftime, &subn[0]), 2, reftime)
             },
-            //"<time> -> in <duration>" => {
-            //},
+            "<time> -> <duration> after <time>" => {
+                let t = eval(reftime, &subn[2]);
+                let (g, n) = duration_to_grain(&subn[0]);
+                kronos::shift(t, n, g)
+            },
+            "<time> -> in <duration>" => {
+                let r = kronos::Range{
+                    start: reftime,
+                    end: reftime + chrono::Duration::days(1),
+                    grain: kronos::Granularity::Day
+                };
+                let (g, n) = duration_to_grain(&subn[1]);
+                kronos::shift(r, n, g)
+            },
             _ => panic!("Unknown [eval] spec={:?}", spec)
         }
     } else {

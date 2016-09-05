@@ -2,13 +2,14 @@ use chrono::{Datelike, Weekday};
 use chrono::naive::datetime::NaiveDateTime as DateTime;
 use chrono::naive::date::NaiveDate as Date;
 use std::rc::Rc;
+use std::cmp;
 use chrono;
 use utils;
 
 // shortcircuit bad sequences
 const SEQFUSE: usize = 1000;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug,PartialEq,Eq,PartialOrd,Ord,Clone,Copy)]
 pub enum Granularity {
     Day,
     Week,
@@ -27,11 +28,6 @@ pub struct Range {
 
 // A generator of Ranges
 pub type Seq = Rc<Fn(DateTime)->Box<Iterator<Item=Range>>>;
-
-//pub enum Duration {
-    //Grain(Granularity),
-    //Dur(chrono::Duration),
-//}
 
 //enum TmDir {
     //Future,
@@ -303,5 +299,28 @@ pub fn next(s: Seq, n: usize, r: DateTime) -> Range {
 }
 
 // add a duration to a range
-//pub fn shift(r: Range, d: Duration) -> Range {
-//}
+pub fn shift(r: Range, n: i32, g: Granularity) -> Range {
+    let (s, e) = (r.start.date(), r.end.date());
+    let (s, e) = match g {
+        Granularity::Year => {
+            (utils::date_add(s, n, 0, 0), utils::date_add(e, n, 0, 0))
+        },
+        Granularity::Quarter => {
+            (utils::date_add(s, 0, 3*n as u32, 0), utils::date_add(e, 0, 3*n as u32, 0))
+        },
+        Granularity::Month => {
+            (utils::date_add(s, 0, n as u32, 0), utils::date_add(e, 0, n as u32, 0))
+        },
+        Granularity::Week => {
+            (utils::date_add(s, 0, 0, 7*n as u32), utils::date_add(e, 0, 0, 7*n as u32))
+        },
+        Granularity::Day => {
+            (utils::date_add(s, 0, 0, n as u32), utils::date_add(e, 0, 0, n as u32))
+        },
+    };
+    Range{
+        start: s.and_time(r.start.time()),
+        end: e.and_time(r.end.time()),
+        grain: cmp::min(r.grain, g)
+    }
+}

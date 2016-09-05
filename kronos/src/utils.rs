@@ -2,17 +2,10 @@ use chrono::naive::date::NaiveDate as Date;
 use chrono::Datelike;
 use std::cmp;
 
-// TODO: could be intelligent about the loop
 pub fn startof_next_month(d: Date) -> Date {
-    let m = d.month();
-    let mut next_month = d.clone();
-    while m == next_month.month() {
-        next_month = next_month.succ();
-    }
-    next_month
+    date_add(Date::from_ymd(d.year(), d.month(), 1), 0, 1, 0)
 }
 
-// TODO: could be intelligent about the loop
 pub fn startof_next_week(d: Date) -> Date {
     let week = d.isoweekdate().1;
     let mut next_week = d.clone();
@@ -22,14 +15,8 @@ pub fn startof_next_week(d: Date) -> Date {
     next_week
 }
 
-// TODO: could be intelligent about the loop
 pub fn startof_next_year(d: Date) -> Date {
-    let y = d.year();
-    let mut next_year = d.clone();
-    while y == next_year.year() {
-        next_year = startof_next_month(next_year);
-    }
-    next_year
+    Date::from_ymd(d.year() + 1, 1, 1)
 }
 
 pub fn days_in_month(m: u32, y: i32) -> u32 {

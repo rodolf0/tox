@@ -10,7 +10,7 @@ use std::str::FromStr;
 // https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj
 fn build_grammar() -> earley::Grammar {
     static STOP_WORDS: &'static [&'static str] = &[
-        "the", "of", "a", "next", "this", "after", "weekend", "in", "to",
+        "the", "of", "a", "next", "this", "after", "weekend", "in", "to", "ago",
     ];
     let mut gb = earley::GrammarBuilder::new();
     for sw in STOP_WORDS { gb = gb.symbol((*sw, move |n: &str| n == *sw)); }
@@ -65,6 +65,7 @@ fn build_grammar() -> earley::Grammar {
       // ranges shifted by duration
       .rule("<time>", &["<duration>", "after", "<time>"]) // 2 days after xx
       .rule("<time>", &["in", "<duration>"])  // in a week, in 6 days
+      .rule("<time>", &["<duration>", "ago"])  // 3 months ago
 
       // TODO
       // * the last week of november
@@ -235,6 +236,15 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> kronos::Range {
                 };
                 let (g, n) = duration_to_grain(&subn[1]);
                 kronos::shift(r, n, g)
+            },
+            "<time> -> <duration> ago" => {
+                let r = kronos::Range{
+                    start: reftime,
+                    end: reftime + chrono::Duration::days(1),
+                    grain: kronos::Granularity::Day
+                };
+                let (g, n) = duration_to_grain(&subn[0]);
+                kronos::shift(r, -n, g)
             },
             _ => panic!("Unknown [eval] spec={:?}", spec)
         }

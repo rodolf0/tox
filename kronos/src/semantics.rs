@@ -301,21 +301,23 @@ pub fn next(s: Seq, n: usize, r: DateTime) -> Range {
 // add a duration to a range
 pub fn shift(r: Range, n: i32, g: Granularity) -> Range {
     let (s, e) = (r.start.date(), r.end.date());
+    let dtfunc = if n >= 0 { utils::date_add } else { utils::date_sub };
+    let n = if n < 0 { -n as u32 } else { n as u32 };
     let (s, e) = match g {
         Granularity::Year => {
-            (utils::date_add(s, n, 0, 0), utils::date_add(e, n, 0, 0))
+            (dtfunc(s, n as i32, 0, 0), dtfunc(e, n as i32, 0, 0))
         },
         Granularity::Quarter => {
-            (utils::date_add(s, 0, 3*n as u32, 0), utils::date_add(e, 0, 3*n as u32, 0))
+            (dtfunc(s, 0, 3*n, 0), dtfunc(e, 0, 3*n, 0))
         },
         Granularity::Month => {
-            (utils::date_add(s, 0, n as u32, 0), utils::date_add(e, 0, n as u32, 0))
+            (dtfunc(s, 0, n, 0), dtfunc(e, 0, n, 0))
         },
         Granularity::Week => {
-            (utils::date_add(s, 0, 0, 7*n as u32), utils::date_add(e, 0, 0, 7*n as u32))
+            (dtfunc(s, 0, 0, 7*n), dtfunc(e, 0, 0, 7*n))
         },
         Granularity::Day => {
-            (utils::date_add(s, 0, 0, n as u32), utils::date_add(e, 0, 0, n as u32))
+            (dtfunc(s, 0, 0, n), dtfunc(e, 0, 0, n))
         },
     };
     Range{

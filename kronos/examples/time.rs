@@ -71,7 +71,6 @@ fn build_grammar() -> earley::Grammar {
       //.rule("<time>", &["last", "<time>"])                   // last week | last sunday | last friday
       //.rule("<time>", &["<time>", "before", "last"])
 
-
       .into_grammar("<time>")
 }
 

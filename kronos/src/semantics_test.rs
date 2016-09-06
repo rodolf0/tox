@@ -377,12 +377,12 @@ fn test_interval_1() {
     assert_eq!(mon2fri.next().unwrap(),
                Range{
                 start: Date::from_ymd(2016, 2, 29).and_hms(0, 0, 0),
-                end: Date::from_ymd(2016, 3, 5).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 3, 4).and_hms(0, 0, 0),
                 grain: Granularity::Day});
     assert_eq!(mon2fri.next().unwrap(),
                Range{
                 start: Date::from_ymd(2016, 3, 7).and_hms(0, 0, 0),
-                end: Date::from_ymd(2016, 3, 12).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 3, 11).and_hms(0, 0, 0),
                 grain: Granularity::Day});
 }
 
@@ -391,9 +391,9 @@ fn test_interval_2() {
     let reftime = Date::from_ymd(2016, 9, 25).and_hms(0, 0, 0);
     let jun21st = s::intersect(
         s::month_of_year(6), s::nthof(21, s::day(), s::month()));
-    let sep20st = s::intersect(
-        s::month_of_year(9), s::nthof(20, s::day(), s::month()));
-    let mut summer = s::interval(jun21st, sep20st)(reftime);
+    let sep21st = s::intersect(
+        s::month_of_year(9), s::nthof(21, s::day(), s::month()));
+    let mut summer = s::interval(jun21st, sep21st)(reftime);
     assert_eq!(summer.next().unwrap(),
                Range{
                 start: Date::from_ymd(2017, 6, 21).and_hms(0, 0, 0),

@@ -267,7 +267,7 @@ pub fn interval(a: Seq, b: Seq) -> Seq {
         fn next(&mut self) -> Option<Range> {
             let t0 = self.s.next().unwrap();
             let t1 = self.e.next().unwrap();
-            Some(Range{start: t0.start, end: t1.end, grain: t0.grain})
+            Some(Range{start: t0.start, end: t1.start, grain: t0.grain})
         }
     }
     Rc::new(move |reftime| {

@@ -333,6 +333,19 @@ fn test_intersect_2() {
 }
 
 #[test]
+fn test_intersect_4() {
+    let reftime = Date::from_ymd(2016, 8, 31).and_hms(0, 0, 0);
+    // 1st day of month
+    let first = s::nthof(1, s::day(), s::month());
+    let mut firstofmonth = s::intersect(first, s::month())(reftime);
+    assert_eq!(firstofmonth.next().unwrap(),
+               Range{
+                start: Date::from_ymd(2016, 9, 1).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 9, 2).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+}
+
+#[test]
 fn test_intersect_3() {
     let reftime = Date::from_ymd(2016, 2, 25).and_hms(0, 0, 0);
     // thursdays of june

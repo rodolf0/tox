@@ -10,7 +10,8 @@ use std::str::FromStr;
 // https://github.com/wit-ai/duckling/blob/master/resources/languages/en/rules/time.clj
 fn build_grammar() -> earley::Grammar {
     static STOP_WORDS: &'static [&'static str] = &[
-        "the", "of", "a", "next", "this", "after", "weekend", "in", "to", "ago",
+        "of", "a", "next", "this", "after",
+        "weekend", "in", "to", "ago", "last",
     ];
     let mut gb = earley::GrammarBuilder::new();
     for sw in STOP_WORDS { gb = gb.symbol((*sw, move |n: &str| n == *sw)); }
@@ -38,26 +39,21 @@ fn build_grammar() -> earley::Grammar {
       .symbol(("<day-of-week>", |d: &str| k::weekday(d).is_some()))
       .symbol(("<named-month>", |m: &str| k::month(m).is_some()))
       // basic sequences
-      .rule("<seq>", &["<duration>"])
+      .rule("<seq>", &["<number>"]) // year
       .rule("<seq>", &["<named-month>"])
       .rule("<seq>", &["<day-of-week>"])
-      .rule("<seq>", &["the", "<ordinal>"]) // (day of the month)
+      .rule("<seq>", &["<ordinal>"]) // (day of the month)
+      .rule("<seq>", &["<duration>"])
       .rule("<seq>", &["weekend"])
-      // intersections
-      .rule("<seq>", &["<named-month>", "<ordinal>"])
-      .rule("<seq>", &["<named-month>", "<number>"])
-      .rule("<seq>", &["<day-of-week>", "<ordinal>"])
-      .rule("<seq>", &["<day-of-week>", "<number>"])
+      // intersection, nthofs, interval
       .rule("<seq>", &["<seq>", "<seq>"])
-      // nthofs
       .rule("<seq>", &["<ordinal>", "<seq>", "of", "<seq>"])
+      .rule("<seq>", &["last", "<seq>", "of", "<seq>"])
       .rule("<seq>", &["<seq>", "to", "<seq>"])
 
       //// Ranges
       .symbol("<time>")
-      .rule("<time>", &["<number>"]) // year
-      .rule("<time>", &["<named-month>", "<number>"]) // july 1994
-      .rule("<time>", &["<seq>"]) // grab first item of seq
+      .rule("<time>", &["<seq>"]) // 1st range of seq
       .rule("<time>", &["this", "<seq>"])
       .rule("<time>", &["next", "<seq>"])
       .rule("<time>", &["next", "<number>", "<seq>"]) // next 3 weeks
@@ -161,19 +157,11 @@ pub fn eval_seq(reftime: DateTime, n: &earley::Subtree) -> kronos::Seq {
             "<seq> -> <duration>" => duration_to_seq(reftime, &subn[0]),
             "<seq> -> <named-month>" |
             "<seq> -> <day-of-week>" => xtract!(Tobj::Seq, eval_terminal(&subn[0])),
-            "<seq> -> the <ordinal>" => {
-                let n = xtract!(Tobj::Num, eval_terminal(&subn[1])) as usize;
+            "<seq> -> <ordinal>" => {
+                let n = xtract!(Tobj::Num, eval_terminal(&subn[0])) as usize;
                 kronos::nthof(n, kronos::day(), kronos::month())
             },
             "<seq> -> weekend" => kronos::weekend(),
-            "<seq> -> <named-month> <ordinal>" |
-            "<seq> -> <named-month> <number>" |
-            "<seq> -> <day-of-week> <ordinal>" |
-            "<seq> -> <day-of-week> <number>" => {
-                let m = xtract!(Tobj::Seq, eval_terminal(&subn[0]));
-                let d = xtract!(Tobj::Num, eval_terminal(&subn[1])) as usize;
-                kronos::intersect(m, kronos::nthof(d, kronos::day(), kronos::month()))
-            },
             "<seq> -> <seq> <seq>" => {
                 kronos::intersect(eval_seq(reftime, &subn[0]), eval_seq(reftime, &subn[1]))
             },
@@ -183,6 +171,13 @@ pub fn eval_seq(reftime: DateTime, n: &earley::Subtree) -> kronos::Seq {
             },
             "<seq> -> <seq> to <seq>" => {
                 kronos::interval(eval_seq(reftime, &subn[0]), eval_seq(reftime, &subn[2]))
+            },
+            "<seq> -> last <seq> of <seq>" => {
+                kronos::lastof(1, eval_seq(reftime, &subn[1]), eval_seq(reftime, &subn[3]))
+            },
+            "<seq> -> <number>" => {
+                let n = xtract!(Tobj::Num, eval_terminal(&subn[0])) as usize;
+                kronos::a_year(n)
             },
             _ => panic!("Unknown [eval_seq] spec={:?}", spec)
         }
@@ -196,15 +191,6 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> kronos::Range {
     if let &earley::Subtree::SubT(ref spec, ref subn) = n {
         println!("* {:?}", spec);
         match spec.as_ref() {
-            "<time> -> <number>" => {
-                let n = xtract!(Tobj::Num, eval_terminal(&subn[0])) as usize;
-                kronos::a_year(n)
-            },
-            "<time> -> <named-month> <number>" => {
-                let month = xtract!(Tobj::Seq, eval_terminal(&subn[0]));
-                let n = xtract!(Tobj::Num, eval_terminal(&subn[1])) as usize;
-                kronos::this(month, kronos::a_year(n).start)
-            },
             "<time> -> <seq>" => {
                 kronos::this(eval_seq(reftime, &subn[0]), reftime)
             },
@@ -269,5 +255,21 @@ fn main() {
             println!("{:?}", eval(reftime, &tree));
         },
         Err(e) => println!("Parse err: {:?}", e)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::naive::date::NaiveDate as Date;
+    #[test]
+    fn test_time_1() {
+        let s = "july 2015";
+        let s = "june 2014";
+        let s = "last feb of 2013";
+        let s = "july 23rd";
+        let s = "1st thu of the month"; // TODO
+        let s = "2nd month of 2012";
+        let s = "3 days after mon feb 28th";
+        let s = "feb next year";
     }
 }

@@ -46,7 +46,7 @@ fn build_grammar() -> earley::Grammar {
       .rule("<base_seq>", &["weekend"]) // seq of weekends (TODO: quarters)
       .rule("<base_seq>", &["<duration>"]) // days, weeks, months, ... 2 weeks (of june)
 
-      .symbol("<seq>") // right associativity
+      .symbol("<seq>")
       .rule("<seq>", &["<ordinal>", "<base_seq>", "of", "the", "<seq>"]) // 2nd day of the 3rd week
       .rule("<seq>", &["<ordinal>", "<base_seq>", "of", "<seq>"]) // 3rd hour of june 18th
       .rule("<seq>", &["last", "<base_seq>", "of", "the", "<seq>"])
@@ -64,6 +64,7 @@ fn build_grammar() -> earley::Grammar {
       .rule("<time>", &["<seq>", "after", "next"])
       // seqs anchored to times
       // HIGHLY ambiguous and not clearly needed .rule("<time>", &["<seq>", "<time>"]) // 1st range of seq evaled at time
+      .rule("<time>", &["<seq>", "<time>"]) // EVAL SEQ ON <TIME>
       .rule("<time>", &["<seq>", "<number>"]) // tied to a year
       .rule("<time>", &["<seq>", "after", "<time>"]) // 2 days after monday 28th (could be a seq)
       .rule("<time>", &["<ordinal>", "<seq>", "of", "<number>"]) // tied to a year
@@ -71,6 +72,7 @@ fn build_grammar() -> earley::Grammar {
       // ranges shifted by duration
       .rule("<time>", &["in", "<duration>"])  // in a week, in 6 days
       .rule("<time>", &["<duration>", "ago"])  // 3 months ago
+      .rule("<time>", &["<duration>", "after", "<time>"]) // same but different than <seq> ...
 
       // TODO
       // * the last week of november
@@ -232,10 +234,10 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> kronos::Range {
             "<time> -> <seq> after next" =>
                 kronos::next(eval_seq(reftime, &subn[0]), 2, reftime),
             ////////////////////////////////////////////////////////////////////////////
-            //"<time> -> <seq> <time>" => { HIGHLY ambiguous and not clearly needed
-                //let t = eval(reftime, &subn[1]);
-                //kronos::this(eval_seq(t.start, &subn[0]), t.start)
-            //},
+            "<time> -> <seq> <time>" => { // HIGHLY ambiguous and not clearly needed
+                let t = eval(reftime, &subn[1]);
+                kronos::this(eval_seq(t.start, &subn[0]), t.start)
+            },
             "<time> -> <seq> <number>" => {
                 let y = xtract!(Tobj::Num, eval_terminal(&subn[1])) as usize;
                 let y = kronos::a_year(y);
@@ -244,6 +246,10 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> kronos::Range {
             "<time> -> <seq> after <time>" => {
                 let t = eval(reftime, &subn[2]);
                 kronos::this(eval_seq(t.start, &subn[0]), t.start)
+            },
+            "<time> -> <duration> after <time>" => {
+                let (g, n) = duration_to_grain(&subn[0]);
+                kronos::shift(eval(reftime, &subn[2]), n, g)
             },
             "<time> -> <ordinal> <seq> of <number>" => {
                 let n = xtract!(Tobj::Num, eval_terminal(&subn[0])) as usize;
@@ -321,15 +327,14 @@ mod tests {
         let s = "mondays of june";
 
         let s = "mon feb 28th"; // slow
+        let s = "2nd thu of sep 2016";
+        let s = "3 days after mon feb 28th";
 
-        let s = "2nd thu of sep 2016"; // ambig branch is wrong: intersects 2nd day of month with thu, sep
+        let s = "1st thu of the month"; // OK, it's != this month
+        let s = "1st thu of this month";
 
-        let s = "1st thu of the month"; // TODO: off by 1 month
-        let s = "3 days after mon feb 28th"; // wrong offset
         let s = "feb next year"; // doesn't work
         let s = "4th day of next year"; // doesn't work
         let s = "the 2nd day, of the 3rd week, of february"; // some branches don't finish
-
-        // "of" times should be filtered by grain
     }
 }

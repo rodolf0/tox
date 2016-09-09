@@ -119,12 +119,12 @@ pub fn weekend() -> Seq {
 pub fn week() -> Seq {
     Rc::new(|reftime| {
         // X-precondition: (endtime = tm + 1 week) > reftime
-        let mut tm = Date::from_isoywd(reftime.isoweekdate().0,
-                                       reftime.isoweekdate().1,
-                                       Weekday::Mon);
+        let tm = reftime.date();
+        let ddiff = tm.weekday().num_days_from_sunday();
+        let mut tm = utils::date_sub(tm, 0, 0, ddiff);
         Box::new((0..).map(move |_| {
             let t0 = tm;
-            tm = utils::startof_next_week(tm);
+            tm = t0 + chrono::Duration::days(7);
             Range{
                 start: t0.and_hms(0, 0, 0),
                 end: tm.and_hms(0, 0, 0),
@@ -314,16 +314,12 @@ pub fn interval(a: Seq, b: Seq) -> Seq {
     })
 }
 
-pub fn a_year(y: usize) -> Seq {
-    Rc::new(move |_| {
-        Box::new((0..).map(move |_| {
-            Range{
-                start: Date::from_ymd(y as i32, 1, 1).and_hms(0, 0, 0),
-                end: Date::from_ymd(y as i32 + 1, 1, 1).and_hms(0, 0, 0),
-                grain: Granularity::Year
-            }
-        }))
-    })
+pub fn a_year(y: usize) -> Range {
+    Range{
+        start: Date::from_ymd(y as i32, 1, 1).and_hms(0, 0, 0),
+        end: Date::from_ymd(y as i32 + 1, 1, 1).and_hms(0, 0, 0),
+        grain: Granularity::Year
+    }
 }
 
 pub fn this(s: Seq, r: DateTime) -> Range {

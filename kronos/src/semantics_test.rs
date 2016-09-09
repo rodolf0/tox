@@ -68,13 +68,13 @@ fn test_week() {
     let mut days = s::week()(reftime);
     assert_eq!(days.next().unwrap(),
                Range{
-                start: Date::from_ymd(2015, 12, 28).and_hms(0, 0, 0),
-                end: Date::from_ymd(2016, 1, 4).and_hms(0, 0, 0),
+                start: Date::from_ymd(2015, 12, 27).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 1, 3).and_hms(0, 0, 0),
                 grain: Granularity::Week});
     assert_eq!(days.next().unwrap(),
                Range{
-                start: Date::from_ymd(2016, 1, 4).and_hms(0, 0, 0),
-                end: Date::from_ymd(2016, 1, 11).and_hms(0, 0, 0),
+                start: Date::from_ymd(2016, 1, 3).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 1, 10).and_hms(0, 0, 0),
                 grain: Granularity::Week});
 }
 
@@ -148,13 +148,13 @@ fn test_merge() {
     let mut twoweeks = s::merge(2, s::week())(reftime);
     assert_eq!(twoweeks.next().unwrap(),
                Range{
-                start: Date::from_ymd(2015, 2, 23).and_hms(0, 0, 0),
-                end: Date::from_ymd(2015, 3, 9).and_hms(0, 0, 0),
+                start: Date::from_ymd(2015, 2, 22).and_hms(0, 0, 0),
+                end: Date::from_ymd(2015, 3, 8).and_hms(0, 0, 0),
                 grain: Granularity::Week});
     assert_eq!(twoweeks.next().unwrap(),
                Range{
-                start: Date::from_ymd(2015, 3, 9).and_hms(0, 0, 0),
-                end: Date::from_ymd(2015, 3, 23).and_hms(0, 0, 0),
+                start: Date::from_ymd(2015, 3, 8).and_hms(0, 0, 0),
+                end: Date::from_ymd(2015, 3, 22).and_hms(0, 0, 0),
                 grain: Granularity::Week});
     let mut threedays= s::merge(3, s::day())(reftime);
     assert_eq!(threedays.next().unwrap(),
@@ -278,8 +278,8 @@ fn test_nth_7() {
     let mut thirdwkjune = s::nthof(3, s::week(), s::month_of_year(6))(reftime);
     assert_eq!(thirdwkjune.next().unwrap(),
                Range{
-                start: Date::from_ymd(2017, 6, 12).and_hms(0, 0, 0),
-                end: Date::from_ymd(2017, 6, 19).and_hms(0, 0, 0),
+                start: Date::from_ymd(2017, 6, 11).and_hms(0, 0, 0),
+                end: Date::from_ymd(2017, 6, 18).and_hms(0, 0, 0),
                 grain: Granularity::Week});
 }
 

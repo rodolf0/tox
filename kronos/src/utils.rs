@@ -6,15 +6,6 @@ pub fn startof_next_month(d: Date) -> Date {
     date_add(Date::from_ymd(d.year(), d.month(), 1), 0, 1, 0)
 }
 
-pub fn startof_next_week(d: Date) -> Date {
-    let week = d.isoweekdate().1;
-    let mut next_week = d.clone();
-    while week == next_week.isoweekdate().1 {
-        next_week = next_week.succ();
-    }
-    next_week
-}
-
 pub fn startof_next_year(d: Date) -> Date {
     Date::from_ymd(d.year() + 1, 1, 1)
 }

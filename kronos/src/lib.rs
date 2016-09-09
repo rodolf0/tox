@@ -10,7 +10,7 @@ pub use semantics::{nthof, lastof, intersect, merge, interval};
 pub use semantics::{this, next, a_year, shift};
 
 mod utils;
-pub use utils::{date_add, date_sub, days_in_month};
+pub use utils::{date_add, date_sub, days_in_month, enclose};
 
 #[cfg(test)]
 mod semantics_test;

@@ -1,6 +1,8 @@
 use chrono::naive::date::NaiveDate as Date;
-use chrono::Datelike;
+use chrono::naive::datetime::NaiveDateTime as DateTime;
+use chrono::{Duration, Datelike};
 use std::cmp;
+use semantics::{Range, Granularity};
 
 pub fn startof_next_month(d: Date) -> Date {
     date_add(Date::from_ymd(d.year(), d.month(), 1), 0, 1, 0)
@@ -80,10 +82,57 @@ pub fn date_sub(dt: Date, y: i32, mut m: u32, mut d: u32) -> Date {
     Date::from_ymd(year, month, day)
 }
 
+// Build a Range enclosing <t> wiht granularity <g>
+pub fn enclose(t: DateTime, g: Granularity) -> Range {
+    match g {
+        Granularity::Year => {
+            Range{
+                start: Date::from_ymd(t.year(), 1, 1).and_hms(0, 0, 0),
+                end: Date::from_ymd(t.year()+1, 1, 1).and_hms(0, 0, 0),
+                grain: Granularity::Year
+            }
+        },
+        Granularity::Quarter => {
+            let start = Date::from_ymd(t.year(), 1 + 3 * (t.month()/4), 1);
+            Range{
+                start: start.and_hms(0, 0, 0),
+                end: date_add(start, 0, 3, 0).and_hms(0, 0, 0),
+                grain: Granularity::Quarter
+            }
+        },
+        Granularity::Month => {
+            let start = Date::from_ymd(t.year(), t.month(), 1);
+            Range{
+                start: start.and_hms(0, 0, 0),
+                end: date_add(start, 0, 1, 0).and_hms(0, 0, 0),
+                grain: Granularity::Month
+            }
+        },
+        Granularity::Week => {
+            let wdiff = t.weekday().num_days_from_sunday();
+            let start = date_sub(t.date(), 0, 0, wdiff).and_hms(0, 0, 0);
+            Range{
+                start: start,
+                end: start + Duration::days(7),
+                grain: Granularity::Week
+            }
+        },
+        Granularity::Day => {
+            let start = Date::from_ymd(t.year(), t.month(), t.day());
+            Range{
+                start: start.and_hms(0, 0, 0),
+                end: date_add(start, 0, 0, 1).and_hms(0, 0, 0),
+                grain: Granularity::Day
+            }
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::naive::date::NaiveDate as Date;
-    use super::{date_add, date_sub};
+    use super::{date_add, date_sub, enclose};
+    use semantics::{Range, Granularity};
     #[test]
     fn test_dateadd() {
         let dt = Date::from_ymd(2016, 9, 5);
@@ -116,5 +165,39 @@ mod tests {
         assert_eq!(date_sub(dt, 0, 1, 0), Date::from_ymd(2016, 2, 29));
         assert_eq!(date_sub(dt, 0, 2, 0), Date::from_ymd(2016, 1, 31));
         assert_eq!(date_sub(dt, 0, 13, 0), Date::from_ymd(2015, 2, 28));
+    }
+    #[test]
+    fn test_enclose() {
+        let dt = Date::from_ymd(2016, 9, 5).and_hms(0, 0, 0);
+        assert_eq!(enclose(dt, Granularity::Year),
+                   Range{
+                       start: Date::from_ymd(2016, 1, 1).and_hms(0, 0, 0),
+                       end: Date::from_ymd(2017, 1, 1).and_hms(0, 0, 0),
+                       grain: Granularity::Year
+                   });
+        assert_eq!(enclose(dt, Granularity::Quarter),
+                   Range{
+                       start: Date::from_ymd(2016, 7, 1).and_hms(0, 0, 0),
+                       end: Date::from_ymd(2016, 10, 1).and_hms(0, 0, 0),
+                       grain: Granularity::Quarter
+                   });
+        assert_eq!(enclose(dt, Granularity::Month),
+                   Range{
+                       start: Date::from_ymd(2016, 9, 1).and_hms(0, 0, 0),
+                       end: Date::from_ymd(2016, 10, 1).and_hms(0, 0, 0),
+                       grain: Granularity::Month
+                   });
+        assert_eq!(enclose(dt, Granularity::Week),
+                   Range{
+                       start: Date::from_ymd(2016, 9, 4).and_hms(0, 0, 0),
+                       end: Date::from_ymd(2016, 9, 11).and_hms(0, 0, 0),
+                       grain: Granularity::Week
+                   });
+        assert_eq!(enclose(dt, Granularity::Day),
+                   Range{
+                       start: Date::from_ymd(2016, 9, 5).and_hms(0, 0, 0),
+                       end: Date::from_ymd(2016, 9, 6).and_hms(0, 0, 0),
+                       grain: Granularity::Day
+                   });
     }
 }

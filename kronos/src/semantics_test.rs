@@ -479,3 +479,23 @@ fn test_next() {
                 end: Date::from_ymd(2016, 8, 26).and_hms(0, 0, 0),
                 grain: Granularity::Day});
 }
+
+#[test]
+fn test_multi_1() {
+    // 3 days after mon feb 28th
+    let rt = Date::from_ymd(2021, 9, 5).and_hms(0, 0, 0);
+    let monfeb28th = s::nthof(28, s::day(), s::month());
+    let monfeb28th = s::intersect(monfeb28th, s::day_of_week(1));
+    let monfeb28th = s::intersect(monfeb28th, s::month_of_year(2));
+    assert_eq!(monfeb28th(rt).next().unwrap(),
+               Range{
+                start: Date::from_ymd(2022, 2, 28).and_hms(0, 0, 0),
+                end: Date::from_ymd(2022, 3, 1).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+    let after3 = s::shift(monfeb28th(rt).next().unwrap(), 3, Granularity::Day);
+    assert_eq!(after3,
+               Range{
+                start: Date::from_ymd(2022, 3, 3).and_hms(0, 0, 0),
+                end: Date::from_ymd(2022, 3, 4).and_hms(0, 0, 0),
+                grain: Granularity::Day});
+}

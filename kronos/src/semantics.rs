@@ -7,9 +7,6 @@ use std::cmp;
 use chrono;
 use utils;
 
-// shortcircuit bad sequences
-const SEQFUSE: usize = 1000;
-
 #[derive(Debug,PartialEq,Eq,PartialOrd,Ord,Clone,Copy)]
 pub enum Granularity {
     Day,
@@ -27,9 +24,6 @@ pub struct Range {
     pub grain: Granularity,
 }
 
-// A generator of Ranges
-pub type Seq = Rc<Fn(DateTime)->Box<Iterator<Item=Range>>>;
-
 //enum TmDir {
     //Future,
     //Past,
@@ -39,6 +33,10 @@ pub type Seq = Rc<Fn(DateTime)->Box<Iterator<Item=Range>>>;
     //start: DateTime,
     //dir: TmDir,
 //}
+
+// A generator of Ranges
+pub type Seq = Rc<Fn(DateTime)->Box<Iterator<Item=Range>>>;
+
 
 // NOTES
 // X: Sequences generate Ranges that have ENDtime after reference-time,
@@ -225,7 +223,6 @@ pub fn nthof(n: usize, win: Seq, within: Seq) -> Seq {
         //println!("ref={:?} align={:?}, win={:?}",
                  //reftime, align, win(align).next().unwrap());
         Box::new(within(reftime)
-                    .take(SEQFUSE) // TODO: panic here ? looks like wrong place
                     .filter_map(move |outer| {
             // we restart <win> each time instead of continuing because we
             // could have overflowed the outer interval and we cant miss items
@@ -254,7 +251,6 @@ pub fn lastof(n: usize, win: Seq, within: Seq) -> Seq {
         //println!("ref={:?} align={:?}, win={:?}",
                  //reftime, align, win(align).next().unwrap());
         Box::new(within(reftime)
-                    .take(SEQFUSE) // TODO: panic here ? looks like wrong place
                     .filter_map(move |outer| {
             // we restart <win> each time instead of continuing because we
             // could have overflowed the outer interval and we cant miss items

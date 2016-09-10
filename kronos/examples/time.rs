@@ -63,7 +63,6 @@ fn build_grammar() -> earley::Grammar {
       .rule("<time>", &["<seq>"]) // 1st range of seq evaluated now
       .rule("<time>", &["<seq>", "after", "next"])
       // seqs anchored to times
-      // HIGHLY ambiguous and not clearly needed .rule("<time>", &["<seq>", "<time>"]) // 1st range of seq evaled at time
       .rule("<time>", &["<seq>", "<time>"]) // EVAL SEQ ON <TIME>
       .rule("<time>", &["<seq>", "<number>"]) // tied to a year
       .rule("<time>", &["<seq>", "after", "<time>"]) // 2 days after monday 28th (could be a seq)

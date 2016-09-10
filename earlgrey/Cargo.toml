@@ -1,8 +1,8 @@
 [package]
-name = "toxearley"
-version = "0.0.3"
+name = "earlgrey"
+version = "0.0.4"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
-description = "An earley parser"
+description = "An earley parser library"
 license = "MIT"
 repository = "https://github.com/rodolf0/tox"
 

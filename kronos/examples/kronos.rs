@@ -1,4 +1,4 @@
-extern crate toxearley as earley;
+extern crate earlgrey as earley;
 extern crate lexers;
 extern crate kronos;
 extern crate chrono;

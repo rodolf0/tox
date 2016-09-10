@@ -1,11 +1,11 @@
 # kronos
 A library (WIP) to work with time expressions.
 
-Try out the **time** example binary that uses both *kronos* and *earlgrey* to parse some text into time objects.
+Try out the **kronos** example binary that uses both *kronos* and *earlgrey* to parse some text into time objects.
 Run *cargo test* to build the example.
 
 ```
-$ time next monday 28th of feb
+$ kronos next monday 28th of feb
 
 * "<time> -> next <seq>" ==> "next | <seq> -> <base_seq> <seq>"
 * "<seq> -> <base_seq> <seq>" ==> "<base_seq> -> <day-of-week> | <seq> -> <base_seq> of <seq>"

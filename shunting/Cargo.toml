@@ -9,7 +9,7 @@ default = ["dynlink-eval"]
 dynlink-eval = ["dylib"]
 
 [dependencies]
-lexers = { path = "../lexers" }
+lexers = { version = "0.0.4", path = "../lexers" }
 linenoise-rust = "*"
 rand = "*"
 num = "*"

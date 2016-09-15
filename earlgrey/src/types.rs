@@ -2,7 +2,7 @@ use std::collections::{HashSet, HashMap};
 use std::ops::Index;
 use std::{fmt, hash, iter, slice};
 use std::rc::Rc;
-use std::cell::RefCell;
+use std::cell;
 
 pub enum Symbol {
     NonTerm(String),
@@ -50,7 +50,7 @@ impl Eq for Symbol {}
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Hash, PartialEq, Eq)]
+#[derive(PartialEq,Eq,Hash)]
 struct Rule {
     name: String,
     spec: Vec<Rc<Symbol>>,
@@ -58,7 +58,7 @@ struct Rule {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone,PartialEq,Eq,Hash,Debug)]
 pub enum Trigger {
     Completion(Rc<Item>),
     Scan(String),
@@ -66,15 +66,18 @@ pub enum Trigger {
 
 #[derive(Clone)]
 pub struct Item {
+    // LR0item (dotted rule)
     rule: Rc<Rule>,
-    dot: usize,    // index into the production
-    start: usize,  // Earley state where item starts
-    end: usize,    // Earley state where item ends (needed for dedup)
-    // backpointers to source of this item: (source-item, trigger)
-    bp: RefCell<HashSet<(Rc<Item>, Trigger)>>,
+    dot: usize,
+    // early item match span start/ends
+    start: usize,
+    end: usize,
+    // backpointers leading to this item: (source-item, trigger)
+    bp: cell::RefCell<HashSet<(Rc<Item>, Trigger)>>,
 }
 
 // Items are deduped only by rule, dot, start, end (ie: not bp)
+// This is needed to insert into StateSet merging back-pointers
 impl hash::Hash for Item {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.rule.hash(state);
@@ -84,7 +87,6 @@ impl hash::Hash for Item {
     }
 }
 
-// Items are deduped only by rule, dot, start, end (ie: not bp)
 impl PartialEq for Item {
     fn eq(&self, other: &Item) -> bool {
         self.rule == other.rule && self.dot == other.dot &&
@@ -103,8 +105,8 @@ impl Item {
     pub fn next_symbol<'a>(&'a self) -> Option<&'a Symbol> {
         self.rule.spec.get(self.dot).map(|s| &**s)
     }
-    pub fn back_pointers(&self) -> HashSet<(Rc<Item>, Trigger)> {
-        self.bp.borrow().clone()
+    pub fn back_pointers(&self) -> cell::Ref<HashSet<(Rc<Item>, Trigger)>> {
+        self.bp.borrow()
     }
 }
 
@@ -126,21 +128,21 @@ impl Item {
     // build a new Item for a prediction
     fn predict_new(rule: &Rc<Rule>, start: usize) -> Item {
         Item{rule: rule.clone(), dot: 0, start: start, end: start,
-             bp: RefCell::new(HashSet::new())}
+             bp: cell::RefCell::new(HashSet::new())}
     }
     // produce an Item after scanning using another item as the base
     fn scan_new(source: &Rc<Item>, end: usize, input: &str) -> Item {
         let mut _bp = HashSet::new();
         _bp.insert((source.clone(), Trigger::Scan(input.to_string())));
         Item{rule: source.rule.clone(), dot: source.dot+1,
-             start: source.start, end: end, bp: RefCell::new(_bp)}
+             start: source.start, end: end, bp: cell::RefCell::new(_bp)}
     }
     // build a new item completing another one
     fn complete_new(source: &Rc<Item>, trigger: &Rc<Item>, end: usize) -> Item {
         let mut _bp = HashSet::new();
         _bp.insert((source.clone(), Trigger::Completion(trigger.clone())));
         Item{rule: source.rule.clone(), dot: source.dot+1,
-             start: source.start, end: end, bp: RefCell::new(_bp)}
+             start: source.start, end: end, bp: cell::RefCell::new(_bp)}
     }
 }
 
@@ -164,7 +166,8 @@ pub struct StateSet {
     dedup: HashSet<Rc<Item>>,
 }
 
-// Statesets are filled with Item's via push/extend. These are boxed to share BP
+// Statesets are filled with Item's via push/extend, these are boxed to share BP
+// See implementations of Hash + PartialEq + Eq for Item excluding Item::bp
 impl StateSet {
     pub fn new() -> StateSet {
         StateSet{order: Vec::new(), dedup: HashSet::new()}

@@ -223,7 +223,7 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> kronos::Range {
                  }).collect::<Vec<_>>().join(" | "));
         match spec.as_ref() {
             "<time> -> <number>" =>
-                kronos::a_year(xtract!(Tobj::Num, eval_terminal(&subn[0])) as usize),
+                kronos::a_year(xtract!(Tobj::Num, eval_terminal(&subn[0]))),
             "<time> -> this <seq>" =>
                 kronos::this(eval_seq(reftime, &subn[1]), reftime),
             "<time> -> next <seq>" =>
@@ -238,7 +238,7 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> kronos::Range {
                 kronos::this(eval_seq(t.start, &subn[0]), t.start)
             },
             "<time> -> <seq> <number>" => {
-                let y = xtract!(Tobj::Num, eval_terminal(&subn[1])) as usize;
+                let y = xtract!(Tobj::Num, eval_terminal(&subn[1]));
                 let y = kronos::a_year(y);
                 kronos::this(eval_seq(y.start, &subn[0]), y.start)
             },
@@ -253,13 +253,13 @@ pub fn eval(reftime: DateTime, n: &earley::Subtree) -> kronos::Range {
             "<time> -> <ordinal> <seq> of <number>" => {
                 let n = xtract!(Tobj::Num, eval_terminal(&subn[0])) as usize;
                 let s = kronos::nthof(n, eval_seq(reftime, &subn[1]), kronos::year());
-                let y = xtract!(Tobj::Num, eval_terminal(&subn[3])) as usize;
+                let y = xtract!(Tobj::Num, eval_terminal(&subn[3]));
                 let y = kronos::a_year(y);
                 kronos::this(s, y.start)
             },
             "<time> -> last <seq> of <number>" => {
                 let s = kronos::lastof(1, eval_seq(reftime, &subn[1]), kronos::year());
-                let y = xtract!(Tobj::Num, eval_terminal(&subn[3])) as usize;
+                let y = xtract!(Tobj::Num, eval_terminal(&subn[3]));
                 let y = kronos::a_year(y);
                 kronos::this(s, y.start)
             },

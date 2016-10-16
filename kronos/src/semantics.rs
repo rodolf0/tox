@@ -295,6 +295,10 @@ pub fn intersect(a: Seq, b: Seq) -> Seq {
     })
 }
 
+pub fn skip(s: Seq, n: usize) -> Seq {
+    Rc::new(move |reftime| { Box::new(s(reftime).skip(n)) })
+}
+
 // duckling intervals http://tinyurl.com/hk2vu34
 pub fn interval(a: Seq, b: Seq) -> Seq {
     struct IntervalIt {
@@ -315,10 +319,10 @@ pub fn interval(a: Seq, b: Seq) -> Seq {
     })
 }
 
-pub fn a_year(y: usize) -> Range {
+pub fn a_year(y: i32) -> Range {
     Range{
-        start: Date::from_ymd(y as i32, 1, 1).and_hms(0, 0, 0),
-        end: Date::from_ymd(y as i32 + 1, 1, 1).and_hms(0, 0, 0),
+        start: Date::from_ymd(y, 1, 1).and_hms(0, 0, 0),
+        end: Date::from_ymd(y + 1, 1, 1).and_hms(0, 0, 0),
         grain: Granularity::Year
     }
 }

@@ -95,7 +95,7 @@ macro_rules! xtract {
 }
 
 fn eval_terminal(n: &earley::Subtree) -> Tobj {
-    if let &earley::Subtree::Node(ref sym, ref lexeme) = n {
+    if let &earley::Subtree::Leaf(ref sym, ref lexeme) = n {
         match sym.as_ref() {
             "<day-of-week>" => {
                 let dow = k::weekday(lexeme).unwrap();
@@ -119,7 +119,7 @@ fn eval_terminal(n: &earley::Subtree) -> Tobj {
 }
 
 fn duration_to_seq(reftime: DateTime, n: &earley::Subtree) -> kronos::Seq {
-    if let &earley::Subtree::SubT(ref spec, ref subn) = n {
+    if let &earley::Subtree::Node(ref spec, ref subn) = n {
         println!("* {:?}", spec); // trace
         match spec.as_ref() {
             "<base_duration> -> <dur-day>" => kronos::day(),
@@ -141,7 +141,7 @@ fn duration_to_seq(reftime: DateTime, n: &earley::Subtree) -> kronos::Seq {
 }
 
 fn duration_to_grain(n: &earley::Subtree) -> (kronos::Granularity, i32) {
-    if let &earley::Subtree::SubT(ref spec, ref subn) = n {
+    if let &earley::Subtree::Node(ref spec, ref subn) = n {
         println!("* {:?}", spec); // trace
         match spec.as_ref() {
             "<base_duration> -> <dur-day>" => (kronos::Granularity::Day, 1),
@@ -164,12 +164,12 @@ fn duration_to_grain(n: &earley::Subtree) -> (kronos::Granularity, i32) {
 }
 
 pub fn eval_seq(reftime: DateTime, n: &earley::Subtree) -> kronos::Seq {
-    if let &earley::Subtree::SubT(ref spec, ref subn) = n {
+    if let &earley::Subtree::Node(ref spec, ref subn) = n {
         println!("* {:?} ==> {:?}", spec,
                  subn.iter().map(|i| {
                      match i {
-                         &earley::Subtree::Node(_, ref n) => n.to_string(),
-                         &earley::Subtree::SubT(ref n, _) => n.to_string(),
+                         &earley::Subtree::Leaf(_, ref n) => n.to_string(),
+                         &earley::Subtree::Node(ref n, _) => n.to_string(),
                      }
                  }).collect::<Vec<_>>().join(" | "));
         match spec.as_ref() {
@@ -213,12 +213,12 @@ pub fn eval_seq(reftime: DateTime, n: &earley::Subtree) -> kronos::Seq {
 
 
 pub fn eval(reftime: DateTime, n: &earley::Subtree) -> kronos::Range {
-    if let &earley::Subtree::SubT(ref spec, ref subn) = n {
+    if let &earley::Subtree::Node(ref spec, ref subn) = n {
         println!("* {:?} ==> {:?}", spec,
                  subn.iter().map(|i| {
                      match i {
-                         &earley::Subtree::Node(_, ref n) => n.to_string(),
-                         &earley::Subtree::SubT(ref n, _) => n.to_string(),
+                         &earley::Subtree::Leaf(_, ref n) => n.to_string(),
+                         &earley::Subtree::Node(ref n, _) => n.to_string(),
                      }
                  }).collect::<Vec<_>>().join(" | "));
         match spec.as_ref() {

@@ -17,7 +17,7 @@ macro_rules! xtract {
 }
 
 fn num(n: &Subtree) -> i32 {
-    let (sym, lexeme) = xtract!(Subtree::Node, n);
+    let (sym, lexeme) = xtract!(Subtree::Leaf, n);
     match sym.as_ref() {
         "<ordinal>" => (k::ordinal(lexeme)
                         .or(k::short_ordinal(lexeme)).unwrap() as i32),
@@ -28,7 +28,7 @@ fn num(n: &Subtree) -> i32 {
 
 fn seq(n: &Subtree) -> kronos::Seq {
 match n {
-    &Subtree::Node(ref sym, ref lexeme) => match sym.as_ref() {
+    &Subtree::Leaf(ref sym, ref lexeme) => match sym.as_ref() {
         "<day-of-week>" => kronos::day_of_week(k::weekday(lexeme).unwrap()),
         "<named-month>" => kronos::month_of_year(k::month(lexeme).unwrap()),
         "<day-of-month>" => {
@@ -37,7 +37,7 @@ match n {
         },
         _ => panic!("Unknown sym={:?} lexeme={:?}", sym, lexeme)
     },
-    &Subtree::SubT(ref spec, ref subn) => match spec.as_ref() {
+    &Subtree::Node(ref spec, ref subn) => match spec.as_ref() {
         "<seq> -> <day-of-week>" => seq(&subn[0]),
         "<seq> -> <day-of-month>" => seq(&subn[0]),
         "<seq> -> <named-month>" => seq(&subn[0]),
@@ -84,7 +84,7 @@ match n {
 }
 
 fn duration_to_grain(n: &Subtree) -> (g, i32) {
-    let (spec, subn) = xtract!(Subtree::SubT, n);
+    let (spec, subn) = xtract!(Subtree::Node, n);
     println!("* {:?}", spec); // trace
     match spec.as_ref() {
         "<duration> -> <dur-day>" => (g::Day, 1),
@@ -103,13 +103,13 @@ fn duration_to_grain(n: &Subtree) -> (g, i32) {
 }
 
 pub fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
-    let (spec, subn) = xtract!(Subtree::SubT, n);
+    let (spec, subn) = xtract!(Subtree::Node, n);
     // DEBUG
     println!("* {:?} ==> {:?}", spec,
              subn.iter().map(|i| {
                  match i {
-                     &Subtree::Node(_, ref n) => n.to_string(),
-                     &Subtree::SubT(ref n, _) => n.to_string(),
+                     &Subtree::Leaf(_, ref n) => n.to_string(),
+                     &Subtree::Node(ref n, _) => n.to_string(),
                  }
              }).collect::<Vec<_>>().join(" | "));
 
@@ -133,7 +133,7 @@ pub fn parse_time(t: &str, reftime: DateTime) -> Option<kronos::Range> {
         Ok(state) => {
             let trees = earlgrey::all_trees(parser.g.start(), &state);
             assert_eq!(trees.len(), 1); // don't allow ambiguity
-            let (spec, subn) = xtract!(Subtree::SubT, &trees[0]);
+            let (spec, subn) = xtract!(Subtree::Node, &trees[0]);
             match spec.as_ref() {
                 "<S> -> <range>" => Some(eval_range(reftime, &subn[0])),
                 "<S> -> <seq> <range>" => {

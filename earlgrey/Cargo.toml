@@ -1,6 +1,6 @@
 [package]
 name = "earlgrey"
-version = "0.0.4"
+version = "0.0.5"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "An earley parser library"
 license = "MIT"

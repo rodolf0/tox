@@ -3,8 +3,8 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Subtree {
-    Node(String, String),       // ("[+-]", "+")
-    SubT(String, Vec<Subtree>), // ("E + E", [("n", "5"), ("[+-]", "+"), ("E * E", [...])])
+    Leaf(String, String),       // ("[+-]", "+")
+    Node(String, Vec<Subtree>), // ("E + E", [("n", "5"), ("[+-]", "+"), ("E * E", [...])])
 }
 
 // for non-ambiguous grammars this retreieve the only possible parse
@@ -25,8 +25,8 @@ fn one_helper(pstate: &Vec<StateSet>, root: &Rc<Item>) -> Subtree {
         // source/left-side is always a prediction (completions/scans are right side of bp)
         // flat-accumulate all left-side back-pointers that lead to the trigger
         match one_helper(pstate, bp_pred) {
-            n @ Subtree::Node(_, _) => childs.push(n),
-            Subtree::SubT(_, c) => childs.extend(c),
+            n @ Subtree::Leaf(_, _) => childs.push(n),
+            Subtree::Node(_, c) => childs.extend(c),
         };
         match bp_trig {
             // Eg: E -> E + E .  // prediction is E +, trigger E
@@ -35,11 +35,11 @@ fn one_helper(pstate: &Vec<StateSet>, root: &Rc<Item>) -> Subtree {
             // Eg: E -> E + . E  // prediction is E, trigger +
             &Trigger::Scan(ref input) => {
                 let label = bp_pred.next_symbol().unwrap().name();
-                childs.push(Subtree::Node(label, input.clone()));
+                childs.push(Subtree::Leaf(label, input.clone()));
             }
         }
     }
-    Subtree::SubT(root.str_rule(), childs)
+    Subtree::Node(root.str_rule(), childs)
 }
 
 
@@ -56,13 +56,13 @@ fn all_helper(pstate: &Vec<StateSet>, root: &Rc<Item>) -> Vec<Subtree> {
     let back_pointers = root.back_pointers();
     let mut trees = Vec::new();
     if back_pointers.len() == 0 {
-        trees.push(Subtree::SubT(root.str_rule(), Vec::new()));
+        trees.push(Subtree::Node(root.str_rule(), Vec::new()));
     } else {
         for &(ref bp_pred, ref bp_trig) in back_pointers.iter() {
             for predtree in all_helper(pstate, bp_pred) {
                 let mut prediction = match predtree {
-                    n @ Subtree::Node(_, _) => vec![n],
-                    Subtree::SubT(_, c) => c,
+                    n @ Subtree::Leaf(_, _) => vec![n],
+                    Subtree::Node(_, c) => c,
                 };
                 match bp_trig {
                     // Eg: E -> E + E .  // prediction is E +, trigger E
@@ -70,13 +70,13 @@ fn all_helper(pstate: &Vec<StateSet>, root: &Rc<Item>) -> Vec<Subtree> {
                         for trigger in all_helper(pstate, bp_trig) {
                             let mut p = prediction.clone();
                             p.push(trigger.clone());
-                            trees.push(Subtree::SubT(root.str_rule(), p));
+                            trees.push(Subtree::Node(root.str_rule(), p));
                         },
                     // Eg: E -> E + . E  // prediction is E, trigger +
                     &Trigger::Scan(ref input) => {
                         let label = bp_pred.next_symbol().unwrap().name();
-                        prediction.push(Subtree::Node(label.clone(), input.clone()));
-                        trees.push(Subtree::SubT(root.str_rule(), prediction));
+                        prediction.push(Subtree::Leaf(label.clone(), input.clone()));
+                        trees.push(Subtree::Node(root.str_rule(), prediction));
                     }
                 }
             }

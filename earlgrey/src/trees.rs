@@ -7,6 +7,28 @@ pub enum Subtree {
     Node(String, Vec<Subtree>), // ("E + E", [("n", "5"), ("[+-]", "+"), ("E * E", [...])])
 }
 
+impl Subtree {
+    pub fn print(&self) {
+        self.print_helper("")
+    }
+    fn print_helper(&self, level: &str) {
+        match self {
+            &Subtree::Leaf(ref sym, ref lexeme) => {
+                println!("{}`-- {:?} ==> {:?}", level, sym, lexeme);
+            },
+            &Subtree::Node(ref spec, ref subn) => {
+                println!("{}`-- {:?}", level, spec);
+                if let Some((last, rest)) = subn.split_last() {
+                    let l = format!("{}  |", level);
+                    for n in rest { n.print_helper(&l); }
+                    let l = format!("{}   ", level);
+                    last.print_helper(&l);
+                }
+            }
+        }
+    }
+}
+
 // for non-ambiguous grammars this retreieve the only possible parse
 pub fn one_tree(startsym: String, pstate: &Vec<StateSet>) -> Subtree {
     pstate.last().unwrap()

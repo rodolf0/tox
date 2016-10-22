@@ -261,8 +261,8 @@ fn test_nth_6() {
     let mut first = s::nthof(1, s::day(), s::month())(reftime);
     assert_eq!(first.next().unwrap(),
                Range{
-                start: Date::from_ymd(2016, 9, 1).and_hms(0, 0, 0),
-                end: Date::from_ymd(2016, 9, 2).and_hms(0, 0, 0),
+                start: Date::from_ymd(2016, 8, 1).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 8, 2).and_hms(0, 0, 0),
                 grain: Granularity::Day});
     let mut thirtyfirst = s::nthof(31, s::day(), s::month())(reftime);
     assert_eq!(thirtyfirst.next().unwrap(),
@@ -340,8 +340,8 @@ fn test_intersect_4() {
     let mut firstofmonth = s::intersect(first, s::month())(reftime);
     assert_eq!(firstofmonth.next().unwrap(),
                Range{
-                start: Date::from_ymd(2016, 9, 1).and_hms(0, 0, 0),
-                end: Date::from_ymd(2016, 9, 2).and_hms(0, 0, 0),
+                start: Date::from_ymd(2016, 8, 1).and_hms(0, 0, 0),
+                end: Date::from_ymd(2016, 8, 2).and_hms(0, 0, 0),
                 grain: Granularity::Day});
 }
 

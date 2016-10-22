@@ -231,7 +231,7 @@ pub fn nthof(n: usize, win: Seq, within: Seq) -> Seq {
                       // Could enforce x.start >= outer.start
                       .take_while(|inner| inner.end <= outer.end)
                       .nth(n - 1)
-        }).skip_while(move |range| range.end < reftime))
+        })) //.skip_while(move |range| range.end < reftime))
     })
 }
 
@@ -267,7 +267,7 @@ pub fn lastof(n: usize, win: Seq, within: Seq) -> Seq {
                 }
             }
             None
-        }).skip_while(move |range| range.end < reftime))
+        })) //.skip_while(move |range| range.end < reftime))
     })
 }
 
@@ -286,7 +286,7 @@ pub fn intersect(a: Seq, b: Seq) -> Seq {
         Box::new(b(reftime).flat_map(move |outer| {
             a(align).skip_while(move |inner| inner.start < outer.start)
                     .take_while(move |inner| inner.end <= outer.end)
-        }).skip_while(move |range| range.end < reftime))
+        })) //.skip_while(move |range| range.end < reftime))
     })
 }
 

@@ -1,9 +1,10 @@
+#[macro_use] extern crate lazy_static;
+extern crate regex;
 extern crate chrono;
 extern crate kronos;
 extern crate earlgrey;
 extern crate lexers;
 
-mod grammar;
-mod eval;
+mod time;
 
-pub use eval::parse_time;
+pub use time::parse_time;

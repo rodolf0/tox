@@ -1,13 +1,111 @@
 use earlgrey;
 use kronos;
-use grammar;
 use lexers;
 
 use chrono::naive::datetime::NaiveDateTime as DateTime;
-use kronos::constants as k;
-use kronos::Granularity as g;
-use std::str::FromStr;
 use earlgrey::Subtree;
+use kronos::Granularity as g;
+use kronos::constants as k;
+use regex::Regex;
+use std::str::FromStr;
+use std::collections::HashMap;
+
+pub fn build_grammar() -> earlgrey::Grammar {
+    let mut gb = earlgrey::GrammarBuilder::new();
+
+    lazy_static! {
+        static ref STOP_WORDS: HashMap<String, Regex> = [
+            "days?", "weeks?", "months?", "quarters?", "years?",
+            "this", "next", "the", "(of|in)" "(of|in|of the)", "after",
+            "weekend", "last",
+        ].iter()
+         .map(|s| (s.to_string(), Regex::new(&format!("^{}$", s)).unwrap()))
+         .collect();
+    }
+    for (sw, rx) in STOP_WORDS.iter() {
+        gb = gb.symbol((sw.as_str(), move |n: &str| rx.is_match(n)));
+    }
+
+    gb.symbol("<S>")
+      // terminals
+      .symbol(("<number>", |n: &str| i32::from_str(n).is_ok()))
+      .symbol(("<ordinal>", |n: &str| k::ordinal(n).or(k::short_ordinal(n)).is_some()))
+      .symbol(("<day-of-week>", |d: &str| k::weekday(d).is_some()))
+      .symbol(("<day-of-month>", |n: &str| match k::ordinal(n).or(k::short_ordinal(n)) {
+          Some(dom) => (0 < dom && dom < 32), _ => false,
+      }))
+      .symbol(("<named-month>", |m: &str| k::month(m).is_some()))
+      .symbol(("<year>", |n: &str| match i32::from_str(n) {
+          Ok(y) => (999 < y && y < 2101), _ => false,
+      }))
+
+      .symbol("<range>")
+      .symbol("<therange>")
+      .rule("<therange>", &["<range>"])
+      .rule("<therange>", &["the", "<range>"])
+
+      .rule("<range>", &["<day-of-week>"])
+      .rule("<range>", &["<named-month>"])
+      .rule("<range>", &["<year>"])
+      .rule("<range>", &["today"])
+      .rule("<range>", &["tomorrow"])
+      //.rule("<range>", &["yesterday"])
+
+      .symbol("<seq>")
+      .rule("<seq>", &["<day-of-week>"])
+      .rule("<seq>", &["<day-of-month>"])
+      .rule("<seq>", &["<named-month>"])
+      .rule("<seq>", &["days?"])
+      .rule("<seq>", &["weeks?"])
+      .rule("<seq>", &["months?"])
+      .rule("<seq>", &["quarters?"])
+      .rule("<seq>", &["years?"])
+
+      // this-next-last
+      .rule("<range>", &["this", "<seq>"])
+      .rule("<therange>", &["next", "<seq>"])
+      //.rule("<therange>", &["last", "<seq>"])
+      .rule("<therange>", &["<seq>", "after", "next"])
+      //.rule("<therange>", &["<seq>", "before", "last"])
+
+      // nth-last of sequences
+      .rule("<therange>", &["<ordinal>", "<seq>", "(of|in|of the)", "<seq>"]) // 3rd day of the month, 2nd week in august, 2nd tuesday in march
+      .rule("<therange>", &["last", "<seq>", "(of|in|of the)", "<seq>"])
+
+      .rule("<therange>", &["<ordinal>", "<seq>", "after", "<seq>"])
+
+      // Grab grain of <range>, create a sequence, then evaluate on <range>
+      .rule("<therange>", &["<ordinal>", "<seq>", "(of|in)", "<range>"]) // 3rd day next month, 2nd month of 2018, 1st tuesday of 2020
+      .rule("<therange>", &["<ordinal>", "<seq>", "after", "<range>"]) // grab next grain to create seq?  3rd day after tomorrow
+      .rule("<therange>", &["last", "<seq>", "(of|in)", "<range>"])
+
+      .rule("<theseq>", &["<ordinal>", "<seq>", "(of|in)", "<theseq>"]) // 2nd day of the 3rd week of june
+
+      // <seq> are latent, <range> are not ?
+
+      // intersections
+      .rule("<therange>", &["<day-of-month>"]) // the 12th
+      .rule("<therange>", &["<day-of-month>", "of", "<named-month>"]) // 18th of august
+      .rule("<range>", &["<day-of-week>", "<day-of-month>"]) // friday 18th
+      .rule("<range>", &["<named-month>", "<day-of-month>"]) // march 18th
+
+
+      //.symbol("<duration>")
+      //.rule("<duration>", &["days?"])
+      //.rule("<duration>", &["<number>", "<duration>"])
+      //.rule("<S>", &["<duration>", "after", "<range>"])
+      //.rule("<number>", &["<duration>", "until", "<range>"]) // seconds until feb 24th
+
+      // start
+      .rule("<S>", &["<range>"])
+      .rule("<S>", &["<therange>"])
+
+      .into_grammar("<S>")
+}
+
+
+
+
 
 macro_rules! xtract {
     ($p:path, $e:expr) => (match $e {
@@ -66,10 +164,6 @@ match n {
             kronos::lastof(1, seq(&subn[1]), seq(&subn[4])),
         "<seq> -> last <seq> of <seq>" =>
             kronos::lastof(1, seq(&subn[1]), seq(&subn[3])),
-        "<seq> -> <ordinal> <seq>" => {
-            let n = num(&subn[0]) as usize;
-            kronos::skip(seq(&subn[1]), n-1)
-        },
         //////////////////////////////////////////////////////////////////////////////
         //"<seq> -> <seq> of <seq>" =>
             //kronos::intersect(seq(&subn[0]), seq(&subn[2])),
@@ -85,7 +179,6 @@ match n {
 
 fn duration_to_grain(n: &Subtree) -> (g, i32) {
     let (spec, subn) = xtract!(Subtree::Node, n);
-    println!("* {:?}", spec); // trace
     match spec.as_ref() {
         "<duration> -> <dur-day>" => (g::Day, 1),
         "<duration> -> <dur-week>" => (g::Week, 1),
@@ -104,19 +197,11 @@ fn duration_to_grain(n: &Subtree) -> (g, i32) {
 
 pub fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
     let (spec, subn) = xtract!(Subtree::Node, n);
-    // DEBUG
-    println!("* {:?} ==> {:?}", spec,
-             subn.iter().map(|i| {
-                 match i {
-                     &Subtree::Leaf(_, ref n) => n.to_string(),
-                     &Subtree::Node(ref n, _) => n.to_string(),
-                 }
-             }).collect::<Vec<_>>().join(" | "));
-
     match spec.as_ref() {
         "<range> -> next <seq>" => kronos::next(seq(&subn[1]), 1, reftime),
         "<range> -> this <seq>" => kronos::this(seq(&subn[1]), reftime),
-        "<range> -> the <seq>" => kronos::this(seq(&subn[1]), reftime),
+        //"<range> -> the <seq>" => kronos::this(seq(&subn[1]), reftime),
+        "<range> -> the <day-of-month>" => kronos::this(seq(&subn[1]), reftime),
         "<range> -> <seq>" => kronos::this(seq(&subn[0]), reftime),
         "<range> -> <seq> after next" => kronos::next(seq(&subn[0]), 2, reftime),
         "<range> -> <year>" => kronos::a_year(num(&subn[0])),
@@ -126,12 +211,20 @@ pub fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
     }
 }
 
+
+
+
+
+
 pub fn parse_time(t: &str, reftime: DateTime) -> Option<kronos::Range> {
-    let parser = earlgrey::EarleyParser::new(grammar::build_grammar());
+    let parser = earlgrey::EarleyParser::new(build_grammar());
     let mut tokenizer = lexers::DelimTokenizer::from_str(t, ", ", true);
     match parser.parse(&mut tokenizer) {
         Ok(state) => {
             let trees = earlgrey::all_trees(parser.g.start(), &state);
+            for t in &trees {
+                t.print();
+            }
             assert_eq!(trees.len(), 1); // don't allow ambiguity
             let (spec, subn) = xtract!(Subtree::Node, &trees[0]);
             match spec.as_ref() {
@@ -154,6 +247,16 @@ pub fn parse_time(t: &str, reftime: DateTime) -> Option<kronos::Range> {
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
 
 #[cfg(test)]
 mod tests {
@@ -187,6 +290,9 @@ mod tests {
         let ex = kronos::Range{
             start: d(2016, 3, 6), end: d(2016, 3, 13), grain: g::Week};
         assert_eq!(parse_time("next week", d(2016, 3, 5)), Some(ex));
+        let ex = kronos::Range{
+            start: d(2016, 10, 1), end: d(2016, 11, 1), grain: g::Month};
+        assert_eq!(parse_time("next month", d(2016, 9, 5)), Some(ex));
     }
     #[test]
     fn t_thedom() {
@@ -213,20 +319,16 @@ mod tests {
             start: d(2017, 6, 19), end: d(2017, 6, 20), grain: g::Day};
         assert_eq!(parse_time("the 3rd monday of june",
                               d(2016, 9, 5)), Some(ex));
-        let ex = kronos::Range{
-            start: d(2017, 5, 9), end: d(2017, 5, 10), grain: g::Day};
-        assert_eq!(parse_time("the 3rd day of the 2nd week of may",
-                              d(2016, 9, 5)), Some(ex));
+        //let ex = kronos::Range{
+            //start: d(2017, 5, 9), end: d(2017, 5, 10), grain: g::Day};
+        //assert_eq!(parse_time("the 3rd day of the 2nd week of may",
+                              //d(2016, 9, 5)), Some(ex));
     }
     #[test]
     fn t_seqrelrange() {
         let ex = kronos::Range{
-            start: d(2016, 9, 11), end: d(2016, 9, 18), grain: g::Week};
-        assert_eq!(parse_time("the 2nd week", d(2016, 9, 5)), Some(ex));
-        let ex = kronos::Range{
             start: d(2016, 10, 2), end: d(2016, 10, 9), grain: g::Week};
-        assert_eq!(parse_time("2nd week next month",
-                              d(2016, 9, 5)), Some(ex));
+        assert_eq!(parse_time("2nd week next month", d(2016, 9, 5)), Some(ex));
         let ex = kronos::Range{
             start: d(2017, 1, 4), end: d(2017, 1, 5), grain: g::Day};
         assert_eq!(parse_time("4th day next year",

@@ -15,10 +15,9 @@ pub fn build_grammar() -> earlgrey::Grammar {
 
     lazy_static! {
         static ref STOP_WORDS: HashMap<String, Regex> = [
-            "days?", "weeks?", "months?", "quarters?", "years?",
-            "this", "next", "of", "the", "(of|in)",
-            "before", "after", "weekend", "last",
             "today", "tomorrow", "yesterday",
+            "days?", "weeks?", "months?", "quarters?", "years?", "weekend",
+            "this", "next", "of", "the", "(of|in)", "before", "after", "last",
         ].iter()
          .map(|s| (s.to_string(), Regex::new(&format!("^{}$", s)).unwrap()))
          .collect();
@@ -56,6 +55,7 @@ pub fn build_grammar() -> earlgrey::Grammar {
       .rule("<cycle>", &["months?"])
       .rule("<cycle>", &["quarters?"])
       .rule("<cycle>", &["years?"])
+      .rule("<cycle>", &["weekend"])
       .rule("<cycle>", &["<named-seq>"])
 
       .symbol("<range>")
@@ -85,15 +85,15 @@ pub fn build_grammar() -> earlgrey::Grammar {
       .rule("<nth>", &["<the>", "<ordinal>", "<cycle>", "(of|in)", "<cycle-nth>"])
       .rule("<nth>", &["<the>", "last", "<cycle>", "(of|in)", "<cycle-nth>"])
       //.rule("<nth>", &["<the>", "<ordinal>", "<cycle>", "after", "<cycle-nth>"])
-      .rule("<range>", &["<nth>"])
 
       // Grab grain of <range>, create a sequence, then evaluate on <range>
       // 2nd month of <2018>, 1st tuesday of <last summer>
       // last day of <feb 2019>
       // after: INFER next grain for seq? 3rd day after tomorrow (in month)
-      //.rule("<range>", &["<the>", "<ordinal>", "<cycle>", "(of|in)", "<range>"])
-      //.rule("<range>", &["<the>", "last", "<cycle>", "(of|in)", "<range>"])
-      //.rule("<range>", &["<the>", "<ordinal>", "<cycle>", "after", "<range>"])
+      //.rule("<nth>", &["<the>", "<ordinal>", "<cycle>", "(of|in)", "<range>"])
+      //.rule("<nth>", &["<the>", "last", "<cycle>", "(of|in)", "<range>"])
+      //.rule("<nth>", &["<the>", "<ordinal>", "<cycle>", "after", "<range>"])
+      .rule("<range>", &["<nth>"])
 
       // intersections
       //3rd day next month
@@ -156,8 +156,8 @@ match n {
         "<cycle> -> quarters?" => kronos::quarter(),
         "<cycle> -> years?" => kronos::year(),
         "<cycle> -> <named-seq>" => seq(&subn[0]),
+        "<cycle> -> weekend" => kronos::weekend(),
 
-        //"<cycle> -> weekends?" => kronos::weekend(),
         //"<duration> -> <number> <duration>" => {
             //let n = num(&subn[0]) as usize;
             //kronos::merge(n, seq(&subn[1]))
@@ -187,28 +187,30 @@ fn nth(n: &Subtree) -> kronos::Seq {
         "<nth> -> <the> last <cycle> (of|in) <cycle-nth>" => {
             kronos::lastof(1, seq(&subn[2]), nth(&subn[4]))
         },
+        ////////////////////////////////////////////////////////////////////////////
+
         _ => panic!("Unknown [nth] spec={:?}", spec)
     }
 }
 
 
-fn duration_to_grain(n: &Subtree) -> (g, i32) {
-    let (spec, subn) = xtract!(Subtree::Node, n);
-    match spec.as_ref() {
-        "<duration> -> <dur-day>" => (g::Day, 1),
-        "<duration> -> <dur-week>" => (g::Week, 1),
-        "<duration> -> <dur-month>" => (g::Month, 1),
-        "<duration> -> <dur-quarter>" => (g::Quarter, 1),
-        "<duration> -> <dur-year>" => (g::Year, 1),
-        "<duration> -> <duration>" => duration_to_grain(&subn[0]),
-        "<duration> -> a <duration>" => duration_to_grain(&subn[1]),
-        "<duration> -> <number> <duration>" => {
-            let (g, n2) = duration_to_grain(&subn[1]);
-            (g, num(&subn[0]) * n2)
-        },
-        _ => panic!("Unknown duration rule={:?}", spec)
-    }
-}
+//fn duration_to_grain(n: &Subtree) -> (g, i32) {
+    //let (spec, subn) = xtract!(Subtree::Node, n);
+    //match spec.as_ref() {
+        //"<duration> -> <dur-day>" => (g::Day, 1),
+        //"<duration> -> <dur-week>" => (g::Week, 1),
+        //"<duration> -> <dur-month>" => (g::Month, 1),
+        //"<duration> -> <dur-quarter>" => (g::Quarter, 1),
+        //"<duration> -> <dur-year>" => (g::Year, 1),
+        //"<duration> -> <duration>" => duration_to_grain(&subn[0]),
+        //"<duration> -> a <duration>" => duration_to_grain(&subn[1]),
+        //"<duration> -> <number> <duration>" => {
+            //let (g, n2) = duration_to_grain(&subn[1]);
+            //(g, num(&subn[0]) * n2)
+        //},
+        //_ => panic!("Unknown duration rule={:?}", spec)
+    //}
+//}
 
 pub fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
     let (spec, subn) = xtract!(Subtree::Node, n);
@@ -320,7 +322,7 @@ mod tests {
             start: d(2017, 6, 19), end: d(2017, 6, 20), grain: g::Day};
         assert_eq!(parse_time("the 3rd mon of june", d(2016, 9, 5)), Some(ex));
         let ex = kronos::Range{
-            start: d(2016, 10, 3), end: d(2016, 10, 4), grain: g::Day};
+            start: d(2016, 9, 3), end: d(2016, 9, 4), grain: g::Day};
         assert_eq!(parse_time("3rd day of the month", d(2016, 9, 5)), Some(ex));
         let ex = kronos::Range{
             start: d(2017, 8, 6), end: d(2017, 8, 13), grain: g::Week};
@@ -338,16 +340,16 @@ mod tests {
     }
     #[test]
     fn t_seqrelrange() {
-        let ex = kronos::Range{
-            start: d(2016, 10, 2), end: d(2016, 10, 9), grain: g::Week};
-        assert_eq!(parse_time("2nd week next month", d(2016, 9, 5)), Some(ex));
-        let ex = kronos::Range{
-            start: d(2017, 1, 4), end: d(2017, 1, 5), grain: g::Day};
-        assert_eq!(parse_time("4th day next year",
-                              d(2016, 9, 5)), Some(ex));
-        let ex = kronos::Range{
-            start: d(2017, 7, 1), end: d(2017, 8, 1), grain: g::Month};
-        assert_eq!(parse_time("july next year", d(2016, 9, 5)), Some(ex));
+        //let ex = kronos::Range{
+            //start: d(2016, 10, 2), end: d(2016, 10, 9), grain: g::Week};
+        //assert_eq!(parse_time("2nd week next month", d(2016, 9, 5)), Some(ex));
+        //let ex = kronos::Range{
+            //start: d(2017, 1, 4), end: d(2017, 1, 5), grain: g::Day};
+        //assert_eq!(parse_time("4th day next year",
+                              //d(2016, 9, 5)), Some(ex));
+        //let ex = kronos::Range{
+            //start: d(2017, 7, 1), end: d(2017, 8, 1), grain: g::Month};
+        //assert_eq!(parse_time("july next year", d(2016, 9, 5)), Some(ex));
         //let ex = kronos::Range{
             //start: d(2014, 9, 11), end: d(2014, 9, 12), grain: g::Day};
         //assert_eq!(parse_time("2nd thu of sep 2014", d(2016, 9, 5)), Some(ex));

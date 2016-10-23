@@ -85,23 +85,29 @@ pub fn build_grammar() -> earlgrey::Grammar {
       .rule("<nth>", &["<the>", "<ordinal>", "<cycle>", "(of|in)", "<cycle-nth>"])
       .rule("<nth>", &["<the>", "last", "<cycle>", "(of|in)", "<cycle-nth>"])
       //.rule("<nth>", &["<the>", "<ordinal>", "<cycle>", "after", "<cycle-nth>"])
+      .rule("<range>", &["<nth>"])
 
       // Grab grain of <range>, create a sequence, then evaluate on <range>
       // 2nd month of <2018>, 1st tuesday of <last summer>
-      // last day of <feb 2019>
       // after: INFER next grain for seq? 3rd day after tomorrow (in month)
-      //.rule("<nth>", &["<the>", "<ordinal>", "<cycle>", "(of|in)", "<range>"])
-      //.rule("<nth>", &["<the>", "last", "<cycle>", "(of|in)", "<range>"])
+      // TODO: fix ambiguity with prev section
+      // SHOULD handle 3rd day next month
+      .rule("<range>", &["<the>", "<ordinal>", "<cycle>", "(of|in)", "<range>"])
+      .rule("<range>", &["<the>", "last", "<cycle>", "(of|in)", "<range>"])
       //.rule("<nth>", &["<the>", "<ordinal>", "<cycle>", "after", "<range>"])
-      .rule("<range>", &["<nth>"])
 
       // intersections
-      //3rd day next month
-      //.rule("<range>", &["<the>", "<day-of-month>"]) // the 12th // colides
-      //.rule("<range>", &["<the>", "<day-of-month>", "of", "<named-month>"]) // 18th of august
-      //.rule("<range>", &["<day-of-week>", "<day-of-month>"]) // friday 18th
-      //.rule("<range>", &["<named-month>", "<day-of-month>"]) // march 18th
-      //.rule("<range>", &["<named-month>", "<day-of-month>", "<year>"])
+      // friday 18th
+      // 18th of june
+      // feb 18th
+      // feb 18th 2014
+      // 18th 2018
+      .symbol("<intersect>")
+      .rule("<intersect>", &["<named-seq>"])
+      .rule("<intersect>", &["<named-seq>", "<intersect>"])
+      .rule("<range>", &["<named-seq>", "<intersect>"])
+      .rule("<range>", &["<intersect>", "<year>"])
+      .rule("<range>", &["<the>", "<day-of-month>", "of", "<range>"])
 
       //.symbol("<duration>")
       //.rule("<duration>", &["days?"])
@@ -157,24 +163,21 @@ match n {
         "<cycle> -> years?" => kronos::year(),
         "<cycle> -> <named-seq>" => seq(&subn[0]),
         "<cycle> -> weekend" => kronos::weekend(),
-
-        //"<duration> -> <number> <duration>" => {
-            //let n = num(&subn[0]) as usize;
-            //kronos::merge(n, seq(&subn[1]))
-        //},
-        //////////////////////////////////////////////////////////////////////////////
-        //"<seq> -> <seq> of <seq>" =>
-            //kronos::intersect(seq(&subn[0]), seq(&subn[2])),
-        //"<seq> -> <seq> <seq>" =>
-            //kronos::intersect(seq(&subn[0]), seq(&subn[1])),
-        //"<seq> -> <seq> to <seq>" =>
-            //kronos::interval(seq(&subn[0]), seq(&subn[2])),
+        ////////////////////////////////////////////////////////////////////////////
+        // TODO: move nths here
+        ////////////////////////////////////////////////////////////////////////////
+        "<intersect> -> <named-seq> <intersect>" => {
+            kronos::intersect(seq(&subn[0]), seq(&subn[1]))
+        },
+        "<intersect> -> <named-seq>" => seq(&subn[0]),
+        "<intersect> -> <year>" => panic!("TODO"),
         ////////////////////////////////////////////////////////////////////////////
         _ => panic!("Unknown [seq] spec={:?}", spec)
     }
 }
 }
 
+// TODO: move to seq
 fn nth(n: &Subtree) -> kronos::Seq {
     let (spec, subn) = xtract!(Subtree::Node, n);
     match spec.as_ref() {
@@ -194,23 +197,15 @@ fn nth(n: &Subtree) -> kronos::Seq {
 }
 
 
-//fn duration_to_grain(n: &Subtree) -> (g, i32) {
-    //let (spec, subn) = xtract!(Subtree::Node, n);
-    //match spec.as_ref() {
-        //"<duration> -> <dur-day>" => (g::Day, 1),
-        //"<duration> -> <dur-week>" => (g::Week, 1),
-        //"<duration> -> <dur-month>" => (g::Month, 1),
-        //"<duration> -> <dur-quarter>" => (g::Quarter, 1),
-        //"<duration> -> <dur-year>" => (g::Year, 1),
-        //"<duration> -> <duration>" => duration_to_grain(&subn[0]),
-        //"<duration> -> a <duration>" => duration_to_grain(&subn[1]),
-        //"<duration> -> <number> <duration>" => {
-            //let (g, n2) = duration_to_grain(&subn[1]);
-            //(g, num(&subn[0]) * n2)
-        //},
-        //_ => panic!("Unknown duration rule={:?}", spec)
-    //}
-//}
+fn seq_from_grain(g: kronos::Granularity) -> kronos::Seq {
+    match g {
+        g::Day => kronos::day(),
+        g::Week => kronos::week(),
+        g::Month => kronos::month(),
+        g::Quarter => kronos::quarter(),
+        g::Year => kronos::year(),
+    }
+}
 
 pub fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
     let (spec, subn) = xtract!(Subtree::Node, n);
@@ -225,6 +220,31 @@ pub fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
         "<range> -> <the> <cycle> after next" => kronos::next(seq(&subn[1]), 2, reftime),
         "<range> -> <nth>" => kronos::this(nth(&subn[0]), reftime),
 
+        "<range> -> <the> <ordinal> <cycle> (of|in) <range>" => {
+            let reftime = eval_range(reftime, &subn[4]);
+            let s = seq_from_grain(reftime.grain);
+            let n = num(&subn[1]) as usize;
+            kronos::this(kronos::nthof(n, seq(&subn[2]), s), reftime.start)
+        },
+        "<range> -> <the> last <cycle> (of|in) <range>" => {
+            let reftime = eval_range(reftime, &subn[4]);
+            let s = seq_from_grain(reftime.grain);
+            kronos::this(kronos::lastof(1, seq(&subn[2]), s), reftime.start)
+        },
+
+        "<range> -> <named-seq> <intersect>" => {
+            let i = kronos::intersect(seq(&subn[0]), seq(&subn[1]));
+            kronos::this(i, reftime)
+        },
+        "<range> -> <intersect> <year>" => {
+            let y = kronos::a_year(num(&subn[1]));
+            kronos::this(seq(&subn[0]), y.start)
+        },
+        "<range> -> <the> <day-of-month> of <range>" => {
+            let reftime = eval_range(reftime, &subn[3]);
+            kronos::this(seq(&subn[1]), reftime.start)
+        },
+
         ////////////////////////////////////////////////////////////////////////////
         _ => panic!("Unknown [eval] spec={:?}", spec)
     }
@@ -237,15 +257,19 @@ pub fn parse_time(t: &str, reftime: DateTime) -> Option<kronos::Range> {
     match parser.parse(&mut tokenizer) {
         Ok(state) => {
             let trees = earlgrey::all_trees(parser.g.start(), &state);
+            let mut X = kronos::a_year(2012);
+            // TODO: yuck
             for t in &trees {
                 t.print();
+                let (spec, subn) = xtract!(Subtree::Node, t);
+                X = match spec.as_ref() {
+                    "<S> -> <range>" => eval_range(reftime, &subn[0]),
+                    _ => panic!("Unknown [eval] spec={:?}", spec)
+                };
+                println!("{:?}", X);
             }
             assert_eq!(trees.len(), 1); // don't allow ambiguity
-            let (spec, subn) = xtract!(Subtree::Node, &trees[0]);
-            match spec.as_ref() {
-                "<S> -> <range>" => Some(eval_range(reftime, &subn[0])),
-                _ => panic!("Unknown [eval] spec={:?}", spec)
-            }
+            Some(X)
         },
         Err(_) => None
     }

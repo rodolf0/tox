@@ -165,7 +165,15 @@ match n {
         "<cycle> -> <named-seq>" => seq(&subn[0]),
         "<cycle> -> weekend" => kronos::weekend(),
         ////////////////////////////////////////////////////////////////////////////
-        // TODO: move nths here
+        "<cycle-nth> -> <nth>" => seq(&subn[0]),
+        "<cycle-nth> -> <the> <cycle>" => seq(&subn[1]),
+        "<nth> -> <the> <ordinal> <cycle> (of|in) <cycle-nth>" => {
+            let n = num(&subn[1]) as usize;
+            kronos::nthof(n, seq(&subn[2]), seq(&subn[4]))
+        },
+        "<nth> -> <the> last <cycle> (of|in) <cycle-nth>" => {
+            kronos::lastof(1, seq(&subn[2]), seq(&subn[4]))
+        },
         ////////////////////////////////////////////////////////////////////////////
         "<intersect> -> <named-seq> <intersect>" => {
             kronos::intersect(seq(&subn[0]), seq(&subn[1]))
@@ -177,26 +185,6 @@ match n {
     }
 }
 }
-
-// TODO: move to seq
-fn nth(n: &Subtree) -> kronos::Seq {
-    let (spec, subn) = xtract!(Subtree::Node, n);
-    match spec.as_ref() {
-        "<cycle-nth> -> <nth>" => nth(&subn[0]),
-        "<cycle-nth> -> <the> <cycle>" => seq(&subn[1]),
-        "<nth> -> <the> <ordinal> <cycle> (of|in) <cycle-nth>" => {
-            let n = num(&subn[1]) as usize;
-            kronos::nthof(n, seq(&subn[2]), nth(&subn[4]))
-        },
-        "<nth> -> <the> last <cycle> (of|in) <cycle-nth>" => {
-            kronos::lastof(1, seq(&subn[2]), nth(&subn[4]))
-        },
-        ////////////////////////////////////////////////////////////////////////////
-
-        _ => panic!("Unknown [nth] spec={:?}", spec)
-    }
-}
-
 
 fn seq_from_grain(g: kronos::Granularity) -> kronos::Seq {
     match g {
@@ -219,11 +207,11 @@ pub fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
         "<range> -> this <cycle>" => kronos::this(seq(&subn[1]), reftime),
         "<range> -> <the> next <cycle>" => kronos::next(seq(&subn[2]), 1, reftime),
         "<range> -> <the> <cycle> after next" => kronos::next(seq(&subn[1]), 2, reftime),
-        "<range> -> <nth>" => kronos::this(nth(&subn[0]), reftime),
+        "<range> -> <nth>" => kronos::this(seq(&subn[0]), reftime),
 
         "<range> -> <nth> <year>" => {
             let y = kronos::a_year(num(&subn[1]));
-            kronos::this(nth(&subn[0]), y.start)
+            kronos::this(seq(&subn[0]), y.start)
         },
 
         //"<range> -> <the> <ordinal> <cycle> <range>" => {

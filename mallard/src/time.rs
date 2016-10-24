@@ -48,6 +48,7 @@ pub fn build_grammar() -> earlgrey::Grammar {
       .rule("<named-seq>", &["<named-month>"])
       .rule("<named-seq>", &["<day-of-week>"])
       .rule("<named-seq>", &["<day-of-month>"])
+      // TODO: add seasons
 
       .symbol("<cycle>")
       .rule("<cycle>", &["days?"])
@@ -85,16 +86,16 @@ pub fn build_grammar() -> earlgrey::Grammar {
       .rule("<nth>", &["<the>", "<ordinal>", "<cycle>", "(of|in)", "<cycle-nth>"])
       .rule("<nth>", &["<the>", "last", "<cycle>", "(of|in)", "<cycle-nth>"])
       //.rule("<nth>", &["<the>", "<ordinal>", "<cycle>", "after", "<cycle-nth>"])
-      .rule("<range>", &["<nth>"])
 
+      // TODO: SHOULD handle 3rd day next month <range>
       // Grab grain of <range>, create a sequence, then evaluate on <range>
       // 2nd month of <2018>, 1st tuesday of <last summer>
-      // after: INFER next grain for seq? 3rd day after tomorrow (in month)
-      // TODO: fix ambiguity with prev section
-      // SHOULD handle 3rd day next month
-      .rule("<range>", &["<the>", "<ordinal>", "<cycle>", "(of|in)", "<range>"])
-      .rule("<range>", &["<the>", "last", "<cycle>", "(of|in)", "<range>"])
-      //.rule("<nth>", &["<the>", "<ordinal>", "<cycle>", "after", "<range>"])
+      .rule("<range>", &["<nth>"])
+      .rule("<range>", &["<nth>", "<year>"])
+
+      //.rule("<range>", &["<the>", "<ordinal>", "<cycle>", "<range>"])
+      //.rule("<range>", &["<the>", "<ordinal>", "<cycle>", "of", "<range>"])
+
 
       // intersections
       // friday 18th
@@ -220,17 +221,30 @@ pub fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
         "<range> -> <the> <cycle> after next" => kronos::next(seq(&subn[1]), 2, reftime),
         "<range> -> <nth>" => kronos::this(nth(&subn[0]), reftime),
 
-        "<range> -> <the> <ordinal> <cycle> (of|in) <range>" => {
-            let reftime = eval_range(reftime, &subn[4]);
-            let s = seq_from_grain(reftime.grain);
-            let n = num(&subn[1]) as usize;
-            kronos::this(kronos::nthof(n, seq(&subn[2]), s), reftime.start)
+        "<range> -> <nth> <year>" => {
+            let y = kronos::a_year(num(&subn[1]));
+            kronos::this(nth(&subn[0]), y.start)
         },
-        "<range> -> <the> last <cycle> (of|in) <range>" => {
-            let reftime = eval_range(reftime, &subn[4]);
-            let s = seq_from_grain(reftime.grain);
-            kronos::this(kronos::lastof(1, seq(&subn[2]), s), reftime.start)
-        },
+
+        //"<range> -> <the> <ordinal> <cycle> <range>" => {
+            //let reftime = eval_range(reftime, &subn[3]);
+            //let s = seq_from_grain(reftime.grain);
+            //let n = num(&subn[1]) as usize;
+            //kronos::this(kronos::nthof(n, seq(&subn[2]), s), reftime.start)
+        //},
+
+        //"<range> -> <the> <ordinal> <cycle> of <range>" => {
+            //let reftime = eval_range(reftime, &subn[4]);
+            //let s = seq_from_grain(reftime.grain);
+            //let n = num(&subn[1]) as usize;
+            //kronos::this(kronos::nthof(n, seq(&subn[2]), s), reftime.start)
+        //},
+
+        //"<range> -> <the> last <cycle> (of|in) <range>" => {
+            //let reftime = eval_range(reftime, &subn[4]);
+            //let s = seq_from_grain(reftime.grain);
+            //kronos::this(kronos::lastof(1, seq(&subn[2]), s), reftime.start)
+        //},
 
         "<range> -> <named-seq> <intersect>" => {
             let i = kronos::intersect(seq(&subn[0]), seq(&subn[1]));
@@ -257,31 +271,23 @@ pub fn parse_time(t: &str, reftime: DateTime) -> Option<kronos::Range> {
     match parser.parse(&mut tokenizer) {
         Ok(state) => {
             let trees = earlgrey::all_trees(parser.g.start(), &state);
-            let mut X = kronos::a_year(2012);
+            let mut x = kronos::a_year(2012);
             // TODO: yuck
             for t in &trees {
                 t.print();
                 let (spec, subn) = xtract!(Subtree::Node, t);
-                X = match spec.as_ref() {
+                x = match spec.as_ref() {
                     "<S> -> <range>" => eval_range(reftime, &subn[0]),
                     _ => panic!("Unknown [eval] spec={:?}", spec)
                 };
-                println!("{:?}", X);
+                println!("{:?}", x);
             }
             assert_eq!(trees.len(), 1); // don't allow ambiguity
-            Some(X)
+            Some(x)
         },
         Err(_) => None
     }
 }
-
-
-
-
-
-
-
-
 
 
 
@@ -360,6 +366,10 @@ mod tests {
         let ex = kronos::Range{
             start: d(2017, 5, 9), end: d(2017, 5, 10), grain: g::Day};
         assert_eq!(parse_time("the 3rd day of the 2nd week of may",
+                              d(2016, 9, 5)), Some(ex));
+        let ex = kronos::Range{
+            start: d(2014, 6, 2), end: d(2014, 6, 3), grain: g::Day};
+        assert_eq!(parse_time("2nd day of june 2014",
                               d(2016, 9, 5)), Some(ex));
     }
     #[test]

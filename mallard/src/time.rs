@@ -109,7 +109,7 @@ pub fn build_grammar() -> earlgrey::Grammar {
       // TODO: SHOULD handle 3rd day next month <range>
       // Grab grain of <range>, create a sequence, then evaluate on <range>
       // 2nd month of <2018>, 1st tuesday of <last summer>
-      //.rule("<range>", &["<the>", "<ordinal>", "<cycle>", "<range>"])
+      .rule("<range>", &["<the>", "<ordinal>", "<cycle>", "<range>"])
       //.rule("<range>", &["<the>", "<ordinal>", "<cycle>", "of", "<range>"])
       //.rule("<range>", &["<intersect>", "<range>"])
 
@@ -229,11 +229,13 @@ pub fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
         },
 
         /////////// testing, START HERE 2nd week next month
-        //"<range> -> <intersect> <range>" => {
-            //let reftime = eval_range(reftime, &subn[1]);
-            //let s = seq_from_grain(reftime.grain);
-            //kronos::this(seq(&subn[0]), reftime.start)
-        //},
+        "<range> -> <the> <ordinal> <cycle> <range>" => {
+            let reftime = eval_range(reftime, &subn[3]);
+            let n = num(&subn[1]) as usize;
+            let s = seq_from_grain(reftime.grain);
+            println!("{:?}", reftime);
+            kronos::this(kronos::nthof(n, seq(&subn[2]), s), reftime.start)
+        },
         ////////////////////////////////////////////////////////////////////////////
         _ => panic!("Unknown [eval] spec={:?}", spec)
     }

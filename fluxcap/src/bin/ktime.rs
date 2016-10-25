@@ -1,5 +1,5 @@
 extern crate chrono;
-extern crate mallard;
+extern crate fluxcap;
 
 fn main() {
     if std::env::args().len() < 1 {
@@ -8,7 +8,7 @@ fn main() {
     }
     let input = std::env::args().skip(1).collect::<Vec<String>>().join(" ");
     let reftime = chrono::Local::now().naive_local();
-    let tm = mallard::TimeMachine::new();
+    let tm = fluxcap::TimeMachine::new();
     tm.print_trees(&input);
     match tm.parse_time(reftime, &input) {
         Some(time) => println!("{:?}", time),

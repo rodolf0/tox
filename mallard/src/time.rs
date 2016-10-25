@@ -16,8 +16,9 @@ pub fn build_grammar() -> earlgrey::Grammar {
     lazy_static! {
         static ref STOP_WORDS: HashMap<String, Regex> = [
             "today", "tomorrow", "yesterday",
-            "days?", "weeks?", "months?", "quarters?", "years?", "weekend",
+            "days?", "weeks?", "months?", "quarters?", "years?", "weekends?",
             "this", "next", "of", "the", "(of|in)", "before", "after", "last",
+            "until", "from", "to", "and", "between",
         ].iter()
          .map(|s| (s.to_string(), Regex::new(&format!("^{}$", s)).unwrap()))
          .collect();
@@ -56,7 +57,7 @@ pub fn build_grammar() -> earlgrey::Grammar {
       .rule("<cycle>", &["months?"])
       .rule("<cycle>", &["quarters?"])
       .rule("<cycle>", &["years?"])
-      .rule("<cycle>", &["weekend"])
+      .rule("<cycle>", &["weekends?"])
       .rule("<cycle>", &["<named-seq>"])
 
       .symbol("<range>")
@@ -102,7 +103,7 @@ pub fn build_grammar() -> earlgrey::Grammar {
       .rule("<range>", &["<intersect>", "<year>"])
       .rule("<range>", &["<the>", "<day-of-month>", "of", "<range>"])
 
-
+      // TODO
       // the 10th week of 1948
       // the 2nd day of the 3rd week of 1987
       // 3rd day next month
@@ -110,15 +111,18 @@ pub fn build_grammar() -> earlgrey::Grammar {
       // 1st tuesday of <last summer>
       // Grab grain of <range>, create a sequence, then evaluate on <range>
 
-      //.symbol("<duration>")
-      //.rule("<duration>", &["days?"])
-      //.rule("<duration>", &["<number>", "<duration>"])
-      //.rule("<S>", &["<duration>", "after", "<range>"])
-      //.rule("<number>", &["<cycle>", "until", "<range>"]) // seconds until feb 24th, mondays until next year
+      // seconds until feb 24th
+      // mondays until next year
+      .symbol("<timediff>")
+      .rule("<timediff>", &["<cycle>", "until", "<range>"])
+      .rule("<timediff>", &["<cycle>", "between", "<range>", "and", "<range>"])
+      .rule("<timediff>", &["<cycle>", "from", "<range>", "to", "<range>"])
+
+      //.rule("<timediff>", &["<number>", "<cycle>", "after", "<range>"]) // nthof
 
       // start
       .rule("<S>", &["<range>"])
-      //.rule("<S>", &["<timediff>"])
+      .rule("<S>", &["<timediff>"])
 
       .into_grammar("<S>")
 }
@@ -163,7 +167,7 @@ match n {
         "<cycle> -> quarters?" => kronos::quarter(),
         "<cycle> -> years?" => kronos::year(),
         "<cycle> -> <named-seq>" => seq(&subn[0]),
-        "<cycle> -> weekend" => kronos::weekend(),
+        "<cycle> -> weekends?" => kronos::weekend(),
         ////////////////////////////////////////////////////////////////////////////
         "<cycle-nth> -> <nth>" => seq(&subn[0]),
         "<cycle-nth> -> <the> <cycle>" => seq(&subn[1]),
@@ -238,6 +242,30 @@ pub fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
     }
 }
 
+pub fn eval_timediff(reftime: DateTime, n: &Subtree) -> usize {
+    let (spec, subn) = xtract!(Subtree::Node, n);
+    match spec.as_ref() {
+        "<timediff> -> <cycle> until <range>" => {
+            let target = eval_range(reftime, &subn[2]);
+            seq(&subn[0])(reftime)
+                .skip_while(|x| x.start < reftime)
+                .take_while(|x| x.start < target.start)
+                .count()
+        },
+        "<timediff> -> <cycle> from <range> to <range>" |
+        "<timediff> -> <cycle> between <range> and <range>" => {
+            let t0 = eval_range(reftime, &subn[2]);
+            let t1 = eval_range(reftime, &subn[4]);
+            seq(&subn[0])(t0.start)
+                .skip_while(|x| x.start < t0.start)
+                .take_while(|x| x.start < t1.start)
+                .count()
+        },
+        ////////////////////////////////////////////////////////////////////////////
+        _ => panic!("Unknown [timediff] spec={:?}", spec)
+    }
+}
+
 
 pub fn parse_time(t: &str, reftime: DateTime) -> Option<kronos::Range> {
     let parser = earlgrey::EarleyParser::new(build_grammar());
@@ -252,6 +280,10 @@ pub fn parse_time(t: &str, reftime: DateTime) -> Option<kronos::Range> {
                 let (spec, subn) = xtract!(Subtree::Node, t);
                 x = match spec.as_ref() {
                     "<S> -> <range>" => eval_range(reftime, &subn[0]),
+                    "<S> -> <timediff>" => {
+                        println!("{:?}", eval_timediff(reftime, &subn[0]));
+                        x
+                    },
                     _ => panic!("Unknown [eval] spec={:?}", spec)
                 };
                 println!("{:?}", x);

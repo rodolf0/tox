@@ -7,6 +7,8 @@ use std::cmp;
 use chrono;
 use utils;
 
+const EMPTY_FUSE: usize = 1000;
+
 #[derive(Debug,PartialEq,Eq,PartialOrd,Ord,Clone,Copy)]
 pub enum Granularity {
     Day,
@@ -16,7 +18,6 @@ pub enum Granularity {
     Year,
 }
 
-// TODO: implement Display for Range to show based on grain
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Range {
     pub start: DateTime,
@@ -223,6 +224,7 @@ pub fn nthof(n: usize, win: Seq, within: Seq) -> Seq {
         //println!("ref={:?} align={:?}, win={:?}",
                  //reftime, align, win(align).next().unwrap());
         Box::new(within(reftime)
+                    .take(EMPTY_FUSE)
                     .filter_map(move |outer| {
             // we restart <win> each time instead of continuing because we
             // could have overflowed the outer interval and we cant miss items
@@ -251,6 +253,7 @@ pub fn lastof(n: usize, win: Seq, within: Seq) -> Seq {
         //println!("ref={:?} align={:?}, win={:?}",
                  //reftime, align, win(align).next().unwrap());
         Box::new(within(reftime)
+                    .take(EMPTY_FUSE)
                     .filter_map(move |outer| {
             // we restart <win> each time instead of continuing because we
             // could have overflowed the outer interval and we cant miss items
@@ -283,7 +286,9 @@ pub fn intersect(a: Seq, b: Seq) -> Seq {
     Rc::new(move |reftime| {
         let a = a.clone();
         let align = b(reftime).next().unwrap().start;
-        Box::new(b(reftime).flat_map(move |outer| {
+        Box::new(b(reftime)
+                 .take(EMPTY_FUSE)
+                 .flat_map(move |outer| {
             a(align).skip_while(move |inner| inner.start < outer.start)
                     .take_while(move |inner| inner.end <= outer.end)
         })) //.skip_while(move |range| range.end < reftime))

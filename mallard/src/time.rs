@@ -306,20 +306,26 @@ impl TimeMachine {
 
     pub fn parse_time(&self, reftime: DateTime, t: &str) -> Option<kronos::Range> {
         let trees = self.parse(t);
-        for tree in &trees { tree.print(); }
         assert_eq!(trees.len(), 1); // just evaluate 1st option
         let (spec, subn) = xtract!(Subtree::Node, &trees[0]);
-        assert_eq!(spec, "<S> -> <range>");
-        Some(eval_range(reftime, &subn[0]))
+        match spec.as_ref() {
+            "<S> -> <range>" => Some(eval_range(reftime, &subn[0])),
+            _ => None
+        }
     }
 
     pub fn time_diff(&self, reftime: DateTime, t: &str) -> Option<usize> {
         let trees = self.parse(t);
-        for tree in &trees { tree.print(); }
         assert_eq!(trees.len(), 1); // just evaluate 1st option
         let (spec, subn) = xtract!(Subtree::Node, &trees[0]);
-        assert_eq!(spec, "<S> -> <timediff>");
-        Some(eval_timediff(reftime, &subn[0]))
+        match spec.as_ref() {
+            "<S> -> <timediff>" => Some(eval_timediff(reftime, &subn[0])),
+            _ => None
+        }
+    }
+
+    pub fn print_trees(&self, t: &str) {
+        for tree in self.parse(t) { tree.print(); }
     }
 }
 
@@ -426,10 +432,11 @@ mod tests {
     }
     #[test]
     fn t_timediff() {
-      // seconds until feb 24th
-      // mondays until next year
-        //let ex = kronos::range{
-            //start: d(2017, 3, 3), end: d(2017, 3, 4), grain: g::Day};
-        //assert_eq!(parse_time("3 days after mon feb 28th", d(2016, 9, 5)), Some(ex));
+        let tm = TimeMachine::new();
+        assert_eq!(tm.time_diff(d(2016, 9, 5), "days until tomorrow"), Some(1));
+        assert_eq!(tm.time_diff(d(2016, 9, 5), "months until 2018"), Some(15));
+        assert_eq!(tm.time_diff(d(2016, 9, 5), "weeks until dec"), Some(12));
+        assert_eq!(tm.time_diff(d(2016, 10, 25), "mon until nov 14th"), Some(2));
+        assert_eq!(tm.time_diff(d(2016, 10, 25), "weekends until jan"), Some(10));
     }
 }

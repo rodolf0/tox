@@ -18,7 +18,7 @@ pub fn build_grammar() -> earlgrey::Grammar {
             "today", "tomorrow", "yesterday",
             "days?", "weeks?", "months?", "quarters?", "years?", "weekends?",
             "this", "next", "of", "the", "(of|in)", "before", "after", "last",
-            "until", "from", "to", "and", "between",
+            "until", "from", "to", "and", "between", "in",
         ].iter()
          .map(|s| (s.to_string(), Regex::new(&format!("^{}$", s)).unwrap()))
          .collect();
@@ -111,14 +111,26 @@ pub fn build_grammar() -> earlgrey::Grammar {
       // 1st tuesday of <last summer>
       // Grab grain of <range>, create a sequence, then evaluate on <range>
 
+      // shifts
+      // in 20 days
+      // 10 days after monday
+      // TODO: composite cycles
+      //.rule("<range>", &["in", "<number>", "<cycle>"])
+      //.rule("<n-cycle>", &["a", "<cycle>"])
+      //.rule("<n-cycle>", &["<number>", "<cycle>"])
+      //.rule("<n-cycle>", &["<n-cycle>", "and", "<n-cycle>"])
+      //.rule("<range>", &["in", "<n-cycle>"])
+      // in 2 months, 3 weeks and 5 days
+      //
+      //.rule("<range>", &["<number>", "<cycle>", "after", "<range>"])
+
+
       // seconds until feb 24th
       // mondays until next year
       .symbol("<timediff>")
       .rule("<timediff>", &["<cycle>", "until", "<range>"])
       .rule("<timediff>", &["<cycle>", "between", "<range>", "and", "<range>"])
       .rule("<timediff>", &["<cycle>", "from", "<range>", "to", "<range>"])
-
-      //.rule("<timediff>", &["<number>", "<cycle>", "after", "<range>"]) // nthof
 
       // start
       .rule("<S>", &["<range>"])
@@ -238,6 +250,14 @@ pub fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
             //kronos::this(kronos::nthof(n, seq(&subn[2]), s), reftime.start)
         //},
         ////////////////////////////////////////////////////////////////////////////
+        //"<range> -> in <number> <cycle>" => {
+            //let n = num(&subn[1]) as usize;
+            // TODO: doesn't work as expected for year /month ... should preserver current day
+            // should probably use kronos::shift
+            // in 2 months, 3 weeks and 5 days
+            //kronos::this(kronos::skip(seq(&subn[2]), n), reftime)
+        //},
+        ////////////////////////////////////////////////////////////////////////////
         _ => panic!("Unknown [eval] spec={:?}", spec)
     }
 }
@@ -286,7 +306,6 @@ pub fn parse_time(t: &str, reftime: DateTime) -> Option<kronos::Range> {
                     },
                     _ => panic!("Unknown [eval] spec={:?}", spec)
                 };
-                println!("{:?}", x);
             }
             assert_eq!(trees.len(), 1); // don't allow ambiguity
             Some(x)

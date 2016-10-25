@@ -8,7 +8,8 @@ fn main() {
     }
     let input = std::env::args().skip(1).collect::<Vec<String>>().join(" ");
     let reftime = chrono::Local::now().naive_local();
-    match mallard::parse_time(&input, reftime) {
+    let tm = mallard::TimeMachine::new();
+    match tm.parse_time(reftime, &input) {
         Some(time) => println!("{:?}", time),
         None => println!("Parse error")
     }

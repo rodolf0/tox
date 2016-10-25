@@ -7,4 +7,4 @@ extern crate lexers;
 
 mod time;
 
-pub use time::parse_time;
+pub use time::TimeMachine;

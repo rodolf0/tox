@@ -80,14 +80,10 @@ fn build_grammar() -> earlgrey::Grammar {
 
       // nthofs
       .symbol("<nth>")
-      .symbol("<cycle-nth>")
-      .rule("<cycle-nth>", &["<nth>"])
-      .rule("<cycle-nth>", &["<the>", "<cycle>"])
-      .rule("<nth>", &["<the>", "<ordinal>", "<cycle>", "(of|in)", "<cycle-nth>"])
-      .rule("<nth>", &["<the>", "last", "<cycle>", "(of|in)", "<cycle-nth>"])
-      //.rule("<nth>", &["<the>", "<ordinal>", "<cycle>", "after", "<cycle-nth>"])
-      .rule("<range>", &["<nth>"])
-      .rule("<range>", &["<nth>", "<year>"])
+      .rule("<nth>", &["<the>", "<ordinal>", "<cycle>", "(of|in)"])
+      .rule("<nth>", &["<the>", "last", "<cycle>", "(of|in)"])
+      .rule("<range>", &["<nth>", "<range>"])
+      .rule("<range>", &["<nth>", "<the>", "<duration>"])
 
       // intersections
       .symbol("<intersect>")
@@ -100,11 +96,6 @@ fn build_grammar() -> earlgrey::Grammar {
       // TODO: intersects/nths  evaluated on specific range
       // july next year
       // 3rd day next month
-      // the 10th week of 1948
-      // the 2nd day of the 3rd week of 1987
-      // 2nd month of <2018>
-      // 1st tuesday of <last summer>
-      // Grab grain of <range>, create a sequence, then evaluate on <range>
 
       // shifts
       .symbol("<n-duration>")
@@ -147,6 +138,20 @@ fn num(n: &Subtree) -> i32 {
     }
 }
 
+fn semi_seq(aseq: kronos::Seq, n: &Subtree) -> kronos::Seq {
+    let (spec, subn) = xtract!(Subtree::Node, n);
+    match spec.as_ref() {
+        "<nth> -> <the> <ordinal> <cycle> (of|in)" => {
+            let n = num(&subn[1]) as usize;
+            kronos::nthof(n, seq(&subn[2]), aseq)
+        },
+        "<nth> -> <the> last <cycle> (of|in)" => {
+            kronos::lastof(1, seq(&subn[2]), aseq)
+        },
+        _ => panic!("Unknown [semi_seq] spec={:?}", spec)
+    }
+}
+
 fn seq(n: &Subtree) -> kronos::Seq {
 match n {
     &Subtree::Leaf(ref sym, ref lexeme) => match sym.as_ref() {
@@ -170,16 +175,6 @@ match n {
         "<cycle> -> weekends?" => kronos::weekend(),
         "<cycle> -> <named-seq>" => seq(&subn[0]),
         "<cycle> -> <duration>" => seq(&subn[0]),
-        ////////////////////////////////////////////////////////////////////////////
-        "<cycle-nth> -> <nth>" => seq(&subn[0]),
-        "<cycle-nth> -> <the> <cycle>" => seq(&subn[1]),
-        "<nth> -> <the> <ordinal> <cycle> (of|in) <cycle-nth>" => {
-            let n = num(&subn[1]) as usize;
-            kronos::nthof(n, seq(&subn[2]), seq(&subn[4]))
-        },
-        "<nth> -> <the> last <cycle> (of|in) <cycle-nth>" => {
-            kronos::lastof(1, seq(&subn[2]), seq(&subn[4]))
-        },
         ////////////////////////////////////////////////////////////////////////////
         "<intersect> -> <named-seq> <intersect>" => {
             kronos::intersect(seq(&subn[0]), seq(&subn[1]))
@@ -229,11 +224,7 @@ fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
         "<range> -> this <cycle>" => kronos::this(seq(&subn[1]), reftime),
         "<range> -> <the> next <cycle>" => kronos::next(seq(&subn[2]), 1, reftime),
         "<range> -> <the> <cycle> after next" => kronos::next(seq(&subn[1]), 2, reftime),
-        "<range> -> <nth>" => kronos::this(seq(&subn[0]), reftime),
-        "<range> -> <nth> <year>" => {
-            let y = kronos::a_year(num(&subn[1]));
-            kronos::this(seq(&subn[0]), y.start)
-        },
+        ///////////// Intersect ////////////////////////////////
         "<range> -> <named-seq> <intersect>" => {
             let i = kronos::intersect(seq(&subn[0]), seq(&subn[1]));
             kronos::this(i, reftime)
@@ -269,16 +260,16 @@ fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
             let basetime = kronos::this(kronos::day(), reftime.start);
             kronos::shift(basetime, -n, grain)
         },
-        ////////////////////////////////////////////////////////
-
-        /////////// testing, START HERE 2nd week next month
-        //"<range> -> <the> <ordinal> <cycle> <range>" => {
-        ////"<range> -> <the> <ordinal> <cycle> (of|in) <range>" => {
-            //let reftime = eval_range(reftime, &subn[3]);
-            //let n = num(&subn[1]) as usize;
-            //let s = seq_from_grain(reftime.grain);
-            //kronos::this(kronos::nthof(n, seq(&subn[2]), s), reftime.start)
-        //},
+        //////////// Nths //////////////////////////////////////
+        "<range> -> <nth> <range>" => {
+            let reftime = eval_range(reftime, &subn[1]);
+            let s = semi_seq(seq_from_grain(reftime.grain), &subn[0]);
+            kronos::this(s, reftime.start)
+        },
+        "<range> -> <nth> <the> <duration>" => {
+            let s = semi_seq(seq(&subn[2]), &subn[0]);
+            kronos::this(s, reftime)
+        },
         ////////////////////////////////////////////////////////////////////////////
         _ => panic!("Unknown [eval] spec={:?}", spec)
     }
@@ -327,6 +318,7 @@ impl TimeMachine {
 
     pub fn parse_time(&self, reftime: DateTime, t: &str) -> Option<kronos::Range> {
         let trees = self.parse(t);
+        //for t in &trees { t.print(); }
         assert_eq!(trees.len(), 1); // just evaluate 1st option
         let (spec, subn) = xtract!(Subtree::Node, &trees[0]);
         match spec.as_ref() {
@@ -437,9 +429,17 @@ mod tests {
     }
     #[test]
     fn t_seqrange() {
-        //let ex = kronos::range{
-            //start: d(2016, 10, 2), end: d(2016, 10, 9), grain: g::Week};
-        //assert_eq!(parse_time("2nd week next month", d(2016, 9, 5)), Some(ex));
+        let tm = TimeMachine::new();
+        let x = r(d(1984, 3, 4), d(1984, 3, 11), g::Week);
+        assert_eq!(tm.parse_time(d(2016, 9, 5), "10th week of 1984"), Some(x));
+        let x = r(d(2016, 11, 15), d(2016, 11, 16), g::Day);
+        assert_eq!(tm.parse_time(d(2016, 9, 5),
+                    "third tuesday of the month after next"), Some(x));
+        let x = r(d(1987, 1, 12), d(1987, 1, 13), g::Day);
+        assert_eq!(tm.parse_time(d(2016, 9, 5),
+                    "the 2nd day of the 3rd week of 1987"), Some(x));
+        //let x = r(d(2016, 10, 2), d(2016, 10, 9), g::Week);
+        //assert_eq!(tm.parse_time(d(2016, 9, 5), "2nd week next month"), Some(x));
         //let ex = kronos::range{
             //start: d(2017, 1, 4), end: d(2017, 1, 5), grain: g::Day};
         //assert_eq!(parse_time("4th day next year",

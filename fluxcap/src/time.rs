@@ -18,7 +18,7 @@ fn build_grammar() -> earlgrey::Grammar {
             "today", "tomorrow", "yesterday",
             "days?", "weeks?", "months?", "quarters?", "years?", "weekends?",
             "this", "next", "of", "the", "(of|in)", "before", "after", "last",
-            "until", "from", "to", "and", "between", "in",
+            "until", "from", "to", "and", "between", "in", "a", "ago",
         ].iter()
          .map(|s| (s.to_string(), Regex::new(&format!("^{}$", s)).unwrap()))
          .collect();
@@ -51,13 +51,16 @@ fn build_grammar() -> earlgrey::Grammar {
       .rule("<named-seq>", &["<day-of-month>"])
       // TODO: add seasons
 
+      .symbol("<duration>")
+      .rule("<duration>", &["days?"])
+      .rule("<duration>", &["weeks?"])
+      .rule("<duration>", &["months?"])
+      .rule("<duration>", &["quarters?"])
+      .rule("<duration>", &["years?"])
+
       .symbol("<cycle>")
-      .rule("<cycle>", &["days?"])
-      .rule("<cycle>", &["weeks?"])
-      .rule("<cycle>", &["months?"])
-      .rule("<cycle>", &["quarters?"])
-      .rule("<cycle>", &["years?"])
       .rule("<cycle>", &["weekends?"])
+      .rule("<cycle>", &["<duration>"])
       .rule("<cycle>", &["<named-seq>"])
 
       .symbol("<range>")
@@ -75,6 +78,7 @@ fn build_grammar() -> earlgrey::Grammar {
       .rule("<range>", &["<the>", "<cycle>", "after", "next"])
       //.rule("<range>", &["<the>", "<cycle>", "before", "last"])
 
+      // nthofs
       .symbol("<nth>")
       .symbol("<cycle-nth>")
       .rule("<cycle-nth>", &["<nth>"])
@@ -85,6 +89,7 @@ fn build_grammar() -> earlgrey::Grammar {
       .rule("<range>", &["<nth>"])
       .rule("<range>", &["<nth>", "<year>"])
 
+      // intersections
       .symbol("<intersect>")
       .rule("<intersect>", &["<named-seq>"])
       .rule("<intersect>", &["<named-seq>", "<intersect>"])
@@ -112,11 +117,17 @@ fn build_grammar() -> earlgrey::Grammar {
       //.rule("<range>", &["in", "<n-cycle>"])
       // in 2 months, 3 weeks and 5 days
       //
-      //.rule("<range>", &["<number>", "<cycle>", "after", "<range>"])
 
+      // shifts
+      .symbol("<n-duration>")
+      .rule("<n-duration>", &["a", "<duration>"])
+      .rule("<n-duration>", &["<number>", "<duration>"])
+      .rule("<range>", &["in", "<n-duration>"])
+      .rule("<range>", &["<n-duration>", "ago"])
+      .rule("<range>", &["<n-duration>", "after", "<range>"])
+      .rule("<range>", &["<n-duration>", "before", "<range>"])
 
-      // seconds until feb 24th
-      // mondays until next year
+      // duration between times
       .symbol("<timediff>")
       .rule("<timediff>", &["<cycle>", "until", "<range>"])
       .rule("<timediff>", &["<cycle>", "between", "<range>", "and", "<range>"])
@@ -163,13 +174,14 @@ match n {
         "<named-seq> -> <day-of-week>" => seq(&subn[0]),
         "<named-seq> -> <day-of-month>" => seq(&subn[0]),
         "<named-seq> -> <named-month>" => seq(&subn[0]),
-        "<cycle> -> days?" => kronos::day(),
-        "<cycle> -> weeks?" => kronos::week(),
-        "<cycle> -> months?" => kronos::month(),
-        "<cycle> -> quarters?" => kronos::quarter(),
-        "<cycle> -> years?" => kronos::year(),
-        "<cycle> -> <named-seq>" => seq(&subn[0]),
+        "<duration> -> days?" => kronos::day(),
+        "<duration> -> weeks?" => kronos::week(),
+        "<duration> -> months?" => kronos::month(),
+        "<duration> -> quarters?" => kronos::quarter(),
+        "<duration> -> years?" => kronos::year(),
         "<cycle> -> weekends?" => kronos::weekend(),
+        "<cycle> -> <named-seq>" => seq(&subn[0]),
+        "<cycle> -> <duration>" => seq(&subn[0]),
         ////////////////////////////////////////////////////////////////////////////
         "<cycle-nth> -> <nth>" => seq(&subn[0]),
         "<cycle-nth> -> <the> <cycle>" => seq(&subn[1]),
@@ -202,6 +214,22 @@ fn seq_from_grain(g: kronos::Granularity) -> kronos::Seq {
     }
 }
 
+fn calc_duration(reftime: DateTime, n: &Subtree) -> (i32, kronos::Granularity) {
+    let (spec, subn) = xtract!(Subtree::Node, n);
+    match spec.as_ref() {
+        "<n-duration> -> a <duration>" => {
+            let s = kronos::this(seq(&subn[1]), reftime);
+            (1, s.grain)
+        }
+        "<n-duration> -> <number> <duration>" => {
+            let n = num(&subn[0]);
+            let s = kronos::this(seq(&subn[1]), reftime);
+            (n, s.grain)
+        }
+        _ => panic!("Unknown [n-duration] spec={:?}", spec)
+    }
+}
+
 fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
     let (spec, subn) = xtract!(Subtree::Node, n);
     match spec.as_ref() {
@@ -230,6 +258,30 @@ fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
             let reftime = eval_range(reftime, &subn[3]);
             kronos::this(seq(&subn[1]), reftime.start)
         },
+        ///////////// Shifts ///////////////////////////////////
+        "<range> -> in <n-duration>" => {
+            let (n, grain) = calc_duration(reftime, &subn[1]);
+            let today = kronos::this(kronos::day(), reftime);
+            kronos::shift(today, n, grain)
+        },
+        "<range> -> <n-duration> ago" => {
+            let (n, grain) = calc_duration(reftime, &subn[0]);
+            let today = kronos::this(kronos::day(), reftime);
+            kronos::shift(today, -n, grain)
+        },
+        "<range> -> <n-duration> after <range>" => {
+            let (n, grain) = calc_duration(reftime, &subn[0]);
+            let reftime = eval_range(reftime, &subn[2]);
+            let basetime = kronos::this(kronos::day(), reftime.start);
+            kronos::shift(basetime, n, grain)
+        },
+        "<range> -> <n-duration> before <range>" => {
+            let (n, grain) = calc_duration(reftime, &subn[0]);
+            let reftime = eval_range(reftime, &subn[2]);
+            let basetime = kronos::this(kronos::day(), reftime.start);
+            kronos::shift(basetime, -n, grain)
+        },
+        ////////////////////////////////////////////////////////
 
         /////////// testing, START HERE 2nd week next month
         //"<range> -> <the> <ordinal> <cycle> <range>" => {
@@ -238,14 +290,6 @@ fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
             //let n = num(&subn[1]) as usize;
             //let s = seq_from_grain(reftime.grain);
             //kronos::this(kronos::nthof(n, seq(&subn[2]), s), reftime.start)
-        //},
-        ////////////////////////////////////////////////////////////////////////////
-        //"<range> -> in <number> <cycle>" => {
-            //let n = num(&subn[1]) as usize;
-            // TODO: doesn't work as expected for year /month ... should preserver current day
-            // should probably use kronos::shift
-            // in 2 months, 3 weeks and 5 days
-            //kronos::this(kronos::skip(seq(&subn[2]), n), reftime)
         //},
         ////////////////////////////////////////////////////////////////////////////
         _ => panic!("Unknown [eval] spec={:?}", spec)
@@ -424,5 +468,17 @@ mod tests {
         assert_eq!(tm.time_diff(d(2016, 9, 5), "weeks until dec"), Some(12));
         assert_eq!(tm.time_diff(d(2016, 10, 25), "mon until nov 14th"), Some(2));
         assert_eq!(tm.time_diff(d(2016, 10, 25), "weekends until jan"), Some(10));
+    }
+    #[test]
+    fn t_shifts() {
+        let tm = TimeMachine::new();
+        let x = r(d(2016, 10, 12), d(2016, 10, 13), g::Day);
+        assert_eq!(tm.parse_time(d(2016, 10, 26), "2 weeks ago"), Some(x));
+        let x = r(d(2017, 2, 21), d(2017, 2, 22), g::Day);
+        assert_eq!(tm.parse_time(d(2016, 10, 26), "a week after feb 14th"), Some(x));
+        let x = r(d(2017, 2, 21), d(2017, 2, 22), g::Day);
+        assert_eq!(tm.parse_time(d(2016, 10, 26), "a week before feb 28th"), Some(x));
+        let x = r(d(2017, 10, 26), d(2017, 10, 27), g::Day);
+        assert_eq!(tm.parse_time(d(2016, 10, 26), "in a year"), Some(x));
     }
 }

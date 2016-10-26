@@ -75,11 +75,6 @@ fn build_grammar() -> earlgrey::Grammar {
       .rule("<range>", &["<the>", "<cycle>", "after", "next"])
       //.rule("<range>", &["<the>", "<cycle>", "before", "last"])
 
-      // 2nd tuesday in march
-      // 3rd day of the month
-      // 2nd week in august
-      // 1st friday of the year
-      // 2nd day of the 3rd week of june
       .symbol("<nth>")
       .symbol("<cycle-nth>")
       .rule("<cycle-nth>", &["<nth>"])
@@ -90,12 +85,6 @@ fn build_grammar() -> earlgrey::Grammar {
       .rule("<range>", &["<nth>"])
       .rule("<range>", &["<nth>", "<year>"])
 
-      // intersections
-      // friday 18th
-      // 18th of june
-      // feb 18th
-      // feb 18th 2014
-      // 18th 2018
       .symbol("<intersect>")
       .rule("<intersect>", &["<named-seq>"])
       .rule("<intersect>", &["<named-seq>", "<intersect>"])
@@ -363,28 +352,25 @@ mod tests {
         assert_eq!(tm.parse_time(d(2016, 3, 5), "next week"), Some(x));
         let x = r(d(2016, 10, 1), d(2016, 11, 1), g::Month);
         assert_eq!(tm.parse_time(d(2016, 9, 5), "next month"), Some(x));
+        let x = r(d(2016, 9, 13), d(2016, 9, 14), g::Day);
+        assert_eq!(tm.parse_time(d(2016, 9, 5), "tue after next"), Some(x));
     }
     #[test]
-    fn t_thedom() {
+    fn t_direct() {
         let tm = TimeMachine::new();
+        let x = r(d(2002, 1, 1), d(2003, 1, 1), g::Year);
+        assert_eq!(tm.parse_time(d(2016, 9, 5), "2002"), Some(x));
+        let x = r(d(2016, 10, 31), d(2016, 11, 1), g::Day);
+        assert_eq!(tm.parse_time(d(2016, 10, 26), "monday"), Some(x));
+        let x = r(d(2016, 10, 26), d(2016, 10, 27), g::Day);
+        assert_eq!(tm.parse_time(d(2016, 10, 26), "today"), Some(x));
+        assert_eq!(tm.parse_time(d(2016, 10, 25), "tomorrow"), Some(x));
         let x = r(d(2016, 9, 12), d(2016, 9, 13), g::Day);
         assert_eq!(tm.parse_time(d(2016, 9, 5), "the 12th"), Some(x));
         assert_eq!(tm.parse_time(d(2016, 9, 12), "the 12th"), Some(x));
     }
     #[test]
-    fn t_afternext() {
-        let tm = TimeMachine::new();
-        let x = r(d(2016, 9, 13), d(2016, 9, 14), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "tue after next"), Some(x));
-    }
-    #[test]
-    fn t_year() {
-        let tm = TimeMachine::new();
-        let x = r(d(2002, 1, 1), d(2003, 1, 1), g::Year);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "2002"), Some(x));
-    }
-    #[test]
-    fn t_nthseqofseq() {
+    fn t_nthof() {
         let tm = TimeMachine::new();
         let x = r(d(2017, 6, 19), d(2017, 6, 20), g::Day);
         assert_eq!(tm.parse_time(d(2016, 9, 5), "the 3rd mon of june"), Some(x));

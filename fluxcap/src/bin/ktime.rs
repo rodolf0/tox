@@ -21,7 +21,8 @@ fn main() {
     match tm.parse_time(reftime, &input) {
         Some(time) => {
             let t0 = time.start.format("%a, %b %e %Y");
-            let t1 = time.end.format("%a, %b %e %Y");
+            let t1 = time.end - chrono::Duration::nanoseconds(1);
+            let t1 = t1.format("%a, %b %e %Y");
             if time.grain == kronos::Granularity::Day {
                 println!("{}", t0.to_string())
             } else {

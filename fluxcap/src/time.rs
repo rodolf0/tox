@@ -107,18 +107,6 @@ fn build_grammar() -> earlgrey::Grammar {
       // Grab grain of <range>, create a sequence, then evaluate on <range>
 
       // shifts
-      // in 20 days
-      // 10 days after monday
-      // TODO: composite cycles
-      //.rule("<range>", &["in", "<number>", "<cycle>"])
-      //.rule("<n-cycle>", &["a", "<cycle>"])
-      //.rule("<n-cycle>", &["<number>", "<cycle>"])
-      //.rule("<n-cycle>", &["<n-cycle>", "and", "<n-cycle>"])
-      //.rule("<range>", &["in", "<n-cycle>"])
-      // in 2 months, 3 weeks and 5 days
-      //
-
-      // shifts
       .symbol("<n-duration>")
       .rule("<n-duration>", &["a", "<duration>"])
       .rule("<n-duration>", &["<number>", "<duration>"])

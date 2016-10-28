@@ -87,9 +87,9 @@ fn build_grammar() -> earlgrey::Grammar {
 
       // intersections
       .symbol("<intersect>")
-      .rule("<intersect>", &["<named-seq>"])
-      .rule("<intersect>", &["<named-seq>", "<intersect>"])
-      .rule("<range>", &["<named-seq>", "<intersect>"])
+      .rule("<intersect>", &["<cycle>"])
+      .rule("<intersect>", &["<intersect>", "<cycle>"])
+      .rule("<range>", &["<intersect>", "<cycle>"])
       .rule("<range>", &["<intersect>", "<year>"])
       .rule("<range>", &["<the>", "<day-of-month>", "of", "<range>"])
 
@@ -175,13 +175,12 @@ match n {
         "<cycle> -> weekends?" => kronos::weekend(),
         "<cycle> -> <named-seq>" => seq(&subn[0]),
         "<cycle> -> <duration>" => seq(&subn[0]),
-        ////////////////////////////////////////////////////////////////////////////
-        "<intersect> -> <named-seq> <intersect>" => {
+        //////////////////////////////////////////////////////////////////////
+        "<intersect> -> <cycle>" => seq(&subn[0]),
+        "<intersect> -> <intersect> <cycle>" => {
             kronos::intersect(seq(&subn[0]), seq(&subn[1]))
         },
-        "<intersect> -> <named-seq>" => seq(&subn[0]),
-        "<intersect> -> <year>" => panic!("TODO"),
-        ////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////
         _ => panic!("Unknown [seq] spec={:?}", spec)
     }
 }
@@ -225,13 +224,13 @@ fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
         "<range> -> <the> next <cycle>" => kronos::next(seq(&subn[2]), 1, reftime),
         "<range> -> <the> <cycle> after next" => kronos::next(seq(&subn[1]), 2, reftime),
         ///////////// Intersect ////////////////////////////////
-        "<range> -> <named-seq> <intersect>" => {
-            let i = kronos::intersect(seq(&subn[0]), seq(&subn[1]));
-            kronos::this(i, reftime)
-        },
         "<range> -> <intersect> <year>" => {
             let y = kronos::a_year(num(&subn[1]));
             kronos::this(seq(&subn[0]), y.start)
+        },
+        "<range> -> <intersect> <cycle>" => {
+            let i = kronos::intersect(seq(&subn[0]), seq(&subn[1]));
+            kronos::this(i, reftime)
         },
         "<range> -> <the> <day-of-month> of <range>" => {
             let reftime = eval_range(reftime, &subn[3]);

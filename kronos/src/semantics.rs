@@ -18,6 +18,20 @@ pub enum Granularity {
     Year,
 }
 
+impl<S: AsRef<str>> From<S> for Granularity {
+    fn from(s: S) -> Granularity {
+        let s = s.as_ref();
+        match s {
+            "day" | "Day" => Granularity::Day,
+            "week" | "Week" => Granularity::Week,
+            "month" | "Month" => Granularity::Month,
+            "quarter" | "Quarter" => Granularity::Quarter,
+            "year" | "Year" => Granularity::Year,
+            _ => panic!("Can't build Granularity from [{}]", s)
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Range {
     pub start: DateTime,

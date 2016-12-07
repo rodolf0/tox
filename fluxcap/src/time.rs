@@ -10,7 +10,7 @@ use regex::Regex;
 use std::str::FromStr;
 use std::collections::HashMap;
 
-fn build_grammar() -> earlgrey::Grammar {
+pub fn build_grammar() -> earlgrey::Grammar {
     let mut gb = earlgrey::GrammarBuilder::new();
 
     lazy_static! {
@@ -212,7 +212,7 @@ fn calc_duration(reftime: DateTime, n: &Subtree) -> (i32, kronos::Granularity) {
     }
 }
 
-fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
+pub fn eval_range(reftime: DateTime, n: &Subtree) -> kronos::Range {
     let (spec, subn) = xtract!(Subtree::Node, n);
     match spec.as_ref() {
         "<range> -> today" => kronos::this(kronos::day(), reftime),

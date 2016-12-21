@@ -339,6 +339,24 @@ impl TimeMachine {
     pub fn print_trees(&self, t: &str) {
         for tree in self.parse(t) { tree.print(); }
     }
+
+    pub fn oneparse(&self, reftime: DateTime, t: &str, w: &HashMap<String, f64>)
+        -> Option<kronos::Range>
+    {
+        use learn;
+        // score each tree
+        let t = self.parse(t)
+            .into_iter()
+            // yuck can't order f64
+            .max_by_key(|t| {
+                let x = learn::score_tree(t, w);
+                println!("{}", x);
+                (1000_000_000.0 * x) as i64
+            })
+            .unwrap();
+        let (spec, subn) = xtract!(Subtree::Node, &t);
+        Some(eval_range(reftime, &subn[0]))
+    }
 }
 
 

@@ -11,12 +11,12 @@ use std::path::Path;
 use time;
 
 #[derive(Debug)]
-struct TrainData {
+pub struct TrainData {
     reftime: DateTime,
     examples: HashMap<String, kronos::Range>,
 }
 
-fn load_training(path: &Path) -> Result<TrainData, Box<Error>> {
+pub fn load_training(path: &Path) -> Result<TrainData, Box<Error>> {
     use std::io::BufRead;
     // ignore lines starting with blanks
     // 1st line starting with 'ref:' indicates reference time
@@ -81,16 +81,36 @@ fn count_rules(tree: &Subtree,
             for t in subn {
                 count_rules(t, names, rules);
             }
-        }
-        // TODO: we don't care about Leaf counts, do we?
-        //&Subtree::Leaf(ref sym, _) => {
-            //*(histo.entry(sym.to_string()).or_insert(0)) += 1;
-        //},
-        _ => (),
+        },
+        &Subtree::Leaf(ref sym, ref lexeme) => {
+            let spec = format!("{} -> {}", sym, lexeme);
+            *(names.entry(sym.to_string()).or_insert(0.0)) += 1.0;
+            *(rules.entry(spec).or_insert(0.0)) += 1.0;
+        },
     }
 }
 
-fn learn(g: earlgrey::Grammar, td: &TrainData) -> HashMap<String, f64> {
+pub fn score_tree(tree: &Subtree, w: &HashMap<String, f64>) -> f64 {
+    match tree {
+        &Subtree::Node(ref spec, ref subn) => {
+            // split rule name, TODO: Subtree should use Rule{}?
+            //let name = spec.splitn(2, " -> ").next().unwrap();
+            //*(names.entry(name.to_string()).or_insert(0.0)) += 1.0;
+            //*(rules.entry(spec.to_string()).or_insert(0.0)) += 1.0;
+            //for t in subn {
+                //count_rules(t, names, rules);
+            //}
+            w.get(spec).unwrap_or(&0.000_000_001).log2() +
+                subn.iter().map(|st| score_tree(st, w)).sum::<f64>()
+        },
+        &Subtree::Leaf(ref sym, ref lexeme) => {
+            let spec = format!("{} -> {}", sym, lexeme);
+            w.get(&spec).unwrap_or(&0.000_000_001).log2()
+        }
+    }
+}
+
+pub fn learn(g: earlgrey::Grammar, td: &TrainData) -> HashMap<String, f64> {
     let p = earlgrey::EarleyParser::new(g);
     let mut name_count = HashMap::new();
     let mut rule_count = HashMap::new();
@@ -103,7 +123,7 @@ fn learn(g: earlgrey::Grammar, td: &TrainData) -> HashMap<String, f64> {
             Err(err) => panic!("Learning error: {:?}", err),
             Ok(state) => {
                 for tree in earlgrey::all_trees(p.g.start(), &state) {
-                    tree.print();
+                    // DEBUG: tree.print();
                     // TODO: get rid of this, use different grammars
                     // possibly pass in evaler ... eg: TimeMachine (Evaler trait)
                     let (spec, subn) = match tree {
@@ -125,6 +145,7 @@ fn learn(g: earlgrey::Grammar, td: &TrainData) -> HashMap<String, f64> {
 
     // assign probability to rules as fraction of times the whole rule
     // is seen over the total expansions of the left-hand-side
+    // AKA: maximum likelyhood estimates
     for (rule, count) in rule_count.iter_mut() {
         // TODO: split Subtree spec should be a Rule{}
         // needed to break Item::str_rule used by earlgrey::Subtree

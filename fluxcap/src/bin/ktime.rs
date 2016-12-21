@@ -2,6 +2,8 @@ extern crate chrono;
 extern crate fluxcap;
 extern crate kronos;
 
+use std::path::Path;
+
 fn main() {
     if std::env::args().len() < 1 {
         println!("usage: ktime <time-expr>");
@@ -18,7 +20,10 @@ fn main() {
         tm.print_trees(&input);
     }
 
-    match tm.parse_time(reftime, &input) {
+    let traindata = fluxcap::load_training(&Path::new("time.train")).unwrap();
+    let w = fluxcap::learn(fluxcap::build_grammar(), &traindata);
+
+    match tm.oneparse(reftime, &input, &w) {
         Some(time) => {
             let t0 = time.start.format("%a, %b %e %Y");
             let t1 = time.end - chrono::Duration::nanoseconds(1);
@@ -29,7 +34,7 @@ fn main() {
                 println!("{:?}: {} - {}", time.grain,
                          t0.to_string(), t1.to_string())
             }
-        }
+        },
         None => match tm.time_diff(reftime, &input) {
             Some(time) => println!("{}", time),
             None => println!("Parse error")

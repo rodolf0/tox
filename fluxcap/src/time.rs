@@ -458,12 +458,6 @@ mod tests {
         let x = r(d(1987, 1, 12), d(1987, 1, 13), g::Day);
         assert_eq!(tm.parse_time(d(2016, 9, 5),
                     "the 2nd day of the 3rd week of 1987"), Some(x));
-        //let x = r(d(2016, 10, 2), d(2016, 10, 9), g::Week);
-        //assert_eq!(tm.parse_time(d(2016, 9, 5), "2nd week next month"), Some(x));
-        //let ex = kronos::range{
-            //start: d(2017, 1, 4), end: d(2017, 1, 5), grain: g::Day};
-        //assert_eq!(parse_time("4th day next year",
-                              //d(2016, 9, 5)), Some(ex));
     }
     #[test]
     fn t_timediff() {

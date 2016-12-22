@@ -6,7 +6,7 @@ extern crate earlgrey;
 extern crate lexers;
 
 mod time;
-mod learn;
+pub use time::{TimeMachine, Time};
 
-pub use time::{build_grammar, TimeMachine, Time};
+mod learn;
 pub use learn::{TrainData, load_training, learn, score_tree};

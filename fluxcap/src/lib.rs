@@ -8,5 +8,5 @@ extern crate lexers;
 mod time;
 mod learn;
 
-pub use time::{build_grammar, TimeMachine};
+pub use time::{build_grammar, TimeMachine, Time};
 pub use learn::{TrainData, load_training, learn, score_tree};

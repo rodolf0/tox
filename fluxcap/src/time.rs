@@ -9,10 +9,10 @@ use kronos::constants as k;
 use regex::Regex;
 use std::str::FromStr;
 use std::collections::HashMap;
+use std::fmt;
 
 pub fn build_grammar() -> earlgrey::Grammar {
     let mut gb = earlgrey::GrammarBuilder::new();
-
     lazy_static! {
         static ref STOP_WORDS: HashMap<String, Regex> = [
             "today", "tomorrow", "yesterday",
@@ -118,7 +118,6 @@ pub fn build_grammar() -> earlgrey::Grammar {
 
       .into_grammar("<S>")
 }
-
 
 
 macro_rules! xtract {
@@ -302,62 +301,62 @@ pub struct TimeMachine {
     parser: earlgrey::EarleyParser,
 }
 
+#[derive(PartialEq)]
+pub enum Time {
+    Range(kronos::Range),
+    Count(usize),
+    Error(String),
+}
+
+impl fmt::Debug for Time {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use chrono;
+        match self {
+            &Time::Range(ref time) => {
+                let t0 = time.start.format("%a, %b %e %Y");
+                let t1 = time.end - chrono::Duration::nanoseconds(1);
+                let t1 = t1.format("%a, %b %e %Y");
+                if time.grain == kronos::Granularity::Day {
+                    write!(f, "{}", t0.to_string())
+                } else {
+                    write!(f, "{:?}: {} - {}", time.grain,
+                             t0.to_string(), t1.to_string())
+                }
+            },
+            &Time::Count(ref cnt) => write!(f, "{}", cnt),
+            &Time::Error(ref e) => write!(f, "{}", e)
+        }
+    }
+}
+
 impl TimeMachine {
     pub fn new() -> TimeMachine {
         TimeMachine{parser: earlgrey::EarleyParser::new(build_grammar())}
     }
 
-    fn parse(&self, t: &str) -> Vec<Subtree> {
-        let mut tokenizer = lexers::DelimTokenizer::from_str(t, ", ", true);
+    pub fn parse(&self, time: &str) -> Vec<Subtree> {
+        let mut tokenizer = lexers::DelimTokenizer::from_str(time, ", ", true);
         match self.parser.parse(&mut tokenizer) {
-            Err(_) => Vec::new(),
-            Ok(state) => earlgrey::all_trees(self.parser.g.start(), &state)
+            Ok(state) => earlgrey::all_trees(self.parser.g.start(), &state),
+            Err(_) => panic!("failed to parse time expr")
         }
     }
 
-    pub fn parse_time(&self, reftime: DateTime, t: &str) -> Option<kronos::Range> {
-        let trees = self.parse(t);
-        //for t in &trees { t.print(); }
-        assert_eq!(trees.len(), 1); // just evaluate 1st option
+    pub fn eval(&self, t0: DateTime, time: &str) -> Time {
+        let mut tokenizer = lexers::DelimTokenizer::from_str(time, ", ", true);
+        let trees = match self.parser.parse(&mut tokenizer) {
+            Ok(state) => earlgrey::all_trees(self.parser.g.start(), &state),
+            Err(_) => return Time::Error("Parse errror".to_string())
+        };
+        // DEBUG: for t in &trees { t.print(); }
+        if trees.len() > 1 {
+            return Time::Error("Ambibuous parse".to_string());
+        }
         let (spec, subn) = xtract!(Subtree::Node, &trees[0]);
         match spec.as_ref() {
-            "<S> -> <range>" => Some(eval_range(reftime, &subn[0])),
-            _ => None
-        }
-    }
-
-    pub fn time_diff(&self, reftime: DateTime, t: &str) -> Option<usize> {
-        let trees = self.parse(t);
-        assert_eq!(trees.len(), 1); // just evaluate 1st option
-        let (spec, subn) = xtract!(Subtree::Node, &trees[0]);
-        match spec.as_ref() {
-            "<S> -> <timediff>" => Some(eval_timediff(reftime, &subn[0])),
-            _ => None
-        }
-    }
-
-    pub fn print_trees(&self, t: &str) {
-        for tree in self.parse(t) { tree.print(); }
-    }
-
-    pub fn rankedparse(&self, reftime: DateTime, t: &str, w: &HashMap<String, f64>)
-    {
-        use learn;
-        use chrono;
-        for t in self.parse(t) {
-            let score = learn::score_tree(&t, w);
-            let (_, subn) = xtract!(Subtree::Node, &t);
-            let time = eval_range(reftime, &subn[0]);
-            let t0 = time.start.format("%a, %b %e %Y");
-            let t1 = time.end - chrono::Duration::nanoseconds(1);
-            let t1 = t1.format("%a, %b %e %Y");
-            t.print();
-            if time.grain == kronos::Granularity::Day {
-                println!("({}) {}", score, t0.to_string())
-            } else {
-                println!("({}) {:?}: {} - {}", score, time.grain,
-                         t0.to_string(), t1.to_string())
-            }
+            "<S> -> <range>" => Time::Range(eval_range(t0, &subn[0])),
+            "<S> -> <timediff>" => Time::Count(eval_timediff(t0, &subn[0])),
+            _ => Time::Error("Bad time expr".to_string())
         }
     }
 }
@@ -366,7 +365,7 @@ impl TimeMachine {
 #[cfg(test)]
 mod tests {
     use chrono::naive::datetime::NaiveDateTime as DateTime;
-    use super::TimeMachine;
+    use super::{Time, TimeMachine};
     use kronos::Granularity as g;
     use kronos;
 
@@ -382,102 +381,102 @@ mod tests {
     fn t_thisnext() {
         let tm = TimeMachine::new();
         let x = r(d(2016, 9, 12), d(2016, 9, 13), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "next monday"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5), "next monday"), Time::Range(x));
         let x = r(d(2016, 9, 5), d(2016, 9, 6), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "this monday"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5), "this monday"), Time::Range(x));
         let x = r(d(2017, 3, 1), d(2017, 4, 1), g::Month);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "next march"), Some(x));
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "this march"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5), "next march"), Time::Range(x));
+        assert_eq!(tm.eval(d(2016, 9, 5), "this march"), Time::Range(x));
         let x = r(d(2016, 3, 1), d(2016, 4, 1), g::Month);
-        assert_eq!(tm.parse_time(d(2016, 3, 5), "this march"), Some(x));
+        assert_eq!(tm.eval(d(2016, 3, 5), "this march"), Time::Range(x));
         let x = r(d(2017, 1, 1), d(2018, 1, 1), g::Year);
-        assert_eq!(tm.parse_time(d(2016, 3, 5), "next year"), Some(x));
+        assert_eq!(tm.eval(d(2016, 3, 5), "next year"), Time::Range(x));
         let x = r(d(2016, 3, 6), d(2016, 3, 13), g::Week);
-        assert_eq!(tm.parse_time(d(2016, 3, 5), "next week"), Some(x));
+        assert_eq!(tm.eval(d(2016, 3, 5), "next week"), Time::Range(x));
         let x = r(d(2016, 10, 1), d(2016, 11, 1), g::Month);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "next month"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5), "next month"), Time::Range(x));
         let x = r(d(2016, 9, 13), d(2016, 9, 14), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "tue after next"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5), "tue after next"), Time::Range(x));
     }
     #[test]
     fn t_direct() {
         let tm = TimeMachine::new();
         let x = r(d(2002, 1, 1), d(2003, 1, 1), g::Year);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "2002"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5), "2002"), Time::Range(x));
         let x = r(d(2016, 10, 31), d(2016, 11, 1), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 10, 26), "monday"), Some(x));
+        assert_eq!(tm.eval(d(2016, 10, 26), "monday"), Time::Range(x));
         let x = r(d(2016, 10, 26), d(2016, 10, 27), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 10, 26), "today"), Some(x));
-        assert_eq!(tm.parse_time(d(2016, 10, 25), "tomorrow"), Some(x));
+        assert_eq!(tm.eval(d(2016, 10, 26), "today"), Time::Range(x));
+        assert_eq!(tm.eval(d(2016, 10, 25), "tomorrow"), Time::Range(x));
         let x = r(d(2016, 9, 12), d(2016, 9, 13), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "the 12th"), Some(x));
-        assert_eq!(tm.parse_time(d(2016, 9, 12), "the 12th"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5), "the 12th"), Time::Range(x));
+        assert_eq!(tm.eval(d(2016, 9, 12), "the 12th"), Time::Range(x));
     }
     #[test]
     fn t_nthof() {
         let tm = TimeMachine::new();
         let x = r(d(2017, 6, 19), d(2017, 6, 20), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "the 3rd mon of june"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5), "the 3rd mon of june"), Time::Range(x));
         let x = r(d(2016, 9, 3), d(2016, 9, 4), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "3rd day of the month"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5), "3rd day of the month"), Time::Range(x));
         let x = r(d(2017, 8, 6), d(2017, 8, 13), g::Week);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "2nd week in august"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5), "2nd week in august"), Time::Range(x));
         let x = r(d(2017, 2, 24), d(2017, 2, 25), g::Day);
-        assert_eq!(tm.parse_time(d(2017, 1, 1), "8th fri of the year"), Some(x));
+        assert_eq!(tm.eval(d(2017, 1, 1), "8th fri of the year"), Time::Range(x));
         let x = r(d(2020, 2, 29), d(2020, 3, 1), g::Day);
-        assert_eq!(tm.parse_time(d(2020, 1, 1), "last day of feb"), Some(x));
+        assert_eq!(tm.eval(d(2020, 1, 1), "last day of feb"), Time::Range(x));
         let x = r(d(2017, 5, 9), d(2017, 5, 10), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "the 3rd day of the 2nd week of may"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5), "the 3rd day of the 2nd week of may"), Time::Range(x));
         let x = r(d(2014, 6, 2), d(2014, 6, 3), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "2nd day of june 2014"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5), "2nd day of june 2014"), Time::Range(x));
         let x = r(d(2014, 9, 11), d(2014, 9, 12), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "2nd thu of sep 2014"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5), "2nd thu of sep 2014"), Time::Range(x));
     }
     #[test]
     fn t_intersect() {
         let tm = TimeMachine::new();
         let x = r(d(1984, 2, 27), d(1984, 2, 28), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "27th feb 1984"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5), "27th feb 1984"), Time::Range(x));
         let x = r(d(2022, 2, 28), d(2022, 3, 1), g::Day);
-        assert_eq!(tm.parse_time(d(2017, 9, 5), "mon feb 28th"), Some(x));
+        assert_eq!(tm.eval(d(2017, 9, 5), "mon feb 28th"), Time::Range(x));
         let x = r(d(2016, 11, 18), d(2016, 11, 19), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 10, 24), "friday 18th"), Some(x));
+        assert_eq!(tm.eval(d(2016, 10, 24), "friday 18th"), Time::Range(x));
         let x = r(d(2017, 6, 18), d(2017, 6, 19), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 10, 24), "18th of june"), Some(x));
+        assert_eq!(tm.eval(d(2016, 10, 24), "18th of june"), Time::Range(x));
         let x = r(d(2017, 2, 27), d(2017, 2, 28), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 10, 24), "feb 27th"), Some(x));
+        assert_eq!(tm.eval(d(2016, 10, 24), "feb 27th"), Time::Range(x));
     }
     #[test]
     fn t_seqrange() {
         let tm = TimeMachine::new();
         let x = r(d(1984, 3, 4), d(1984, 3, 11), g::Week);
-        assert_eq!(tm.parse_time(d(2016, 9, 5), "10th week of 1984"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5), "10th week of 1984"), Time::Range(x));
         let x = r(d(2016, 11, 15), d(2016, 11, 16), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 9, 5),
-                    "third tuesday of the month after next"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5),
+                    "third tuesday of the month after next"), Time::Range(x));
         let x = r(d(1987, 1, 12), d(1987, 1, 13), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 9, 5),
-                    "the 2nd day of the 3rd week of 1987"), Some(x));
+        assert_eq!(tm.eval(d(2016, 9, 5),
+                    "the 2nd day of the 3rd week of 1987"), Time::Range(x));
     }
     #[test]
     fn t_timediff() {
         let tm = TimeMachine::new();
-        assert_eq!(tm.time_diff(d(2016, 9, 5), "days until tomorrow"), Some(1));
-        assert_eq!(tm.time_diff(d(2016, 9, 5), "months until 2018"), Some(15));
-        assert_eq!(tm.time_diff(d(2016, 9, 5), "weeks until dec"), Some(12));
-        assert_eq!(tm.time_diff(d(2016, 10, 25), "mon until nov 14th"), Some(2));
-        assert_eq!(tm.time_diff(d(2016, 10, 25), "weekends until jan"), Some(10));
+        assert_eq!(tm.eval(d(2016, 9, 5), "days until tomorrow"), Time::Count(1));
+        assert_eq!(tm.eval(d(2016, 9, 5), "months until 2018"), Time::Count(15));
+        assert_eq!(tm.eval(d(2016, 9, 5), "weeks until dec"), Time::Count(12));
+        assert_eq!(tm.eval(d(2016, 10, 25), "mon until nov 14th"), Time::Count(2));
+        assert_eq!(tm.eval(d(2016, 10, 25), "weekends until jan"), Time::Count(10));
     }
     #[test]
     fn t_shifts() {
         let tm = TimeMachine::new();
         let x = r(d(2016, 10, 12), d(2016, 10, 13), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 10, 26), "2 weeks ago"), Some(x));
+        assert_eq!(tm.eval(d(2016, 10, 26), "2 weeks ago"), Time::Range(x));
         let x = r(d(2017, 2, 21), d(2017, 2, 22), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 10, 26), "a week after feb 14th"), Some(x));
+        assert_eq!(tm.eval(d(2016, 10, 26), "a week after feb 14th"), Time::Range(x));
         let x = r(d(2017, 2, 21), d(2017, 2, 22), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 10, 26), "a week before feb 28th"), Some(x));
+        assert_eq!(tm.eval(d(2016, 10, 26), "a week before feb 28th"), Time::Range(x));
         let x = r(d(2017, 10, 26), d(2017, 10, 27), g::Day);
-        assert_eq!(tm.parse_time(d(2016, 10, 26), "in a year"), Some(x));
+        assert_eq!(tm.eval(d(2016, 10, 26), "in a year"), Time::Range(x));
     }
 }

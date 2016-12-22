@@ -23,21 +23,23 @@ fn main() {
     let traindata = fluxcap::load_training(&Path::new("time.train")).unwrap();
     let w = fluxcap::learn(fluxcap::build_grammar(), &traindata);
 
-    match tm.oneparse(reftime, &input, &w) {
-        Some(time) => {
-            let t0 = time.start.format("%a, %b %e %Y");
-            let t1 = time.end - chrono::Duration::nanoseconds(1);
-            let t1 = t1.format("%a, %b %e %Y");
-            if time.grain == kronos::Granularity::Day {
-                println!("{}", t0.to_string())
-            } else {
-                println!("{:?}: {} - {}", time.grain,
-                         t0.to_string(), t1.to_string())
-            }
-        },
-        None => match tm.time_diff(reftime, &input) {
-            Some(time) => println!("{}", time),
-            None => println!("Parse error")
-        }
-    }
+    tm.rankedparse(reftime, &input, &w);
+
+    //match tm.oneparse(reftime, &input, &w) {
+        //Some(time) => {
+            //let t0 = time.start.format("%a, %b %e %Y");
+            //let t1 = time.end - chrono::Duration::nanoseconds(1);
+            //let t1 = t1.format("%a, %b %e %Y");
+            //if time.grain == kronos::Granularity::Day {
+                //println!("{}", t0.to_string())
+            //} else {
+                //println!("{:?}: {} - {}", time.grain,
+                         //t0.to_string(), t1.to_string())
+            //}
+        //},
+        //None => match tm.time_diff(reftime, &input) {
+            //Some(time) => println!("{}", time),
+            //None => println!("Parse error")
+        //}
+    //}
 }

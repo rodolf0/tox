@@ -164,17 +164,17 @@ match n {
         _ => panic!("Unknown sym={:?} lexeme={:?}", sym, lexeme)
     },
     &Subtree::Node(ref spec, ref subn) => match spec.as_ref() {
+        "<named-seq> -> <named-month>" => seq(&subn[0]),
         "<named-seq> -> <day-of-week>" => seq(&subn[0]),
         "<named-seq> -> <day-of-month>" => seq(&subn[0]),
-        "<named-seq> -> <named-month>" => seq(&subn[0]),
         "<duration> -> days?" => kronos::day(),
         "<duration> -> weeks?" => kronos::week(),
         "<duration> -> months?" => kronos::month(),
         "<duration> -> quarters?" => kronos::quarter(),
         "<duration> -> years?" => kronos::year(),
         "<cycle> -> weekends?" => kronos::weekend(),
-        "<cycle> -> <named-seq>" => seq(&subn[0]),
         "<cycle> -> <duration>" => seq(&subn[0]),
+        "<cycle> -> <named-seq>" => seq(&subn[0]),
         //////////////////////////////////////////////////////////////////////
         "<intersect> -> <cycle>" => seq(&subn[0]),
         "<intersect> -> <intersect> <cycle>" => {
@@ -340,22 +340,25 @@ impl TimeMachine {
         for tree in self.parse(t) { tree.print(); }
     }
 
-    pub fn oneparse(&self, reftime: DateTime, t: &str, w: &HashMap<String, f64>)
-        -> Option<kronos::Range>
+    pub fn rankedparse(&self, reftime: DateTime, t: &str, w: &HashMap<String, f64>)
     {
         use learn;
-        // score each tree
-        let t = self.parse(t)
-            .into_iter()
-            // yuck can't order f64
-            .max_by_key(|t| {
-                let x = learn::score_tree(t, w);
-                println!("{}", x);
-                (1000_000_000.0 * x) as i64
-            })
-            .unwrap();
-        let (spec, subn) = xtract!(Subtree::Node, &t);
-        Some(eval_range(reftime, &subn[0]))
+        use chrono;
+        for t in self.parse(t) {
+            let score = learn::score_tree(&t, w);
+            let (_, subn) = xtract!(Subtree::Node, &t);
+            let time = eval_range(reftime, &subn[0]);
+            let t0 = time.start.format("%a, %b %e %Y");
+            let t1 = time.end - chrono::Duration::nanoseconds(1);
+            let t1 = t1.format("%a, %b %e %Y");
+            t.print();
+            if time.grain == kronos::Granularity::Day {
+                println!("({}) {}", score, t0.to_string())
+            } else {
+                println!("({}) {:?}: {} - {}", score, time.grain,
+                         t0.to_string(), t1.to_string())
+            }
+        }
     }
 }
 
@@ -461,9 +464,6 @@ mod tests {
             //start: d(2017, 1, 4), end: d(2017, 1, 5), grain: g::Day};
         //assert_eq!(parse_time("4th day next year",
                               //d(2016, 9, 5)), Some(ex));
-        //let ex = kronos::range{
-            //start: d(2017, 7, 1), end: d(2017, 8, 1), grain: g::Month};
-        //assert_eq!(parse_time("july next year", d(2016, 9, 5)), Some(ex));
     }
     #[test]
     fn t_timediff() {

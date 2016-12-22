@@ -23,8 +23,8 @@ pub fn load_training(path: &Path) -> Result<TrainData, Box<Error>> {
     // lines starting with " specify strings
     // other lines should be datetime fmt %Y-%m-%d %Y-%m-%d <grain>
 
-    let mut f = try!(fs::File::open(path));
-    let mut reader = io::BufReader::new(f);
+    let f = try!(fs::File::open(path));
+    let reader = io::BufReader::new(f);
     let mut data = HashMap::new();
     let mut sample_stack = Vec::new();
     let mut reftime = None;
@@ -93,13 +93,6 @@ fn count_rules(tree: &Subtree,
 pub fn score_tree(tree: &Subtree, w: &HashMap<String, f64>) -> f64 {
     match tree {
         &Subtree::Node(ref spec, ref subn) => {
-            // split rule name, TODO: Subtree should use Rule{}?
-            //let name = spec.splitn(2, " -> ").next().unwrap();
-            //*(names.entry(name.to_string()).or_insert(0.0)) += 1.0;
-            //*(rules.entry(spec.to_string()).or_insert(0.0)) += 1.0;
-            //for t in subn {
-                //count_rules(t, names, rules);
-            //}
             w.get(spec).unwrap_or(&0.000_000_001).log2() +
                 subn.iter().map(|st| score_tree(st, w)).sum::<f64>()
         },

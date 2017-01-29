@@ -1,0 +1,12 @@
+[package]
+name = "ebnf"
+version = "0.0.1"
+authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
+description = "parser generator using earlgrey"
+license = "MIT"
+repository = "https://github.com/rodolf0/tox"
+
+[dependencies]
+regex = "0.1"
+lexers = { version = "0.0.4", path = "../lexers" }
+earlgrey = { version = "0.0.5", path = "../earlgrey" }

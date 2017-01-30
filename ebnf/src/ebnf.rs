@@ -106,14 +106,18 @@ macro_rules! xtract {
     })
 }
 
-fn parse_rhs(tree: &Subtree) -> Vec<String> {
+fn parse_rhs(gb: GrammarBuilder, tree: &Subtree) -> (GrammarBuilder, Vec<String>) {
     let (spec, subn) = xtract!(Subtree::Node, tree);
     match spec.as_ref() {
-        "<Rhs> -> <Terminal>" => parse_rhs(&subn[0]),
+        //"<Rhs> -> <Id>" => {
+            //let (_, lexeme) = xtract!(Subtree::Leaf, &subn[0]);
+            //(gb.symbol(lexeme.as_ref()), vec!(lexeme.clone()))
+        //},
+        "<Rhs> -> <Terminal>" => parse_rhs(gb, &subn[0]),
         "<Terminal> -> ' <Chars> '" |
         "<Terminal> -> \" <Chars> \"" => {
             let (_, lexeme) = xtract!(Subtree::Leaf, &subn[1]);
-            vec!(lexeme.clone())
+            (gb.symbol(lexeme.as_ref()), vec!(lexeme.clone()))
         }
         _ => unreachable!("EBNF: missed a rule (2)!")
     }
@@ -129,7 +133,7 @@ fn parse_rules(mut gb: GrammarBuilder, tree: &Subtree) -> GrammarBuilder {
         },
         "<Rule> -> <Id> := <Rhs> ;" => {
             let (_, lexeme) = xtract!(Subtree::Leaf, &subn[0]);
-            let rhs = parse_rhs(&subn[2]);
+            let (gb, rhs) = parse_rhs(gb, &subn[2]);
             gb.rule(lexeme.clone(), rhs.as_slice())
         },
         _ => unreachable!("EBNF: missed a rule!")
@@ -142,7 +146,8 @@ fn build_grammar(start: &str, tree: &Subtree) -> Grammar {
     match spec.as_ref() {
         "<Grammar> -> <RuleList>" => parse_rules(gb, &subn[0]),
         _ => panic!("EBNF: What !!")
-    }.into_grammar(start)
+    }.symbol(start)
+    .into_grammar(start)
 }
 
 pub fn build_parser(grammar: &str, start: &str) -> EarleyParser {
@@ -173,11 +178,8 @@ mod test {
     }
 
     #[test]
-    fn test_build_parser() {
-        let g = r#"
-            Number := "0" ;
-        "#;
-
+    fn test_minimal_parser() {
+        let g = r#" Number := "0" ; "#;
         build_parser(&g, "Number");
     }
 }

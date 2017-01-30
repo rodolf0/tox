@@ -7,12 +7,11 @@ use earlgrey;
 fn ebnf_grammar() -> Grammar {
 
     let id_re = Regex::new(r"^[A-Za-z_]+[A-Za-z0-9_]*$").unwrap();
-    let chars_re = Regex::new(r#"^[A-Za-z0-9_\[\]{}()<>'=|.,;"]*$"#).unwrap();
     let gb = GrammarBuilder::new();
 
     gb.symbol("<Grammar>")
       .symbol(("<Id>", move |s: &str| id_re.is_match(s)))
-      .symbol(("<Chars>", move |s: &str| chars_re.is_match(s)))
+      .symbol(("<Chars>", move |s: &str| s.chars().all(|c| !c.is_control())))
       .symbol((":=", |s: &str| s == ":="))
       .symbol((";", |s: &str| s == ";"))
       .symbol(("[", |s: &str| s == "["))
@@ -52,16 +51,20 @@ fn ebnf_grammar() -> Grammar {
       .into_grammar("<Grammar>")
 }
 
-struct EbnfTokenizer(Scanner<char>);
+struct EbnfTokenizer(Scanner<char>, Vec<String>);
 
 impl EbnfTokenizer {
     fn from_str(src: &str) -> Scanner<String> {
-        Scanner::new(Box::new(EbnfTokenizer(Scanner::from_str(src))))
+        Scanner::new(Box::new(EbnfTokenizer(Scanner::from_str(src), vec!())))
     }
 }
 
 impl Nexter<String> for EbnfTokenizer {
     fn get_item(&mut self) -> Option<String> {
+        // used for accumulating string parts
+        if !self.1.is_empty() {
+            return self.1.pop();
+        }
         let mut s = &mut self.0;
         s.ignore_ws();
         if s.accept_any_char("[]{}()|,;").is_some() {
@@ -78,7 +81,13 @@ impl Nexter<String> for EbnfTokenizer {
         if let Some(q) = s.accept_any_char("\"'") {
             while let Some(n) = s.next() {
                 if n == q {
-                    return Some(s.extract_string());
+                    // store closing quote
+                    self.1.push(n.to_string());
+                    // store string content
+                    let v = s.extract_string();
+                    self.1.push(v[1..v.len()-1].to_string());
+                    // return opening quote
+                    return Some(q.to_string());
                 }
             }
             s.set_pos(backtrack);
@@ -157,7 +166,6 @@ pub fn build_parser(grammar: &str, start: &str) -> EarleyParser {
 mod test {
     use super::ebnf_grammar;
     use super::build_parser;
-    use super::EbnfTokenizer;
 
     #[test]
     fn build_ebnf_grammar() {
@@ -167,16 +175,8 @@ mod test {
     #[test]
     fn test_build_parser() {
         let g = r#"
-            Number := '0' ;
+            Number := "0" ;
         "#;
-
-        let mut tokenizer = EbnfTokenizer::from_str(&g);
-
-        println!("{:?}", tokenizer.next());
-        println!("{:?}", tokenizer.next());
-        println!("{:?}", tokenizer.next());
-        println!("{:?}", tokenizer.next());
-        println!("{:?}", tokenizer.next());
 
         build_parser(&g, "Number");
     }

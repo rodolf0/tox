@@ -373,7 +373,6 @@ fn natural_lang() {
       .symbol("PP")
       .symbol("NP")
       .symbol("VP")
-      .symbol("VP")
       .symbol("S")
       .rule("NP", &["D", "N"])
       .rule("NP", &["[name]"])

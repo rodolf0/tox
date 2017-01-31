@@ -12,6 +12,8 @@ pub struct EarleyParser {
     pub g: Grammar
 }
 
+const DEBUG_STATESETS: bool = false;
+
 impl EarleyParser {
     pub fn new(grammar: Grammar) -> EarleyParser { EarleyParser{g: grammar} }
 
@@ -55,6 +57,15 @@ impl EarleyParser {
             }
             state_idx += 1;
         }
+
+        // Verbose, debug state-sets
+        if DEBUG_STATESETS {
+            for (idx, stateset) in states.iter().enumerate() {
+                println!("=== {} ===", idx);
+                for item in stateset.iter() { println!("{:?}", item); }
+            }
+        }
+
         {
             // Check that at least one item is a. complete, b. starts at the beginning
             // and c. that the name of the rule matches the starting symbol. It spans

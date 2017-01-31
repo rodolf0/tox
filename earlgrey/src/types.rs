@@ -18,14 +18,26 @@ impl Symbol {
     }
 }
 
+// WISH: merge From impls
 impl<'a> From<&'a str> for Symbol {
     fn from(from: &str) -> Self { Symbol::NonTerm(from.to_string()) }
+}
+
+impl From<String> for Symbol {
+    fn from(from: String) -> Self { Symbol::NonTerm(from) }
 }
 
 impl<'a, F> From<(&'a str, F)> for Symbol
         where F: 'static + Fn(&str)->bool {
     fn from(from: (&str, F)) -> Self {
         Symbol::Terminal(from.0.to_string(), Box::new(from.1))
+    }
+}
+
+impl<F> From<(String, F)> for Symbol
+        where F: 'static + Fn(&str)->bool {
+    fn from(from: (String, F)) -> Self {
+        Symbol::Terminal(from.0, Box::new(from.1))
     }
 }
 

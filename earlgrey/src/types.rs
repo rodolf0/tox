@@ -266,10 +266,9 @@ impl GrammarBuilder {
 
     pub fn symbol<S: Into<Symbol>>(mut self, symbol: S) -> Self {
         let symbol = symbol.into();
-        if self.symbols.contains_key(&symbol.name()) {
-            panic!("Redefining symbol {}", symbol.name());
+        if !self.symbols.contains_key(&symbol.name()) {
+            self.symbols.insert(symbol.name(), Rc::new(symbol));
         }
-        self.symbols.insert(symbol.name(), Rc::new(symbol));
         self
     }
 

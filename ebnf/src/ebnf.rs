@@ -58,7 +58,7 @@ macro_rules! xtract {
     })
 }
 
-fn parse_rhs(gb: GrammarBuilder, tree: &Subtree) -> (GrammarBuilder, Vec<String>) {
+fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree) -> (GrammarBuilder, Vec<String>) {
     let (spec, subn) = xtract!(Subtree::Node, tree);
     match spec.as_ref() {
         //"<Rhs> -> <Id>" => {
@@ -69,7 +69,9 @@ fn parse_rhs(gb: GrammarBuilder, tree: &Subtree) -> (GrammarBuilder, Vec<String>
         "<Terminal> -> ' <Chars> '" |
         "<Terminal> -> \" <Chars> \"" => {
             let (_, lexeme) = xtract!(Subtree::Leaf, &subn[1]);
-            (gb.symbol(lexeme.as_ref()), vec!(lexeme.clone()))
+            let x = lexeme.to_string();
+            gb = gb.symbol((lexeme.as_ref(), move |s: &str| s == x));
+            (gb, vec!(lexeme.clone()))
         }
         _ => unreachable!("EBNF: missed a rule (2)!")
     }
@@ -124,6 +126,7 @@ mod test {
     use super::ebnf_grammar;
     use super::build_parser;
     use lexers::DelimTokenizer;
+    use earlgrey::all_trees;
 
     #[test]
     fn build_ebnf_grammar() {
@@ -136,7 +139,9 @@ mod test {
         let p = build_parser(&g, "Number");
         let input = "0";
         let mut tok = DelimTokenizer::from_str(input, " ", true);
-        p.parse(&mut tok).unwrap();
-        //assert!(p.parse(&mut tok).is_ok());
+        let state = p.parse(&mut tok).unwrap();
+        let trees = all_trees(p.g.start(), &state);
+        assert_eq!(format!("{:?}", trees),
+                   r#"[Node("Number -> 0", [Leaf("0", "0")])]"#);
     }
 }

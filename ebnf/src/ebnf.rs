@@ -1,11 +1,11 @@
 use regex::Regex;
-use lexers::{Scanner, Nexter, scan_identifier};
-use earlgrey::{Grammar, GrammarBuilder, Subtree, EarleyParser};
-use earlgrey;
+use earlgrey::{Grammar, GrammarBuilder, Subtree, EarleyParser, all_trees};
+use lexer::EbnfTokenizer;
 
 // https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form
 fn ebnf_grammar() -> Grammar {
 
+    // TODO: get rid of regex dependency
     let id_re = Regex::new(r"^[A-Za-z_]+[A-Za-z0-9_]*$").unwrap();
     let gb = GrammarBuilder::new();
 
@@ -49,54 +49,6 @@ fn ebnf_grammar() -> Grammar {
       .rule("<Terminal>", &["\"", "<Chars>", "\""])
 
       .into_grammar("<Grammar>")
-}
-
-struct EbnfTokenizer(Scanner<char>, Vec<String>);
-
-impl EbnfTokenizer {
-    fn from_str(src: &str) -> Scanner<String> {
-        Scanner::new(Box::new(EbnfTokenizer(Scanner::from_str(src), vec!())))
-    }
-}
-
-impl Nexter<String> for EbnfTokenizer {
-    fn get_item(&mut self) -> Option<String> {
-        // used for accumulating string parts
-        if !self.1.is_empty() {
-            return self.1.pop();
-        }
-        let mut s = &mut self.0;
-        s.ignore_ws();
-        if s.accept_any_char("[]{}()|,;").is_some() {
-            return Some(s.extract_string());
-        }
-        let backtrack = s.pos();
-        if s.accept_any_char(":").is_some() {
-            if s.accept_any_char("=").is_some() {
-                return Some(s.extract_string());
-            }
-            s.set_pos(backtrack);
-        }
-        let backtrack = s.pos();
-        if let Some(q) = s.accept_any_char("\"'") {
-            while let Some(n) = s.next() {
-                if n == q {
-                    // store closing quote
-                    self.1.push(n.to_string());
-                    // store string content
-                    let v = s.extract_string();
-                    self.1.push(v[1..v.len()-1].to_string());
-                    // return opening quote
-                    return Some(q.to_string());
-                }
-            }
-            s.set_pos(backtrack);
-        }
-        if let Some(id) = scan_identifier(&mut s) {
-            return Some(id);
-        }
-        return None;
-    }
 }
 
 macro_rules! xtract {
@@ -156,7 +108,7 @@ pub fn build_parser(grammar: &str, start: &str) -> EarleyParser {
     let trees = match ebnf_parser.parse(&mut tokenizer) {
         Err(e) => panic!("Bad grammar: {:?}", e),
         Ok(state) => {
-            let ts = earlgrey::all_trees(ebnf_parser.g.start(), &state);
+            let ts = all_trees(ebnf_parser.g.start(), &state);
             if ts.len() != 1 {
                 panic!("EBNF is ambiguous?");
             }
@@ -171,6 +123,7 @@ pub fn build_parser(grammar: &str, start: &str) -> EarleyParser {
 mod test {
     use super::ebnf_grammar;
     use super::build_parser;
+    use lexers::DelimTokenizer;
 
     #[test]
     fn build_ebnf_grammar() {
@@ -180,6 +133,10 @@ mod test {
     #[test]
     fn test_minimal_parser() {
         let g = r#" Number := "0" ; "#;
-        build_parser(&g, "Number");
+        let p = build_parser(&g, "Number");
+        let input = "0";
+        let mut tok = DelimTokenizer::from_str(input, " ", true);
+        p.parse(&mut tok).unwrap();
+        //assert!(p.parse(&mut tok).is_ok());
     }
 }

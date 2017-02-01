@@ -41,6 +41,7 @@ impl Nexter<String> for EbnfTokenizer {
             }
             s.set_pos(backtrack);
         }
+        // NOTE: scan_identifier limits the valid options
         if let Some(id) = scan_identifier(&mut s) {
             return Some(id);
         }

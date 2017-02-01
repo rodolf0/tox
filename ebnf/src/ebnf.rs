@@ -27,8 +27,8 @@ fn ebnf_grammar() -> Grammar {
       .symbol("<RuleList>")
       .symbol("<Rule>")
       .symbol("<Rhs>")
-      .symbol("<Terminal>")
-
+      .symbol("<Rhs1>")
+      .symbol("<Rhs2>")
 
       .rule("<Grammar>", &["<RuleList>"])
 
@@ -37,16 +37,18 @@ fn ebnf_grammar() -> Grammar {
 
       .rule("<Rule>", &["<Id>", ":=", "<Rhs>", ";"])
 
-      .rule("<Rhs>", &["<Id>"])
-      .rule("<Rhs>", &["<Terminal>"])
-      .rule("<Rhs>", &["[", "<Rhs>", "]"])
-      .rule("<Rhs>", &["{", "<Rhs>", "}"])
-      .rule("<Rhs>", &["(", "<Rhs>", ")"])
-      .rule("<Rhs>", &["<Rhs>", "|", "<Rhs>"])
-      .rule("<Rhs>", &["<Rhs>", ",", "<Rhs>"])
+      .rule("<Rhs>", &["<Rhs>", "|", "<Rhs1>"])
+      .rule("<Rhs>", &["<Rhs1>"])
 
-      .rule("<Terminal>", &["'", "<Chars>", "'"])
-      .rule("<Terminal>", &["\"", "<Chars>", "\""])
+      .rule("<Rhs1>", &["<Rhs1>", ",", "<Rhs2>"])
+      .rule("<Rhs1>", &["<Rhs2>"])
+
+      .rule("<Rhs2>", &["<Id>"])
+      .rule("<Rhs2>", &["'", "<Chars>", "'"])
+      .rule("<Rhs2>", &["\"", "<Chars>", "\""])
+      .rule("<Rhs2>", &["[", "<Rhs>", "]"])
+      .rule("<Rhs2>", &["{", "<Rhs>", "}"])
+      .rule("<Rhs2>", &["(", "<Rhs>", ")"])
 
       .into_grammar("<Grammar>")
 }
@@ -61,19 +63,38 @@ macro_rules! xtract {
 fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree) -> (GrammarBuilder, Vec<String>) {
     let (spec, subn) = xtract!(Subtree::Node, tree);
     match spec.as_ref() {
-        //"<Rhs> -> <Id>" => {
-            //let (_, lexeme) = xtract!(Subtree::Leaf, &subn[0]);
-            //(gb.symbol(lexeme.as_ref()), vec!(lexeme.clone()))
-        //},
-        "<Rhs> -> <Terminal>" => parse_rhs(gb, &subn[0]),
-        "<Terminal> -> ' <Chars> '" |
-        "<Terminal> -> \" <Chars> \"" => {
+        "<Rhs> -> <Rhs> | <Rhs1>" => {
+            let (gb, rhs) = parse_rhs(gb, &subn[0]);
+            //println!("Adding rule {:?} -> {:?}", lexeme, rhs);
+            //gb = gb.rule(lexeme.clone(), rhs.as_slice());
+            parse_rhs(gb, &subn[2])
+        },
+        "<Rhs> -> <Rhs1>" => {
+            parse_rhs(gb, &subn[0])
+        },
+
+        "<Rhs1> -> <Rhs1> , <Rhs2>" => {
+            let (gb, _) = parse_rhs(gb, &subn[0]);
+            parse_rhs(gb, &subn[2])
+        },
+        "<Rhs1> -> <Rhs2>" => {
+            parse_rhs(gb, &subn[0])
+        },
+
+        "<Rhs2> -> <Id>" => {
+            let (_, lexeme) = xtract!(Subtree::Leaf, &subn[0]);
+            (gb.symbol(lexeme.as_ref()), vec!(lexeme.clone()))
+        },
+
+        "<Rhs2> -> ' <Chars> '" |
+        "<Rhs2> -> \" <Chars> \"" => {
             let (_, lexeme) = xtract!(Subtree::Leaf, &subn[1]);
             let x = lexeme.to_string();
+            println!("Adding symbol {:?}", lexeme);
             gb = gb.symbol((lexeme.as_ref(), move |s: &str| s == x));
             (gb, vec!(lexeme.clone()))
         }
-        _ => unreachable!("EBNF: missed a rule (2)!")
+        missing => unreachable!("EBNF: missed a rule (2): {}", missing)
     }
 }
 
@@ -88,9 +109,10 @@ fn parse_rules(mut gb: GrammarBuilder, tree: &Subtree) -> GrammarBuilder {
         "<Rule> -> <Id> := <Rhs> ;" => {
             let (_, lexeme) = xtract!(Subtree::Leaf, &subn[0]);
             let (gb, rhs) = parse_rhs(gb, &subn[2]);
+            println!("Adding rule {:?} -> {:?}", lexeme, rhs);
             gb.rule(lexeme.clone(), rhs.as_slice())
         },
-        _ => unreachable!("EBNF: missed a rule!")
+        missing => unreachable!("EBNF: missed a rule: {}", missing)
     }
 }
 
@@ -112,6 +134,9 @@ pub fn build_parser(grammar: &str, start: &str) -> EarleyParser {
         Ok(state) => {
             let ts = all_trees(ebnf_parser.g.start(), &state);
             if ts.len() != 1 {
+                for t in &ts {
+                    t.print();
+                }
                 panic!("EBNF is ambiguous?");
             }
             ts
@@ -143,5 +168,23 @@ mod test {
         let trees = all_trees(p.g.start(), &state);
         assert_eq!(format!("{:?}", trees),
                    r#"[Node("Number -> 0", [Leaf("0", "0")])]"#);
+    }
+
+    #[test]
+    fn test_arith_parser() {
+        let g = r#"
+            expr := Number
+                  | expr, "+", Number ;
+
+            Number := "0" | "1" | "2" | "3" ;
+        "#;
+        let p = build_parser(&g, "expr");
+        let input = "3 + 3";
+        let mut tok = DelimTokenizer::from_str(input, " ", true);
+        let state = p.parse(&mut tok).unwrap();
+        let trees = all_trees(p.g.start(), &state);
+        println!("{:?}", trees);
+        //assert_eq!(format!("{:?}", trees),
+                   //r#"[Node("Number -> 0", [Leaf("0", "0")])]"#);
     }
 }

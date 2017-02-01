@@ -60,39 +60,56 @@ macro_rules! xtract {
     })
 }
 
-fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree) -> (GrammarBuilder, Vec<String>) {
+//fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree, nt: String) -> (GrammarBuilder, Vec<String>) {
+//fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree, rule_id: &str) -> GrammarBuilder {
+fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree, rule_id: &str) -> (GrammarBuilder, Vec<String>) {
     let (spec, subn) = xtract!(Subtree::Node, tree);
+    println!("==== spec: {:?}", spec);
     match spec.as_ref() {
         "<Rhs> -> <Rhs> | <Rhs1>" => {
-            let (gb, rhs) = parse_rhs(gb, &subn[0]);
-            //println!("Adding rule {:?} -> {:?}", lexeme, rhs);
-            //gb = gb.rule(lexeme.clone(), rhs.as_slice());
-            parse_rhs(gb, &subn[2])
-        },
-        "<Rhs> -> <Rhs1>" => {
-            parse_rhs(gb, &subn[0])
+            // rules don't get added here
+            let (mut gb, rhs) = parse_rhs(gb, &subn[0], rule_id);
+            println!("Adding rule {:?} -> {:?}", rule_id, rhs);
+            gb = gb.rule(rule_id.to_string(), rhs.as_slice());
+
+            let (mut gb, rhs) = parse_rhs(gb, &subn[2], rule_id);
+            println!("Adding rule {:?} -> {:?}", rule_id, rhs);
+            gb = gb.rule(rule_id.to_string(), rhs.as_slice());
+
+            (gb, rhs)
+            // "expr" -> ["Number"]
+            // "expr" -> ["expr", ",", "+", ",", "Number"]
         },
 
         "<Rhs1> -> <Rhs1> , <Rhs2>" => {
-            let (gb, _) = parse_rhs(gb, &subn[0]);
-            parse_rhs(gb, &subn[2])
+
+            let (mut gb, mut rhs1) = parse_rhs(gb, &subn[0], rule_id);
+            rhs1.push(",".to_string());
+            gb = gb.symbol(",");
+            let (gb, mut rhs2) = parse_rhs(gb, &subn[2], rule_id);
+            rhs1.append(&mut rhs2);
+            (gb, rhs1)
         },
-        "<Rhs1> -> <Rhs2>" => {
-            parse_rhs(gb, &subn[0])
+
+        "<Rhs1> -> <Rhs2>" |
+        "<Rhs> -> <Rhs1>" => {
+            parse_rhs(gb, &subn[0], rule_id)
         },
 
         "<Rhs2> -> <Id>" => {
-            let (_, lexeme) = xtract!(Subtree::Leaf, &subn[0]);
-            (gb.symbol(lexeme.as_ref()), vec!(lexeme.clone()))
+            let (_, id) = xtract!(Subtree::Leaf, &subn[0]);
+            println!("Adding symbol {:?}", id);
+            gb = gb.symbol(id.as_ref());
+            (gb, vec!(id.to_string()))
         },
 
         "<Rhs2> -> ' <Chars> '" |
         "<Rhs2> -> \" <Chars> \"" => {
-            let (_, lexeme) = xtract!(Subtree::Leaf, &subn[1]);
-            let x = lexeme.to_string();
-            println!("Adding symbol {:?}", lexeme);
-            gb = gb.symbol((lexeme.as_ref(), move |s: &str| s == x));
-            (gb, vec!(lexeme.clone()))
+            let (_, term) = xtract!(Subtree::Leaf, &subn[1]);
+            let x = term.to_string();
+            println!("Adding symbol {:?}", term);
+            gb = gb.symbol((term.as_ref(), move |s: &str| s == x));
+            (gb, vec!(term.to_string()))
         }
         missing => unreachable!("EBNF: missed a rule (2): {}", missing)
     }
@@ -107,10 +124,12 @@ fn parse_rules(mut gb: GrammarBuilder, tree: &Subtree) -> GrammarBuilder {
             parse_rules(gb, &subn[1])
         },
         "<Rule> -> <Id> := <Rhs> ;" => {
-            let (_, lexeme) = xtract!(Subtree::Leaf, &subn[0]);
-            let (gb, rhs) = parse_rhs(gb, &subn[2]);
-            println!("Adding rule {:?} -> {:?}", lexeme, rhs);
-            gb.rule(lexeme.clone(), rhs.as_slice())
+            let (_, rule_id) = xtract!(Subtree::Leaf, &subn[0]);
+            // TODO: add symbol rule_id
+            let (mut gb, rhs) = parse_rhs(gb, &subn[2], rule_id.as_ref());
+            println!("Adding rule {:?} -> {:?}", rule_id, rhs);
+            gb = gb.rule(rule_id.to_string(), rhs.as_slice());
+            gb
         },
         missing => unreachable!("EBNF: missed a rule: {}", missing)
     }

@@ -73,8 +73,8 @@ fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree, rule_id: &str) -> (GrammarB
             gb = gb.rule(rule_id.to_string(), rhs.as_slice());
 
             let (mut gb, rhs) = parse_rhs(gb, &subn[2], rule_id);
-            println!("Adding rule {:?} -> {:?}", rule_id, rhs);
-            gb = gb.rule(rule_id.to_string(), rhs.as_slice());
+            //println!("Adding rule {:?} -> {:?}", rule_id, rhs);
+            //gb = gb.rule(rule_id.to_string(), rhs.as_slice());
 
             (gb, rhs)
             // "expr" -> ["Number"]
@@ -84,8 +84,8 @@ fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree, rule_id: &str) -> (GrammarB
         "<Rhs1> -> <Rhs1> , <Rhs2>" => {
 
             let (mut gb, mut rhs1) = parse_rhs(gb, &subn[0], rule_id);
-            rhs1.push(",".to_string());
-            gb = gb.symbol(",");
+            //rhs1.push(",".to_string());
+            //gb = gb.symbol(",");
             let (gb, mut rhs2) = parse_rhs(gb, &subn[2], rule_id);
             rhs1.append(&mut rhs2);
             (gb, rhs1)
@@ -202,7 +202,9 @@ mod test {
         let mut tok = DelimTokenizer::from_str(input, " ", true);
         let state = p.parse(&mut tok).unwrap();
         let trees = all_trees(p.g.start(), &state);
-        println!("{:?}", trees);
+        for t in &trees {
+            t.print();
+        }
         //assert_eq!(format!("{:?}", trees),
                    //r#"[Node("Number -> 0", [Leaf("0", "0")])]"#);
     }

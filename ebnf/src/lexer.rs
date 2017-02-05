@@ -16,7 +16,7 @@ impl Nexter<String> for EbnfTokenizer {
         }
         let mut s = &mut self.0;
         s.ignore_ws();
-        if s.accept_any_char("[]{}()|,;").is_some() {
+        if s.accept_any_char("[]{}()|;").is_some() {
             return Some(s.extract_string());
         }
         let backtrack = s.pos();

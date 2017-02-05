@@ -1,6 +1,8 @@
 use regex::Regex;
 use earlgrey::{Grammar, GrammarBuilder, Subtree, EarleyParser, all_trees};
 use lexer::EbnfTokenizer;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 // https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form
 fn ebnf_grammar() -> Grammar {
@@ -101,38 +103,27 @@ fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree, lhs: &str) -> (GrammarBuild
         "<Rhs2> -> { <Rhs> }" => {
             let (gb, mut rhs) = parse_rhs(gb, &subn[1], lhs);
 
-            let repsym = "<rhs-repeat>";  // BUG TODO: should be has of rhs
+            let mut h = DefaultHasher::new();
+            rhs.hash(&mut h);
+            let repsym = format!("<Rx-{}>", h.finish());
 
-            let mut newrhs = vec!(repsym.to_string());
+            let mut newrhs = vec!(repsym.clone());
             newrhs.append(&mut rhs);
 
-            // rhs2 -> <e>
-            // rhs2 -> rhs2 rhs
-            //
-            //  num -> X
-            //
-            //  num -> {D}
-            //
-            //  num -> <e>
-            //  num -> num D
-            //
             //  num -> rx
+            //  rx  -> <e>
             //  rx  -> rx D
-            //  rx  -> D
-            //
-            // rhs2 -> rhsX
-            // rhsX -> rhsX rhs | <e>
 
             println!("Adding symbol {:?}", repsym);
             println!("Adding rule {:?} -> []", repsym);
             println!("Adding rule {:?} -> {:?}", repsym, newrhs);
 
             let gb =
-            gb.symbol(repsym)
-              .rule(repsym, &[])
-              .rule(repsym.to_string(), newrhs.as_slice());
+            gb.symbol(repsym.as_ref())
+              .rule(repsym.as_ref(), &[])
+              .rule(repsym.clone(), newrhs.as_slice());
 
-            (gb, vec!(repsym.to_string()))
+            (gb, vec!(repsym))
         },
 
         missing => unreachable!("EBNF: missed a rule (2): {}", missing)
@@ -237,7 +228,7 @@ mod test {
             b := "0" | "1" ;
         "#;
         let p = build_parser(&g, "arg");
-        let input = "1 , 0 , 0";
+        let input = "1 , 0 , 1";
         let mut tok = DelimTokenizer::from_str(input, " ", true);
         let state = p.parse(&mut tok).unwrap();
         let trees = all_trees(p.g.start(), &state);

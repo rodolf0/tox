@@ -111,7 +111,7 @@ fn grammar_ambiguous_epsilon() {
       .symbol("X")
       .symbol(("b", |n: &str| n == "b"))
       .rule("S", &["S", "S", "X"])
-      .rule("X", &[])
+      .rule::<_, &str>("X", &[])
       .rule("S", &["b"]);
     // Earley's corner case that generates spurious trees for bbb
     let mut input = DelimTokenizer::from_str("b b b", " ", true);
@@ -187,7 +187,7 @@ fn bogus_empty() {
     let gb = GrammarBuilder::new()
       .symbol("A")
       .symbol("B")
-      .rule("A", &vec![])
+      .rule::<_, &str>("A", &[])
       .rule("A", &vec!["B"])
       .rule("B", &vec!["A"]);
     let g = gb.into_grammar("A");
@@ -208,7 +208,7 @@ fn bogus_epsilon() {
       .symbol((")", |l: &str| l == ")"))
       .rule("P", &["(", "P", ")"])
       .rule("P", &["P", "P"])
-      .rule("P", &[]);
+      .rule::<_, &str>("P", &[]);
     let g = gb.into_grammar("P");
     let p = EarleyParser::new(g);
     let mut input = Scanner::from_buf("".split_whitespace()
@@ -235,7 +235,7 @@ fn grammar_example() {
       .symbol(("n", |l: &str| l == "n"))
       .rule("Program", &["Letters", "m", "a", "i", "n", "Letters"])
       .rule("Letters", &["oneletter", "Letters"])
-      .rule("Letters", &[]);
+      .rule::<_, &str>("Letters", &[]);
     let p = EarleyParser::new(gb.into_grammar("Program"));
     let mut input = Scanner::from_buf("containsmainword".chars().map(|c| c.to_string()));
     assert!(p.parse(&mut input).is_ok());
@@ -343,7 +343,7 @@ fn chained_terminals() {
           .symbol("X")
           .symbol(("+", |n: &str| n == "+"))
           .rule("E", &variant)
-          .rule("X", &[]);
+          .rule::<_, &str>("X", &[]);
         let p = EarleyParser::new(gb.into_grammar("E"));
         let mut input = DelimTokenizer::from_str(tokens, "+", false);
         let ps = p.parse(&mut input).unwrap();

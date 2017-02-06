@@ -42,7 +42,7 @@ pub fn build_grammar() -> earlgrey::Grammar {
 
       // optional prefix <the>
       .symbol("<the>")
-      .rule("<the>", &[])
+      .rule::<_, &str>("<the>", &[])
       .rule("<the>", &["the"])
 
       .symbol("<named-seq>")

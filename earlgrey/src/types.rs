@@ -284,8 +284,8 @@ impl GrammarBuilder {
         self
     }
 
-    pub fn rule<N>(mut self, name: N, spec: &[N]) -> Self
-            where N: Into<String> + AsRef<str> {
+    pub fn rule<N, N2>(mut self, name: N, spec: &[N2]) -> Self
+            where N: Into<String>, N2: AsRef<str> {
         let rule = Rule{
             name: name.into(),
             spec: spec.into_iter().map(|s| match self.symbols.get(s.as_ref()) {

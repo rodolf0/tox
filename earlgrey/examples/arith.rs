@@ -59,7 +59,7 @@ fn build_grammar() -> earley::Grammar {
       .rule("func",   &["[v]", "[(]", "args", "[)]"])
       .rule("args",   &["expr"])
       .rule("args",   &["args", "[,]", "expr"])
-      .rule("args",   &[])
+      .rule::<_, &str>("args",   &[])
       .into_grammar("assign")
 }
 

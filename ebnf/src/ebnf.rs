@@ -63,12 +63,12 @@ macro_rules! xtract {
 
 fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree, lhs: &str) -> (GrammarBuilder, Vec<String>) {
     let (spec, subn) = xtract!(Subtree::Node, tree);
-    println!("==== spec: {:?}", spec);
+    println!("** spec: {:?}", spec);
     match spec.as_ref() {
         "<Rhs> -> <Rhs> | <Rhs1>" => {
             let (mut gb, rhs) = parse_rhs(gb, &subn[0], lhs);
             println!("Adding rule {:?} -> {:?}", lhs, rhs);
-            gb = gb.rule(lhs.to_string(), rhs.as_slice());
+            gb = gb.rule(lhs, rhs.as_slice());
             parse_rhs(gb, &subn[2], lhs)
         },
 
@@ -79,10 +79,7 @@ fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree, lhs: &str) -> (GrammarBuild
             (gb, rhs1)
         },
 
-        "<Rhs1> -> <Rhs2>" |
-        "<Rhs> -> <Rhs1>" => {
-            parse_rhs(gb, &subn[0], lhs)
-        },
+        "<Rhs1> -> <Rhs2>" | "<Rhs> -> <Rhs1>" => parse_rhs(gb, &subn[0], lhs),
 
         "<Rhs2> -> <Id>" => {
             let (_, id) = xtract!(Subtree::Leaf, &subn[0]);
@@ -91,8 +88,7 @@ fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree, lhs: &str) -> (GrammarBuild
             (gb, vec!(id.to_string()))
         },
 
-        "<Rhs2> -> ' <Chars> '" |
-        "<Rhs2> -> \" <Chars> \"" => {
+        "<Rhs2> -> ' <Chars> '" | "<Rhs2> -> \" <Chars> \"" => {
             let (_, term) = xtract!(Subtree::Leaf, &subn[1]);
             let x = term.to_string();
             println!("Adding symbol {:?}", term);
@@ -101,28 +97,37 @@ fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree, lhs: &str) -> (GrammarBuild
         },
 
         "<Rhs2> -> { <Rhs> }" => {
+            //  rx -> rhs rx | <e>
+            //  rhs2 -> rx
             let (gb, mut rhs) = parse_rhs(gb, &subn[1], lhs);
-
             let mut h = DefaultHasher::new();
             rhs.hash(&mut h);
             let repsym = format!("<Rx-{}>", h.finish());
-
-            let mut newrhs = vec!(repsym.clone());
-            newrhs.append(&mut rhs);
-
-            //  num -> rx
-            //  rx  -> <e>
-            //  rx  -> rx D
-
+            rhs.push(repsym.clone());
             println!("Adding symbol {:?}", repsym);
+            println!("Adding rule {:?} -> {:?}", repsym, rhs);
             println!("Adding rule {:?} -> []", repsym);
-            println!("Adding rule {:?} -> {:?}", repsym, newrhs);
-
             let gb =
             gb.symbol(repsym.as_ref())
-              .rule(repsym.as_ref(), &[])
-              .rule(repsym.clone(), newrhs.as_slice());
+              .rule(repsym.clone(), rhs.as_slice())
+              .rule::<_, String>(repsym.as_ref(), &[]);
+            (gb, vec!(repsym))
+        },
 
+        "<Rhs2> -> [ <Rhs> ]" => {
+            //  rx -> rhs | <e>
+            //  rhs2 -> rx
+            let (gb, rhs) = parse_rhs(gb, &subn[1], lhs);
+            let mut h = DefaultHasher::new();
+            rhs.hash(&mut h);
+            let repsym = format!("<Rx-{}>", h.finish());
+            println!("Adding symbol {:?}", repsym);
+            println!("Adding rule {:?} -> {:?}", repsym, rhs);
+            println!("Adding rule {:?} -> []", repsym);
+            let gb =
+            gb.symbol(repsym.as_ref())
+              .rule(repsym.clone(), rhs.as_slice())
+              .rule::<_, String>(repsym.as_ref(), &[]);
             (gb, vec!(repsym))
         },
 
@@ -140,11 +145,9 @@ fn parse_rules(mut gb: GrammarBuilder, tree: &Subtree) -> GrammarBuilder {
         },
         "<Rule> -> <Id> := <Rhs> ;" => {
             let (_, lhs) = xtract!(Subtree::Leaf, &subn[0]);
-            // TODO: add symbol lhs
-            let (mut gb, rhs) = parse_rhs(gb, &subn[2], lhs.as_ref());
+            let (gb, rhs) = parse_rhs(gb, &subn[2], lhs.as_ref());
             println!("Adding rule {:?} -> {:?}", lhs, rhs);
-            gb = gb.rule(lhs.to_string(), rhs.as_slice());
-            gb
+            gb.rule(lhs.to_string(), rhs.as_slice())
         },
         missing => unreachable!("EBNF: missed a rule: {}", missing)
     }
@@ -196,8 +199,7 @@ mod test {
     fn test_minimal_parser() {
         let g = r#" Number := "0" ; "#;
         let p = build_parser(&g, "Number");
-        let input = "0";
-        let mut tok = DelimTokenizer::from_str(input, " ", true);
+        let mut tok = DelimTokenizer::from_str("0", " ", true);
         let state = p.parse(&mut tok).unwrap();
         let trees = all_trees(p.g.start(), &state);
         assert_eq!(format!("{:?}", trees),
@@ -213,8 +215,7 @@ mod test {
             Number := "0" | "1" | "2" | "3" ;
         "#;
         let p = build_parser(&g, "expr");
-        let input = "3 + 2 + 1";
-        let mut tok = DelimTokenizer::from_str(input, " ", true);
+        let mut tok = DelimTokenizer::from_str("3 + 2 + 1", " ", true);
         let state = p.parse(&mut tok).unwrap();
         let trees = all_trees(p.g.start(), &state);
         assert_eq!(format!("{:?}", trees),
@@ -224,14 +225,32 @@ mod test {
     #[test]
     fn test_repetition() {
         let g = r#"
-            arg := b { "," arg } ;
+            arg := b { "," b } ;
             b := "0" | "1" ;
         "#;
         let p = build_parser(&g, "arg");
-        let input = "1 , 0 , 1";
-        let mut tok = DelimTokenizer::from_str(input, " ", true);
+        let mut tok = DelimTokenizer::from_str("1 , 0 , 1", " ", true);
         let state = p.parse(&mut tok).unwrap();
         let trees = all_trees(p.g.start(), &state);
-        for t in &trees { t.print(); }
+        // NOTE: hash might make this test fail
+        assert_eq!(format!("{:?}", trees),
+                   r#"[Node("arg -> b <Rx-4288732297984548594>", [Node("b -> 1", [Leaf("1", "1")]), Node("<Rx-4288732297984548594> -> , b <Rx-4288732297984548594>", [Leaf(",", ","), Node("b -> 0", [Leaf("0", "0")]), Node("<Rx-4288732297984548594> -> , b <Rx-4288732297984548594>", [Leaf(",", ","), Node("b -> 1", [Leaf("1", "1")]), Node("<Rx-4288732297984548594> -> ", [])])])])]"#);
+    }
+
+    #[test]
+    fn test_option() {
+        let g = r#"
+            complex := d [ "i" ];
+            d := "0" | "1" | "2";
+        "#;
+        let p = build_parser(&g, "complex");
+        let mut tok = DelimTokenizer::from_str("1", " ", true);
+        let state = p.parse(&mut tok).unwrap();
+        let trees = all_trees(p.g.start(), &state);
+        // NOTE: hash might make this test fail
+        assert_eq!(format!("{:?}", trees),
+                   r#"[Node("complex -> d <Rx-12307430620962403152>", [Node("d -> 1", [Leaf("1", "1")]), Node("<Rx-12307430620962403152> -> ", [])])]"#);
+        let mut tok = DelimTokenizer::from_str("2 i", " ", true);
+        assert!(p.parse(&mut tok).is_ok());
     }
 }

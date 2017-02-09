@@ -68,6 +68,13 @@ struct Rule {
     spec: Vec<Rc<Symbol>>,
 }
 
+impl Rule {
+    fn to_string(&self) -> String {
+        format!("{} -> {}", self.name, self.spec.iter().map(
+                |s| s.name()).collect::<Vec<_>>().join(" "))
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone,PartialEq,Eq,Hash,Debug)]
@@ -110,10 +117,7 @@ impl Eq for Item {}
 impl Item {
     pub fn start(&self) -> usize { self.start }
     pub fn complete(&self) -> bool { self.dot >= self.rule.spec.len() }
-    pub fn str_rule(&self) -> String {
-        format!("{} -> {}", self.rule.name, self.rule.spec.iter().map(
-                |s| s.name()).collect::<Vec<_>>().join(" "))
-    }
+    pub fn str_rule(&self) -> String { self.rule.to_string() }
     pub fn next_symbol<'a>(&'a self) -> Option<&'a Symbol> {
         self.rule.spec.get(self.dot).map(|s| &**s)
     }
@@ -276,11 +280,20 @@ impl GrammarBuilder {
         GrammarBuilder{ symbols: HashMap::new(), rules: Vec::new()}
     }
 
-    pub fn symbol<S: Into<Symbol>>(mut self, symbol: S) -> Self {
+    pub fn symbol_relaxed<S: Into<Symbol>>(mut self, symbol: S) -> Self {
         let symbol = symbol.into();
         if !self.symbols.contains_key(&symbol.name()) {
             self.symbols.insert(symbol.name(), Rc::new(symbol));
         }
+        self
+    }
+
+    pub fn symbol<S: Into<Symbol>>(mut self, symbol: S) -> Self {
+        let symbol = symbol.into();
+        if self.symbols.contains_key(&symbol.name()) {
+            panic!("Redefining symbol {}", symbol.name());
+        }
+        self.symbols.insert(symbol.name(), Rc::new(symbol));
         self
     }
 
@@ -293,6 +306,12 @@ impl GrammarBuilder {
                 None => panic!("Missing symbol: {}", s.as_ref())
             }).collect()
         };
+        let rulestr = rule.to_string();
+        for r in &self.rules {
+            if r.to_string() == rulestr {
+                panic!("Redefining rule {}", rulestr);
+            }
+        }
         self.rules.push(Rc::new(rule));
         self
     }
@@ -303,6 +322,10 @@ impl GrammarBuilder {
             true => Grammar{start: start, rules: self.rules},
             false => panic!("Missing symbol: {}", start),
         }
+    }
+
+    pub fn unique_symbol_name(&self) -> String {
+        format!("<Uniq-{}>", self.symbols.len())
     }
 }
 

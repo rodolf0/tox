@@ -59,21 +59,16 @@ macro_rules! xtract {
     })
 }
 
-// TODO: use let gb = gb.... everywhere, get rid of mut
-// TODO: seems we don't need to pass lhs ?
-fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree, lhs: &str) -> (GrammarBuilder, Vec<String>) {
+fn parse_rhs(gb: GrammarBuilder, tree: &Subtree, lhs: &str) -> (GrammarBuilder, Vec<String>) {
     let (spec, subn) = xtract!(Subtree::Node, tree);
     println!("** spec: {:?}", spec);
     match spec.as_ref() {
         "<Rhs> -> <Rhs> | <Rhs1>" => {
-            let (mut gb, rhs) = parse_rhs(gb, &subn[0], lhs);
+            let (gb, rhs) = parse_rhs(gb, &subn[0], lhs);
             println!("Adding rule {:?} -> {:?}", lhs, rhs);
-            gb = gb.rule(lhs, rhs.as_slice());
-
-            let (mut gb, rhs) = parse_rhs(gb, &subn[2], lhs);
-            //println!("Adding rule {:?} -> {:?}", lhs, rhs);
-            //gb = gb.rule(lhs, rhs.as_slice());
-            (gb, rhs)
+            let gb = gb.rule(lhs, rhs.as_slice());
+            // rule for 2nd branch is added in parent
+            parse_rhs(gb, &subn[2], lhs)
         },
 
         "<Rhs1> -> <Rhs1> <Rhs2>" => {
@@ -86,23 +81,19 @@ fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree, lhs: &str) -> (GrammarBuild
         "<Rhs1> -> <Rhs2>" | "<Rhs> -> <Rhs1>" => parse_rhs(gb, &subn[0], lhs),
 
         "<Rhs2> -> ( <Rhs> )" => {
-
             let auxsym = gb.unique_symbol_name();
             println!("Adding symbol {:?}", auxsym);
             let gb = gb.symbol(auxsym.as_ref());
-
-            let (gb, mut rhs) = parse_rhs(gb, &subn[1], auxsym.as_ref());
-
+            let (gb, rhs) = parse_rhs(gb, &subn[1], auxsym.as_ref());
             println!("Adding rule {:?} -> {:?}", auxsym, rhs);
             let gb = gb.rule(auxsym.clone(), rhs.as_slice());
-
             (gb, vec!(auxsym))
         },
 
         "<Rhs2> -> <Id>" => {
             let (_, id) = xtract!(Subtree::Leaf, &subn[0]);
             println!("Adding symbol {:?}", id);
-            gb = gb.symbol_relaxed(id.as_ref());
+            let gb = gb.symbol_relaxed(id.as_ref());
             (gb, vec!(id.to_string()))
         },
 
@@ -110,48 +101,39 @@ fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree, lhs: &str) -> (GrammarBuild
             let (_, term) = xtract!(Subtree::Leaf, &subn[1]);
             let x = term.to_string();
             println!("Adding symbol {:?}", term);
-            gb = gb.symbol_relaxed((term.as_ref(), move |s: &str| s == x));
+            let gb = gb.symbol_relaxed((term.as_ref(), move |s: &str| s == x));
             (gb, vec!(term.to_string()))
         },
 
         "<Rhs2> -> { <Rhs> }" => {
-            let auxsym = gb.unique_symbol_name();
-            println!("Adding symbol {:?}", auxsym);
-            let gb = gb.symbol(auxsym.as_ref());
-
             // rhs -> auxsym
             // auxsym -> <e>
             // auxsym -> rhs auxsym
-
+            let auxsym = gb.unique_symbol_name();
+            println!("Adding symbol {:?}", auxsym);
+            let gb = gb.symbol(auxsym.as_ref());
             let (gb, mut rhs) = parse_rhs(gb, &subn[1], auxsym.as_ref());
             rhs.push(auxsym.clone());
-
             println!("Adding rule {:?} -> []", auxsym);
             println!("Adding rule {:?} -> {:?}", auxsym, rhs);
             let gb =
             gb.rule::<_, String>(auxsym.as_ref(), &[])
               .rule(auxsym.clone(), rhs.as_slice());
-
             (gb, vec!(auxsym))
         },
 
         "<Rhs2> -> [ <Rhs> ]" => {
-            let auxsym = gb.unique_symbol_name();
-            println!("Adding symbol {:?}", auxsym);
-            let gb = gb.symbol(auxsym.as_ref());
-
             // rhs -> auxsym
             // auxsym -> <e>
             // auxsym -> rhs
-
-            let (gb, mut rhs) = parse_rhs(gb, &subn[1], auxsym.as_ref());
-
+            let auxsym = gb.unique_symbol_name();
+            println!("Adding symbol {:?}", auxsym);
+            let gb = gb.symbol(auxsym.as_ref());
+            let (gb, rhs) = parse_rhs(gb, &subn[1], auxsym.as_ref());
             println!("Adding rule {:?} -> []", auxsym);
             println!("Adding rule {:?} -> {:?}", auxsym, rhs);
-            let gb =
-            gb.rule::<_, String>(auxsym.as_ref(), &[])
-              .rule(auxsym.clone(), rhs.as_slice());
-
+            let gb = gb.rule::<_, String>(auxsym.as_ref(), &[])
+                       .rule(auxsym.clone(), rhs.as_slice());
             (gb, vec!(auxsym))
         },
 
@@ -159,12 +141,12 @@ fn parse_rhs(mut gb: GrammarBuilder, tree: &Subtree, lhs: &str) -> (GrammarBuild
     }
 }
 
-fn parse_rules(mut gb: GrammarBuilder, tree: &Subtree) -> GrammarBuilder {
+fn parse_rules(gb: GrammarBuilder, tree: &Subtree) -> GrammarBuilder {
     let (spec, subn) = xtract!(Subtree::Node, tree);
     match spec.as_ref() {
         "<RuleList> -> <Rule>" => parse_rules(gb, &subn[0]),
         "<RuleList> -> <RuleList> <Rule>" => {
-            gb = parse_rules(gb, &subn[0]);
+            let gb = parse_rules(gb, &subn[0]);
             parse_rules(gb, &subn[1])
         },
         "<Rule> -> <Id> := <Rhs> ;" => {
@@ -186,7 +168,7 @@ fn build_grammar(start: &str, tree: &Subtree) -> Grammar {
         "<Grammar> -> <RuleList>" => parse_rules(gb, &subn[0]),
         _ => panic!("EBNF: What !!")
     }.symbol_relaxed(start)
-    .into_grammar(start)
+     .into_grammar(start)
 }
 
 pub fn build_parser(grammar: &str, start: &str) -> EarleyParser {
@@ -287,8 +269,6 @@ mod test {
         let mut tok = DelimTokenizer::from_str("b 1", " ", true);
         let state = p.parse(&mut tok).unwrap();
         let trees = all_trees(p.g.start(), &state);
-        for t in &trees { t.print(); }
-        println!("{:?}", trees);
         assert_eq!(format!("{:?}", trees),
                    r#"[Node("row -> <Uniq-1> <Uniq-4>", [Node("<Uniq-1> -> b", [Leaf("b", "b")]), Node("<Uniq-4> -> 1", [Leaf("1", "1")])])]"#);
         let mut tok = DelimTokenizer::from_str("a 0", " ", true);

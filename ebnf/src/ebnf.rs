@@ -1,6 +1,8 @@
 use earlgrey::{Grammar, GrammarBuilder, Subtree, EarleyParser, all_trees};
 use lexer::EbnfTokenizer;
 
+const DEBUG_EBNF: bool = false;
+
 // https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form
 fn ebnf_grammar() -> Grammar {
     GrammarBuilder::new()
@@ -55,13 +57,14 @@ macro_rules! xtract {
     })
 }
 
-fn parse_rhs(gb: GrammarBuilder, tree: &Subtree, lhs: &str) -> (GrammarBuilder, Vec<String>) {
+fn parse_rhs(gb: GrammarBuilder, tree: &Subtree, lhs: &str)
+        -> (GrammarBuilder, Vec<String>) {
     let (spec, subn) = xtract!(Subtree::Node, tree);
-    println!("** spec: {:?}", spec);
+    if DEBUG_EBNF { println!("** spec: {:?}", spec); }
     match spec.as_ref() {
         "<Rhs> -> <Rhs> | <Rhs1>" => {
             let (gb, rhs) = parse_rhs(gb, &subn[0], lhs);
-            println!("Adding rule {:?} -> {:?}", lhs, rhs);
+            if DEBUG_EBNF { println!("Adding rule {:?} -> {:?}", lhs, rhs); }
             let gb = gb.rule(lhs, rhs.as_slice());
             // rule for 2nd branch is added in parent
             parse_rhs(gb, &subn[2], lhs)
@@ -78,17 +81,17 @@ fn parse_rhs(gb: GrammarBuilder, tree: &Subtree, lhs: &str) -> (GrammarBuilder, 
 
         "<Rhs2> -> ( <Rhs> )" => {
             let auxsym = gb.unique_symbol_name();
-            println!("Adding symbol {:?}", auxsym);
+            if DEBUG_EBNF { println!("Adding symbol {:?}", auxsym); }
             let gb = gb.symbol(auxsym.as_ref());
             let (gb, rhs) = parse_rhs(gb, &subn[1], auxsym.as_ref());
-            println!("Adding rule {:?} -> {:?}", auxsym, rhs);
+            if DEBUG_EBNF { println!("Adding rule {:?} -> {:?}", auxsym, rhs); }
             let gb = gb.rule(auxsym.clone(), rhs.as_slice());
             (gb, vec!(auxsym))
         },
 
         "<Rhs2> -> <Id>" => {
             let (_, id) = xtract!(Subtree::Leaf, &subn[0]);
-            println!("Adding symbol {:?}", id);
+            if DEBUG_EBNF { println!("Adding symbol {:?}", id); }
             let gb = gb.symbol_relaxed(id.as_ref());
             (gb, vec!(id.to_string()))
         },
@@ -96,7 +99,7 @@ fn parse_rhs(gb: GrammarBuilder, tree: &Subtree, lhs: &str) -> (GrammarBuilder, 
         "<Rhs2> -> ' <Chars> '" | "<Rhs2> -> \" <Chars> \"" => {
             let (_, term) = xtract!(Subtree::Leaf, &subn[1]);
             let x = term.to_string();
-            println!("Adding symbol {:?}", term);
+            if DEBUG_EBNF { println!("Adding symbol {:?}", term); }
             let gb = gb.symbol_relaxed((term.as_ref(), move |s: &str| s == x));
             (gb, vec!(term.to_string()))
         },
@@ -106,12 +109,14 @@ fn parse_rhs(gb: GrammarBuilder, tree: &Subtree, lhs: &str) -> (GrammarBuilder, 
             // auxsym -> <e>
             // auxsym -> rhs auxsym
             let auxsym = gb.unique_symbol_name();
-            println!("Adding symbol {:?}", auxsym);
+            if DEBUG_EBNF { println!("Adding symbol {:?}", auxsym); }
             let gb = gb.symbol(auxsym.as_ref());
             let (gb, mut rhs) = parse_rhs(gb, &subn[1], auxsym.as_ref());
             rhs.push(auxsym.clone());
-            println!("Adding rule {:?} -> []", auxsym);
-            println!("Adding rule {:?} -> {:?}", auxsym, rhs);
+            if DEBUG_EBNF {
+                println!("Adding rule {:?} -> []", auxsym);
+                println!("Adding rule {:?} -> {:?}", auxsym, rhs);
+            }
             let gb =
             gb.rule::<_, String>(auxsym.as_ref(), &[])
               .rule(auxsym.clone(), rhs.as_slice());
@@ -123,11 +128,13 @@ fn parse_rhs(gb: GrammarBuilder, tree: &Subtree, lhs: &str) -> (GrammarBuilder, 
             // auxsym -> <e>
             // auxsym -> rhs
             let auxsym = gb.unique_symbol_name();
-            println!("Adding symbol {:?}", auxsym);
+            if DEBUG_EBNF { println!("Adding symbol {:?}", auxsym); }
             let gb = gb.symbol(auxsym.as_ref());
             let (gb, rhs) = parse_rhs(gb, &subn[1], auxsym.as_ref());
-            println!("Adding rule {:?} -> []", auxsym);
-            println!("Adding rule {:?} -> {:?}", auxsym, rhs);
+            if DEBUG_EBNF {
+                println!("Adding rule {:?} -> []", auxsym);
+                println!("Adding rule {:?} -> {:?}", auxsym, rhs);
+            }
             let gb = gb.rule::<_, String>(auxsym.as_ref(), &[])
                        .rule(auxsym.clone(), rhs.as_slice());
             (gb, vec!(auxsym))
@@ -147,10 +154,10 @@ fn parse_rules(gb: GrammarBuilder, tree: &Subtree) -> GrammarBuilder {
         },
         "<Rule> -> <Id> := <Rhs> ;" => {
             let (_, lhs) = xtract!(Subtree::Leaf, &subn[0]);
-            println!("Adding symbol {:?}", lhs);
+            if DEBUG_EBNF { println!("Adding symbol {:?}", lhs); }
             let gb = gb.symbol_relaxed(lhs.to_string());
             let (gb, rhs) = parse_rhs(gb, &subn[2], lhs.as_ref());
-            println!("Adding rule {:?} -> {:?}", lhs, rhs);
+            if DEBUG_EBNF { println!("Adding rule {:?} -> {:?}", lhs, rhs); }
             gb.rule(lhs.to_string(), rhs.as_slice())
         },
         missing => unreachable!("EBNF: missed a rule: {}", missing)

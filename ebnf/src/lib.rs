@@ -1,6 +1,5 @@
 extern crate earlgrey;
 extern crate lexers;
-extern crate regex;
 
 mod lexer;
 

@@ -1,16 +1,12 @@
-use regex::Regex;
 use earlgrey::{Grammar, GrammarBuilder, Subtree, EarleyParser, all_trees};
 use lexer::EbnfTokenizer;
 
 // https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form
 fn ebnf_grammar() -> Grammar {
-
-    // TODO: get rid of regex dependency
-    let id_re = Regex::new(r"^[A-Za-z_]+[A-Za-z0-9_]*$").unwrap();
-    let gb = GrammarBuilder::new();
-
-    gb.symbol("<Grammar>")
-      .symbol(("<Id>", move |s: &str| id_re.is_match(s)))
+    GrammarBuilder::new()
+      .symbol("<Grammar>")
+      .symbol(("<Id>", move |s: &str|  // in sync w lexers::scan_identifier
+               s.chars().all(|c| c.is_alphanumeric() || c == '_')))
       .symbol(("<Chars>", move |s: &str| s.chars().all(|c| !c.is_control())))
       .symbol((":=", |s: &str| s == ":="))
       .symbol((";", |s: &str| s == ";"))

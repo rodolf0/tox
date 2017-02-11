@@ -1,11 +1,13 @@
 mod scanner;
 mod helpers;
 mod tokenizers;
+mod ebnf_tokenizer;
 
 pub use scanner::{Scanner, Nexter};
 pub use tokenizers::{MathTokenizer, MathToken};
 pub use tokenizers::{LispTokenizer, LispToken};
 pub use tokenizers::DelimTokenizer;
+pub use ebnf_tokenizer::EbnfTokenizer;
 
 pub use helpers::scan_identifier;
 pub use helpers::scan_math_op;

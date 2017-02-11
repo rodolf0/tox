@@ -1,4 +1,5 @@
-use lexers::{Scanner, Nexter, scan_identifier};
+use helpers;
+use scanner::{Scanner, Nexter};
 
 pub struct EbnfTokenizer(Scanner<char>, Vec<String>);
 
@@ -42,7 +43,7 @@ impl Nexter<String> for EbnfTokenizer {
             s.set_pos(backtrack);
         }
         // NOTE: scan_identifier limits the valid options
-        if let Some(id) = scan_identifier(&mut s) {
+        if let Some(id) = helpers::scan_identifier(&mut s) {
             return Some(id);
         }
         return None;

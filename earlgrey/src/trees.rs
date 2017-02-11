@@ -3,8 +3,10 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Subtree {
-    Leaf(String, String),       // ("[+-]", "+")
-    Node(String, Vec<Subtree>), // ("E + E", [("n", "5"), ("[+-]", "+"), ("E * E", [...])])
+    // ("[+-]", "+")
+    Leaf(String, String),
+    // ("E -> E [+-] E", [("n", "5"), ("[+-]", "+"), ("E * E", [...])])
+    Node(String, Vec<Subtree>),
 }
 
 impl Subtree {

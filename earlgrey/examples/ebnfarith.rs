@@ -26,14 +26,12 @@ fn main() {
         factor := '-' factor | power ;
         power  := ufact '^' factor | ufact ;
         ufact  := ufact '!' | group ;
-        group  := num | id | '(' expr ')' | func ;
-        func   := id '(' expr {',' expr} ')' ;
-
-        num    := "0" | "1" | "2" | "3" | "4" | "5" ;
-
+        group  := num | '(' expr ')' ;
     "#;
 
-    let parser = earlgrey::build_parser(&grammar, "expr");
+    let parser = earlgrey::ParserBuilder::new(&grammar)
+        .plug_terminal("num", |n| n.chars().all(|c| c.is_numeric()))
+        .into_parser("expr");
 
     let input = std::env::args().skip(1).
         collect::<Vec<String>>().join(" ");

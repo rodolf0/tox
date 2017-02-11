@@ -1,5 +1,5 @@
 use lexers::DelimTokenizer;
-use ebnf::{ebnf_grammar, build_parser};
+use ebnf::{ebnf_grammar, ParserBuilder};
 use trees::all_trees;
 
 #[test]
@@ -10,7 +10,7 @@ fn build_ebnf_grammar() {
 #[test]
 fn test_minimal_parser() {
     let g = r#" Number := "0" ; "#;
-    let p = build_parser(&g, "Number");
+    let p = ParserBuilder::new(&g).into_parser("Number");
     let mut tok = DelimTokenizer::from_str("0", " ", true);
     let state = p.parse(&mut tok).unwrap();
     let trees = all_trees(p.g.start(), &state);
@@ -26,7 +26,7 @@ fn test_arith_parser() {
 
         Number := "0" | "1" | "2" | "3" ;
     "#;
-    let p = build_parser(&g, "expr");
+    let p = ParserBuilder::new(&g).into_parser("expr");
     let mut tok = DelimTokenizer::from_str("3 + 2 + 1", " ", true);
     let state = p.parse(&mut tok).unwrap();
     let trees = all_trees(p.g.start(), &state);
@@ -40,7 +40,7 @@ fn test_repetition() {
         arg := b { "," b } ;
         b := "0" | "1" ;
     "#;
-    let p = build_parser(&g, "arg");
+    let p = ParserBuilder::new(&g).into_parser("arg");
     let mut tok = DelimTokenizer::from_str("1 , 0 , 1", " ", true);
     let state = p.parse(&mut tok).unwrap();
     let trees = all_trees(p.g.start(), &state);
@@ -54,7 +54,7 @@ fn test_option() {
         complex := d [ "i" ];
         d := "0" | "1" | "2";
     "#;
-    let p = build_parser(&g, "complex");
+    let p = ParserBuilder::new(&g).into_parser("complex");
     let mut tok = DelimTokenizer::from_str("1", " ", true);
     let state = p.parse(&mut tok).unwrap();
     let trees = all_trees(p.g.start(), &state);
@@ -69,7 +69,7 @@ fn test_group() {
     let g = r#"
         row := ("a" | "b") ("0" | "1") ;
     "#;
-    let p = build_parser(&g, "row");
+    let p = ParserBuilder::new(&g).into_parser("row");
     let mut tok = DelimTokenizer::from_str("b 1", " ", true);
     let state = p.parse(&mut tok).unwrap();
     let trees = all_trees(p.g.start(), &state);

@@ -166,31 +166,35 @@ fn parse_rules(gb: GrammarBuilder, tree: &Subtree) -> GrammarBuilder {
     }
 }
 
-fn build_grammar(start: &str, tree: &Subtree) -> Grammar {
-    let (spec, subn) = xtract!(Subtree::Node, tree);
-    let gb = GrammarBuilder::new();
-    match spec.as_ref() {
-        "<Grammar> -> <RuleList>" => parse_rules(gb, &subn[0]),
-        _ => panic!("EBNF: What !!")
-    }.symbol_relaxed(start)
-     .into_grammar(start)
-}
+pub struct ParserBuilder(GrammarBuilder, Subtree);
 
-pub fn build_parser(grammar: &str, start: &str) -> EarleyParser {
-    let ebnf_parser = EarleyParser::new(ebnf_grammar());
-    let mut tokenizer = EbnfTokenizer::from_str(grammar);
-    let trees = match ebnf_parser.parse(&mut tokenizer) {
-        Err(e) => panic!("Bad grammar: {:?}", e),
-        Ok(state) => {
-            let ts = all_trees(ebnf_parser.g.start(), &state);
-            if ts.len() != 1 {
-                for t in &ts {
-                    t.print();
-                }
-                panic!("EBNF is ambiguous?");
-            }
-            ts
+impl ParserBuilder {
+    pub fn new(grammar: &str) -> ParserBuilder {
+        let ebnf_parser = EarleyParser::new(ebnf_grammar());
+        let mut tokenizer = EbnfTokenizer::from_str(grammar);
+        let mut trees = match ebnf_parser.parse(&mut tokenizer) {
+            Err(e) => panic!("ParserBuilder error: {:?}", e),
+            Ok(state) => all_trees(ebnf_parser.g.start(), &state),
+        };
+        if trees.len() != 1 {
+            for t in &trees { t.print(); }
+            panic!("EBNF is ambiguous?");
         }
-    };
-    EarleyParser::new(build_grammar(start, &trees[0]))
+        ParserBuilder(GrammarBuilder::new(), trees.swap_remove(0))
+    }
+
+    pub fn plug_terminal<N, F>(self, name: N, pred: F) -> ParserBuilder
+            where N: Into<String>, F: 'static + Fn(&str)->bool {
+        ParserBuilder(self.0.symbol((name.into(), pred)), self.1)
+    }
+
+    pub fn into_parser(self, start: &str) -> EarleyParser {
+        let (spec, subn) = xtract!(Subtree::Node, &self.1);
+        let grammar = match spec.as_ref() {
+            "<Grammar> -> <RuleList>" => parse_rules(self.0, &subn[0]),
+            _ => panic!("EBNF: What !!")
+        }.symbol_relaxed(start)
+         .into_grammar(start);
+        EarleyParser::new(grammar)
+    }
 }

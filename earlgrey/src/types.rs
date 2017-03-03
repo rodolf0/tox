@@ -92,6 +92,7 @@ pub struct Item {
     start: usize,
     end: usize,
     // backpointers leading to this item: (source-item, trigger)
+    // TODO: change to cell::Cell once available
     bp: cell::RefCell<HashSet<(Rc<Item>, Trigger)>>,
 }
 
@@ -114,6 +115,12 @@ impl PartialEq for Item {
 }
 impl Eq for Item {}
 
+//impl Drop for Item {
+    //fn drop(&mut self) {
+        //println!("dropped item");
+    //}
+//}
+
 impl Item {
     pub fn start(&self) -> usize { self.start }
     pub fn complete(&self) -> bool { self.dot >= self.rule.spec.len() }
@@ -121,7 +128,7 @@ impl Item {
     pub fn next_symbol<'a>(&'a self) -> Option<&'a Symbol> {
         self.rule.spec.get(self.dot).map(|s| &**s)
     }
-    pub fn back_pointers(&self) -> cell::Ref<HashSet<(Rc<Item>, Trigger)>> {
+    pub fn source(&self) -> cell::Ref<HashSet<(Rc<Item>, Trigger)>> {
         self.bp.borrow()
     }
 }
@@ -192,6 +199,7 @@ impl StateSet {
     // push items into the set, merging back-pointer sets
     fn push(&mut self, item: Item) {
         if let Some(existent) = self.dedup.get(&item) {
+            // TODO: try logging drop existent.bp.borrow_mut().extend(item.bp.clone().into_inner());
             existent.bp.borrow_mut().extend(item.bp.into_inner());
             return;
         }

@@ -77,6 +77,7 @@ impl EarleyParser {
                 return Err(ParseError::BadInput);
             }
         }
+        // TODO: return Vec<Rc<Item>>
         Ok(states)
     }
 }

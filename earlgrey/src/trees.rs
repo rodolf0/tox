@@ -1,5 +1,6 @@
 use types::{Item, Trigger, StateSet};
 use std::rc::Rc;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Subtree {
@@ -36,26 +37,26 @@ pub fn one_tree(startsym: String, pstate: &Vec<StateSet>) -> Subtree {
     pstate.last().unwrap()
           .filter_by_rule(startsym)
           .filter(|it| it.start() == 0 && it.complete())
-          .map(|root| one_helper(pstate, root))
+          .map(|root| one_helper(root))
           .next().unwrap()
 }
 
 // source is always a prediction, can't be anything else cause it's on the left side,
 // trigger is either a scan or a completion, only those can advance a prediction,
 // to write this helper just draw a tree of the backpointers and see how they link
-fn one_helper(pstate: &Vec<StateSet>, root: &Rc<Item>) -> Subtree {
+fn one_helper(root: &Rc<Item>) -> Subtree {
     let mut childs = Vec::new();
-    if let Some(&(ref bp_pred, ref bp_trig)) = root.back_pointers().iter().next() {
+    if let Some(&(ref bp_pred, ref bp_trig)) = root.source().iter().next() {
         // source/left-side is always a prediction (completions/scans are right side of bp)
         // flat-accumulate all left-side back-pointers that lead to the trigger
-        match one_helper(pstate, bp_pred) {
+        match one_helper(bp_pred) {
             n @ Subtree::Leaf(_, _) => childs.push(n),
             Subtree::Node(_, c) => childs.extend(c),
         };
         match bp_trig {
             // Eg: E -> E + E .  // prediction is E +, trigger E
             &Trigger::Completion(ref bp_trig) =>
-                childs.push(one_helper(pstate, bp_trig)),
+                childs.push(one_helper(bp_trig)),
             // Eg: E -> E + . E  // prediction is E, trigger +
             &Trigger::Scan(ref input) => {
                 let label = bp_pred.next_symbol().unwrap().name();
@@ -71,19 +72,19 @@ pub fn all_trees(startsym: String, pstate: &Vec<StateSet>) -> Vec<Subtree> {
     pstate.last().unwrap()
           .filter_by_rule(startsym)
           .filter(|it| it.start() == 0 && it.complete())
-          .flat_map(|root| all_helper(pstate, root).into_iter())
+          .flat_map(|root| all_helper(root).into_iter())
           .collect()
 }
 
 // Enhance: return iterators to avoid busting mem
-fn all_helper(pstate: &Vec<StateSet>, root: &Rc<Item>) -> Vec<Subtree> {
-    let back_pointers = root.back_pointers();
+fn all_helper(root: &Rc<Item>) -> Vec<Subtree> {
+    let source = root.source();
     let mut trees = Vec::new();
-    if back_pointers.len() == 0 {
+    if source.len() == 0 {
         trees.push(Subtree::Node(root.str_rule(), Vec::new()));
     } else {
-        for &(ref bp_pred, ref bp_trig) in back_pointers.iter() {
-            for predtree in all_helper(pstate, bp_pred) {
+        for &(ref bp_pred, ref bp_trig) in source.iter() {
+            for predtree in all_helper(bp_pred) {
                 let mut prediction = match predtree {
                     n @ Subtree::Leaf(_, _) => vec![n],
                     Subtree::Node(_, c) => c,
@@ -91,7 +92,7 @@ fn all_helper(pstate: &Vec<StateSet>, root: &Rc<Item>) -> Vec<Subtree> {
                 match bp_trig {
                     // Eg: E -> E + E .  // prediction is E +, trigger E
                     &Trigger::Completion(ref bp_trig) =>
-                        for trigger in all_helper(pstate, bp_trig) {
+                        for trigger in all_helper(bp_trig) {
                             let mut p = prediction.clone();
                             p.push(trigger.clone());
                             trees.push(Subtree::Node(root.str_rule(), p));
@@ -107,4 +108,116 @@ fn all_helper(pstate: &Vec<StateSet>, root: &Rc<Item>) -> Vec<Subtree> {
         }
     }
     trees
+}
+
+use std::collections::hash_set;
+
+pub struct EarleyEvaler<ASTNode: Clone> {
+    actions: HashMap<String, Box<Fn(&Vec<ASTNode>) -> ASTNode>>,
+    tokenizer: Box<Fn(&str, &str)->ASTNode>,
+}
+
+impl<ASTNode: Clone> EarleyEvaler<ASTNode> {
+    pub fn new<F>(tokenizer: F) -> EarleyEvaler<ASTNode>
+            where F: 'static + Fn(&str, &str) -> ASTNode {
+        EarleyEvaler{
+            actions: HashMap::new(),
+            tokenizer: Box::new(tokenizer),
+        }
+    }
+
+    pub fn action<F>(&mut self, rule: &str, action: F)
+            where F: 'static + Fn(&Vec<ASTNode>) -> ASTNode {
+        self.actions.insert(rule.to_string(), Box::new(action));
+    }
+
+    fn walker(&self, root: &Rc<Item>) -> Vec<ASTNode> {
+        // 1. collect arguments for semantic actions
+        let mut args = Vec::new();
+        let bp = root.source();
+        if let Some(&(ref prediction, ref trigger)) = bp.iter().next() {
+            // explore left side of the root
+            args.extend(self.walker(prediction));
+            // explore right side of the root
+            match trigger {
+                &Trigger::Completion(ref itm) => args.extend(self.walker(itm)),
+                &Trigger::Scan(ref token) => {
+                    let symbol = prediction.next_symbol().unwrap().name();
+                    args.push((self.tokenizer)(&symbol, token));
+                }
+            };
+        }
+
+        // 2.if rule is complete, execute semantic action, else keep collecting
+        if root.complete() {
+            let rulename = root.str_rule();
+            return match self.actions.get(&rulename) {
+                None => panic!("No action for rule: {}", rulename),
+                Some(action) => vec!(action(&args)),
+            };
+        }
+        args
+    }
+
+    fn walker_all(&self, root: &Rc<Item>) -> Vec<Vec<ASTNode>> {
+        let source = root.source();
+        if source.len() == 0 {
+            return vec!(vec!());
+        }
+        // reduce function to call on complete items
+        let rulename = root.str_rule();
+        let reduce = |semargs| {
+            match root.complete() {
+                false => semargs,
+                true => match self.actions.get(&rulename) {
+                    None => panic!("No action for rule: {}", rulename),
+                    Some(action) => vec!(action(&semargs)),
+                }
+            }
+        };
+        // explore treespace
+        let mut trees = Vec::new();
+        for &(ref prediction, ref trigger) in source.iter() {
+            // get left-side-tree of each source
+            for mut args in self.walker_all(prediction) {
+                match trigger {
+                    &Trigger::Completion(ref itm) => {
+                        // collect right-side-tree of each source
+                        for trig in self.walker_all(itm) {
+                            let mut args = args.clone();
+                            args.extend(trig);
+                            trees.push(reduce(args));
+                        }
+                    },
+                    &Trigger::Scan(ref token) => {
+                        let symbol = prediction.next_symbol().unwrap().name();
+                        args.push((self.tokenizer)(&symbol, token));
+                        trees.push(reduce(args));
+                    }
+                };
+            }
+        }
+        trees
+    }
+
+    // TODO: directly call with Rc<Item> root returned from parser
+    pub fn eval(&self, startsym: String, pstate: &Vec<StateSet>) -> Vec<ASTNode> {
+        let root = pstate.last().unwrap()
+            .filter_by_rule(startsym)
+            .filter(|it| it.start() == 0 && it.complete())
+            .next().unwrap();
+
+        self.walker(root)
+    }
+
+    pub fn eval_all(&self, startsym: String, pstate: &Vec<StateSet>) -> Vec<Vec<ASTNode>> {
+        pstate.last().unwrap()
+            .filter_by_rule(startsym)
+            .filter(|it| it.start() == 0 && it.complete())
+            .flat_map(|root| self.walker_all(root).into_iter())
+            .collect()
+    }
+
+    // estimate of max number of trees
+    pub fn trees_ubound() {}
 }

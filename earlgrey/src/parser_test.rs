@@ -5,6 +5,8 @@ use trees::{one_tree, all_trees, Subtree};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 
+use trees::EarleyEvaler;
+
 
 // Sum -> Sum + Mul | Mul
 // Mul -> Mul * Pow | Pow
@@ -157,6 +159,141 @@ fn test_left_recurse() {
     check_trees(&vec![tree], vec![
         r#"Node("S -> S [+] N", [Node("S -> N", [Node("N -> [0-9]", [Leaf("[0-9]", "1")])]), Leaf("[+]", "+"), Node("N -> [0-9]", [Leaf("[0-9]", "2")])])"#,
     ]);
+}
+
+#[test]
+fn test_yy() {
+    // S -> S + E | E
+    // E -> n ^ E | n
+    let gb = GrammarBuilder::new()
+      .symbol("E")
+      .symbol(("+", |n: &str| n == "+"))
+      .symbol(("*", |n: &str| n == "*"))
+      .symbol(("n", |n: &str| "1234567890".contains(n)))
+      .rule("E", &["E", "*", "E"])
+      .rule("E", &["E", "+", "E"])
+      .rule("E", &["n"]);
+    let p = EarleyParser::new(gb.into_grammar("E"));
+    let mut input = DelimTokenizer::from_str("3+4*2", "+*", false);
+    let ps = p.parse(&mut input).unwrap();
+    print_statesets(&ps);
+
+    use std::str::FromStr;;
+    let mut ev = EarleyEvaler::<f64>::new(|symbol, token| {
+        match symbol {
+            "n" => f64::from_str(token).unwrap(),
+            _ => 0.0
+        }
+    });
+
+    ev.action("E -> E + E", |nodes| nodes[0] + nodes[2]);
+    ev.action("E -> E * E", |nodes| nodes[0] * nodes[2]);
+    ev.action("E -> n", |nodes| nodes[0]);
+
+
+#[derive(Clone, Debug)]
+enum MathAST {
+    BinOP(Box<MathAST>, String, Box<MathAST>),
+    Num(f64),
+}
+
+    let mut ev = EarleyEvaler::<MathAST>::new(|symbol, token| {
+        match symbol {
+            "n" => MathAST::Num(f64::from_str(token).unwrap()),
+            _ => MathAST::Num(0.0)
+        }
+    });
+
+    ev.action("E -> E * E", |nodes| { MathAST::BinOP(Box::new(nodes[0].clone()), format!("*"), Box::new(nodes[2].clone())) });
+    ev.action("E -> E + E", |nodes| { MathAST::BinOP(Box::new(nodes[0].clone()), format!("+"), Box::new(nodes[2].clone())) });
+    ev.action("E -> n", |nodes| { nodes[0].clone() });
+
+//#[derive(Clone, Debug)]
+//enum Sexpr {
+    //Atom(String),
+    //List(Vec<Sexpr>)
+//}
+
+    //let mut ev = EarleyEvaler::<Sexpr>::new(|_, tok| Sexpr::Atom(tok.to_string()));
+
+    //ev.action("E -> E + E", |nodes| Sexpr::List(nodes.clone()));
+    //ev.action("E -> E * E", |nodes| Sexpr::List(nodes.clone()));
+    //ev.action("E -> n", |nodes| nodes[0].clone());
+
+    let r = ev.eval_all("E".to_string(), &ps);
+    println!("{:?}", r);
+    println!("{:?}", all_trees(p.g.start(), &ps));
+}
+
+#[test]
+fn test_xx() {
+    // S -> S + E | E
+    // E -> n ^ E | n
+    let gb = GrammarBuilder::new()
+      .symbol("S")
+      .symbol("E")
+      .symbol(("[+]", |n: &str| n == "+"))
+      .symbol(("[^]", |n: &str| n == "^"))
+      .symbol(("[n]", |n: &str| "1234567890".contains(n)))
+      .rule("S", &["S", "[+]", "E"])
+      .rule("S", &["E"])
+      .rule("E", &["[n]", "[^]", "E"])
+      .rule("E", &["[n]"]);
+    let p = EarleyParser::new(gb.into_grammar("S"));
+    let mut input = DelimTokenizer::from_str("3+4^2", "+^", false);
+    let ps = p.parse(&mut input).unwrap();
+    print_statesets(&ps);
+
+    use std::str::FromStr;;
+    let mut ev = EarleyEvaler::<f64>::new(|symbol, token| {
+        match symbol {
+            "[n]" => f64::from_str(token).unwrap(),
+            _ => 0.0
+        }
+    });
+
+    ev.action("S -> S [+] E", |nodes| nodes[0] + nodes[2]);
+    ev.action("S -> E", |nodes| nodes[0]);
+    ev.action("E -> [n] [^] E", |nodes| nodes[0].powf(nodes[2]));
+    ev.action("E -> [n]", |nodes| nodes[0]);
+
+
+#[derive(Clone, Debug)]
+enum MathAST {
+    BinOP(Box<MathAST>, String, Box<MathAST>),
+    Num(f64),
+}
+
+    let mut ev = EarleyEvaler::<MathAST>::new(|symbol, token| {
+        match symbol {
+            "[n]" => MathAST::Num(f64::from_str(token).unwrap()),
+            _ => MathAST::Num(0.0)
+        }
+    });
+
+    ev.action("E -> [n] [^] E", |nodes| { MathAST::BinOP(Box::new(nodes[0].clone()), format!("^"), Box::new(nodes[2].clone())) });
+    ev.action("S -> S [+] E", |nodes| { MathAST::BinOP(Box::new(nodes[0].clone()), format!("+"), Box::new(nodes[2].clone())) });
+    ev.action("E -> [n]", |nodes| { nodes[0].clone() });
+    ev.action("S -> E", |nodes| { nodes[0].clone() });
+
+#[derive(Clone, Debug)]
+enum Sexpr {
+    Atom(String),
+    List(Vec<Sexpr>)
+}
+
+    let mut ev = EarleyEvaler::<Sexpr>::new(|_, tok| Sexpr::Atom(tok.to_string()));
+
+    ev.action("E -> [n] [^] E", |nodes| Sexpr::List(nodes.clone()));
+    ev.action("S -> S [+] E", |nodes| Sexpr::List(nodes.clone()));
+    ev.action("E -> [n]", |nodes| nodes[0].clone());
+    ev.action("S -> E", |nodes| nodes[0].clone());
+
+
+    let r = ev.eval("S".to_string(), &ps);
+    println!("{:?}", r);
+
+    println!("{:?}", one_tree(p.g.start(), &ps));
 }
 
 #[test]

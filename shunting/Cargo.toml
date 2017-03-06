@@ -10,10 +10,9 @@ dynlink-eval = ["dylib"]
 
 [dependencies]
 lexers = { version = "0.0.4", path = "../lexers" }
-linenoise-rust = "*"
-rand = "*"
-num = "*"
+linenoise-rust = "0.2.0"
+rand = "0.3"
 
 [dependencies.dylib]
-version = "*"
+version = "0.0.2"
 optional = true

@@ -2,7 +2,6 @@ extern crate linenoise;
 extern crate lexers;
 extern crate shunting;
 
-#[cfg(not(test))]
 mod repl {
     use shunting::{ShuntingParser, MathContext};
     use lexers::{MathTokenizer, MathToken};
@@ -44,7 +43,6 @@ mod repl {
     }
 }
 
-#[cfg(not(test))]
 fn main() {
     if std::env::args().len() > 1 {
         let input = std::env::args().skip(1).
@@ -53,8 +51,11 @@ fn main() {
     } else {
         use shunting::MathContext;
         let mut cx = MathContext::new();
+        linenoise::history_load("~/.tox_history");
+        linenoise::history_set_max_len(1000);
         while let Some(input) = linenoise::input(">> ") {
-            linenoise::history_add(&input[..]);
+            linenoise::history_add(input.as_ref());
+            linenoise::history_save("~/.tox_history");
             repl::parse_statement(&mut cx, &input[..]);
         }
     }

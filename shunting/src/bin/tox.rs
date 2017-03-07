@@ -1,6 +1,8 @@
-extern crate linenoise;
+extern crate rustyline;
 extern crate lexers;
 extern crate shunting;
+
+use std::env;
 
 mod repl {
     use shunting::{ShuntingParser, MathContext};
@@ -51,12 +53,15 @@ fn main() {
     } else {
         use shunting::MathContext;
         let mut cx = MathContext::new();
-        linenoise::history_load("~/.tox_history");
-        linenoise::history_set_max_len(1000);
-        while let Some(input) = linenoise::input(">> ") {
-            linenoise::history_add(input.as_ref());
-            linenoise::history_save("~/.tox_history");
+        let histpath = env::home_dir().map(|h| h.join(".tox_history")).unwrap();
+        let mut rl = rustyline::Editor::<()>::new();
+        if let Err(_) = rl.load_history(&histpath) {
+            println!("No history yet");
+        }
+        while let Ok(input) = rl.readline(">> ") {
+            rl.add_history_entry(&input);
             repl::parse_statement(&mut cx, &input[..]);
         }
+        rl.save_history(&histpath).unwrap();
     }
 }

@@ -11,6 +11,6 @@ pub use trees::{one_tree, all_trees, Subtree, EarleyEvaler};
 pub use ebnf::ParserBuilder;
 
 #[cfg(test)]
-mod parser_test;
+mod earley_test;
 #[cfg(test)]
 mod ebnf_test;

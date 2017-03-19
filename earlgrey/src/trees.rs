@@ -1,39 +1,9 @@
-use types::{Item, Trigger};
+use types::{Item, Trigger, Grammar};
 use parser::ParseTrees;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Subtree {
-    // ("[+-]", "+")
-    Leaf(String, String),
-    // ("E -> E [+-] E", [("n", "5"), ("[+-]", "+"), ("E * E", [...])])
-    Node(String, Vec<Subtree>),
-}
 
-impl Subtree {
-    pub fn print(&self) {
-        self.print_helper("")
-    }
-    fn print_helper(&self, level: &str) {
-        match self {
-            &Subtree::Leaf(ref sym, ref lexeme) => {
-                println!("{}`-- {:?} ==> {:?}", level, sym, lexeme);
-            },
-            &Subtree::Node(ref spec, ref subn) => {
-                println!("{}`-- {:?}", level, spec);
-                if let Some((last, rest)) = subn.split_last() {
-                    let l = format!("{}  |", level);
-                    for n in rest { n.print_helper(&l); }
-                    let l = format!("{}   ", level);
-                    last.print_helper(&l);
-                }
-            }
-        }
-    }
-}
-
-// for non-ambiguous grammars this retreieve the only possible parse
 pub fn one_tree(ptrees: &ParseTrees) -> Subtree {
     ptrees.0.first().map(|root| one_helper(root)).unwrap()
 }
@@ -151,10 +121,6 @@ impl<ASTNode: Clone> EarleyEvaler<ASTNode> {
     }
 
     fn walker_all(&self, root: &Rc<Item>) -> Vec<Vec<ASTNode>> {
-        let source = root.source();
-        if source.len() == 0 {
-            return vec!(vec!());
-        }
         // reduce function to call on complete items
         let rulename = root.str_rule();
         let reduce = |semargs| {
@@ -168,6 +134,10 @@ impl<ASTNode: Clone> EarleyEvaler<ASTNode> {
         };
         // explore treespace
         let mut trees = Vec::new();
+        let source = root.source();
+        if source.len() == 0 {
+            return vec!(reduce(vec!()));
+        }
         for &(ref prediction, ref trigger) in source.iter() {
             // get left-side-tree of each source
             for mut args in self.walker_all(prediction) {
@@ -191,6 +161,7 @@ impl<ASTNode: Clone> EarleyEvaler<ASTNode> {
         trees
     }
 
+    // for non-ambiguous grammars this retreieve the only possible parse
     pub fn eval(&self, ptrees: &ParseTrees) -> Vec<ASTNode> {
         self.walker(ptrees.0.first().unwrap())
     }
@@ -200,4 +171,45 @@ impl<ASTNode: Clone> EarleyEvaler<ASTNode> {
             .flat_map(|root| self.walker_all(root).into_iter())
             .collect()
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Subtree {
+    // ("[+-]", "+")
+    Leaf(String, String),
+    // ("E -> E [+-] E", [("n", "5"), ("[+-]", "+"), ("E -> E * E", [...])])
+    Node(String, Vec<Subtree>),
+}
+
+impl Subtree {
+    pub fn print(&self) {
+        self.print_helper("")
+    }
+    fn print_helper(&self, level: &str) {
+        match self {
+            &Subtree::Leaf(ref sym, ref lexeme) => {
+                println!("{}`-- {:?} ==> {:?}", level, sym, lexeme);
+            },
+            &Subtree::Node(ref spec, ref subn) => {
+                println!("{}`-- {:?}", level, spec);
+                if let Some((last, rest)) = subn.split_last() {
+                    let l = format!("{}  |", level);
+                    for n in rest { n.print_helper(&l); }
+                    let l = format!("{}   ", level);
+                    last.print_helper(&l);
+                }
+            }
+        }
+    }
+}
+
+pub fn subtree_evaler(g: Grammar) -> EarleyEvaler<Subtree> {
+    let mut evaler = EarleyEvaler::<Subtree>::new(
+        |sym, tok| Subtree::Leaf(sym.to_string(), tok.to_string())
+    );
+    for rule in g.rules() {
+        evaler.action(&rule.clone(), move |nodes|
+                      Subtree::Node(rule.clone(), nodes.clone()));
+    }
+    evaler
 }

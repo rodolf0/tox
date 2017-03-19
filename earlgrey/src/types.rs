@@ -252,6 +252,7 @@ impl fmt::Debug for StateSet {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone)]
 pub struct Grammar {
     start: String,
     rules: Vec<Rc<Rule>>,
@@ -266,6 +267,10 @@ impl Grammar {
             .filter(|r| r.name == name)
             .map(|r| Item::predict_new(r, state_idx))
             .collect()
+    }
+
+    pub fn rules(&self) -> Vec<String> {
+        self.rules.iter().map(|r| r.to_string()).collect()
     }
 }
 

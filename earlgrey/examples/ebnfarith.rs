@@ -37,10 +37,11 @@ fn main() {
         collect::<Vec<String>>().join(" ");
     match parser.parse(&mut Tokenizer::from_str(&input)) {
         Ok(state) => {
-            let trees = earlgrey::all_trees(&state);
+            let trees = earlgrey::subtree_evaler(parser.g.clone())
+                        .eval_all(&state);
             for t in trees {
                 println!("================================");
-                t.print();
+                t[0].print();
             }
         },
         Err(e) => println!("Arit error: {:?}", e)

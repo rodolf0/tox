@@ -1,5 +1,5 @@
 use types::{Grammar, GrammarBuilder};
-use trees::{Subtree, all_trees};
+use trees::{Subtree, subtree_evaler};
 use lexers::EbnfTokenizer;
 use parser::EarleyParser;
 
@@ -170,17 +170,19 @@ pub struct ParserBuilder(GrammarBuilder, Subtree);
 
 impl ParserBuilder {
     pub fn new(grammar: &str) -> ParserBuilder {
-        let ebnf_parser = EarleyParser::new(ebnf_grammar());
+        let ebnfgrammar = ebnf_grammar();
+        let ebnf_parser = EarleyParser::new(ebnfgrammar.clone());
         let mut tokenizer = EbnfTokenizer::from_str(grammar);
         let mut trees = match ebnf_parser.parse(&mut tokenizer) {
             Err(e) => panic!("ParserBuilder error: {:?}", e),
-            Ok(state) => all_trees(&state),
+            Ok(state) => subtree_evaler(ebnfgrammar).eval_all(&state),
         };
         if trees.len() != 1 {
-            for t in &trees { t.print(); }
+            for t in &trees { t[0].print(); }
             panic!("EBNF is ambiguous?");
         }
-        ParserBuilder(GrammarBuilder::new(), trees.swap_remove(0))
+        let mut tree0 = trees.swap_remove(0);
+        ParserBuilder(GrammarBuilder::new(), tree0.swap_remove(0))
     }
 
     pub fn plug_terminal<N, F>(self, name: N, pred: F) -> ParserBuilder

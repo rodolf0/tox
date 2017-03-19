@@ -3,78 +3,8 @@ use parser::ParseTrees;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-
-pub fn one_tree(ptrees: &ParseTrees) -> Subtree {
-    ptrees.0.first().map(|root| one_helper(root)).unwrap()
-}
-
-// source is always a prediction, can't be anything else cause it's on the left side,
-// trigger is either a scan or a completion, only those can advance a prediction,
-// to write this helper just draw a tree of the backpointers and see how they link
-fn one_helper(root: &Rc<Item>) -> Subtree {
-    let mut childs = Vec::new();
-    if let Some(&(ref bp_pred, ref bp_trig)) = root.source().iter().next() {
-        // source/left-side is always a prediction (completions/scans are right side of bp)
-        // flat-accumulate all left-side back-pointers that lead to the trigger
-        match one_helper(bp_pred) {
-            n @ Subtree::Leaf(_, _) => childs.push(n),
-            Subtree::Node(_, c) => childs.extend(c),
-        };
-        match bp_trig {
-            // Eg: E -> E + E .  // prediction is E +, trigger E
-            &Trigger::Completion(ref bp_trig) =>
-                childs.push(one_helper(bp_trig)),
-            // Eg: E -> E + . E  // prediction is E, trigger +
-            &Trigger::Scan(ref input) => {
-                let label = bp_pred.next_symbol().unwrap().name();
-                childs.push(Subtree::Leaf(label, input.clone()));
-            }
-        }
-    }
-    Subtree::Node(root.str_rule(), childs)
-}
-
-
-pub fn all_trees(ptrees: &ParseTrees) -> Vec<Subtree> {
-    ptrees.0.iter().flat_map(|root| all_helper(root).into_iter()).collect()
-}
-
-// Enhance: return iterators to avoid busting mem
-fn all_helper(root: &Rc<Item>) -> Vec<Subtree> {
-    let source = root.source();
-    let mut trees = Vec::new();
-    if source.len() == 0 {
-        trees.push(Subtree::Node(root.str_rule(), Vec::new()));
-    } else {
-        for &(ref bp_pred, ref bp_trig) in source.iter() {
-            for predtree in all_helper(bp_pred) {
-                let mut prediction = match predtree {
-                    n @ Subtree::Leaf(_, _) => vec![n],
-                    Subtree::Node(_, c) => c,
-                };
-                match bp_trig {
-                    // Eg: E -> E + E .  // prediction is E +, trigger E
-                    &Trigger::Completion(ref bp_trig) =>
-                        for trigger in all_helper(bp_trig) {
-                            let mut p = prediction.clone();
-                            p.push(trigger.clone());
-                            trees.push(Subtree::Node(root.str_rule(), p));
-                        },
-                    // Eg: E -> E + . E  // prediction is E, trigger +
-                    &Trigger::Scan(ref input) => {
-                        let label = bp_pred.next_symbol().unwrap().name();
-                        prediction.push(Subtree::Leaf(label.clone(), input.clone()));
-                        trees.push(Subtree::Node(root.str_rule(), prediction));
-                    }
-                }
-            }
-        }
-    }
-    trees
-}
-
 pub struct EarleyEvaler<ASTNode: Clone> {
-    actions: HashMap<String, Box<Fn(&Vec<ASTNode>) -> ASTNode>>,
+    actions: HashMap<String, Box<Fn(Vec<ASTNode>) -> ASTNode>>,
     tokenizer: Box<Fn(&str, &str)->ASTNode>,
 }
 
@@ -88,10 +18,13 @@ impl<ASTNode: Clone> EarleyEvaler<ASTNode> {
     }
 
     pub fn action<F>(&mut self, rule: &str, action: F)
-            where F: 'static + Fn(&Vec<ASTNode>) -> ASTNode {
+            where F: 'static + Fn(Vec<ASTNode>) -> ASTNode {
         self.actions.insert(rule.to_string(), Box::new(action));
     }
 
+    // source is always a prediction, can't be anything else cause it's on the left side,
+    // trigger is either a scan or a completion, only those can advance a prediction,
+    // to write this helper just draw a tree of the backpointers and see how they link
     fn walker(&self, root: &Rc<Item>) -> Vec<ASTNode> {
         // 1. collect arguments for semantic actions
         let mut args = Vec::new();
@@ -114,7 +47,7 @@ impl<ASTNode: Clone> EarleyEvaler<ASTNode> {
             let rulename = root.str_rule();
             return match self.actions.get(&rulename) {
                 None => panic!("No action for rule: {}", rulename),
-                Some(action) => vec!(action(&args)),
+                Some(action) => vec!(action(args)),
             };
         }
         args
@@ -128,7 +61,7 @@ impl<ASTNode: Clone> EarleyEvaler<ASTNode> {
                 false => semargs,
                 true => match self.actions.get(&rulename) {
                     None => panic!("No action for rule: {}", rulename),
-                    Some(action) => vec!(action(&semargs)),
+                    Some(action) => vec!(action(semargs)),
                 }
             }
         };

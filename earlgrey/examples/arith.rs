@@ -182,7 +182,7 @@ fn main() {
             collect::<Vec<String>>().join(" ");
         match parser.parse(&mut Tokenizer::from_str(&input)) {
             Ok(estate) => {
-                let tree = earley::one_tree(parser.g.start(), &estate);
+                let tree = earley::one_tree(&estate);
                 println!("digraph x {{");
                 dotprinter(&tree, 0);
                 println!("}}");
@@ -197,7 +197,7 @@ fn main() {
         linenoise::history_add(&input[..]);
         match parser.parse(&mut Tokenizer::from_str(&input)) {
             Ok(estate) => {
-                let tree = earley::one_tree(parser.g.start(), &estate);
+                let tree = earley::one_tree(&estate);
                 let val = xeval(&tree, &mut ctx)[0];
                 ctx.insert(format!["ans"], val);
                 println!("{:?}", val);

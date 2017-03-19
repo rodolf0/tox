@@ -1,6 +1,7 @@
-use types::{Item, Trigger, StateSet};
-use std::rc::Rc;
+use types::{Item, Trigger};
+use parser::ParseTrees;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Subtree {
@@ -33,12 +34,8 @@ impl Subtree {
 }
 
 // for non-ambiguous grammars this retreieve the only possible parse
-pub fn one_tree(startsym: String, pstate: &Vec<StateSet>) -> Subtree {
-    pstate.last().unwrap()
-          .filter_by_rule(startsym)
-          .filter(|it| it.start() == 0 && it.complete())
-          .map(|root| one_helper(root))
-          .next().unwrap()
+pub fn one_tree(ptrees: &ParseTrees) -> Subtree {
+    ptrees.0.first().map(|root| one_helper(root)).unwrap()
 }
 
 // source is always a prediction, can't be anything else cause it's on the left side,
@@ -68,12 +65,8 @@ fn one_helper(root: &Rc<Item>) -> Subtree {
 }
 
 
-pub fn all_trees(startsym: String, pstate: &Vec<StateSet>) -> Vec<Subtree> {
-    pstate.last().unwrap()
-          .filter_by_rule(startsym)
-          .filter(|it| it.start() == 0 && it.complete())
-          .flat_map(|root| all_helper(root).into_iter())
-          .collect()
+pub fn all_trees(ptrees: &ParseTrees) -> Vec<Subtree> {
+    ptrees.0.iter().flat_map(|root| all_helper(root).into_iter()).collect()
 }
 
 // Enhance: return iterators to avoid busting mem
@@ -109,8 +102,6 @@ fn all_helper(root: &Rc<Item>) -> Vec<Subtree> {
     }
     trees
 }
-
-use std::collections::hash_set;
 
 pub struct EarleyEvaler<ASTNode: Clone> {
     actions: HashMap<String, Box<Fn(&Vec<ASTNode>) -> ASTNode>>,
@@ -200,24 +191,13 @@ impl<ASTNode: Clone> EarleyEvaler<ASTNode> {
         trees
     }
 
-    // TODO: directly call with Rc<Item> root returned from parser
-    pub fn eval(&self, startsym: String, pstate: &Vec<StateSet>) -> Vec<ASTNode> {
-        let root = pstate.last().unwrap()
-            .filter_by_rule(startsym)
-            .filter(|it| it.start() == 0 && it.complete())
-            .next().unwrap();
-
-        self.walker(root)
+    pub fn eval(&self, ptrees: &ParseTrees) -> Vec<ASTNode> {
+        self.walker(ptrees.0.first().unwrap())
     }
 
-    pub fn eval_all(&self, startsym: String, pstate: &Vec<StateSet>) -> Vec<Vec<ASTNode>> {
-        pstate.last().unwrap()
-            .filter_by_rule(startsym)
-            .filter(|it| it.start() == 0 && it.complete())
+    pub fn eval_all(&self, ptrees: &ParseTrees) -> Vec<Vec<ASTNode>> {
+        ptrees.0.iter()
             .flat_map(|root| self.walker_all(root).into_iter())
             .collect()
     }
-
-    // estimate of max number of trees
-    pub fn trees_ubound() {}
 }

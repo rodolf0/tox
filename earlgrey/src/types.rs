@@ -115,12 +115,6 @@ impl PartialEq for Item {
 }
 impl Eq for Item {}
 
-//impl Drop for Item {
-    //fn drop(&mut self) {
-        //println!("dropped item");
-    //}
-//}
-
 impl Item {
     pub fn start(&self) -> usize { self.start }
     pub fn complete(&self) -> bool { self.dot >= self.rule.spec.len() }
@@ -199,7 +193,6 @@ impl StateSet {
     // push items into the set, merging back-pointer sets
     fn push(&mut self, item: Item) {
         if let Some(existent) = self.dedup.get(&item) {
-            // TODO: try logging drop existent.bp.borrow_mut().extend(item.bp.clone().into_inner());
             existent.bp.borrow_mut().extend(item.bp.into_inner());
             return;
         }

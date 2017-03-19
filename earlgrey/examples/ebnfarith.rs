@@ -37,7 +37,7 @@ fn main() {
         collect::<Vec<String>>().join(" ");
     match parser.parse(&mut Tokenizer::from_str(&input)) {
         Ok(state) => {
-            let trees = earlgrey::all_trees(parser.g.start(), &state);
+            let trees = earlgrey::all_trees(&state);
             for t in trees {
                 println!("================================");
                 t.print();

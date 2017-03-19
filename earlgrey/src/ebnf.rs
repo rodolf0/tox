@@ -174,7 +174,7 @@ impl ParserBuilder {
         let mut tokenizer = EbnfTokenizer::from_str(grammar);
         let mut trees = match ebnf_parser.parse(&mut tokenizer) {
             Err(e) => panic!("ParserBuilder error: {:?}", e),
-            Ok(state) => all_trees(ebnf_parser.g.start(), &state),
+            Ok(state) => all_trees(&state),
         };
         if trees.len() != 1 {
             for t in &trees { t.print(); }

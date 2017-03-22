@@ -286,24 +286,23 @@ impl GrammarBuilder {
         GrammarBuilder{ symbols: HashMap::new(), rules: Vec::new()}
     }
 
-    pub fn symbol_relaxed<S: Into<Symbol>>(mut self, symbol: S) -> Self {
+    pub fn add_symbol<S: Into<Symbol>>(&mut self, symbol: S, strict: bool) {
         let symbol = symbol.into();
         if !self.symbols.contains_key(&symbol.name()) {
             self.symbols.insert(symbol.name(), Rc::new(symbol));
+        } else {
+            if strict {
+                panic!("Redefining symbol {}", symbol.name());
+            }
         }
-        self
     }
 
     pub fn symbol<S: Into<Symbol>>(mut self, symbol: S) -> Self {
-        let symbol = symbol.into();
-        if self.symbols.contains_key(&symbol.name()) {
-            panic!("Redefining symbol {}", symbol.name());
-        }
-        self.symbols.insert(symbol.name(), Rc::new(symbol));
+        self.add_symbol(symbol, true);
         self
     }
 
-    pub fn rule<N, N2>(mut self, name: N, spec: &[N2]) -> Self
+    pub fn add_rule<N, N2>(&mut self, name: N, spec: &[N2])
             where N: Into<String>, N2: AsRef<str> {
         let rule = Rule{
             name: name.into(),
@@ -319,6 +318,11 @@ impl GrammarBuilder {
             }
         }
         self.rules.push(Rc::new(rule));
+    }
+
+    pub fn rule<N, N2>(mut self, name: N, spec: &[N2]) -> Self
+            where N: Into<String>, N2: AsRef<str> {
+        self.add_rule(name, spec);
         self
     }
 

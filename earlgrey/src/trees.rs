@@ -3,14 +3,14 @@ use parser::ParseTrees;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub struct EarleyEvaler<ASTNode: Clone> {
-    actions: HashMap<String, Box<Fn(Vec<ASTNode>) -> ASTNode>>,
-    tokenizer: Box<Fn(&str, &str)->ASTNode>,
+pub struct EarleyEvaler<'a, ASTNode: Clone> {
+    actions: HashMap<String, Box<Fn(Vec<ASTNode>)->ASTNode + 'a>>,
+    tokenizer: Box<Fn(&str, &str)->ASTNode + 'a>,
 }
 
-impl<ASTNode: Clone> EarleyEvaler<ASTNode> {
-    pub fn new<F>(tokenizer: F) -> EarleyEvaler<ASTNode>
-            where F: 'static + Fn(&str, &str) -> ASTNode {
+impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
+    pub fn new<F>(tokenizer: F) -> EarleyEvaler<'a, ASTNode>
+            where F: 'a + Fn(&str, &str) -> ASTNode {
         EarleyEvaler{
             actions: HashMap::new(),
             tokenizer: Box::new(tokenizer),
@@ -18,7 +18,7 @@ impl<ASTNode: Clone> EarleyEvaler<ASTNode> {
     }
 
     pub fn action<F>(&mut self, rule: &str, action: F)
-            where F: 'static + Fn(Vec<ASTNode>) -> ASTNode {
+            where F: 'a + Fn(Vec<ASTNode>) -> ASTNode {
         self.actions.insert(rule.to_string(), Box::new(action));
     }
 
@@ -136,7 +136,7 @@ impl Subtree {
     }
 }
 
-pub fn subtree_evaler(g: Grammar) -> EarleyEvaler<Subtree> {
+pub fn subtree_evaler<'a>(g: Grammar) -> EarleyEvaler<'a, Subtree> {
     let mut evaler = EarleyEvaler::<Subtree>::new(
         |sym, tok| Subtree::Leaf(sym.to_string(), tok.to_string())
     );

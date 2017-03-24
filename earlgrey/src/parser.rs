@@ -1,6 +1,7 @@
-use types::{Symbol, StateSet, Grammar};
+use types::{Symbol, Item, StateSet, Grammar};
 use lexers::Scanner;
 use std::iter::FromIterator;
+use std::rc::Rc;
 
 #[derive(PartialEq, Debug)]
 pub enum ParseError {
@@ -9,15 +10,21 @@ pub enum ParseError {
 }
 
 pub struct EarleyParser {
-    pub g: Grammar
+    pub g: Grammar,
 }
 
-const DEBUG_STATESETS: bool = false;
+#[derive(Debug)]
+pub struct ParseTrees(pub Vec<Rc<Item>>);
 
 impl EarleyParser {
-    pub fn new(grammar: Grammar) -> EarleyParser { EarleyParser{g: grammar} }
+    pub fn new(grammar: Grammar)
+        -> EarleyParser { EarleyParser{g: grammar} }
 
-    pub fn parse(&self, tok: &mut Scanner<String>) -> Result<Vec<StateSet>, ParseError> {
+    pub fn parse(&self, tok: &mut Scanner<String>)
+        -> Result<ParseTrees, ParseError> { self._parse(tok, false) }
+
+    fn _parse(&self, tok: &mut Scanner<String>, debug: bool)
+            -> Result<ParseTrees, ParseError> {
         let mut states = Vec::new();
         // Populate S0: add items for each rule matching the start symbol
         states.push(StateSet::from_iter(self.g.predict_new(&self.g.start(), 0)));
@@ -59,24 +66,26 @@ impl EarleyParser {
         }
 
         // Verbose, debug state-sets
-        if DEBUG_STATESETS {
+        if debug {
             for (idx, stateset) in states.iter().enumerate() {
                 println!("=== {} ===", idx);
                 for item in stateset.iter() { println!("{:?}", item); }
             }
+            println!("=========");
         }
 
-        {
-            // Check that at least one item is a. complete, b. starts at the beginning
-            // and c. that the name of the rule matches the starting symbol. It spans
-            // the whole input because we search at the last stateset
-            let last = try!(states.last().ok_or(ParseError::BadInput));
-            if last.filter_by_rule(self.g.start())
-                   .filter(|item| item.start() == 0 && item.complete())
-                   .count() < 1 {
-                return Err(ParseError::BadInput);
-            }
+        // Check that at least one item is a. complete, b. starts at the beginning
+        // and c. that the name of the rule matches the starting symbol. It spans
+        // the whole input because we search at the last stateset
+        let last = try!(states.last().ok_or(ParseError::BadInput));
+        let parse_trees = last
+            .filter_by_rule(self.g.start())
+            .filter(|item| item.start() == 0 && item.complete())
+            .cloned()
+            .collect::<Vec<_>>();
+        if parse_trees.len() < 1 {
+            return Err(ParseError::BadInput);
         }
-        Ok(states)
+        Ok(ParseTrees(parse_trees))
     }
 }

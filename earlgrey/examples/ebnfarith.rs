@@ -29,18 +29,20 @@ fn main() {
         group  := num | '(' expr ')' ;
     "#;
 
-    let parser = earlgrey::ParserBuilder::new(&grammar)
-        .plug_terminal("num", |n| n.chars().all(|c| c.is_numeric()))
-        .into_parser("expr");
+    use std::str::FromStr;;
+    let parser = earlgrey::ParserBuilder::new()
+        .plug_terminal("num", |n| f64::from_str(n).is_ok())
+        .into_parser("expr", &grammar);
 
     let input = std::env::args().skip(1).
         collect::<Vec<String>>().join(" ");
     match parser.parse(&mut Tokenizer::from_str(&input)) {
         Ok(state) => {
-            let trees = earlgrey::all_trees(parser.g.start(), &state);
+            let trees = earlgrey::subtree_evaler(parser.g.clone())
+                        .eval_all(&state);
             for t in trees {
                 println!("================================");
-                t.print();
+                t[0].print();
             }
         },
         Err(e) => println!("Arit error: {:?}", e)

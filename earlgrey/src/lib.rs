@@ -7,10 +7,11 @@ mod ebnf;
 
 pub use types::{GrammarBuilder, Grammar};
 pub use parser::{EarleyParser, ParseError};
-pub use trees::{one_tree, all_trees, Subtree};
+pub use trees::EarleyEvaler;
+pub use trees::{Subtree, subtree_evaler};
 pub use ebnf::ParserBuilder;
 
 #[cfg(test)]
-mod parser_test;
+mod earley_test;
 #[cfg(test)]
 mod ebnf_test;

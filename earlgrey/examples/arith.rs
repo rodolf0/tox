@@ -1,5 +1,4 @@
 extern crate linenoise;
-extern crate regex;
 extern crate lexers;
 extern crate earlgrey as earley;
 
@@ -17,8 +16,7 @@ use std::collections::HashMap;
 // args   -> args ',' expr | expr | <e>
 
 fn build_grammar() -> earley::Grammar {
-    let num = regex::Regex::new(r"^-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?$").unwrap();
-    let var = regex::Regex::new(r"^[A-Za-z_]+[A-Za-z0-9_]*$").unwrap();
+    use std::str::FromStr;;
     earley::GrammarBuilder::new()
       .symbol("assign")
       .symbol("expr")
@@ -29,8 +27,8 @@ fn build_grammar() -> earley::Grammar {
       .symbol("group")
       .symbol("func")
       .symbol("args")
-      .symbol(("[n]", move |n: &str| num.is_match(n)))
-      .symbol(("[v]", move |n: &str| var.is_match(n)))
+      .symbol(("[n]", |n: &str| f64::from_str(n).is_ok()))
+      .symbol(("[v]", |n: &str| n.chars().all(|c| c.is_alphabetic() || c == '_')))
       .symbol(("[+-]", |n: &str| n == "+" || n == "-"))
       .symbol(("[*/%]", |n: &str| n == "*" || n == "/" || n == "%"))
       .symbol(("[-]", |n: &str| n == "-"))
@@ -127,7 +125,7 @@ fn xeval(n: &Subtree, ctx: &mut HashMap<String, f64>) -> Vec<f64> {
                 _ => unreachable!()
             },
             "ufact -> group" => xeval(&subn[0], ctx),
-            "ufact -> ufact [!]" => panic!(), // no gamma function?
+            "ufact -> ufact [!]" => panic!("no gamma function!"),
             "group -> [n]" => xeval(&subn[0], ctx),
             "group -> [v]" => xeval(&subn[0], ctx),
             "group -> [(] expr [)]" => xeval(&subn[1], ctx),
@@ -182,9 +180,9 @@ fn main() {
             collect::<Vec<String>>().join(" ");
         match parser.parse(&mut Tokenizer::from_str(&input)) {
             Ok(estate) => {
-                let tree = earley::one_tree(parser.g.start(), &estate);
+                let tree = earley::subtree_evaler(parser.g.clone()).eval(&estate);
                 println!("digraph x {{");
-                dotprinter(&tree, 0);
+                dotprinter(&tree[0], 0);
                 println!("}}");
             },
             Err(e) => println!("Parse err: {:?}", e)
@@ -197,8 +195,8 @@ fn main() {
         linenoise::history_add(&input[..]);
         match parser.parse(&mut Tokenizer::from_str(&input)) {
             Ok(estate) => {
-                let tree = earley::one_tree(parser.g.start(), &estate);
-                let val = xeval(&tree, &mut ctx)[0];
+                let tree = earley::subtree_evaler(parser.g.clone()).eval(&estate);
+                let val = xeval(&tree[0], &mut ctx)[0];
                 ctx.insert(format!["ans"], val);
                 println!("{:?}", val);
             },

@@ -92,6 +92,7 @@ pub struct Item {
     start: usize,
     end: usize,
     // backpointers leading to this item: (source-item, trigger)
+    // TODO: change to cell::Cell once available
     bp: cell::RefCell<HashSet<(Rc<Item>, Trigger)>>,
 }
 
@@ -121,7 +122,7 @@ impl Item {
     pub fn next_symbol<'a>(&'a self) -> Option<&'a Symbol> {
         self.rule.spec.get(self.dot).map(|s| &**s)
     }
-    pub fn back_pointers(&self) -> cell::Ref<HashSet<(Rc<Item>, Trigger)>> {
+    pub fn source(&self) -> cell::Ref<HashSet<(Rc<Item>, Trigger)>> {
         self.bp.borrow()
     }
 }
@@ -251,6 +252,7 @@ impl fmt::Debug for StateSet {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone)]
 pub struct Grammar {
     start: String,
     rules: Vec<Rc<Rule>>,
@@ -266,6 +268,10 @@ impl Grammar {
             .map(|r| Item::predict_new(r, state_idx))
             .collect()
     }
+
+    pub fn rules(&self) -> Vec<String> {
+        self.rules.iter().map(|r| r.to_string()).collect()
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -280,24 +286,21 @@ impl GrammarBuilder {
         GrammarBuilder{ symbols: HashMap::new(), rules: Vec::new()}
     }
 
-    pub fn symbol_relaxed<S: Into<Symbol>>(mut self, symbol: S) -> Self {
+    pub fn add_symbol<S: Into<Symbol>>(&mut self, symbol: S, ignoredup: bool) {
         let symbol = symbol.into();
-        if !self.symbols.contains_key(&symbol.name()) {
-            self.symbols.insert(symbol.name(), Rc::new(symbol));
-        }
-        self
+        match self.symbols.contains_key(&symbol.name()) {
+            false => self.symbols.insert(symbol.name(), Rc::new(symbol)),
+            true if !ignoredup => panic!("Redefined symbol {}", symbol.name()),
+            true => None
+        };
     }
 
     pub fn symbol<S: Into<Symbol>>(mut self, symbol: S) -> Self {
-        let symbol = symbol.into();
-        if self.symbols.contains_key(&symbol.name()) {
-            panic!("Redefining symbol {}", symbol.name());
-        }
-        self.symbols.insert(symbol.name(), Rc::new(symbol));
+        self.add_symbol(symbol, false);
         self
     }
 
-    pub fn rule<N, N2>(mut self, name: N, spec: &[N2]) -> Self
+    pub fn add_rule<N, N2>(&mut self, name: N, spec: &[N2])
             where N: Into<String>, N2: AsRef<str> {
         let rule = Rule{
             name: name.into(),
@@ -309,10 +312,15 @@ impl GrammarBuilder {
         let rulestr = rule.to_string();
         for r in &self.rules {
             if r.to_string() == rulestr {
-                panic!("Redefining rule {}", rulestr);
+                panic!("Redefined rule {}", rulestr);
             }
         }
         self.rules.push(Rc::new(rule));
+    }
+
+    pub fn rule<N, N2>(mut self, name: N, spec: &[N2]) -> Self
+            where N: Into<String>, N2: AsRef<str> {
+        self.add_rule(name, spec);
         self
     }
 

@@ -29,8 +29,9 @@ fn main() {
         group  := num | '(' expr ')' ;
     "#;
 
+    use std::str::FromStr;;
     let parser = earlgrey::ParserBuilder::new()
-        .plug_terminal("num", |n| n.chars().all(|c| c.is_numeric()))
+        .plug_terminal("num", |n| f64::from_str(n).is_ok())
         .into_parser("expr", &grammar);
 
     let input = std::env::args().skip(1).

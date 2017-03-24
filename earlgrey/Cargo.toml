@@ -19,4 +19,3 @@ path = "examples/ebnfarith.rs"
 
 [dev-dependencies]
 linenoise-rust = "0.2"
-regex = "0.1"

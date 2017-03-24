@@ -1,4 +1,4 @@
-extern crate linenoise;
+extern crate rustyline;
 extern crate lexers;
 extern crate earlgrey as earley;
 
@@ -191,8 +191,9 @@ fn main() {
     }
 
     let mut ctx = HashMap::new();
-    while let Some(input) = linenoise::input("~> ") {
-        linenoise::history_add(&input[..]);
+    let mut rl = rustyline::Editor::<()>::new();
+    while let Ok(input) = rl.readline("~> ") {
+        rl.add_history_entry(&input);
         match parser.parse(&mut Tokenizer::from_str(&input)) {
             Ok(estate) => {
                 let tree = earley::subtree_evaler(parser.g.clone()).eval(&estate);

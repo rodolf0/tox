@@ -18,4 +18,4 @@ name = "ebnfarith"
 path = "examples/ebnfarith.rs"
 
 [dev-dependencies]
-linenoise-rust = "0.2"
+rustyline = "1.0.0"

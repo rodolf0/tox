@@ -6,4 +6,4 @@ description = "A lisp like thingy"
 
 [dependencies]
 lexers = { version = "0.0.4", path = "../lexers" }
-linenoise-rust = "*"
+rustyline = "1.0.0"

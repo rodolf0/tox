@@ -1,4 +1,4 @@
-extern crate linenoise;
+extern crate rustyline;
 extern crate lexers;
 extern crate lisp;
 
@@ -7,8 +7,9 @@ fn main() {
     use std::rc::Rc;
     use lisp::{LispContext, Parser};
     let cx = Rc::new(LispContext::new());
-    while let Some(input) = linenoise::input("~> ") {
-        linenoise::history_add(&input[..]);
+    let mut rl = rustyline::Editor::<()>::new();
+    while let Ok(input) = rl.readline("~> ") {
+        rl.add_history_entry(&input);
         match Parser::parse_str(&input[..]) {
             Err(e) => println!("Parse error: {:?}", e),
             Ok(exp) => match LispContext::eval(&exp, &cx) {

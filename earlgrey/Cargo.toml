@@ -1,13 +1,13 @@
 [package]
 name = "earlgrey"
-version = "0.0.5"
+version = "0.0.6"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "An earley parser library"
 license = "MIT"
 repository = "https://github.com/rodolf0/tox"
 
 [dependencies]
-lexers = { version = "0.0.4", path = "../lexers" }
+lexers = { version = "0.0.5", path = "../lexers" }
 
 [[example]]
 name = "arith"

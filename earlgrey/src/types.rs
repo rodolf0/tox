@@ -286,19 +286,17 @@ impl GrammarBuilder {
         GrammarBuilder{ symbols: HashMap::new(), rules: Vec::new()}
     }
 
-    pub fn add_symbol<S: Into<Symbol>>(&mut self, symbol: S, strict: bool) {
+    pub fn add_symbol<S: Into<Symbol>>(&mut self, symbol: S, ignoredup: bool) {
         let symbol = symbol.into();
-        if !self.symbols.contains_key(&symbol.name()) {
-            self.symbols.insert(symbol.name(), Rc::new(symbol));
-        } else {
-            if strict {
-                panic!("Redefining symbol {}", symbol.name());
-            }
-        }
+        match self.symbols.contains_key(&symbol.name()) {
+            false => self.symbols.insert(symbol.name(), Rc::new(symbol)),
+            true if !ignoredup => panic!("Redefined symbol {}", symbol.name()),
+            true => None
+        };
     }
 
     pub fn symbol<S: Into<Symbol>>(mut self, symbol: S) -> Self {
-        self.add_symbol(symbol, true);
+        self.add_symbol(symbol, false);
         self
     }
 
@@ -314,7 +312,7 @@ impl GrammarBuilder {
         let rulestr = rule.to_string();
         for r in &self.rules {
             if r.to_string() == rulestr {
-                panic!("Redefining rule {}", rulestr);
+                panic!("Redefined rule {}", rulestr);
             }
         }
         self.rules.push(Rc::new(rule));

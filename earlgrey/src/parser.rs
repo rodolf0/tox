@@ -11,22 +11,20 @@ pub enum ParseError {
 
 pub struct EarleyParser {
     pub g: Grammar,
-    debug_statesets: bool,
 }
 
 #[derive(Debug)]
 pub struct ParseTrees(pub Vec<Rc<Item>>);
 
 impl EarleyParser {
-    pub fn new(grammar: Grammar) -> EarleyParser {
-        EarleyParser{g: grammar, debug_statesets: false}
-    }
+    pub fn new(grammar: Grammar)
+        -> EarleyParser { EarleyParser{g: grammar} }
 
-    pub fn debug(grammar: Grammar) -> EarleyParser {
-        EarleyParser{g: grammar, debug_statesets: true}
-    }
+    pub fn parse(&self, tok: &mut Scanner<String>)
+        -> Result<ParseTrees, ParseError> { self._parse(tok, false) }
 
-    pub fn parse(&self, tok: &mut Scanner<String>) -> Result<ParseTrees, ParseError> {
+    fn _parse(&self, tok: &mut Scanner<String>, debug: bool)
+            -> Result<ParseTrees, ParseError> {
         let mut states = Vec::new();
         // Populate S0: add items for each rule matching the start symbol
         states.push(StateSet::from_iter(self.g.predict_new(&self.g.start(), 0)));
@@ -68,11 +66,12 @@ impl EarleyParser {
         }
 
         // Verbose, debug state-sets
-        if self.debug_statesets {
+        if debug {
             for (idx, stateset) in states.iter().enumerate() {
                 println!("=== {} ===", idx);
                 for item in stateset.iter() { println!("{:?}", item); }
             }
+            println!("=========");
         }
 
         // Check that at least one item is a. complete, b. starts at the beginning

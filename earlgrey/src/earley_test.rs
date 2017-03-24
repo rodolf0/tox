@@ -168,17 +168,18 @@ fn test_ast_build() {
       .rule("E", &["n"])
       .into_grammar("E");
     let mut input = DelimTokenizer::from_str("3+4*2", "+*", false);
-    let p = EarleyParser::debug(grammar);
+    let p = EarleyParser::new(grammar);
     let ps = p.parse(&mut input).unwrap();
 
     use std::str::FromStr;;
-    let mut ev = EarleyEvaler::<f64>::new(|symbol, token| {
+    let mut ev = EarleyEvaler::new(|symbol, token| {
         match symbol {"n" => f64::from_str(token).unwrap(), _ => 0.0}
     });
     ev.action("E -> E + E", |nodes| nodes[0] + nodes[2]);
     ev.action("E -> E * E", |nodes| nodes[0] * nodes[2]);
     ev.action("E -> n", |nodes| nodes[0]);
     let trees = ev.eval_all(&ps);
+    println!("{:?}", trees);
     assert_eq!(trees.len(), 2);
     assert!(trees.contains(&vec!(11.0)));
     assert!(trees.contains(&vec!(14.0)));
@@ -189,7 +190,7 @@ fn test_ast_build() {
         BinOP(Box<MathAST>, String, Box<MathAST>),
         Num(f64),
     }
-    let mut ev = EarleyEvaler::<MathAST>::new(|symbol, token| {
+    let mut ev = EarleyEvaler::new(|symbol, token| {
         match symbol {
             "n" => MathAST::Num(f64::from_str(token).unwrap()),
             _ => MathAST::Num(0.0)
@@ -211,7 +212,7 @@ fn test_ast_build() {
         List(Vec<Sexpr>)
     }
 
-    let mut ev = EarleyEvaler::<Sexpr>::new(|_, tok| Sexpr::Atom(tok.to_string()));
+    let mut ev = EarleyEvaler::new(|_, tok| Sexpr::Atom(tok.to_string()));
     ev.action("E -> E + E", |nodes| Sexpr::List(nodes.clone()));
     ev.action("E -> E * E", |nodes| Sexpr::List(nodes.clone()));
     ev.action("E -> n", |nodes| nodes[0].clone());
@@ -375,7 +376,7 @@ fn math_ambiguous() {
 
 #[test]
 fn math_various() {
-    let p = EarleyParser::debug(grammar_math());
+    let p = EarleyParser::new(grammar_math());
     let inputs = vec![
         "1+2^3^4*5/6+7*8^9",
         "(1+2^3)^4*5/6+7*8^9",
@@ -409,7 +410,7 @@ fn chained_terminals() {
           .symbol(("+", |n: &str| n == "+"))
           .rule("E", &variant)
           .rule::<_, &str>("X", &[]);
-        let p = EarleyParser::debug(gb.into_grammar("E"));
+        let p = EarleyParser::new(gb.into_grammar("E"));
         let mut input = DelimTokenizer::from_str(tokens, "+", false);
         assert!(p.parse(&mut input).is_ok());
     }

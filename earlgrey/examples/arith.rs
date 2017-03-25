@@ -1,23 +1,11 @@
-extern crate rustyline;
+extern crate earlgrey;
 extern crate lexers;
-extern crate earlgrey as earley;
+extern crate rustyline;
+use std::cell::RefCell;
 
-use earley::Subtree;
-use std::collections::HashMap;
-
-// assign -> id '=' expr | expr
-// expr   -> expr '[+-]' term | term
-// term   -> term '[*%/]' factor | factor
-// factor -> '-' factor | power
-// power  -> ufact '^' factor | ufact
-// ufact  -> ufact '!' | group
-// group  -> num | id | '(' expr ')' | func
-// func   -> id '(' args ')'
-// args   -> args ',' expr | expr | <e>
-
-fn build_grammar() -> earley::Grammar {
+fn build_grammar() -> earlgrey::Grammar {
     use std::str::FromStr;;
-    earley::GrammarBuilder::new()
+    earlgrey::GrammarBuilder::new()
       .symbol("assign")
       .symbol("expr")
       .symbol("term")
@@ -29,129 +17,41 @@ fn build_grammar() -> earley::Grammar {
       .symbol("args")
       .symbol(("[n]", |n: &str| f64::from_str(n).is_ok()))
       .symbol(("[v]", |n: &str| n.chars().all(|c| c.is_alphabetic() || c == '_')))
-      .symbol(("[+-]", |n: &str| n == "+" || n == "-"))
-      .symbol(("[*/%]", |n: &str| n == "*" || n == "/" || n == "%"))
-      .symbol(("[-]", |n: &str| n == "-"))
-      .symbol(("[^]", |n: &str| n == "^"))
-      .symbol(("[!]", |n: &str| n == "!"))
-      .symbol(("[,]", |n: &str| n == ","))
-      .symbol(("[(]", |n: &str| n == "("))
-      .symbol(("[)]", |n: &str| n == ")"))
-      .symbol(("[=]", |n: &str| n == "="))
+      .symbol(("+", |n: &str| n == "+"))
+      .symbol(("-", |n: &str| n == "-"))
+      .symbol(("*", |n: &str| n == "*"))
+      .symbol(("/", |n: &str| n == "/"))
+      .symbol(("%", |n: &str| n == "%"))
+      .symbol(("^", |n: &str| n == "^"))
+      .symbol(("!", |n: &str| n == "!"))
+      .symbol((",", |n: &str| n == ","))
+      .symbol(("(", |n: &str| n == "("))
+      .symbol((")", |n: &str| n == ")"))
+      .symbol(("=", |n: &str| n == "="))
       .rule("assign", &["expr"])
-      .rule("assign", &["[v]", "[=]", "expr"])
+      //.rule("assign", &["[v]", "=", "expr"])
       .rule("expr",   &["term"])
-      .rule("expr",   &["expr", "[+-]", "term"])
+      .rule("expr",   &["expr", "+", "term"])
+      .rule("expr",   &["expr", "-", "term"])
       .rule("term",   &["factor"])
-      .rule("term",   &["term", "[*/%]", "factor"])
+      .rule("term",   &["term", "*", "factor"])
+      .rule("term",   &["term", "/", "factor"])
+      .rule("term",   &["term", "%", "factor"])
       .rule("factor", &["power"])
-      .rule("factor", &["[-]", "factor"])
+      .rule("factor", &["-", "factor"])
       .rule("power",  &["ufact"])
-      .rule("power",  &["ufact", "[^]", "factor"])
+      .rule("power",  &["ufact", "^", "factor"])
       .rule("ufact",  &["group"])
-      .rule("ufact",  &["ufact", "[!]"])
+      .rule("ufact",  &["ufact", "!"])
       .rule("group",  &["[n]"])
-      .rule("group",  &["[v]"])
-      .rule("group",  &["[(]", "expr", "[)]"])
-      .rule("group",  &["func"])
-      .rule("func",   &["[v]", "[(]", "args", "[)]"])
-      .rule("args",   &["expr"])
-      .rule("args",   &["args", "[,]", "expr"])
-      .rule::<_, &str>("args",   &[])
+      //.rule("group",  &["[v]"])
+      .rule("group",  &["(", "expr", ")"])
+      //.rule("group",  &["func"])
+      //.rule("func",   &["[v]", "(", "args", ")"])
+      //.rule("args",   &["expr"])
+      //.rule("args",   &["args", ",", "expr"])
+      //.rule::<_, &str>("args",   &[])
       .into_grammar("assign")
-}
-
-fn dotprinter(node: &Subtree, n: usize) {
-    match node {
-        &Subtree::Leaf(ref term, ref value) => println!("  \"{}. {}\" -> \"{}. {}\"", n, term, n + 1, value),
-        &Subtree::Node(ref spec, ref childs) => for (nn, c) in childs.iter().enumerate() {
-            let x = match c {
-                &Subtree::Leaf(ref term, _) => term,
-                &Subtree::Node(ref sspec, _) => sspec,
-            };
-            println!("  \"{}. {}\" -> \"{}. {}\"", n, spec, n + nn + 100, x);
-            dotprinter(&c, n + nn + 100);
-        }
-    }
-}
-
-fn xeval(n: &Subtree, ctx: &mut HashMap<String, f64>) -> Vec<f64> {
-    use std::str::FromStr;
-    use std::f64::consts;
-
-    macro_rules! eval0 {
-        ($e:expr, $c:ident) => (xeval($e, $c)[0])
-    }
-
-    match n {
-        &Subtree::Leaf(ref key, ref val) => match key.as_ref() {
-            "[n]" => vec![f64::from_str(&val).unwrap()],
-            "[v]" => match val.as_ref() {
-                "e" => vec![consts::E],
-                "pi" => vec![consts::PI],
-                x => vec![ctx[x]]
-            },
-            _ => unreachable!()
-        },
-        &Subtree::Node(ref key, ref subn) => match key.as_ref() {
-            "assign -> expr" => xeval(&subn[0], ctx),
-            "assign -> [v] [=] expr" => {
-                let var = match &subn[0] {
-                    &Subtree::Leaf(_, ref var) => var.clone(),
-                    _ => unreachable!()
-                };
-                let val = xeval(&subn[2], ctx);
-                ctx.insert(var, val[0]);
-                val
-            },
-            "expr -> term" => xeval(&subn[0], ctx),
-            "expr -> expr [+-] term" => match &subn[1] {
-                &Subtree::Leaf(_, ref op) if op == "+" => vec![eval0!(&subn[0], ctx) + eval0!(&subn[2], ctx)],
-                &Subtree::Leaf(_, ref op) if op == "-" => vec![eval0!(&subn[0], ctx) - eval0!(&subn[2], ctx)],
-                _ => unreachable!()
-            },
-            "term -> factor" => xeval(&subn[0], ctx),
-            "term -> term [*/%] factor" => match &subn[1] {
-                &Subtree::Leaf(_, ref op) if op == "*" => vec![eval0!(&subn[0], ctx) * eval0!(&subn[2], ctx)],
-                &Subtree::Leaf(_, ref op) if op == "/" => vec![eval0!(&subn[0], ctx) / eval0!(&subn[2], ctx)],
-                &Subtree::Leaf(_, ref op) if op == "%" => vec![eval0!(&subn[0], ctx) % eval0!(&subn[2], ctx)],
-                _ => unreachable!()
-            },
-            "factor -> power" => xeval(&subn[0], ctx),
-            "factor -> [-] factor" => vec![- eval0!(&subn[1], ctx)],
-            "power -> ufact" => xeval(&subn[0], ctx),
-            "power -> ufact [^] factor" => match &subn[1] {
-                &Subtree::Leaf(_, ref op) if op == "^" => vec![eval0!(&subn[0], ctx).powf(eval0!(&subn[2], ctx))],
-                _ => unreachable!()
-            },
-            "ufact -> group" => xeval(&subn[0], ctx),
-            "ufact -> ufact [!]" => panic!("no gamma function!"),
-            "group -> [n]" => xeval(&subn[0], ctx),
-            "group -> [v]" => xeval(&subn[0], ctx),
-            "group -> [(] expr [)]" => xeval(&subn[1], ctx),
-            "group -> func" => xeval(&subn[0], ctx),
-            "func -> [v] [(] args [)]" => {
-                let args = xeval(&subn[2], ctx);
-                match &subn[0] {
-                    &Subtree::Leaf(_, ref f) if f == "sin" => vec![args[0].sin()],
-                    &Subtree::Leaf(_, ref f) if f == "cos" => vec![args[0].cos()],
-                    &Subtree::Leaf(_, ref f) if f == "max" => match args.len() {
-                        0 => vec![],
-                        _ => vec![args.iter().cloned().fold(std::f64::NAN, f64::max)]
-                    },
-                    _ => panic!()
-                }
-            },
-            "args -> expr" => xeval(&subn[0], ctx),
-            "args -> args [,] expr" => {
-                let mut a = xeval(&subn[0], ctx);
-                a.push(eval0!(&subn[2], ctx));
-                a
-            }
-            "args ->" => vec![],
-            _ => unreachable!()
-        }
-    }
 }
 
 struct Tokenizer(lexers::Scanner<char>);
@@ -172,36 +72,62 @@ impl Tokenizer {
     }
 }
 
+fn gamma(x: f64) -> f64 {
+    #[link(name="m")]
+    extern { fn tgamma(x: f64) -> f64; }
+    unsafe { tgamma(x) }
+}
+
+fn semanter<'a>() -> earlgrey::EarleyEvaler<'a, f64> {
+    use std::str::FromStr;
+    let mut ev = earlgrey::EarleyEvaler::new(|symbol, token| {
+        match symbol {"[n]" => f64::from_str(token).unwrap(), _ => 0.0}
+    });
+    ev.action("assign -> expr", |n| n[0]);
+    //ev.action("assign -> [v] = expr", || {});
+    ev.action("expr -> term", |n| n[0]);
+    ev.action("expr -> expr + term", |n| n[0] + n[2]);
+    ev.action("expr -> expr - term", |n| n[0] + n[2]);
+    ev.action("term -> factor", |n| n[0]);
+    ev.action("term -> term * factor", |n| n[0] * n[2]);
+    ev.action("term -> term / factor", |n| n[0] / n[2]);
+    ev.action("term -> term % factor", |n| n[0] % n[2]);
+    ev.action("factor -> power", |n| n[0]);
+    ev.action("factor -> - factor", |n| -n[1]);
+    ev.action("power -> ufact", |n| n[0]);
+    ev.action("power -> ufact ^ factor", |n| n[0].powf(n[2]));
+    ev.action("ufact -> group", |n| n[0]);
+    ev.action("ufact -> ufact !", |n| gamma(n[0]+1.0));
+    ev.action("group -> [n]", |n| n[0]);
+    //ev.action("group -> [v]", |n| {});
+    ev.action("group -> ( expr )", |n| n[1]);
+    //ev.action("group -> func", || {});
+    //ev.action("func -> [v] ( args )", || {});
+    //ev.action("args -> expr", || {});
+    //ev.action("args -> args , expr", || {});
+    //ev.action("args -> ", || {});
+    ev
+}
+
 fn main() {
-    let parser = earley::EarleyParser::new(build_grammar());
-
-    if std::env::args().len() > 1 {
-        let input = std::env::args().skip(1).
-            collect::<Vec<String>>().join(" ");
-        match parser.parse(&mut Tokenizer::from_str(&input)) {
-            Ok(estate) => {
-                let tree = earley::subtree_evaler(parser.g.clone()).eval(&estate);
-                println!("digraph x {{");
-                dotprinter(&tree[0], 0);
-                println!("}}");
-            },
-            Err(e) => println!("Parse err: {:?}", e)
-        }
-        return;
-    }
-
-    let mut ctx = HashMap::new();
-    let mut rl = rustyline::Editor::<()>::new();
-    while let Ok(input) = rl.readline("~> ") {
-        rl.add_history_entry(&input);
-        match parser.parse(&mut Tokenizer::from_str(&input)) {
-            Ok(estate) => {
-                let tree = earley::subtree_evaler(parser.g.clone()).eval(&estate);
-                let val = xeval(&tree[0], &mut ctx)[0];
-                ctx.insert(format!["ans"], val);
-                println!("{:?}", val);
-            },
-            Err(e) => println!("Parse err: {:?}", e)
+    let rl = RefCell::new(rustyline::Editor::<()>::new());
+    let input: Box<Iterator<Item=_>> = if std::env::args().len() > 1 {
+        Box::new((0..1).map(|_| std::env::args()
+                            .skip(1).collect::<Vec<String>>().join(" ")))
+    } else {
+        Box::new((0..).map(|_| rl.borrow_mut().readline("~> "))
+                 .take_while(|i| i.is_ok()).map(|i| i.unwrap()))
+    };
+    let parser = earlgrey::EarleyParser::new(build_grammar());
+    let evaler = semanter();
+    for expr in input {
+        match parser.parse(&mut Tokenizer::from_str(&expr)) {
+            Err(e) => println!("Parse err: {:?}", e),
+            Ok(state) => {
+                rl.borrow_mut().add_history_entry(&expr);
+                let val = evaler.eval(&state);
+                println!("{:?}", val[0]);
+            }
         }
     }
 }

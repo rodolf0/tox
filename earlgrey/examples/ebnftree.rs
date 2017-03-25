@@ -29,7 +29,7 @@ fn main() {
         group  := num | '(' expr ')' ;
     "#;
 
-    use std::str::FromStr;;
+    use std::str::FromStr;
     let parser = earlgrey::ParserBuilder::new()
         .plug_terminal("num", |n| f64::from_str(n).is_ok())
         .into_parser("expr", &grammar);

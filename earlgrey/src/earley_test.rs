@@ -171,7 +171,7 @@ fn test_ast_build() {
     let p = EarleyParser::new(grammar);
     let ps = p.parse(&mut input).unwrap();
 
-    use std::str::FromStr;;
+    use std::str::FromStr;
     let mut ev = EarleyEvaler::new(|symbol, token| {
         match symbol {"n" => f64::from_str(token).unwrap(), _ => 0.0}
     });

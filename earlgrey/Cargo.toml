@@ -14,8 +14,8 @@ name = "arith"
 path = "examples/arith.rs"
 
 [[example]]
-name = "ebnfarith"
-path = "examples/ebnfarith.rs"
+name = "ebnftree"
+path = "examples/ebnftree.rs"
 
 [dev-dependencies]
 rustyline = "1.0.0"

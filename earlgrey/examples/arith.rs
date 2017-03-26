@@ -87,7 +87,7 @@ fn semanter<'a>() -> earlgrey::EarleyEvaler<'a, f64> {
     //ev.action("assign -> [v] = expr", || {});
     ev.action("expr -> term", |n| n[0]);
     ev.action("expr -> expr + term", |n| n[0] + n[2]);
-    ev.action("expr -> expr - term", |n| n[0] + n[2]);
+    ev.action("expr -> expr - term", |n| n[0] - n[2]);
     ev.action("term -> factor", |n| n[0]);
     ev.action("term -> term * factor", |n| n[0] * n[2]);
     ev.action("term -> term / factor", |n| n[0] / n[2]);

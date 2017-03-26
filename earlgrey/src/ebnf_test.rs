@@ -1,6 +1,6 @@
 use lexers::DelimTokenizer;
 use ebnf::{ebnf_grammar, ParserBuilder};
-use trees::subtree_evaler;
+use util::subtree_evaler;
 
 #[test]
 fn build_ebnf_grammar() {

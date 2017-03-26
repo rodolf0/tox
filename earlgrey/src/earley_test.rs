@@ -1,7 +1,8 @@
 use lexers::{Scanner, DelimTokenizer};
 use parser::{EarleyParser, ParseError};
-use trees::{EarleyEvaler, subtree_evaler};
+use trees::EarleyEvaler;
 use types::{GrammarBuilder, Grammar};
+use util::{Sexpr, subtree_evaler};
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::fmt;
@@ -204,13 +205,6 @@ fn test_ast_build() {
         r#"[BinOP(BinOP(Num(3), "+", Num(4)), "*", Num(2))]"#,
         r#"[BinOP(Num(3), "+", BinOP(Num(4), "*", Num(2)))]"#,
     ]);
-
-    // try a different AST -> S-expr
-    #[derive(Clone, Debug)]
-    enum Sexpr {
-        Atom(String),
-        List(Vec<Sexpr>)
-    }
 
     let mut ev = EarleyEvaler::new(|_, tok| Sexpr::Atom(tok.to_string()));
     ev.action("E -> E + E", |nodes| Sexpr::List(nodes.clone()));

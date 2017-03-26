@@ -1,7 +1,8 @@
-use types::{Grammar, GrammarBuilder};
-use trees::EarleyEvaler;
-use lexers::EbnfTokenizer;
+use lexers::{EbnfTokenizer, Scanner};
 use parser::EarleyParser;
+use trees::EarleyEvaler;
+use types::{Grammar, GrammarBuilder};
+use util::Sexpr;
 use std::cell::RefCell;
 
 // https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form
@@ -166,8 +167,29 @@ impl ParserBuilder {
     }
 
     pub fn into_parser(self, start: &str, grammar: &str) -> EarleyParser {
-        EarleyParser::new(
-            ParserBuilder::builder(self.0, grammar, false).into_grammar(start))
+        let gb = ParserBuilder::builder(self.0, grammar, false);
+        EarleyParser::new(gb.into_grammar(start))
+    }
+
+    pub fn treeficator<'a>(self, start: &str, grammar: &'a str)
+            -> Box<Fn(&mut Scanner<String>)->Vec<Vec<Sexpr>> + 'a> {
+        let grammar = ParserBuilder::builder(self.0, grammar, false)
+            .into_grammar(start);
+        // Add semantic actions that flatten the parse tree
+        let mut ev = EarleyEvaler::new(|_, tok| Sexpr::Atom(tok.to_string()));
+        for rule in grammar.rules() {
+            ev.action(&rule.clone(), move |mut nodes| match nodes.len() {
+                1 => nodes.swap_remove(0),
+                _ => Sexpr::List(nodes),
+            });
+        }
+        let parser = EarleyParser::new(grammar);
+        Box::new(move |mut tokenizer| {
+            match parser.parse(&mut tokenizer) {
+                Ok(state) => ev.eval_all(&state),
+                Err(e) => panic!("Parse error: {:?}", e)
+            }
+        })
     }
 
     pub fn plug_terminal<N, F>(mut self, name: N, pred: F) -> ParserBuilder

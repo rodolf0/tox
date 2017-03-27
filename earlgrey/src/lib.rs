@@ -9,8 +9,8 @@ mod util;
 pub use types::{GrammarBuilder, Grammar};
 pub use parser::{EarleyParser, ParseError};
 pub use trees::EarleyEvaler;
-pub use ebnf::ParserBuilder;
-pub use util::subtree_evaler;
+pub use ebnf::{ParserBuilder, Treeresult};
+pub use util::{Sexpr, subtree_evaler};
 
 #[cfg(test)]
 mod earley_test;

@@ -1,5 +1,5 @@
 use lexers::{EbnfTokenizer, Scanner};
-use parser::EarleyParser;
+use parser::{EarleyParser, ParseError};
 use trees::EarleyEvaler;
 use types::{Grammar, GrammarBuilder};
 use util::Sexpr;
@@ -44,6 +44,7 @@ pub fn ebnf_grammar() -> Grammar {
 }
 
 pub struct ParserBuilder(GrammarBuilder);
+pub type Treeresult = Result<Vec<Vec<Sexpr>>, ParseError>;
 
 macro_rules! pull {
     ($p:path, $e:expr) => (match $e {
@@ -172,7 +173,7 @@ impl ParserBuilder {
     }
 
     pub fn treeficator<'a>(self, start: &str, grammar: &'a str)
-            -> Box<Fn(&mut Scanner<String>)->Vec<Vec<Sexpr>> + 'a> {
+            -> Box<Fn(&mut Scanner<String>)->Treeresult + 'a> {
         let grammar = ParserBuilder::builder(self.0, grammar, false)
             .into_grammar(start);
         // Add semantic actions that flatten the parse tree
@@ -185,10 +186,7 @@ impl ParserBuilder {
         }
         let parser = EarleyParser::new(grammar);
         Box::new(move |mut tokenizer| {
-            match parser.parse(&mut tokenizer) {
-                Ok(state) => ev.eval_all(&state),
-                Err(e) => panic!("Parse error: {:?}", e)
-            }
+            parser.parse(&mut tokenizer).map(|state| ev.eval_all(&state))
         })
     }
 

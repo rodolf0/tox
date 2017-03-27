@@ -37,7 +37,8 @@ fn main() {
         .plug_terminal("num", |n| f64::from_str(n).is_ok())
         .treeficator("expr", &grammar);
 
-    for t in trificator(&mut Tokenizer::from_str(&input)) {
-        t[0].print();
+    match trificator(&mut Tokenizer::from_str(&input)) {
+        Ok(trees) => for t in trees { t[0].print(); },
+        Err(e) => println!("{:?}", e)
     }
 }

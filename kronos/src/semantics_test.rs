@@ -1,7 +1,7 @@
 use semantics::{Range, Grain, Seq};
 use utils::{DateTime, Date};
 
-pub fn dt(year: i32, month: u32, day: u32) -> DateTime {
+fn dt(year: i32, month: u32, day: u32) -> DateTime {
     Date::from_ymd(year, month, day).and_hms(0, 0, 0)
 }
 

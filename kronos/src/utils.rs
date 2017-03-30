@@ -1,7 +1,6 @@
 extern crate chrono;
 use chrono::{Datelike, Timelike};
-use semantics::{Grain};
-use std::cmp;
+use semantics::Grain;
 
 pub type DateTime = chrono::NaiveDateTime;
 pub type Date = chrono::NaiveDate;
@@ -36,96 +35,98 @@ pub fn find_dow(mut date: Date, dow: u32) -> Date {
 
 pub fn find_month(mut date: Date, month: u32) -> Date {
     while date.month() != month {
-        date = date_add(date, 0, 1, 0);
+        date = dtshift::add(date, 0, 1, 0);
     }
     date
 }
 
-// TODO: implement negative n
-pub fn shift_datetime(d: DateTime, grain: Grain, n: u32) -> DateTime {
+pub fn shift_datetime(d: DateTime, grain: Grain, n: i32) -> DateTime {
     use Grain::*;
+    let m = if n >= 0 {n as u32} else {(-n) as u32};
+    let shiftfn = if n >= 0 {dtshift::add} else {dtshift::sub};
     match grain {
         Second => d + Duration::seconds(n as i64),
         Minute => d + Duration::minutes(n as i64),
         Hour => d + Duration::hours(n as i64),
         Day => d + Duration::days(n as i64),
         Week => d + Duration::weeks(n as i64),
-        Month => DateTime::new(date_add(d.date(), 0, n, 0), d.time()),
-        Quarter => DateTime::new(date_add(d.date(), 0, 3 * n, 0), d.time()),
-        Year => DateTime::new(date_add(d.date(), n as i32, 0, 0), d.time()),
+        Month => DateTime::new(shiftfn(d.date(), 0, m, 0), d.time()),
+        Quarter => DateTime::new(shiftfn(d.date(), 0, 3 * m, 0), d.time()),
+        Year => DateTime::new(shiftfn(d.date(), m, 0, 0), d.time()),
     }
 }
 
-// TODO: u8
-pub fn days_in_month(m: u32, y: i32) -> u32 {
-    static DIM: [u32;12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    assert!(m > 0 && m <= 12);
-    // check when february has 29 days
-    if m == 2 && y % 4 == 0 && (y % 100 != 0 || y % 400 == 0) { return 29; }
-    DIM[(m-1) as usize]
-}
+mod dtshift {
+    use super::*;
+    use std::cmp;
 
-pub fn date_add(dt: Date, y: i32, mut m: u32, mut d: u32) -> Date {
-    let mut day = dt.day();
-    let mut month = dt.month();
-    let mut year = dt.year();
-    while d > 0 {
-        let diff = cmp::min(days_in_month(month, year)-day, d);
-        day += diff;
-        d -= diff;
-        if d > 0 {
-            day = 0;
-            month += 1;
-            if month > 12 {
-                year += 1;
-                month = 1;
+    fn days_in_month(m: u32, y: i32) -> u32 {
+        static DIM: [u8;12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        assert!(m > 0 && m <= 12);
+        // check when february has 29 days
+        if m == 2 && y % 4 == 0 && (y % 100 != 0 || y % 400 == 0) {return 29;}
+        DIM[(m-1) as usize] as u32
+    }
+
+    pub fn add(dt: Date, y: u32, mut m: u32, mut d: u32) -> Date {
+        let (mut day, mut month, mut year) = (dt.day(), dt.month(), dt.year());
+        while d > 0 {
+            let diff = cmp::min(days_in_month(month, year)-day, d);
+            day += diff;
+            d -= diff;
+            if d > 0 {
+                day = 0;
+                month += 1;
+                if month > 12 {
+                    year += 1;
+                    month = 1;
+                }
             }
         }
-    }
-    while m > 0 {
-        let diff = cmp::min(12 - month, m);
-        month += diff;
-        m -= diff;
-        if m > 0 {
-            month = 0;
-            year += 1;
+        while m > 0 {
+            let diff = cmp::min(12 - month, m);
+            month += diff;
+            m -= diff;
+            if m > 0 {
+                month = 0;
+                year += 1;
+            }
         }
+        year += y as i32;
+        day = cmp::min(day, days_in_month(month, year));
+        Date::from_ymd(year, month, day)
     }
-    year += y;
-    day = cmp::min(day, days_in_month(month, year));
-    Date::from_ymd(year, month, day)
+
+    pub fn sub(dt: Date, y: u32, mut m: u32, mut d: u32) -> Date {
+        let (mut day, mut month, mut year) = (dt.day(), dt.month(), dt.year());
+        while d > 0 {
+            let diff = cmp::min(day-1, d);
+            day -= diff;
+            d -= diff;
+            if d > 0 {
+                month -= 1;
+                if month < 1 {
+                    month = 12;
+                    year -= 1;
+                }
+                day = 1 + days_in_month(month, year);
+            }
+        }
+        while m > 0 {
+            let diff = cmp::min(month-1, m);
+            month -= diff;
+            m -= diff;
+            if m > 0 {
+                month = 13;
+                year -= 1;
+            }
+        }
+        year -= y as i32;
+        day = cmp::min(day, days_in_month(month, year));
+        Date::from_ymd(year, month, day)
+    }
 }
 
-//pub fn date_sub(dt: Date, y: i32, mut m: u32, mut d: u32) -> Date {
-    //let mut day = dt.day();
-    //let mut month = dt.month();
-    //let mut year = dt.year();
-    //while d > 0 {
-        //let diff = cmp::min(day-1, d);
-        //day -= diff;
-        //d -= diff;
-        //if d > 0 {
-            //month -= 1;
-            //if month < 1 {
-                //month = 12;
-                //year -= 1;
-            //}
-            //day = 1 + days_in_month(month, year);
-        //}
-    //}
-    //while m > 0 {
-        //let diff = cmp::min(month-1, m);
-        //month -= diff;
-        //m -= diff;
-        //if m > 0 {
-            //month = 13;
-            //year -= 1;
-        //}
-    //}
-    //year -= y;
-    //day = cmp::min(day, days_in_month(month, year));
-    //Date::from_ymd(year, month, day)
-//}
 
 // Build a Range enclosing <t> wiht granularity <g>
 //pub fn enclose(t: DateTime, g: Granularity) -> Range {
@@ -173,44 +174,70 @@ pub fn date_add(dt: Date, y: i32, mut m: u32, mut d: u32) -> Date {
     //}
 //}
 
-//#[cfg(test)]
-//mod tests {
-    //use chrono::naive::date::NaiveDate as Date;
-    //use super::{date_add, date_sub, enclose};
-    //use semantics::{Range, Granularity};
-    //#[test]
-    //fn test_dateadd() {
-        //let dt = Date::from_ymd(2016, 9, 5);
-        //assert_eq!(date_add(dt, 0, 0, 30), Date::from_ymd(2016, 10, 5));
-        //assert_eq!(date_add(dt, 0, 0, 1234), Date::from_ymd(2020, 1, 22));
-        //assert_eq!(date_add(dt, 0, 0, 365), Date::from_ymd(2017, 9, 5));
-        //assert_eq!(date_add(dt, 0, 0, 2541), Date::from_ymd(2023, 8, 21));
-        //assert_eq!(date_add(dt, 0, 1, 0), Date::from_ymd(2016, 10, 5));
-        //let dt = Date::from_ymd(2016, 1, 30);
-        //assert_eq!(date_add(dt, 0, 1, 0), Date::from_ymd(2016, 2, 29));
-        //assert_eq!(date_add(dt, 0, 2, 0), Date::from_ymd(2016, 3, 30));
-        //assert_eq!(date_add(dt, 0, 12, 0), Date::from_ymd(2017, 1, 30));
-        //let dt = Date::from_ymd(2016, 12, 31);
-        //assert_eq!(date_add(dt, 0, 1, 0), Date::from_ymd(2017, 1, 31));
-    //}
-    //#[test]
-    //fn test_datesub() {
-        //let dt = Date::from_ymd(2016, 9, 5);
-        //assert_eq!(date_sub(dt, 0, 0, 3), Date::from_ymd(2016, 9, 2));
-        //assert_eq!(date_sub(dt, 0, 0, 6), Date::from_ymd(2016, 8, 30));
-        //assert_eq!(date_sub(dt, 0, 0, 36), Date::from_ymd(2016, 7, 31));
-        //assert_eq!(date_sub(dt, 0, 0, 1234), Date::from_ymd(2013, 4, 20));
-        //assert_eq!(date_sub(dt, 0, 0, 365), Date::from_ymd(2015, 9, 6));
-        //assert_eq!(date_sub(dt, 0, 1, 0), Date::from_ymd(2016, 8, 5));
-        //let dt = Date::from_ymd(2016, 9, 1);
-        //assert_eq!(date_sub(dt, 0, 0, 1), Date::from_ymd(2016, 8, 31));
-        //let dt = Date::from_ymd(2016, 1, 31);
-        //assert_eq!(date_sub(dt, 0, 1, 0), Date::from_ymd(2015, 12, 31));
-        //let dt = Date::from_ymd(2016, 3, 31);
-        //assert_eq!(date_sub(dt, 0, 1, 0), Date::from_ymd(2016, 2, 29));
-        //assert_eq!(date_sub(dt, 0, 2, 0), Date::from_ymd(2016, 1, 31));
-        //assert_eq!(date_sub(dt, 0, 13, 0), Date::from_ymd(2015, 2, 28));
-    //}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn dt(year: i32, month: u32, day: u32) -> Date {
+        Date::from_ymd(year, month, day)
+    }
+    fn dttm(year: i32, month: u32, day: u32) -> DateTime {
+        Date::from_ymd(year, month, day).and_hms(0, 0, 0)
+    }
+
+    #[test]
+    fn test_dateadd() {
+        let d = dt(2016, 9, 5);
+        assert_eq!(dtshift::add(d, 0, 0, 30), dt(2016, 10, 5));
+        assert_eq!(dtshift::add(d, 0, 0, 1234), dt(2020, 1, 22));
+        assert_eq!(dtshift::add(d, 0, 0, 365), dt(2017, 9, 5));
+        assert_eq!(dtshift::add(d, 0, 0, 2541), dt(2023, 8, 21));
+        assert_eq!(dtshift::add(d, 0, 1, 0), dt(2016, 10, 5));
+        let d = dt(2016, 1, 30);
+        assert_eq!(dtshift::add(d, 0, 1, 0), dt(2016, 2, 29));
+        assert_eq!(dtshift::add(d, 0, 2, 0), dt(2016, 3, 30));
+        assert_eq!(dtshift::add(d, 0, 12, 0), dt(2017, 1, 30));
+        let d = dt(2016, 12, 31);
+        assert_eq!(dtshift::add(d, 0, 1, 0), dt(2017, 1, 31));
+    }
+
+    #[test]
+    fn test_datesub() {
+        let d = dt(2016, 9, 5);
+        assert_eq!(dtshift::sub(d, 0, 0, 3), dt(2016, 9, 2));
+        assert_eq!(dtshift::sub(d, 0, 0, 6), dt(2016, 8, 30));
+        assert_eq!(dtshift::sub(d, 0, 0, 36), dt(2016, 7, 31));
+        assert_eq!(dtshift::sub(d, 0, 0, 1234), dt(2013, 4, 20));
+        assert_eq!(dtshift::sub(d, 0, 0, 365), dt(2015, 9, 6));
+        assert_eq!(dtshift::sub(d, 0, 1, 0), dt(2016, 8, 5));
+        let d = dt(2016, 9, 1);
+        assert_eq!(dtshift::sub(d, 0, 0, 1), dt(2016, 8, 31));
+        let d = dt(2016, 1, 31);
+        assert_eq!(dtshift::sub(d, 0, 1, 0), dt(2015, 12, 31));
+        let d = dt(2016, 3, 31);
+        assert_eq!(dtshift::sub(d, 0, 1, 0), dt(2016, 2, 29));
+        assert_eq!(dtshift::sub(d, 0, 2, 0), dt(2016, 1, 31));
+        assert_eq!(dtshift::sub(d, 0, 13, 0), dt(2015, 2, 28));
+    }
+
+    #[test]
+    fn test_shifts() {
+        let d = dttm(2016, 9, 5);
+        assert_eq!(shift_datetime(d, Grain::Day, -3), dttm(2016, 9, 2));
+        assert_eq!(shift_datetime(d, Grain::Day, -36), dttm(2016, 7, 31));
+        assert_eq!(shift_datetime(d, Grain::Day, -1234), dttm(2013, 4, 20));
+        assert_eq!(shift_datetime(d, Grain::Month, -1), dttm(2016, 8, 5));
+        let d = dttm(2016, 1, 31);
+        assert_eq!(shift_datetime(d, Grain::Month, -1), dttm(2015, 12, 31));
+        let d = dttm(2016, 3, 31);
+        assert_eq!(shift_datetime(d, Grain::Month, -27), dttm(2013, 12, 31));
+        assert_eq!(shift_datetime(d, Grain::Month, -2), dttm(2016, 1, 31));
+        assert_eq!(shift_datetime(d, Grain::Month, -13), dttm(2015, 2, 28));
+        let d = dttm(2016, 3, 31);
+        assert_eq!(shift_datetime(d, Grain::Week, 7), dttm(2016, 5, 19));
+        assert_eq!(shift_datetime(d, Grain::Year, -7), dttm(2009, 3, 31));
+        assert_eq!(shift_datetime(d, Grain::Quarter, 2), dttm(2016, 9, 30));
+    }
+
     //#[test]
     //fn test_enclose() {
         //let dt = Date::from_ymd(2016, 9, 5).and_hms(0, 0, 0);
@@ -245,4 +272,4 @@ pub fn date_add(dt: Date, y: i32, mut m: u32, mut d: u32) -> Date {
                        //grain: Granularity::Day
                    //});
     //}
-//}
+}

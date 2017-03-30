@@ -71,15 +71,12 @@ impl Seq {
     pub fn month(month: u32) -> Seq {
         // X-precondition: end-of-month(reftime) > reftime
         Seq(Rc::new(move |reftime: DateTime| {
-            let mut m_end = utils::truncate(reftime, Grain::Month).date();
+            let mut m_end = utils::truncate(reftime, Grain::Month);
             Box::new((0..).map(move |_| {
-                let m_start = utils::find_month(m_end, month);
-                m_end = utils::date_add(m_start, 0, 1, 0);
-                Range{
-                    start: m_start.and_hms(0, 0, 0),
-                    end: m_end.and_hms(0, 0, 0),
-                    grain: Grain::Month
-                }
+                let m_start =
+                    utils::find_month(m_end.date(), month).and_hms(0, 0, 0);
+                m_end = utils::shift_datetime(m_start, Grain::Month, 1);
+                Range{start: m_start, end: m_end, grain: Grain::Month}
             }))
         }))
     }

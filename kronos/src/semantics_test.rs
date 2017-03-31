@@ -263,6 +263,42 @@ fn test_nth_composed() {
                      grain: Grain::Day});
 }
 
+#[test]
+fn test_lastof() {
+    // last weekend of the year
+    let weekendofyear = Seq::lastof(
+        1, Seq::weekend(), Seq::from_grain(Grain::Year));
+    let mut weekendofyear = weekendofyear(dt(2015, 2, 25));
+    assert_eq!(weekendofyear.next().unwrap(),
+               Range{start: dt(2015, 12, 26), end: dt(2015, 12, 28),
+                     grain: Grain::Day});
+    assert_eq!(weekendofyear.next().unwrap(),
+               Range{start: dt(2016, 12, 31), end: dt(2017, 1, 2),
+                     grain: Grain::Day});
+
+    // 2nd-to-last day of february
+    let daybeforelastfeb = Seq::lastof(
+        2, Seq::from_grain(Grain::Day), Seq::month(2));
+    let mut daybeforelastfeb = daybeforelastfeb(dt(2015, 2, 25));
+    assert_eq!(daybeforelastfeb.next().unwrap(),
+               Range{start: dt(2015, 2, 27), end: dt(2015, 2, 28),
+                     grain: Grain::Day});
+    assert_eq!(daybeforelastfeb.next().unwrap(),
+               Range{start: dt(2016, 2, 28), end: dt(2016, 2, 29),
+                     grain: Grain::Day});
+
+    // 29th-to-last day of feb
+    let daybeforelastfeb = Seq::lastof(
+        29, Seq::from_grain(Grain::Day), Seq::month(2));
+    let mut daybeforelastfeb = daybeforelastfeb(dt(2015, 2, 25));
+    assert_eq!(daybeforelastfeb.next().unwrap(),
+               Range{start: dt(2016, 2, 1), end: dt(2016, 2, 2),
+                     grain: Grain::Day});
+    assert_eq!(daybeforelastfeb.next().unwrap(),
+               Range{start: dt(2020, 2, 1), end: dt(2020, 2, 2),
+                     grain: Grain::Day});
+}
+
 //#[test]
 //fn test_intersect_2() {
     //let reftime = Date::from_ymd(2016, 2, 25).and_hms(0, 0, 0);

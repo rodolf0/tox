@@ -3,6 +3,7 @@ use chrono::{Datelike, Weekday};
 
 use std::ops;
 use std::rc::Rc;
+use std::collections::VecDeque;
 use utils::{Duration, DateTime, Date};
 use utils;
 
@@ -95,6 +96,7 @@ impl Seq {
     pub fn nthof(n: usize, win: Seq, frame: Seq) -> Seq {
         // 1. X-invariant: end-of-frame(reftime) > reftime
         // 2. X-invariant: end-of-win-1(outer.start) > outer.start
+        assert!(n > 0);
         Seq(Rc::new(move |reftime| {
             let win = win.clone();
             Box::new(frame(reftime).flat_map(move |outer|
@@ -110,6 +112,50 @@ impl Seq {
             ))
         }))
     }
+
+    pub fn lastof(n: usize, win: Seq, frame: Seq) -> Seq {
+        // 1. X-invariant: end-of-frame(reftime) > reftime
+        // 2. X-invariant: end-of-win-1(outer.start) > outer.start
+        assert!(n > 0);
+        Seq(Rc::new(move |reftime| {
+            let win = win.clone();
+            Box::new(frame(reftime).flat_map(move |outer| {
+                let mut buf = VecDeque::new();
+                for inner in win(outer.start) {
+                    if inner.start >= outer.end {
+                        return buf.remove(n-1);
+                    }
+                    buf.push_front(inner);
+                    if buf.len() > n {
+                        buf.pop_back();
+                    }
+                }
+                None
+            }))
+        }))
+    }
+
+//pub fn intersect(a: Seq, b: Seq) -> Seq {
+    //let (a, b) = { // a is the seq with shortest duration items
+        //let testtm = Date::from_ymd(2000, 1, 1).and_hms(0, 0, 0);
+        //let x = a(testtm).next().unwrap();
+        //let y = b(testtm).next().unwrap();
+        //match (y.end - y.start) < (x.end - x.start) {
+            //true => (b, a), false => (a, b)
+        //}
+    //};
+    //Rc::new(move |reftime| {
+        //let a = a.clone();
+        //let align = b(reftime).next().unwrap().start;
+        //Box::new(b(reftime)
+                 //.take(EMPTY_FUSE)
+                 //.flat_map(move |outer| {
+            //a(align).skip_while(move |inner| inner.start < outer.start)
+                    //.take_while(move |inner| inner.end <= outer.end)
+        //})) //.skip_while(move |range| range.end < reftime))
+    //})
+//}
+
 }
 
 impl Seq {
@@ -236,63 +282,6 @@ impl Seq {
     //})
 //}
 
-//pub fn lastof(n: usize, win: Seq, within: Seq) -> Seq {
-    //// For a predictable outcome you probably want aligned sequences
-    //// 1. take an instance of <within>
-    //// 2. cycle to the n-th instance if <win> within <within>
-    //{   // assert win-item.duration < within-item.duration
-        //let testtm = Date::from_ymd(2000, 1, 1).and_hms(0, 0, 0);
-        //let a = win(testtm).next().unwrap();
-        //let b = within(testtm).next().unwrap();
-        //assert!((a.end - a.start) <= (b.end - b.start));
-    //}
-    //Rc::new(move |reftime| {
-        //let win = win.clone();
-        //let align = within(reftime).next().unwrap().start;
-        ////println!("ref={:?} align={:?}, win={:?}",
-                 ////reftime, align, win(align).next().unwrap());
-        //Box::new(within(reftime)
-                    //.take(EMPTY_FUSE)
-                    //.filter_map(move |outer| {
-            //// we restart <win> each time instead of continuing because we
-            //// could have overflowed the outer interval and we cant miss items
-            //// See note X on the skip_while filter, could be inner.start < outer.start
-            //let witems = win(align).skip_while(|inner| inner.end <= outer.start);
-            //let mut buf = VecDeque::new();
-            //for inner in witems {
-                //if inner.start >= outer.end {
-                    //return Some(buf[n-1]);
-                //}
-                //buf.push_front(inner);
-                //if buf.len() > n {
-                    //buf.pop_back();
-                //}
-            //}
-            //None
-        //})) //.skip_while(move |range| range.end < reftime))
-    //})
-//}
-
-//pub fn intersect(a: Seq, b: Seq) -> Seq {
-    //let (a, b) = { // a is the seq with shortest duration items
-        //let testtm = Date::from_ymd(2000, 1, 1).and_hms(0, 0, 0);
-        //let x = a(testtm).next().unwrap();
-        //let y = b(testtm).next().unwrap();
-        //match (y.end - y.start) < (x.end - x.start) {
-            //true => (b, a), false => (a, b)
-        //}
-    //};
-    //Rc::new(move |reftime| {
-        //let a = a.clone();
-        //let align = b(reftime).next().unwrap().start;
-        //Box::new(b(reftime)
-                 //.take(EMPTY_FUSE)
-                 //.flat_map(move |outer| {
-            //a(align).skip_while(move |inner| inner.start < outer.start)
-                    //.take_while(move |inner| inner.end <= outer.end)
-        //})) //.skip_while(move |range| range.end < reftime))
-    //})
-//}
 
 //pub fn skip(s: Seq, n: usize) -> Seq {
     //Rc::new(move |reftime| { Box::new(s(reftime).skip(n)) })

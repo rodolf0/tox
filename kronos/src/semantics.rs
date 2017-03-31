@@ -3,7 +3,7 @@ use chrono::{Datelike, Weekday};
 
 use std::ops;
 use std::rc::Rc;
-use utils::{Duration, DateTime};
+use utils::{Duration, DateTime, Date};
 use utils;
 
 #[derive(Debug,PartialEq,Eq,PartialOrd,Ord,Clone,Copy)]
@@ -33,11 +33,6 @@ impl ops::Deref for Seq {
     fn deref(&self) -> &Self::Target { &self.0 }
 }
 
-//enum TmDir {
-    //Future,
-    //Past,
-//}
-
 //// NOTES
 //// X: Sequences generate Ranges that have ENDtime after reference-time,
 ////    they may contain the reference time or start after if discontinuous.
@@ -57,8 +52,8 @@ impl Seq {
     }
 
     pub fn weekday(dow: u32) -> Seq {
-        // given X-precondition: end-of-day(reftime-shifted-to-dow) > reftime
-        Seq(Rc::new(move |reftime: DateTime| {
+        // given X-invariant: end-of-day(reftime-shifted-to-dow) > reftime
+        Seq(Rc::new(move |reftime| {
             let base = utils::find_dow(reftime.date(), dow).and_hms(0, 0, 0);
             Box::new((0..).map(move |x| Range{
                 start: base + Duration::days(x * 7),
@@ -69,8 +64,8 @@ impl Seq {
     }
 
     pub fn month(month: u32) -> Seq {
-        // X-precondition: end-of-month(reftime) > reftime
-        Seq(Rc::new(move |reftime: DateTime| {
+        // X-invariant: end-of-month(reftime) > reftime
+        Seq(Rc::new(move |reftime| {
             let mut m_end = utils::truncate(reftime, Grain::Month);
             Box::new((0..).map(move |_| {
                 let m_start =
@@ -82,7 +77,7 @@ impl Seq {
     }
 
     pub fn weekend() -> Seq {
-        Seq(Rc::new(|reftime: DateTime| {
+        Seq(Rc::new(|reftime| {
             let mut base = reftime.date();
             if base.weekday() == Weekday::Sun { base = base.pred(); }
             while base.weekday() != Weekday::Sat { base = base.succ(); }
@@ -96,7 +91,48 @@ impl Seq {
             }))
         }))
     }
+
+    pub fn nthof(n: usize, win: Seq, frame: Seq) -> Seq {
+        // 1. X-invariant: end-of-frame(reftime) > reftime
+        // 2. X-invariant: end-of-win-1(outer.start) > outer.start
+        Seq(Rc::new(move |reftime| {
+            let win = win.clone();
+            Box::new(frame(reftime).flat_map(move |outer|
+                win(outer.start)
+                    // nth window must start within frame of reference
+                    .take_while(|inner| {
+                        // check inner <win> can be contained within frame
+                        // NOTE: most probably not needed
+                        assert!(inner.end.signed_duration_since(inner.start) <=
+                                outer.end.signed_duration_since(outer.start));
+                        inner.start < outer.end
+                    }).nth(n-1)
+            ))
+        }))
+    }
 }
+
+impl Seq {
+    pub fn summer() -> Seq {
+        // 21st Jun - 21 Sep
+        Seq(Rc::new(move |mut tm| {
+            // find summer
+            while (tm.month() < 6 || (tm.month() == 6 && tm.day() < 21)) ||
+                  (tm.month() > 9 || (tm.month() == 9 && tm.day() >= 21)) {
+                tm = utils::shift_datetime(tm, Grain::Day, 1);
+            }
+            let tm = Date::from_ymd(tm.year(), 6, 21).and_hms(0, 0, 0);
+            let tn = Date::from_ymd(tm.year(), 9, 21).and_hms(0, 0, 0);
+            Box::new((0..).map(move |x| Range{
+                start: utils::shift_datetime(tm, Grain::Year, x),
+                end: utils::shift_datetime(tn, Grain::Year, x),
+                grain: Grain::Quarter
+            }))
+        }))
+    }
+}
+
+
 
 
 //impl<S: AsRef<str>> From<S> for Granularity {
@@ -197,35 +233,6 @@ impl Seq {
         //let mut ns = s(reftime);
         //let tend = ns.next().unwrap();
         //Box::new(MergeIt{it: ns, tend: tend, n: n})
-    //})
-//}
-
-//pub fn nthof(n: usize, win: Seq, within: Seq) -> Seq {
-    //// For a predictable outcome you probably want aligned sequences
-    //// 1. take an instance of <within>
-    //// 2. cycle to the n-th instance if <win> within <within>
-    //{   // assert win-item.duration < within-item.duration
-        //let testtm = Date::from_ymd(2000, 1, 1).and_hms(0, 0, 0);
-        //let a = win(testtm).next().unwrap();
-        //let b = within(testtm).next().unwrap();
-        //assert!((a.end - a.start) <= (b.end - b.start));
-    //}
-    //Rc::new(move |reftime| {
-        //let win = win.clone();
-        //let align = within(reftime).next().unwrap().start;
-        ////println!("ref={:?} align={:?}, win={:?}",
-                 ////reftime, align, win(align).next().unwrap());
-        //Box::new(within(reftime)
-                    //.take(EMPTY_FUSE)
-                    //.filter_map(move |outer| {
-            //// we restart <win> each time instead of continuing because we
-            //// could have overflowed the outer interval and we cant miss items
-            //// See note X on the skip_while filter, could be inner.start < outer.start
-            //win(align).skip_while(|inner| inner.end <= outer.start)
-                      //// Could enforce x.start >= outer.start
-                      //.take_while(|inner| inner.end <= outer.end)
-                      //.nth(n - 1)
-        //})) //.skip_while(move |range| range.end < reftime))
     //})
 //}
 

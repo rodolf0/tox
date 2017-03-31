@@ -99,6 +99,16 @@ fn test_seq_grain() {
                      grain: Grain::Year});
 }
 
+#[test]
+fn test_seq_summer() {
+    let mut summer = Seq::summer()(dt(2015, 9, 22));
+    assert_eq!(summer.next().unwrap(),
+               Range{start: dt(2016, 6, 21), end: dt(2016, 9, 21),
+                     grain: Grain::Quarter});
+    assert_eq!(summer.next().unwrap(),
+               Range{start: dt(2017, 6, 21), end: dt(2017, 9, 21),
+                     grain: Grain::Quarter});
+}
 
 //#[test]
 //fn test_merge() {
@@ -127,149 +137,131 @@ fn test_seq_grain() {
                 //grain: Granularity::Day});
 //}
 
-//#[test]
-//fn test_nth_1() {
-    //let reftime = Date::from_ymd(2016, 2, 2).and_hms(0, 0, 0);
-    //// 3rd day of the month
-    //let mut day3 = s::nthof(3, s::day(), s::month())(reftime);
-    //assert_eq!(day3.next().unwrap(),
-               //Range{
-                //start: Date::from_ymd(2016, 2, 3).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 2, 4).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-    //assert_eq!(day3.next().unwrap(),
-               //Range{
-                //start: Date::from_ymd(2016, 3, 3).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 3, 4).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-//}
+#[test]
+fn test_nth_basic() {
+    // 3rd day of the month
+    let day3 = Seq::nthof(
+        3, Seq::from_grain(Grain::Day), Seq::from_grain(Grain::Month));
+    let mut day3 = day3(dt(2016, 2, 2));
+    assert_eq!(day3.next().unwrap(),
+               Range{start: dt(2016, 2, 3), end: dt(2016, 2, 4),
+                     grain: Grain::Day});
+    assert_eq!(day3.next().unwrap(),
+               Range{start: dt(2016, 3, 3), end: dt(2016, 3, 4),
+                     grain: Grain::Day});
 
-//#[test]
-//fn test_nth_2() {
-    //let reftime = Date::from_ymd(2016, 2, 10).and_hms(0, 0, 0);
-    //// 3rd tuesday of the month
-    //let mut tue3mo = s::nthof(3, s::day_of_week(2), s::month())(reftime);
-    //assert_eq!(tue3mo.next().unwrap(),
-               //Range{
-                //start: Date::from_ymd(2016, 2, 16).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 2, 17).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-    //assert_eq!(tue3mo.next().unwrap(),
-               //Range{
-                //start: Date::from_ymd(2016, 3, 15).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 3, 16).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-//}
+    // 3rd tuesday of the month
+    let tue3mo = Seq::nthof(
+        3, Seq::weekday(2), Seq::from_grain(Grain::Month));
+    let mut tue3mo = tue3mo(dt(2016, 2, 10));
+    assert_eq!(tue3mo.next().unwrap(),
+               Range{start: dt(2016, 2, 16), end: dt(2016, 2, 17),
+                     grain: Grain::Day});
+    assert_eq!(tue3mo.next().unwrap(),
+               Range{start: dt(2016, 3, 15), end: dt(2016, 3, 16),
+                     grain: Grain::Day});
 
-//#[test]
-//fn test_nth_3() {
-    //let reftime = Date::from_ymd(2016, 2, 23).and_hms(0, 0, 0);
-    //// 4th month of the year
-    //let mut years4thmo = s::nthof(4, s::month(), s::year())(reftime);
-    //assert_eq!(years4thmo.next().unwrap(),
-               //Range{
-                //start: Date::from_ymd(2016, 4, 1).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 5, 1).and_hms(0, 0, 0),
-                //grain: Granularity::Month});
-    //assert_eq!(years4thmo.next().unwrap(),
-               //Range{
-                //start: Date::from_ymd(2017, 4, 1).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2017, 5, 1).and_hms(0, 0, 0),
-                //grain: Granularity::Month});
-//}
+    // 4th month of the year
+    let years4thmo = Seq::nthof(
+        4, Seq::from_grain(Grain::Month), Seq::from_grain(Grain::Year));
+    let mut years4thmo =  years4thmo(dt(2016, 2, 23));
+    assert_eq!(years4thmo.next().unwrap(),
+               Range{start: dt(2016, 4, 1), end: dt(2016, 5, 1),
+                     grain: Grain::Month});
+    assert_eq!(years4thmo.next().unwrap(),
+               Range{start: dt(2017, 4, 1), end: dt(2017, 5, 1),
+                     grain: Grain::Month});
 
-//#[test]
-//fn test_nth_4() {
-    //let reftime = Date::from_ymd(2015, 2, 25).and_hms(0, 0, 0);
-    //// 29th of february
-    //let mut feb29th = s::nthof(29, s::day(), s::month_of_year(2))(reftime);
-    //assert_eq!(feb29th.next().unwrap(),
-               //Range{
-                //start: Date::from_ymd(2016, 2, 29).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 3, 1).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-    //assert_eq!(feb29th.next().unwrap(),
-               //Range{
-                //start: Date::from_ymd(2020, 2, 29).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2020, 3, 1).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-//}
+    // 1st day every month
+    let first = Seq::nthof(
+        1, Seq::from_grain(Grain::Day), Seq::from_grain(Grain::Month));
+    let mut first = first(dt(2016, 8, 31));
+    assert_eq!(first.next().unwrap(),
+               Range{start: dt(2016, 8, 1), end: dt(2016, 8, 2),
+                     grain: Grain::Day});
+    assert_eq!(first.next().unwrap(),
+               Range{start: dt(2016, 9, 1), end: dt(2016, 9, 2),
+                     grain: Grain::Day});
 
-//#[test]
-//fn test_nth_5() {
-    //let reftime = Date::from_ymd(2015, 3, 11).and_hms(0, 0, 0);
-    //let mo10th = s::nthof(10, s::day(), s::month());
-    //// the 5th 10th-day-of-the-month (each year)
-    //let mut y5th10thday = s::nthof(5, mo10th, s::year())(reftime);
-    //assert_eq!(y5th10thday.next().unwrap(),
-               //Range{
-                //start: Date::from_ymd(2015, 5, 10).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2015, 5, 11).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-    //assert_eq!(y5th10thday.next().unwrap(),
-               //Range{
-                //start: Date::from_ymd(2016, 5, 10).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 5, 11).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-//}
+    // 3rd week of june
+    let thirdwkjune =
+        Seq::nthof(3, Seq::from_grain(Grain::Week), Seq::month(6));
+    let mut thirdwkjune = thirdwkjune(dt(2016, 9, 4));
+    assert_eq!(thirdwkjune.next().unwrap(),
+               Range{start: dt(2017, 6, 11), end: dt(2017, 6, 18),
+                     grain: Grain::Week});
+    assert_eq!(thirdwkjune.next().unwrap(),
+               Range{start: dt(2018, 6, 10), end: dt(2018, 6, 17),
+                     grain: Grain::Week});
 
-//#[test]
-//fn test_nth_6() {
-    //let reftime = Date::from_ymd(2016, 8, 31).and_hms(0, 0, 0);
-    //let mut first = s::nthof(1, s::day(), s::month())(reftime);
-    //assert_eq!(first.next().unwrap(),
-               //Range{
-                //start: Date::from_ymd(2016, 8, 1).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 8, 2).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-    //let mut thirtyfirst = s::nthof(31, s::day(), s::month())(reftime);
-    //assert_eq!(thirtyfirst.next().unwrap(),
-               //Range{
-                //start: Date::from_ymd(2016, 8, 31).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 9, 1).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-//}
+    // 28th of june
+    let jun28th =
+        Seq::nthof(28, Seq::from_grain(Grain::Day), Seq::month(6));
+    let mut jun28th = jun28th(dt(2016, 2, 25));
+    assert_eq!(jun28th.next().unwrap(),
+               Range{start: dt(2016, 6, 28), end: dt(2016, 6, 29),
+                     grain: Grain::Day});
+    assert_eq!(jun28th.next().unwrap(),
+               Range{start: dt(2017, 6, 28), end: dt(2017, 6, 29),
+                     grain: Grain::Day});
+}
 
-//#[test]
-//fn test_nth_7() {
-    //let reftime = Date::from_ymd(2016, 9, 4).and_hms(0, 0, 0);
-    //let mut thirdwkjune = s::nthof(3, s::week(), s::month_of_year(6))(reftime);
-    //assert_eq!(thirdwkjune.next().unwrap(),
-               //Range{
-                //start: Date::from_ymd(2017, 6, 11).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2017, 6, 18).and_hms(0, 0, 0),
-                //grain: Granularity::Week});
-//}
+#[test]
+fn test_nth_discontinuous() {
+    // 29th of february
+    let feb29th = Seq::nthof(
+        29, Seq::from_grain(Grain::Day), Seq::month(2));
+    let mut feb29th = feb29th(dt(2015, 2, 25));
+    assert_eq!(feb29th.next().unwrap(),
+               Range{start: dt(2016, 2, 29), end: dt(2016, 3, 1),
+                     grain: Grain::Day});
+    assert_eq!(feb29th.next().unwrap(),
+               Range{start: dt(2020, 2, 29), end: dt(2020, 3, 1),
+                     grain: Grain::Day});
 
-//#[test]
-//fn test_nth_8() {
-    //let reftime = Date::from_ymd(2016, 9, 4).and_hms(0, 0, 0);
-    //let mut firstwkendjan = s::nthof(1, s::weekend(), s::month_of_year(1))(reftime);
-    //assert_eq!(firstwkendjan.next().unwrap(),
-               //Range{
-                //start: Date::from_ymd(2016, 12, 31).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2017, 1, 2).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-//}
+    let thirtyfirst = Seq::nthof(
+        31, Seq::from_grain(Grain::Day), Seq::from_grain(Grain::Month));
+    let mut thirtyfirst = thirtyfirst(dt(2016, 8, 31));
+    assert_eq!(thirtyfirst.next().unwrap(),
+               Range{start: dt(2016, 8, 31), end: dt(2016, 9, 1),
+                     grain: Grain::Day});
+    assert_eq!(thirtyfirst.next().unwrap(),
+               Range{start: dt(2016, 10, 31), end: dt(2016, 11, 1),
+                     grain: Grain::Day});
+    assert_eq!(thirtyfirst.next().unwrap(),
+               Range{start: dt(2016, 12, 31), end: dt(2017, 1, 1),
+                     grain: Grain::Day});
+    assert_eq!(thirtyfirst.next().unwrap(),
+               Range{start: dt(2017, 1, 31), end: dt(2017, 2, 1),
+                     grain: Grain::Day});
+}
 
-//#[test]
-//fn test_intersect_1() {
-    //let reftime = Date::from_ymd(2016, 2, 25).and_hms(0, 0, 0);
-    //// 28th of june
-    //let mut jun28th = s::intersect(
-        //s::month_of_year(6),
-        //s::nthof(28, s::day(), s::month()))(reftime);
-    //assert_eq!(jun28th.next().unwrap(),
-               //Range{
-                //start: Date::from_ymd(2016, 6, 28).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 6, 29).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-    //assert_eq!(jun28th.next().unwrap(),
-               //Range{
-                //start: Date::from_ymd(2017, 6, 28).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2017, 6, 29).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-//}
+#[test]
+fn test_nth_non_aligned() {
+    let firstwkendjan = Seq::nthof(1, Seq::weekend(), Seq::month(1));
+    let mut firstwkendjan = firstwkendjan(dt(2016, 9, 4));
+    assert_eq!(firstwkendjan.next().unwrap(),
+               Range{start: dt(2016, 12, 31), end: dt(2017, 1, 2),
+                     grain: Grain::Day});
+    assert_eq!(firstwkendjan.next().unwrap(),
+               Range{start: dt(2018, 1, 6), end: dt(2018, 1, 8),
+                     grain: Grain::Day});
+}
+
+#[test]
+fn test_nth_composed() {
+    // the 5th instance of 10th-day-of-the-month (each year) aka May 10th
+    let mo10th = Seq::nthof(
+        10, Seq::from_grain(Grain::Day), Seq::from_grain(Grain::Month));
+    let y5th10thday = Seq::nthof(5, mo10th, Seq::from_grain(Grain::Year));
+    let mut y5th10thday = y5th10thday(dt(2015, 3, 11));
+    assert_eq!(y5th10thday.next().unwrap(),
+               Range{start: dt(2015, 5, 10), end: dt(2015, 5, 11),
+                     grain: Grain::Day});
+    assert_eq!(y5th10thday.next().unwrap(),
+               Range{start: dt(2016, 5, 10), end: dt(2016, 5, 11),
+                     grain: Grain::Day});
+}
 
 //#[test]
 //fn test_intersect_2() {

@@ -1,7 +1,7 @@
 extern crate chrono;
 use chrono::{Datelike, Weekday};
 
-use std::ops;
+use std::{ops, cmp};
 use std::rc::Rc;
 use std::collections::VecDeque;
 use utils::{Duration, DateTime, Date};
@@ -135,27 +135,39 @@ impl Seq {
         }))
     }
 
-//pub fn intersect(a: Seq, b: Seq) -> Seq {
-    //let (a, b) = { // a is the seq with shortest duration items
-        //let testtm = Date::from_ymd(2000, 1, 1).and_hms(0, 0, 0);
-        //let x = a(testtm).next().unwrap();
-        //let y = b(testtm).next().unwrap();
-        //match (y.end - y.start) < (x.end - x.start) {
-            //true => (b, a), false => (a, b)
-        //}
-    //};
-    //Rc::new(move |reftime| {
-        //let a = a.clone();
-        //let align = b(reftime).next().unwrap().start;
-        //Box::new(b(reftime)
-                 //.take(EMPTY_FUSE)
-                 //.flat_map(move |outer| {
-            //a(align).skip_while(move |inner| inner.start < outer.start)
-                    //.take_while(move |inner| inner.end <= outer.end)
-        //})) //.skip_while(move |range| range.end < reftime))
-    //})
-//}
+    // eg: next 28th on a weekend
+    //     monday the 3rd
+    //     thursday at 3pm
+    pub fn intersect(a: Seq, b: Seq) -> Seq {
+        Seq(Rc::new(move |reftime| {
+            let mut astream = a(reftime).peekable();
+            let mut bstream = b(reftime).peekable();
 
+            let mut anext = astream.peek().unwrap().clone();
+            let mut bnext = bstream.peek().unwrap().clone();
+
+            Box::new((0..).map(move |_| loop {
+                if anext.end <= bnext.start {
+                    astream.next();
+                    anext = astream.peek().unwrap().clone();
+                } else if anext.start >= bnext.end {
+                    bstream.next();
+                    bnext = bstream.peek().unwrap().clone();
+                } else {
+                    let ret = anext.intersect(&bnext).unwrap();
+                    if anext.end <= bnext.end {
+                        astream.next();
+                        anext = astream.peek().unwrap().clone();
+                    } else {
+                        bstream.next();
+                        bnext = bstream.peek().unwrap().clone();
+                    }
+                    // invariant: ranges overlap
+                    return ret;
+                }
+            }))
+        }))
+    }
 }
 
 impl Seq {
@@ -176,9 +188,30 @@ impl Seq {
             }))
         }))
     }
+
+    //pub fn afternoon() -> Seq {
+        //// 12pm - 6pm interval
+    //}
 }
 
 
+impl Range {
+    pub fn intersect(&self, other: &Range) -> Option<Range> {
+        match self.start < other.end && self.end > other.start {
+            false => None,
+            true => Some(Range{
+                start: cmp::max(self.start, other.start),
+                end: cmp::min(self.end, other.end),
+                // TODO: ranges that span compound grains (eg: weekend) should still work?
+                grain: cmp::min(self.grain, other.grain)
+            })
+        }
+    }
+
+    pub fn len(&self) -> Duration {
+        self.end.signed_duration_since(self.start)
+    }
+}
 
 
 //impl<S: AsRef<str>> From<S> for Granularity {

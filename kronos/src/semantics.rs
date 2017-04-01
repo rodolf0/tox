@@ -26,6 +26,8 @@ pub struct Range {
     pub grain: Grain,
 }
 
+const INFINITE_FUSE: u16 = 100;
+
 #[derive(Clone)]
 pub struct Seq(Rc<Fn(DateTime)->Box<Iterator<Item=Range>>>);
 
@@ -99,8 +101,9 @@ impl Seq {
         assert!(n > 0);
         Seq(Rc::new(move |reftime| {
             let win = win.clone();
-            Box::new(frame(reftime).flat_map(move |outer|
-                win(outer.start)
+            let mut fuse = 0;
+            Box::new(frame(reftime)
+                .map(move |outer| win(outer.start)
                     // nth window must start within frame of reference
                     .take_while(|inner| {
                         // check inner <win> can be contained within frame
@@ -108,8 +111,15 @@ impl Seq {
                         assert!(inner.end.signed_duration_since(inner.start) <=
                                 outer.end.signed_duration_since(outer.start));
                         inner.start < outer.end
-                    }).nth(n-1)
-            ))
+                    }).nth(n-1))
+                .flat_map(move |nth| {
+                    fuse = if nth.is_some() { 0 } else { fuse + 1 };
+                    if fuse >= INFINITE_FUSE {
+                        panic!("Seq::nthof INFINITE_FUSE blown");
+                    }
+                    nth
+                })
+            )
         }))
     }
 
@@ -119,42 +129,43 @@ impl Seq {
         assert!(n > 0);
         Seq(Rc::new(move |reftime| {
             let win = win.clone();
-            Box::new(frame(reftime).flat_map(move |outer| {
-                let mut buf = VecDeque::new();
-                for inner in win(outer.start) {
-                    if inner.start >= outer.end {
-                        return buf.remove(n-1);
+            let mut fuse = 0;
+            Box::new(frame(reftime)
+                .map(move |outer| {
+                    let mut buf = VecDeque::new();
+                    for inner in win(outer.start) {
+                        if inner.start >= outer.end {
+                            return buf.remove(n-1);
+                        }
+                        buf.push_front(inner);
+                        if buf.len() > n {
+                            buf.pop_back();
+                        }
                     }
-                    buf.push_front(inner);
-                    if buf.len() > n {
-                        buf.pop_back();
+                    None
+                })
+                .flat_map(move |nth| {
+                    fuse = if nth.is_some() { 0 } else { fuse + 1 };
+                    if fuse >= INFINITE_FUSE {
+                        panic!("Seq::nthof INFINITE_FUSE blown");
                     }
-                }
-                None
-            }))
+                    nth
+                })
+            )
         }))
     }
 
-    // eg: next 28th on a weekend
-    //     monday the 3rd
-    //     thursday at 3pm
     pub fn intersect(a: Seq, b: Seq) -> Seq {
         Seq(Rc::new(move |reftime| {
             let mut astream = a(reftime).peekable();
             let mut bstream = b(reftime).peekable();
-
             let mut anext = astream.peek().unwrap().clone();
             let mut bnext = bstream.peek().unwrap().clone();
-
-            Box::new((0..).map(move |_| loop {
-                if anext.end <= bnext.start {
-                    astream.next();
-                    anext = astream.peek().unwrap().clone();
-                } else if anext.start >= bnext.end {
-                    bstream.next();
-                    bnext = bstream.peek().unwrap().clone();
-                } else {
-                    let ret = anext.intersect(&bnext).unwrap();
+            // |--- a ---|
+            //   |--- b ---|
+            Box::new((0..).map(move |_| {
+                for _ in 0..INFINITE_FUSE {
+                    let overlap = anext.intersect(&bnext);
                     if anext.end <= bnext.end {
                         astream.next();
                         anext = astream.peek().unwrap().clone();
@@ -162,9 +173,9 @@ impl Seq {
                         bstream.next();
                         bnext = bstream.peek().unwrap().clone();
                     }
-                    // invariant: ranges overlap
-                    return ret;
+                    if let Some(ovp) = overlap { return ovp; }
                 }
+                panic!("Seq::intersect INFINITE_FUSE blown");
             }))
         }))
     }
@@ -192,6 +203,21 @@ impl Seq {
     //pub fn afternoon() -> Seq {
         //// 12pm - 6pm interval
     //}
+
+
+    //pub fn this(&self, r: DateTime) -> Range {
+        //self.0(r).next().unwrap()
+    //}
+
+    //pub fn next(s: Seq, n: usize, r: DateTime) -> Range {
+        //assert!(n > 0);
+        //let mut seq = s(r);
+        //let mut nxt = seq.next();
+        //// see X note above
+        //if nxt.unwrap().start <= r { nxt = seq.next(); }
+        //for _ in 0..n-1 { nxt = seq.next(); }
+        //nxt.unwrap()
+    //}
 }
 
 
@@ -210,6 +236,19 @@ impl Range {
 
     pub fn len(&self) -> Duration {
         self.end.signed_duration_since(self.start)
+    }
+
+    pub fn shift(&self, g: Grain, n: i32) -> Range {
+        Range{
+            start: utils::shift_datetime(self.start, g, n),
+            end: utils::shift_datetime(self.end, g, n),
+            grain: self.grain
+        }
+    }
+
+    pub fn from_grain(d: DateTime, g: Grain) -> Range {
+        let start = utils::truncate(d, g);
+        Range{start: start, end: utils::shift_datetime(start, g, 1), grain: g}
     }
 }
 
@@ -271,21 +310,6 @@ impl Range {
     //}
 
 ////}
-
-
-    //pub fn this(s: Seq, r: DateTime) -> Range {
-        //s(r).next().unwrap()
-    //}
-
-    //pub fn next(s: Seq, n: usize, r: DateTime) -> Range {
-        //assert!(n > 0);
-        //let mut seq = s(r);
-        //let mut nxt = seq.next();
-        //// see X note above
-        //if nxt.unwrap().start <= r { nxt = seq.next(); }
-        //for _ in 0..n-1 { nxt = seq.next(); }
-        //nxt.unwrap()
-    //}
 
 
 

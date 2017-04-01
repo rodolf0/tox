@@ -165,6 +165,16 @@ fn test_nth_basic() {
                Range{start: dt(2016, 3, 15), end: dt(2016, 3, 16),
                      grain: Grain::Day});
 
+    // 2nd monday of april
+    let secmonapr = Seq::nthof(2, Seq::weekday(1), Seq::month(4));
+    let mut secmonapr = secmonapr(dt(2016, 2, 25));
+    assert_eq!(secmonapr.next().unwrap(),
+               Range{start: dt(2016, 4, 11), end: dt(2016, 4, 12),
+                     grain: Grain::Day});
+    assert_eq!(secmonapr.next().unwrap(),
+               Range{start: dt(2017, 4, 10), end: dt(2017, 4, 11),
+                     grain: Grain::Day});
+
     // 4th month of the year
     let years4thmo = Seq::nthof(
         4, Seq::from_grain(Grain::Month), Seq::from_grain(Grain::Year));
@@ -238,6 +248,25 @@ fn test_nth_discontinuous() {
     assert_eq!(thirtyfirst.next().unwrap(),
                Range{start: dt(2017, 1, 31), end: dt(2017, 2, 1),
                      grain: Grain::Day});
+}
+
+#[test]
+#[should_panic]
+fn test_nthof_fuse() {
+    let thirtysecond = Seq::nthof(
+        32, Seq::from_grain(Grain::Day), Seq::from_grain(Grain::Month));
+    let mut thirtysecond = thirtysecond(dt(2016, 8, 31));
+    thirtysecond.next();
+}
+
+#[test]
+#[should_panic]
+fn test_lastof_fuse() {
+    // 32nd-to-last day of month
+    let badlastof = Seq::lastof(
+        32, Seq::from_grain(Grain::Day), Seq::from_grain(Grain::Month));
+    let mut badlastof = badlastof(dt(2015, 2, 25));
+    badlastof.next();
 }
 
 #[test]

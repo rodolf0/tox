@@ -179,6 +179,71 @@ impl Seq {
             }))
         }))
     }
+
+    pub fn shift(seq: Seq, g: Grain, n: i32) -> Seq {
+        Seq(Rc::new(move |reftime| Box::new(
+            seq(reftime).map(move |r| Range{
+                start: utils::shift_datetime(r.start, g, n),
+                end: utils::shift_datetime(r.end, g, n),
+                grain: r.grain
+            }))))
+    }
+
+    // apply a transform to each range emited by seq
+    // to suppress a value emit Option::None
+    pub fn map(seq: Seq, f: Rc<Fn(Range)->Option<Range>>) -> Seq {
+        Seq(Rc::new(move |reftime| {
+            let f = f.clone();
+            Box::new(seq(reftime).filter_map(move |r| f(r)))
+        }))
+    }
+
+    // duckling intervals http://tinyurl.com/hk2vu34
+    // eg: 2nd monday of june to next month, tuesday to friday
+    // NOTE: the first range emitted may not contain 'reftime' if 'reftime'
+    // is not contained within the first element of the <from> sequence
+    pub fn interval(from: Seq, to: Seq, inclusive: bool) -> Seq {
+        Seq(Rc::new(move |reftime| {
+            let to = to.clone();
+            let mut fuse = 0;
+            Box::new(from(reftime).map(move |ibegin| {
+                let iend = to(ibegin.start).next().unwrap();
+                let range = match inclusive {
+                    true => Range{
+                        start: ibegin.start,
+                        end: iend.end,
+                        grain: ibegin.grain},
+                    false => Range{
+                        start: ibegin.start,
+                        end: iend.start,
+                        grain: ibegin.grain},
+                };
+                match range.end < range.start {
+                    true => None,
+                    false => Some(range)
+                }
+            }).flat_map(move |ival| {
+                fuse = if ival.is_some() { 0 } else { fuse + 1 };
+                if fuse >= INFINITE_FUSE {
+                    panic!("Seq::interval INFINITE_FUSE blown");
+                }
+                ival
+            }))
+        }))
+    }
+
+    pub fn merge(merged: Seq, n: usize) -> Seq {
+        assert!(n > 0);
+        Seq(Rc::new(move |reftime| {
+            let mut merged = merged(reftime);
+            Box::new((0..).map(move |_| {
+                let first = merged.next().unwrap();
+                for _ in 1..n-1 { merged.next(); }
+                let last = merged.next().unwrap();
+                Range{start: first.start, end: last.end, grain: first.grain}
+            }))
+        }))
+    }
 }
 
 impl Seq {
@@ -199,11 +264,6 @@ impl Seq {
             }))
         }))
     }
-
-    //pub fn afternoon() -> Seq {
-        //// 12pm - 6pm interval
-    //}
-
 
     //pub fn this(&self, r: DateTime) -> Range {
         //self.0(r).next().unwrap()
@@ -228,7 +288,6 @@ impl Range {
             true => Some(Range{
                 start: cmp::max(self.start, other.start),
                 end: cmp::min(self.end, other.end),
-                // TODO: ranges that span compound grains (eg: weekend) should still work?
                 grain: cmp::min(self.grain, other.grain)
             })
         }
@@ -239,11 +298,9 @@ impl Range {
     }
 
     pub fn shift(&self, g: Grain, n: i32) -> Range {
-        Range{
-            start: utils::shift_datetime(self.start, g, n),
-            end: utils::shift_datetime(self.end, g, n),
-            grain: self.grain
-        }
+        Range{start: utils::shift_datetime(self.start, g, n),
+              end: utils::shift_datetime(self.end, g, n),
+              grain: self.grain}
     }
 
     pub fn from_grain(d: DateTime, g: Grain) -> Range {
@@ -268,98 +325,4 @@ impl Range {
             //_ => panic!("Can't build Granularity from [{}]", s)
         //}
     //}
-//}
-
-
-////impl Range {
-    //pub fn a_year(y: i32) -> Range {
-        //Range{
-            //start: Date::from_ymd(y, 1, 1).and_hms(0, 0, 0),
-            //end: Date::from_ymd(y + 1, 1, 1).and_hms(0, 0, 0),
-            //grain: Granularity::Year
-        //}
-    //}
-
-    //// add a duration to a range
-    //pub fn shift(r: Range, n: i32, g: Granularity) -> Range {
-        //let (s, e) = (r.start.date(), r.end.date());
-        //let dtfunc = if n >= 0 { utils::date_add } else { utils::date_sub };
-        //let n = if n < 0 { -n as u32 } else { n as u32 };
-        //let (s, e) = match g {
-            //Granularity::Year => {
-                //(dtfunc(s, n as i32, 0, 0), dtfunc(e, n as i32, 0, 0))
-            //},
-            //Granularity::Quarter => {
-                //(dtfunc(s, 0, 3*n, 0), dtfunc(e, 0, 3*n, 0))
-            //},
-            //Granularity::Month => {
-                //(dtfunc(s, 0, n, 0), dtfunc(e, 0, n, 0))
-            //},
-            //Granularity::Week => {
-                //(dtfunc(s, 0, 0, 7*n), dtfunc(e, 0, 0, 7*n))
-            //},
-            //Granularity::Day => {
-                //(dtfunc(s, 0, 0, n), dtfunc(e, 0, 0, n))
-            //},
-        //};
-        //Range{
-            //start: s.and_time(r.start.time()),
-            //end: e.and_time(r.end.time()),
-            //grain: cmp::min(r.grain, g)
-        //}
-    //}
-
-////}
-
-
-
-
-
-
-//pub fn merge(n: usize, s: Seq) -> Seq {
-    //struct MergeIt {
-        //it: Box<Iterator<Item=Range>>,
-        //tend: Range,
-        //n: usize,
-    //};
-    //impl Iterator for MergeIt {
-        //type Item = Range;
-        //fn next(&mut self) -> Option<Range> {
-            //let t0 = self.tend;
-            //for _ in 0..self.n {
-                //self.tend = self.it.next().unwrap();
-            //}
-            //Some(Range{start: t0.start, end: self.tend.start, grain: t0.grain})
-        //}
-    //}
-    //Rc::new(move |reftime| {
-        //let mut ns = s(reftime);
-        //let tend = ns.next().unwrap();
-        //Box::new(MergeIt{it: ns, tend: tend, n: n})
-    //})
-//}
-
-
-//pub fn skip(s: Seq, n: usize) -> Seq {
-    //Rc::new(move |reftime| { Box::new(s(reftime).skip(n)) })
-//}
-
-//// duckling intervals http://tinyurl.com/hk2vu34
-//pub fn interval(a: Seq, b: Seq) -> Seq {
-    //struct IntervalIt {
-        //s: Box<Iterator<Item=Range>>,
-        //e: Box<Iterator<Item=Range>>,
-    //};
-    //impl Iterator for IntervalIt {
-        //type Item = Range;
-        //fn next(&mut self) -> Option<Range> {
-            //let t0 = self.s.next().unwrap();
-            //let t1 = self.e.next().unwrap();
-            //Some(Range{start: t0.start, end: t1.start, grain: t0.grain})
-        //}
-    //}
-    //Rc::new(move |reftime| {
-        //let align = a(reftime).next().unwrap().start;
-        //Box::new(IntervalIt{s: a(reftime), e: b(align)})
-    //})
 //}

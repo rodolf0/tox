@@ -465,63 +465,27 @@ fn test_multi() {
                      grain: Grain::Day});
 }
 
-//#[test]
-//fn test_this() {
-    //let reftime = Date::from_ymd(2016, 2, 25).and_hms(0, 0, 0);
-    //assert_eq!(s::this(s::month(), reftime),
-               //Range{
-                //start: Date::from_ymd(2016, 2, 1).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 3, 1).and_hms(0, 0, 0),
-                //grain: Granularity::Month});
-    //assert_eq!(s::this(s::day_of_week(5), reftime),
-               //Range{
-                //start: Date::from_ymd(2016, 2, 26).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 2, 27).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-    //let mon28th = s::intersect(
-        //s::day_of_week(1), s::nthof(28, s::day(), s::month()));
-    //assert_eq!(s::this(mon28th, reftime),
-               //Range{
-                //start: Date::from_ymd(2016, 3, 28).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 3, 29).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-    //assert_eq!(s::this(s::weekend(), reftime),
-               //Range{
-                //start: Date::from_ymd(2016, 2, 27).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 2, 29).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-//}
+#[test]
+fn test_next() {
+    let reftime = dt(2016, 2, 25);
+    assert_eq!(Seq::from_grain(Grain::Month).next(reftime, 1),
+               Range{start: dt(2016, 3, 1), end: dt(2016, 4, 1),
+                     grain: Grain::Month});
+    assert_eq!(Seq::weekday(4).next(reftime, 1),
+               Range{start: dt(2016, 3, 3), end: dt(2016, 3, 4),
+                     grain: Grain::Day});
+    assert_eq!(Seq::weekday(5).next(reftime, 1),
+               Range{start: dt(2016, 2, 26), end: dt(2016, 2, 27),
+                     grain: Grain::Day});
 
-//#[test]
-//fn test_next() {
-    //let reftime = Date::from_ymd(2016, 2, 25).and_hms(0, 0, 0);
-    //assert_eq!(s::next(s::month(), 1, reftime),
-               //Range{
-                //start: Date::from_ymd(2016, 3, 1).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 4, 1).and_hms(0, 0, 0),
-                //grain: Granularity::Month});
-    //assert_eq!(s::next(s::day_of_week(4), 1, reftime),
-               //Range{
-                //start: Date::from_ymd(2016, 3, 3).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 3, 4).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-    //assert_eq!(s::next(s::day_of_week(5), 1, reftime),
-               //Range{
-                //start: Date::from_ymd(2016, 2, 26).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 2, 27).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-    //let mon28th = s::intersect(
-        //s::day_of_week(1), s::nthof(28, s::day(), s::month()));
-    //assert_eq!(s::next(mon28th, 1, reftime),
-               //Range{
-                //start: Date::from_ymd(2016, 3, 28).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 3, 29).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-    //let thu25th = s::intersect(
-        //s::day_of_week(4), s::nthof(25, s::day(), s::month()));
-    //assert_eq!(s::next(thu25th, 1, reftime),
-               //Range{
-                //start: Date::from_ymd(2016, 8, 25).and_hms(0, 0, 0),
-                //end: Date::from_ymd(2016, 8, 26).and_hms(0, 0, 0),
-                //grain: Granularity::Day});
-//}
+    let mon28th = Seq::intersect(Seq::weekday(1), Seq::nthof(
+        28, Seq::from_grain(Grain::Day), Seq::from_grain(Grain::Month)));
+    assert_eq!(mon28th.next(reftime, 1),
+               Range{start: dt(2016, 3, 28), end: dt(2016, 3, 29),
+                     grain: Grain::Day});
+    let thu25th = Seq::intersect(Seq::weekday(4), Seq::nthof(
+        25, Seq::from_grain(Grain::Day), Seq::from_grain(Grain::Month)));
+    assert_eq!(thu25th.next(reftime, 1),
+               Range{start: dt(2016, 8, 25), end: dt(2016, 8, 26),
+                     grain: Grain::Day});
+}

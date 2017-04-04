@@ -1,7 +1,7 @@
 extern crate chrono;
 use chrono::{Datelike, Weekday};
 
-use std::{ops, cmp};
+use std::{ops, cmp, fmt};
 use std::rc::Rc;
 use std::collections::VecDeque;
 use utils::{Duration, DateTime, Date};
@@ -15,7 +15,7 @@ pub enum Grain {
     Day,
     Week,
     Month,
-    Quarter,
+    Quarter, // TODO: might ned to remove this
     Year,
 }
 
@@ -265,19 +265,21 @@ impl Seq {
         }))
     }
 
-    //pub fn this(&self, r: DateTime) -> Range {
-        //self.0(r).next().unwrap()
-    //}
+    pub fn this(&self, reftime: DateTime) -> Range {
+        self.0(reftime).next().unwrap()
+    }
 
-    //pub fn next(s: Seq, n: usize, r: DateTime) -> Range {
-        //assert!(n > 0);
-        //let mut seq = s(r);
-        //let mut nxt = seq.next();
-        //// see X note above
-        //if nxt.unwrap().start <= r { nxt = seq.next(); }
-        //for _ in 0..n-1 { nxt = seq.next(); }
-        //nxt.unwrap()
-    //}
+    pub fn next(&self, reftime: DateTime, n: usize) -> Range {
+        assert!(n > 0);
+        let mut seq = self.0(reftime);
+        let mut base = seq.next().unwrap();
+        // All sequences (except Seq::interval) return a first Range that
+        // wraps reftime (if the the sequence is not discontinuous). The 'next'
+        // method explicitly avoids this first Range if it exists.
+        if base.start <= reftime { base = seq.next().unwrap(); }
+        for _ in 0..n-1 { base = seq.next().unwrap(); }
+        base
+    }
 }
 
 
@@ -307,22 +309,26 @@ impl Range {
         let start = utils::truncate(d, g);
         Range{start: start, end: utils::shift_datetime(start, g, 1), grain: g}
     }
+
+    pub fn truncate(&self, g: Grain) -> Range {
+        Range{start: utils::truncate(self.start, g),
+              end: utils::truncate(self.end, g), grain: g}
+    }
 }
 
 
-//impl<S: AsRef<str>> From<S> for Granularity {
-    //fn from(s: S) -> Granularity {
-        //let s = s.as_ref();
-        //match s {
-            //"second" | "Second" => Granularity::Second,
-            //"minute" | "Minute" => Granularity::Minute,
-            //"hour" | "Hour" => Granularity::Hour,
-            //"day" | "Day" => Granularity::Day,
-            //"week" | "Week" => Granularity::Week,
-            //"month" | "Month" => Granularity::Month,
-            //"quarter" | "Quarter" => Granularity::Quarter,
-            //"year" | "Year" => Granularity::Year,
-            //_ => panic!("Can't build Granularity from [{}]", s)
-        //}
-    //}
-//}
+impl<S: fmt::Debug + AsRef<str>> From<S> for Grain {
+    fn from(s: S) -> Grain {
+        match s.as_ref() {
+            "second" | "Second" => Grain::Second,
+            "minute" | "Minute" => Grain::Minute,
+            "hour" | "Hour" => Grain::Hour,
+            "day" | "Day" => Grain::Day,
+            "week" | "Week" => Grain::Week,
+            "month" | "Month" => Grain::Month,
+            "quarter" | "Quarter" => Grain::Quarter,
+            "year" | "Year" => Grain::Year,
+            _ => panic!("Can't build Grain from [{:?}]", s)
+        }
+    }
+}

@@ -1,4 +1,4 @@
-pub fn weekday(d: &str) -> Option<usize> {
+pub fn weekday(d: &str) -> Option<u32> {
     match d {
         "sunday"    | "sundays"    | "sun" => Some(0),
         "monday"    | "mondays"    | "mon" => Some(1),
@@ -11,7 +11,7 @@ pub fn weekday(d: &str) -> Option<usize> {
     }
 }
 
-pub fn month(m: &str) -> Option<usize> {
+pub fn month(m: &str) -> Option<u32> {
     match m {
         "january"   |  "jan"    => Some(1),
         "february"  |  "feb"    => Some(2),
@@ -29,7 +29,7 @@ pub fn month(m: &str) -> Option<usize> {
     }
 }
 
-pub fn ordinal(n: &str) -> Option<usize> {
+pub fn ordinal(n: &str) -> Option<u32> {
     static ORD: [&'static str;31] = [
         "first", "second", "third", "fourth", "fifth", "sixth", "seventh",
         "eigth", "ninth", "thenth", "eleventh", "twelveth", "thirteenth",
@@ -41,15 +41,16 @@ pub fn ordinal(n: &str) -> Option<usize> {
     ];
     ORD.iter()
        .enumerate()
-       .filter_map(|(i, name)| match *name == n { true => Some(i+1), _=> None })
+       .filter_map(|(i, name)| match *name == n {
+           true => Some((i+1) as u32), _=> None })
        .next()
 }
 
-pub fn short_ordinal(n: &str) -> Option<usize> {
+pub fn short_ordinal(n: &str) -> Option<u32> {
     use std::str::FromStr;
     let num = n.chars().take_while(|d| d.is_numeric()).collect::<String>();
     match &n[num.len()..] {
-        "st"|"nd"|"rd"|"th" => usize::from_str(&num).ok(),
+        "st"|"nd"|"rd"|"th" => u32::from_str(&num).ok(),
         _ => None
     }
 }

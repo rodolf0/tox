@@ -26,7 +26,7 @@ pub struct Range {
     pub grain: Grain,
 }
 
-const INFINITE_FUSE: u16 = 100;
+const INFINITE_FUSE: u16 = 1000;
 
 #[derive(Clone)]
 pub struct Seq(Rc<Fn(DateTime)->Box<Iterator<Item=Range>>>);
@@ -95,7 +95,7 @@ impl Seq {
         }))
     }
 
-    pub fn nthof(n: usize, win: Seq, frame: Seq) -> Seq {
+    pub fn nthof(n: u32, win: Seq, frame: Seq) -> Seq {
         // 1. X-invariant: end-of-frame(reftime) > reftime
         // 2. X-invariant: end-of-win-1(outer.start) > outer.start
         assert!(n > 0);
@@ -111,7 +111,7 @@ impl Seq {
                         assert!(inner.end.signed_duration_since(inner.start) <=
                                 outer.end.signed_duration_since(outer.start));
                         inner.start < outer.end
-                    }).nth(n-1))
+                    }).nth((n-1) as usize))
                 .flat_map(move |nth| {
                     fuse = if nth.is_some() { 0 } else { fuse + 1 };
                     if fuse >= INFINITE_FUSE {
@@ -123,7 +123,7 @@ impl Seq {
         }))
     }
 
-    pub fn lastof(n: usize, win: Seq, frame: Seq) -> Seq {
+    pub fn lastof(n: u32, win: Seq, frame: Seq) -> Seq {
         // 1. X-invariant: end-of-frame(reftime) > reftime
         // 2. X-invariant: end-of-win-1(outer.start) > outer.start
         assert!(n > 0);
@@ -135,10 +135,10 @@ impl Seq {
                     let mut buf = VecDeque::new();
                     for inner in win(outer.start) {
                         if inner.start >= outer.end {
-                            return buf.remove(n-1);
+                            return buf.remove((n-1) as usize);
                         }
                         buf.push_front(inner);
-                        if buf.len() > n {
+                        if buf.len() > n as usize {
                             buf.pop_back();
                         }
                     }
@@ -189,6 +189,17 @@ impl Seq {
             }))))
     }
 
+    pub fn after_next(seq: Seq, n: u32) -> Seq {
+        assert!(n > 0);
+        Seq(Rc::new(move |reftime| {
+            let mut seq = seq(reftime).peekable();
+            if seq.peek().unwrap().start <= reftime {
+                seq.next();
+            }
+            Box::new(seq.skip(n as usize))
+        }))
+    }
+
     // apply a transform to each range emited by seq
     // to suppress a value emit Option::None
     pub fn map(seq: Seq, f: Rc<Fn(Range)->Option<Range>>) -> Seq {
@@ -202,6 +213,7 @@ impl Seq {
     // eg: 2nd monday of june to next month, tuesday to friday
     // NOTE: the first range emitted may not contain 'reftime' if 'reftime'
     // is not contained within the first element of the <from> sequence
+    // NOTE: output grain is taken from <from> seq, could assert they're eq
     pub fn interval(from: Seq, to: Seq, inclusive: bool) -> Seq {
         Seq(Rc::new(move |reftime| {
             let to = to.clone();
@@ -232,7 +244,7 @@ impl Seq {
         }))
     }
 
-    pub fn merge(merged: Seq, n: usize) -> Seq {
+    pub fn merge(merged: Seq, n: u32) -> Seq {
         assert!(n > 0);
         Seq(Rc::new(move |reftime| {
             let mut merged = merged(reftime);
@@ -265,11 +277,19 @@ impl Seq {
         }))
     }
 
+    pub fn year(y: i32) -> Seq {
+        Seq(Rc::new(move |_| Box::new((0..1).map(move |_| Range{
+            start: Date::from_ymd(y, 1, 1).and_hms(0, 0, 0),
+            end: Date::from_ymd(y+1, 1, 1).and_hms(0, 0, 0),
+            grain: Grain::Year,
+        }))))
+    }
+
     pub fn this(&self, reftime: DateTime) -> Range {
         self.0(reftime).next().unwrap()
     }
 
-    pub fn next(&self, reftime: DateTime, n: usize) -> Range {
+    pub fn next(&self, reftime: DateTime, n: u32) -> Range {
         assert!(n > 0);
         let mut seq = self.0(reftime);
         let mut base = seq.next().unwrap();

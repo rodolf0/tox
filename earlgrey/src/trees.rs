@@ -6,6 +6,7 @@ use std::rc::Rc;
 pub struct EarleyEvaler<'a, ASTNode: Clone> {
     actions: HashMap<String, Box<Fn(Vec<ASTNode>)->ASTNode + 'a>>,
     tokenizer: Box<Fn(&str, &str)->ASTNode + 'a>,
+    debug: bool,
 }
 
 impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
@@ -14,6 +15,16 @@ impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
         EarleyEvaler{
             actions: HashMap::new(),
             tokenizer: Box::new(tokenizer),
+            debug: false,
+        }
+    }
+
+    pub fn debug<F>(tokenizer: F) -> EarleyEvaler<'a, ASTNode>
+            where F: 'a + Fn(&str, &str) -> ASTNode {
+        EarleyEvaler{
+            actions: HashMap::new(),
+            tokenizer: Box::new(tokenizer),
+            debug: true,
         }
     }
 
@@ -47,7 +58,10 @@ impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
             let rulename = root.str_rule();
             return match self.actions.get(&rulename) {
                 None => panic!("No action for rule: {}", rulename),
-                Some(action) => vec!(action(args)),
+                Some(action) => {
+                    if self.debug { println!("Reduction: {}", rulename); }
+                    vec!(action(args))
+                }
             };
         }
         args
@@ -61,7 +75,10 @@ impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
                 false => semargs,
                 true => match self.actions.get(&rulename) {
                     None => panic!("No action for rule: {}", rulename),
-                    Some(action) => vec!(action(semargs)),
+                    Some(action) => {
+                        if self.debug { println!("Reduction: {}", rulename); }
+                        vec!(action(semargs))
+                    }
                 }
             }
         };

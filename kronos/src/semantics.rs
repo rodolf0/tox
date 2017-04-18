@@ -1,7 +1,7 @@
 extern crate chrono;
 use chrono::{Datelike, Weekday};
 
-use std::{ops, cmp, fmt};
+use std::{ops, cmp};
 use std::rc::Rc;
 use std::collections::VecDeque;
 use utils::{Duration, DateTime, Date};
@@ -336,19 +336,18 @@ impl Range {
     }
 }
 
-
-impl<S: fmt::Debug + AsRef<str>> From<S> for Grain {
-    fn from(s: S) -> Grain {
-        match s.as_ref() {
-            "second" | "Second" => Grain::Second,
-            "minute" | "Minute" => Grain::Minute,
-            "hour" | "Hour" => Grain::Hour,
-            "day" | "Day" => Grain::Day,
-            "week" | "Week" => Grain::Week,
-            "month" | "Month" => Grain::Month,
-            "quarter" | "Quarter" => Grain::Quarter,
-            "year" | "Year" => Grain::Year,
-            _ => panic!("Can't build Grain from [{:?}]", s)
+impl Grain {
+    pub fn from_str<S: AsRef<str>>(s: S) -> Option<Grain> {
+        match s.as_ref().to_lowercase().as_ref() {
+            "second" | "seconds" => Some(Grain::Second),
+            "minute" | "minutes" => Some(Grain::Minute),
+            "hour" | "hours" => Some(Grain::Hour),
+            "day" | "days" => Some(Grain::Day),
+            "week" | "weeks" => Some(Grain::Week),
+            "month" | "months" => Some(Grain::Month),
+            "quarter" | "quarters" => Some(Grain::Quarter),
+            "year" | "years" => Some(Grain::Year),
+            _ => None,
         }
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "kronos"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "tools to manipulate time expressions"
 license = "MIT"

@@ -77,13 +77,12 @@ impl Rule {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone,PartialEq,Eq,Hash,Debug)]
+#[derive(PartialEq,Eq,Hash)]
 pub enum Trigger {
     Completion(Rc<Item>),
     Scan(String),
 }
 
-#[derive(Clone)]
 pub struct Item {
     // LR0item (dotted rule)
     rule: Rc<Rule>,
@@ -92,7 +91,6 @@ pub struct Item {
     start: usize,
     end: usize,
     // backpointers leading to this item: (source-item, trigger)
-    // TODO: change to cell::Cell once available
     bp: cell::RefCell<HashSet<(Rc<Item>, Trigger)>>,
 }
 
@@ -177,7 +175,6 @@ impl fmt::Debug for Item {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
 pub struct StateSet {
     order: Vec<Rc<Item>>,
     dedup: HashSet<Rc<Item>>,

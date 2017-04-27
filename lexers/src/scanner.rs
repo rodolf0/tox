@@ -142,7 +142,7 @@ impl<T: Clone + Hash + Eq> Scanner<T> {
     }
 }
 
-static WHITE: &'static str = " \n\r\t";
+static WHITE: &str = " \n\r\t";
 
 impl Scanner<char> {
     pub fn from_str(source: &str) -> Scanner<char> {

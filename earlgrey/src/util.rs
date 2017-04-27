@@ -1,7 +1,7 @@
 use types::Grammar;
 use trees::EarleyEvaler;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug,Clone,PartialEq)]
 pub enum Subtree {
     // ("[+-]", "+")
     Leaf(String, String),
@@ -43,7 +43,7 @@ pub fn subtree_evaler<'a>(g: Grammar) -> EarleyEvaler<'a, Subtree> {
 }
 
 
-#[derive(Clone, Debug)]
+#[derive(Clone,Debug)]
 pub enum Sexpr {
     Atom(String),
     List(Vec<Sexpr>),

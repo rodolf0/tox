@@ -30,7 +30,7 @@ pub fn month(m: &str) -> Option<u32> {
 }
 
 pub fn ordinal(n: &str) -> Option<u32> {
-    static ORD: [&'static str;31] = [
+    static ORD: [&str;31] = [
         "first", "second", "third", "fourth", "fifth", "sixth", "seventh",
         "eigth", "ninth", "thenth", "eleventh", "twelveth", "thirteenth",
         "fourteenth", "fifteenth", "sixteenth", "seventeenth", "eighteenth",

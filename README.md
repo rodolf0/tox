@@ -1,19 +1,21 @@
-# a collection of toy parsers and libraries written in rust
+# rust crates for parsing stuff
 
 ## lexers
-Random tokenizers for math expressions, splitting text, parsing lisp-like stuff, etc.
-
-## shunting
-A shunting-yard lib to parse math expressions.
-It supports prefix, infix and postfix operators, unary minus has the correct precedence,
-you get whatever the standard math library has (dlopen self and tap into functions).
+Tokenizers for math expressions, splitting text, lexing lisp-like stuff, etc.
 
 ## earlgrey
-A library for parsing using the *earley* algorithm.
-You can extract all parse trees when the grammar is ambiguous.
+An **Early** CFG parser which can extract all trees and handle ambiguous grammars.
 
-## lisp
-A lisp-like interpreter following norvig's lispy notes.
+## shunting
+A tiny *math* parser that understands prefix/infix/postfix operators and functions.
+
 
 ## kronos
-A library (WIP) to work with time expressions.
+A library to compute *time expressions* (eg: the 3rd monday of the week).
+
+## fluxcap
+A binding of **kronos** and **earlgrey** to parse time expressions from text.
+
+
+## misc
+- lisp: a partial rust clone of lispy.

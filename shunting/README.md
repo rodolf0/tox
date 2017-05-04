@@ -1,11 +1,8 @@
 # shunting
-A shunting-yard lib to parse math expressions.
-It supports prefix, infix and postfix operators, unary minus has the correct precedence,
-you get whatever the standard math library has (dlopen self and tap into functions).
-
-Try it out with the **tox** binary.
+A tiny math parser for the commandline
 
 ```
+$ tox
 >> 4!
 24
 >> a = sin(0.2)^2 + cos(0.2)^2

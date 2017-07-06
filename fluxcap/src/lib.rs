@@ -4,7 +4,7 @@ extern crate earlgrey;
 extern crate lexers;
 
 mod time;
-pub use time::TimeMachine;
+pub use time::{TimeMachine, TimeEl};
 
 #[cfg(test)]
 mod time_test;

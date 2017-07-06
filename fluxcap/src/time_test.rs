@@ -6,7 +6,7 @@ use kronos::Grain as g;
 use kronos;
 
 fn d(year: i32, month: u32, day: u32) -> DateTime {
-    use chrono::naive::date::NaiveDate as Date;
+    use chrono::naive::NaiveDate as Date;
     Date::from_ymd(year, month, day).and_hms(0, 0, 0)
 }
 fn r(s: DateTime, e: DateTime, gr: kronos::Grain) -> TimeEl {

@@ -28,8 +28,14 @@ pub struct Range {
 
 const INFINITE_FUSE: u16 = 1000;
 
+#[derive(Debug,Clone,Copy,PartialEq)]
+pub enum TimeDir {
+    Future,
+    Past
+}
+
 #[derive(Clone)]
-pub struct Seq(Rc<Fn(DateTime)->Box<Iterator<Item=Range>>>);
+pub struct Seq(Rc<Fn(DateTime)->Box<Iterator<Item=Range>>>, TimeDir);
 
 impl ops::Deref for Seq {
     type Target = Rc<Fn(DateTime)->Box<Iterator<Item=Range>>>;
@@ -51,7 +57,19 @@ impl Seq {
                 end: utils::shift_datetime(base, g, x+1),
                 grain: g
             }))
-        }))
+        }), TimeDir::Future)
+    }
+
+    pub fn from_grain_back(g: Grain) -> Seq {
+        Seq(Rc::new(move |reftime| {
+            // given X-precondition: end-of-grain(reftime) <= reftime
+            let base = utils::truncate(reftime, g);
+            Box::new((1..).map(move |x| Range{
+                start: utils::shift_datetime(base, g, -x),
+                end: utils::shift_datetime(base, g, -x+1),
+                grain: g
+            }))
+        }), TimeDir::Past)
     }
 
     pub fn weekday(dow: u32) -> Seq {
@@ -63,7 +81,19 @@ impl Seq {
                 end: base + Duration::days(x * 7 + 1),
                 grain: Grain::Day
             }))
-        }))
+        }), TimeDir::Future)
+    }
+
+    pub fn weekday_back(dow: u32) -> Seq {
+        // given X-invariant: end-of-day(reftime-shifted-to-dow) <= reftime
+        Seq(Rc::new(move |reftime| {
+            let base = utils::find_dow(reftime.date(), dow).and_hms(0, 0, 0);
+            Box::new((1..).map(move |x| Range{
+                start: base + Duration::days(-x * 7),
+                end: base + Duration::days(-x * 7 + 1),
+                grain: Grain::Day
+            }))
+        }), TimeDir::Past)
     }
 
     pub fn month(month: u32) -> Seq {
@@ -76,7 +106,21 @@ impl Seq {
                 m_end = utils::shift_datetime(m_start, Grain::Month, 1);
                 Range{start: m_start, end: m_end, grain: Grain::Month}
             }))
-        }))
+        }), TimeDir::Future)
+    }
+
+    pub fn month_back(month: u32) -> Seq {
+        // X-invariant: end-of-month(reftime) <= reftime
+        Seq(Rc::new(move |reftime| {
+            let base = utils::find_month(
+                utils::truncate(reftime, Grain::Month).date(), month)
+                .and_hms(0, 0, 0);
+            Box::new((1..).map(move |x| Range{
+                start: utils::shift_datetime(base, Grain::Month, -12 * x),
+                end: utils::shift_datetime(base, Grain::Month, -12 * x + 1),
+                grain: Grain::Month
+            }))
+        }), TimeDir::Past)
     }
 
     pub fn weekend() -> Seq {
@@ -92,13 +136,16 @@ impl Seq {
                     grain: Grain::Day
                 }
             }))
-        }))
+        }), TimeDir::Future)
     }
 
     pub fn nthof(n: u32, win: Seq, frame: Seq) -> Seq {
         // 1. X-invariant: end-of-frame(reftime) > reftime
         // 2. X-invariant: end-of-win-1(outer.start) > outer.start
         assert!(n > 0);
+        // Only allow frame to go in past direction
+        assert_eq!(win.1, TimeDir::Future);
+        let timedir = frame.1;
         Seq(Rc::new(move |reftime| {
             let win = win.clone();
             let mut fuse = 0;
@@ -120,13 +167,16 @@ impl Seq {
                     nth
                 })
             )
-        }))
+        }), timedir)
     }
 
     pub fn lastof(n: u32, win: Seq, frame: Seq) -> Seq {
         // 1. X-invariant: end-of-frame(reftime) > reftime
         // 2. X-invariant: end-of-win-1(outer.start) > outer.start
         assert!(n > 0);
+        // Only allow frame to go in past direction
+        assert_eq!(win.1, TimeDir::Future);
+        let timedir = frame.1;
         Seq(Rc::new(move |reftime| {
             let win = win.clone();
             let mut fuse = 0;
@@ -152,10 +202,13 @@ impl Seq {
                     nth
                 })
             )
-        }))
+        }), timedir)
     }
 
     pub fn intersect(a: Seq, b: Seq) -> Seq {
+        // Both Seqs a, b must have the same Time direction
+        assert_eq!(a.1, b.1);
+        let tdir = a.1;
         Seq(Rc::new(move |reftime| {
             let mut astream = a(reftime).peekable();
             let mut bstream = b(reftime).peekable();
@@ -166,7 +219,8 @@ impl Seq {
             Box::new((0..).map(move |_| {
                 for _ in 0..INFINITE_FUSE {
                     let overlap = anext.intersect(&bnext);
-                    if anext.end <= bnext.end {
+                    if (tdir == TimeDir::Past && anext.start >= bnext.start) ||
+                       (tdir == TimeDir::Future && anext.end <= bnext.end) {
                         astream.next();
                         anext = astream.peek().unwrap().clone();
                     } else {
@@ -177,36 +231,40 @@ impl Seq {
                 }
                 panic!("Seq::intersect INFINITE_FUSE blown");
             }))
-        }))
+        }), tdir)
     }
 
     pub fn shift(seq: Seq, g: Grain, n: i32) -> Seq {
+        let timedir = seq.1;
         Seq(Rc::new(move |reftime| Box::new(
             seq(reftime).map(move |r| Range{
                 start: utils::shift_datetime(r.start, g, n),
                 end: utils::shift_datetime(r.end, g, n),
                 grain: r.grain
-            }))))
+            }))), timedir)
     }
 
     pub fn after_next(seq: Seq, n: u32) -> Seq {
         assert!(n > 0);
+        let timedir = seq.1;
         Seq(Rc::new(move |reftime| {
             let mut seq = seq(reftime).peekable();
             if seq.peek().unwrap().start <= reftime {
                 seq.next();
             }
             Box::new(seq.skip(n as usize))
-        }))
+        }), timedir)
     }
 
     // apply a transform to each range emited by seq
     // to suppress a value emit Option::None
+    // TimeDir is assumed to stay the same
     pub fn map(seq: Seq, f: Rc<Fn(Range)->Option<Range>>) -> Seq {
+        let timedir = seq.1;
         Seq(Rc::new(move |reftime| {
             let f = f.clone();
             Box::new(seq(reftime).filter_map(move |r| f(r)))
-        }))
+        }), timedir)
     }
 
     // duckling intervals http://tinyurl.com/hk2vu34
@@ -215,6 +273,10 @@ impl Seq {
     // is not contained within the first element of the <from> sequence
     // NOTE: output grain is taken from <from> seq, could assert they're eq
     pub fn interval(from: Seq, to: Seq, inclusive: bool) -> Seq {
+        // We'll only use first element of 'to' anchored on 'from'.
+        // 'to' must always go into the future
+        assert_eq!(to.1, TimeDir::Future);
+        let timedir = from.1;
         Seq(Rc::new(move |reftime| {
             let to = to.clone();
             let mut fuse = 0;
@@ -241,20 +303,30 @@ impl Seq {
                 }
                 ival
             }))
-        }))
+        }), timedir)
     }
 
     pub fn merge(merged: Seq, n: u32) -> Seq {
         assert!(n > 0);
+        let timedir = merged.1;
         Seq(Rc::new(move |reftime| {
             let mut merged = merged(reftime);
             Box::new((0..).map(move |_| {
                 let first = merged.next().unwrap();
                 for _ in 1..n-1 { merged.next(); }
                 let last = merged.next().unwrap();
-                Range{start: first.start, end: last.end, grain: first.grain}
+                match timedir {
+                    TimeDir::Future => Range{
+                        start: first.start,
+                        end: last.end,
+                        grain: first.grain},
+                    TimeDir::Past => Range{
+                        start: last.start,
+                        end: first.end,
+                        grain: first.grain},
+                }
             }))
-        }))
+        }), timedir)
     }
 }
 
@@ -274,7 +346,7 @@ impl Seq {
                 end: utils::shift_datetime(tn, Grain::Year, x),
                 grain: Grain::Quarter
             }))
-        }))
+        }), TimeDir::Future)
     }
 
     pub fn year(y: i32) -> Seq {
@@ -282,7 +354,7 @@ impl Seq {
             start: Date::from_ymd(y, 1, 1).and_hms(0, 0, 0),
             end: Date::from_ymd(y+1, 1, 1).and_hms(0, 0, 0),
             grain: Grain::Year,
-        }))))
+        }))), TimeDir::Future)
     }
 
     pub fn this(&self, reftime: DateTime) -> Range {

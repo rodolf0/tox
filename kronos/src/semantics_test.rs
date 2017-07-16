@@ -37,6 +37,18 @@ fn test_seq_month() {
     assert_eq!(february.next().unwrap(),
                Range{start: dt(2018, 2, 1), end: dt(2018, 3, 1),
                      grain: Grain::Month});
+
+    let mut weeks = Seq::month_back(2)(dt(2017, 7, 6));
+    assert_eq!(weeks.next().unwrap(),
+               Range{start: dt(2017, 2, 1), end: dt(2017, 3, 1),
+                     grain: Grain::Month});
+    assert_eq!(weeks.next().unwrap(),
+               Range{start: dt(2016, 2, 1), end: dt(2016, 3, 1),
+                     grain: Grain::Month});
+    let mut weeks = Seq::month_back(2)(dt(2017, 2, 6));
+    assert_eq!(weeks.next().unwrap(),
+               Range{start: dt(2016, 2, 1), end: dt(2016, 3, 1),
+                     grain: Grain::Month});
 }
 
 #[test]
@@ -101,6 +113,23 @@ fn test_seq_grain() {
     assert_eq!(years.next().unwrap(),
                Range{start: dt(2016, 1, 1), end: dt(2017, 1, 1),
                      grain: Grain::Year});
+
+    // backward iteration
+    let mut years = Seq::from_grain_back(Grain::Year)(dt(2015, 2, 27));
+    assert_eq!(years.next().unwrap(),
+               Range{start: dt(2014, 1, 1), end: dt(2015, 1, 1),
+                     grain: Grain::Year});
+    assert_eq!(years.next().unwrap(),
+               Range{start: dt(2013, 1, 1), end: dt(2014, 1, 1),
+                     grain: Grain::Year});
+
+    let mut weeks = Seq::from_grain_back(Grain::Week)(dt(2017, 7, 6));
+    assert_eq!(weeks.next().unwrap(),
+               Range{start: dt(2017, 6, 25), end: dt(2017, 7, 2),
+                     grain: Grain::Week});
+    assert_eq!(weeks.next().unwrap(),
+               Range{start: dt(2017, 6, 18), end: dt(2017, 6, 25),
+                     grain: Grain::Week});
 }
 
 #[test]

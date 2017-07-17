@@ -47,117 +47,111 @@ impl ops::Deref for Seq {
 //    they may contain the reference time or start after if discontinuous.
 // see duckling http://goo.gl/gxU1Jo
 //
-// Y: Sequences generate Ranges that have ENDtime before or EQ to reference-time
+// Y: Sequences into the past generate Ranges that have ENDtime before-or-eq
+// to reference-time
+//
+// frame or is_frame: only applies for TimeDir::Past to hint that a Sequence
+// should start without enforcing Y-restriction. This is used mostly when
+// a Sequence is going to be used as a frame for another sequence, for example
+// in nthof, lastof
 
 impl Seq {
-    pub fn from_grain(g: Grain) -> Seq {
+    pub fn _grain(g: Grain, d: TimeDir, frame: bool) -> Seq {
+        let sign = match d {TimeDir::Future => 1, TimeDir::Past => -1};
+        let start = match (frame, d) { (false, TimeDir::Past) => 1, _ => 0};
         Seq(Rc::new(move |reftime| {
             // given X-precondition: end-of-grain(reftime) > reftime
             let base = utils::truncate(reftime, g);
-            Box::new((0..).map(move |x| Range{
-                start: utils::shift_datetime(base, g, x),
-                end: utils::shift_datetime(base, g, x+1),
+            Box::new((start..).map(move |x| Range{
+                start: utils::shift_datetime(base, g, sign * x),
+                end: utils::shift_datetime(base, g, sign * x+1),
                 grain: g
             }))
-        }), TimeDir::Future)
+        }), d)
     }
 
-    pub fn from_grain_back(g: Grain) -> Seq {
+    pub fn grain(g: Grain) -> Seq {
+        Seq::_grain(g, TimeDir::Future, false)
+    }
+
+    pub fn grain_back(g: Grain, frame: bool) -> Seq {
+        Seq::_grain(g, TimeDir::Past, frame)
+    }
+
+    pub fn _weekday(dow: u32, d: TimeDir, frame: bool) -> Seq {
+        // given X-invariant: end-of-day(reftime-shifted-to-dow) > reftime
+        let sign = match d {TimeDir::Future => 1, TimeDir::Past => -1};
+        let start = match (frame, d) { (false, TimeDir::Past) => 1, _ => 0};
         Seq(Rc::new(move |reftime| {
-            // given Y-precondition: end-of-grain(reftime) <= reftime
-            let base = utils::truncate(reftime, g);
-            Box::new((1..).map(move |x| Range{
-                start: utils::shift_datetime(base, g, -x),
-                end: utils::shift_datetime(base, g, -x+1),
-                grain: g
+            let base = utils::find_dow(reftime.date(), dow).and_hms(0, 0, 0);
+            Box::new((start..).map(move |x| Range{
+                start: base + Duration::days(sign * x * 7),
+                end: base + Duration::days(sign * x * 7 + 1),
+                grain: Grain::Day
             }))
-        }), TimeDir::Past)
+        }), d)
     }
 
     pub fn weekday(dow: u32) -> Seq {
-        // given X-invariant: end-of-day(reftime-shifted-to-dow) > reftime
-        Seq(Rc::new(move |reftime| {
-            let base = utils::find_dow(reftime.date(), dow).and_hms(0, 0, 0);
-            Box::new((0..).map(move |x| Range{
-                start: base + Duration::days(x * 7),
-                end: base + Duration::days(x * 7 + 1),
-                grain: Grain::Day
-            }))
-        }), TimeDir::Future)
+        Seq::_weekday(dow, TimeDir::Future, false)
     }
 
-    pub fn weekday_back(dow: u32) -> Seq {
-        // given X-invariant: end-of-day(reftime-shifted-to-dow) <= reftime
-        Seq(Rc::new(move |reftime| {
-            let base = utils::find_dow(reftime.date(), dow).and_hms(0, 0, 0);
-            Box::new((1..).map(move |x| Range{
-                start: base + Duration::days(-x * 7),
-                end: base + Duration::days(-x * 7 + 1),
-                grain: Grain::Day
-            }))
-        }), TimeDir::Past)
+    pub fn weekday_back(dow: u32, frame: bool) -> Seq {
+        Seq::_weekday(dow, TimeDir::Past, frame)
     }
 
-    pub fn month(month: u32) -> Seq {
+    pub fn _month(month: u32, d: TimeDir, frame: bool) -> Seq {
         // X-invariant: end-of-month(reftime) > reftime
-        Seq(Rc::new(move |reftime| {
-            let mut m_end = utils::truncate(reftime, Grain::Month);
-            Box::new((0..).map(move |_| {
-                let m_start =
-                    utils::find_month(m_end.date(), month).and_hms(0, 0, 0);
-                m_end = utils::shift_datetime(m_start, Grain::Month, 1);
-                Range{start: m_start, end: m_end, grain: Grain::Month}
-            }))
-        }), TimeDir::Future)
-    }
-
-    pub fn month_back(month: u32) -> Seq {
-        // X-invariant: end-of-month(reftime) <= reftime
+        let s = match d {TimeDir::Future => 1, TimeDir::Past => -1};
+        let start = match (frame, d) { (false, TimeDir::Past) => 1, _ => 0};
         Seq(Rc::new(move |reftime| {
             let base = utils::find_month(
                 utils::truncate(reftime, Grain::Month).date(), month)
                 .and_hms(0, 0, 0);
-            Box::new((1..).map(move |x| Range{
-                start: utils::shift_datetime(base, Grain::Month, -12 * x),
-                end: utils::shift_datetime(base, Grain::Month, -12 * x + 1),
+            Box::new((start..).map(move |x| Range{
+                start: utils::shift_datetime(base, Grain::Month, s * 12 * x),
+                end: utils::shift_datetime(base, Grain::Month, s * 12 * x + 1),
                 grain: Grain::Month
             }))
-        }), TimeDir::Past)
+        }), d)
     }
 
-    pub fn weekend() -> Seq {
-        Seq(Rc::new(|reftime| {
+    pub fn month(month: u32) -> Seq {
+        Seq::_month(month, TimeDir::Future, false)
+    }
+
+    pub fn month_back(month: u32, frame: bool) -> Seq {
+        Seq::_month(month, TimeDir::Past, frame)
+    }
+
+    pub fn _weekend(d: TimeDir, frame: bool) -> Seq {
+        // X-invariant: end-of-weekend(reftime) > reftime
+        let sign = match d {TimeDir::Future => 1, TimeDir::Past => -1};
+        let start = match (frame, d) { (false, TimeDir::Past) => 1, _ => 0};
+        Seq(Rc::new(move |reftime| {
             let mut base = reftime.date();
             if base.weekday() == Weekday::Sun { base = base.pred(); }
             while base.weekday() != Weekday::Sat { base = base.succ(); }
             let base = base.and_hms(0, 0, 0);
-            Box::new((0..).map(move |x| {
+            Box::new((start..).map(move |x| {
                 Range{
-                    start: base + Duration::days(x * 7),
-                    end: base + Duration::days(x * 7 + 2),
+                    start: base + Duration::days(sign * x * 7),
+                    end: base + Duration::days(sign * x * 7 + 2),
                     grain: Grain::Day
                 }
             }))
-        }), TimeDir::Future)
+        }), d)
     }
 
-    pub fn weekend_back() -> Seq {
-        Seq(Rc::new(|reftime| {
-            let mut base = reftime.date();
-            if base.weekday() == Weekday::Sat { base = base.pred(); }
-            while base.weekday() != Weekday::Sat { base = base.pred(); }
-            let base = base.and_hms(0, 0, 0);
-            Box::new((1..).map(move |x| {
-                Range{
-                    start: base + Duration::days(-x * 7),
-                    end: base + Duration::days(-x * 7 + 2),
-                    grain: Grain::Day
-                }
-            }))
-        }), TimeDir::Future)
+    pub fn weekend() -> Seq {
+        Seq::_weekend(TimeDir::Future, false)
     }
 
-    pub fn nthof(n: u32, win: Seq, frame: Seq) -> Seq {
+    pub fn weekend_back(frame: bool) -> Seq {
+        Seq::_weekend(TimeDir::Past, frame)
+    }
+
+    pub fn _nthof(n: u32, win: Seq, frame: Seq, is_frame: bool) -> Seq {
         // 1. X-invariant: end-of-frame(reftime) > reftime
         // 2. X-invariant: end-of-win-1(outer.start) > outer.start
         assert!(n > 0);
@@ -177,6 +171,14 @@ impl Seq {
                                 outer.end.signed_duration_since(outer.start));
                         inner.start < outer.end
                     }).nth((n-1) as usize))
+                // When going to the Past the Frame is instantiated violating
+                // Y-invariant (frame=true) to avoid missing 1st element within,
+                // so we must skip it here
+                .skip_while(move |nth| timedir == TimeDir::Past && !is_frame &&
+                            match nth {
+                                &Some(ref x) if x.end > reftime => true,
+                                _ => false
+                            })
                 .flat_map(move |nth| {
                     fuse = if nth.is_some() { 0 } else { fuse + 1 };
                     if fuse >= INFINITE_FUSE {
@@ -188,7 +190,15 @@ impl Seq {
         }), timedir)
     }
 
-    pub fn lastof(n: u32, win: Seq, frame: Seq) -> Seq {
+    pub fn nthof(n: u32, win: Seq, frame: Seq) -> Seq {
+        Seq::_nthof(n, win, frame, false)
+    }
+
+    pub fn nthof_frame(n: u32, win: Seq, frame: Seq) -> Seq {
+        Seq::_nthof(n, win, frame, true)
+    }
+
+    pub fn _lastof(n: u32, win: Seq, frame: Seq, is_frame: bool) -> Seq {
         // 1. X-invariant: end-of-frame(reftime) > reftime
         // 2. X-invariant: end-of-win-1(outer.start) > outer.start
         assert!(n > 0);
@@ -212,6 +222,14 @@ impl Seq {
                     }
                     None
                 })
+                // When going to the Past the Frame is instantiated violating
+                // Y-invariant (frame=true) to avoid missing 1st element within,
+                // so we must skip it here
+                .skip_while(move |nth| timedir == TimeDir::Past && !is_frame &&
+                            match nth {
+                                &Some(ref x) if x.end > reftime => true,
+                                _ => false
+                            })
                 .flat_map(move |nth| {
                     fuse = if nth.is_some() { 0 } else { fuse + 1 };
                     if fuse >= INFINITE_FUSE {
@@ -221,6 +239,14 @@ impl Seq {
                 })
             )
         }), timedir)
+    }
+
+    pub fn lastof(n: u32, win: Seq, frame: Seq) -> Seq {
+        Seq::_lastof(n, win, frame, false)
+    }
+
+    pub fn lastof_frame(n: u32, win: Seq, frame: Seq) -> Seq {
+        Seq::_lastof(n, win, frame, true)
     }
 
     pub fn intersect(a: Seq, b: Seq) -> Seq {
@@ -289,7 +315,7 @@ impl Seq {
     // eg: 2nd monday of june to next month, tuesday to friday
     // NOTE: the first range emitted may not contain 'reftime' if 'reftime'
     // is not contained within the first element of the <from> sequence
-    // NOTE: output grain is taken from <from> seq, could assert they're eq
+    // TODO: interval is broken should compute END then backtrack to START
     pub fn interval(from: Seq, to: Seq, inclusive: bool) -> Seq {
         // We'll only use first element of 'to' anchored on 'from'.
         // 'to' must always go into the future

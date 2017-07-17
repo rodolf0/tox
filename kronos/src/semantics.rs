@@ -42,10 +42,12 @@ impl ops::Deref for Seq {
     fn deref(&self) -> &Self::Target { &self.0 }
 }
 
-//// NOTES
-//// X: Sequences generate Ranges that have ENDtime after reference-time,
-////    they may contain the reference time or start after if discontinuous.
-//// see duckling http://goo.gl/gxU1Jo
+// NOTES
+// X: Sequences generate Ranges that have ENDtime after reference-time,
+//    they may contain the reference time or start after if discontinuous.
+// see duckling http://goo.gl/gxU1Jo
+//
+// Y: Sequences generate Ranges that have ENDtime before or EQ to reference-time
 
 impl Seq {
     pub fn from_grain(g: Grain) -> Seq {
@@ -62,7 +64,7 @@ impl Seq {
 
     pub fn from_grain_back(g: Grain) -> Seq {
         Seq(Rc::new(move |reftime| {
-            // given X-precondition: end-of-grain(reftime) <= reftime
+            // given Y-precondition: end-of-grain(reftime) <= reftime
             let base = utils::truncate(reftime, g);
             Box::new((1..).map(move |x| Range{
                 start: utils::shift_datetime(base, g, -x),
@@ -133,6 +135,22 @@ impl Seq {
                 Range{
                     start: base + Duration::days(x * 7),
                     end: base + Duration::days(x * 7 + 2),
+                    grain: Grain::Day
+                }
+            }))
+        }), TimeDir::Future)
+    }
+
+    pub fn weekend_back() -> Seq {
+        Seq(Rc::new(|reftime| {
+            let mut base = reftime.date();
+            if base.weekday() == Weekday::Sat { base = base.pred(); }
+            while base.weekday() != Weekday::Sat { base = base.pred(); }
+            let base = base.and_hms(0, 0, 0);
+            Box::new((1..).map(move |x| {
+                Range{
+                    start: base + Duration::days(-x * 7),
+                    end: base + Duration::days(-x * 7 + 2),
                     grain: Grain::Day
                 }
             }))

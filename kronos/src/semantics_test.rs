@@ -18,6 +18,10 @@ fn test_seq_weekday() {
     assert_eq!(sunday.next().unwrap(),
                Range{start: dt(2016, 9, 4), end: dt(2016, 9, 5),
                      grain: Grain::Day});
+    let mut sunday = Seq::weekday_back(0)(dt(2016, 8, 27));
+    assert_eq!(sunday.next().unwrap(),
+               Range{start: dt(2016, 8, 21), end: dt(2016, 8, 22),
+                     grain: Grain::Day});
 }
 
 #[test]
@@ -69,6 +73,11 @@ fn test_seq_weekend() {
     let mut weekend = Seq::weekend()(dt(2016, 3, 20));
     assert_eq!(weekend.next().unwrap(),
                Range{start: dt(2016, 3, 19), end: dt(2016, 3, 21),
+                     grain: Grain::Day});
+
+    let mut weekend = Seq::weekend_back()(dt(2016, 3, 20));
+    assert_eq!(weekend.next().unwrap(),
+               Range{start: dt(2016, 3, 12), end: dt(2016, 3, 14),
                      grain: Grain::Day});
 }
 
@@ -232,6 +241,49 @@ fn test_nth_basic() {
     assert_eq!(jun28th.next().unwrap(),
                Range{start: dt(2017, 6, 28), end: dt(2017, 6, 29),
                      grain: Grain::Day});
+
+    // backward: 28th of june
+    let jun28th =
+        Seq::nthof(28, Seq::from_grain(Grain::Day), Seq::month_back(6));
+    let mut jun28th = jun28th(dt(2016, 2, 25));
+    assert_eq!(jun28th.next().unwrap(),
+               Range{start: dt(2015, 6, 28), end: dt(2015, 6, 29),
+                     grain: Grain::Day});
+    assert_eq!(jun28th.next().unwrap(),
+               Range{start: dt(2014, 6, 28), end: dt(2014, 6, 29),
+                     grain: Grain::Day});
+
+    // backward: 3rd week of june
+    let thirdwkjune =
+        Seq::nthof(3, Seq::from_grain(Grain::Week), Seq::month_back(6));
+    let mut thirdwkjune = thirdwkjune(dt(2016, 9, 4));
+    assert_eq!(thirdwkjune.next().unwrap(),
+               Range{start: dt(2016, 6, 12), end: dt(2016, 6, 19),
+                     grain: Grain::Week});
+    assert_eq!(thirdwkjune.next().unwrap(),
+               Range{start: dt(2015, 6, 14), end: dt(2015, 6, 21),
+                     grain: Grain::Week});
+
+    // backward: 3rd tuesday of the month
+    let tue3mo = Seq::nthof(
+        3, Seq::weekday(2), Seq::from_grain_back(Grain::Month));
+    let mut tue3mo = tue3mo(dt(2016, 2, 10));
+    assert_eq!(tue3mo.next().unwrap(),
+               Range{start: dt(2016, 1, 19), end: dt(2016, 1, 20),
+                     grain: Grain::Day});
+    assert_eq!(tue3mo.next().unwrap(),
+               Range{start: dt(2015, 12, 15), end: dt(2015, 12, 16),
+                     grain: Grain::Day});
+
+    // backward: 2nd monday of april
+    let secmonapr = Seq::nthof(2, Seq::weekday(1), Seq::month_back(4));
+    let mut secmonapr = secmonapr(dt(2016, 2, 25));
+    assert_eq!(secmonapr.next().unwrap(),
+               Range{start: dt(2015, 4, 13), end: dt(2015, 4, 14),
+                     grain: Grain::Day});
+    assert_eq!(secmonapr.next().unwrap(),
+               Range{start: dt(2014, 4, 14), end: dt(2014, 4, 15),
+                     grain: Grain::Day});
 }
 
 #[test]
@@ -261,6 +313,17 @@ fn test_nth_discontinuous() {
                      grain: Grain::Day});
     assert_eq!(thirtyfirst.next().unwrap(),
                Range{start: dt(2017, 1, 31), end: dt(2017, 2, 1),
+                     grain: Grain::Day});
+
+    // backward: 29th of february
+    let feb29th = Seq::nthof(
+        29, Seq::from_grain(Grain::Day), Seq::month_back(2));
+    let mut feb29th = feb29th(dt(2015, 2, 25));
+    assert_eq!(feb29th.next().unwrap(),
+               Range{start: dt(2012, 2, 29), end: dt(2012, 3, 1),
+                     grain: Grain::Day});
+    assert_eq!(feb29th.next().unwrap(),
+               Range{start: dt(2008, 2, 29), end: dt(2008, 3, 1),
                      grain: Grain::Day});
 }
 
@@ -308,6 +371,18 @@ fn test_nth_composed() {
     assert_eq!(y5th10thday.next().unwrap(),
                Range{start: dt(2016, 5, 10), end: dt(2016, 5, 11),
                      grain: Grain::Day});
+
+    // back: the 5th instance of 10th-day-of-the-month (each year) aka May 10th
+    let mo10th = Seq::nthof(
+        10, Seq::from_grain(Grain::Day), Seq::from_grain(Grain::Month));
+    let y5th10thday = Seq::nthof(5, mo10th, Seq::from_grain_back(Grain::Year));
+    let mut y5th10thday = y5th10thday(dt(2015, 3, 11));
+    assert_eq!(y5th10thday.next().unwrap(),
+               Range{start: dt(2014, 5, 10), end: dt(2014, 5, 11),
+                     grain: Grain::Day});
+    assert_eq!(y5th10thday.next().unwrap(),
+               Range{start: dt(2013, 5, 10), end: dt(2013, 5, 11),
+                     grain: Grain::Day});
 }
 
 #[test]
@@ -344,6 +419,29 @@ fn test_lastof() {
     assert_eq!(daybeforelastfeb.next().unwrap(),
                Range{start: dt(2020, 2, 1), end: dt(2020, 2, 2),
                      grain: Grain::Day});
+
+    // backward: 2nd-to-last day of february
+    let daybeforelastfeb = Seq::lastof(
+        2, Seq::from_grain(Grain::Day), Seq::month_back(2));
+    let mut daybeforelastfeb = daybeforelastfeb(dt(2015, 2, 25));
+    assert_eq!(daybeforelastfeb.next().unwrap(),
+               Range{start: dt(2014, 2, 27), end: dt(2014, 2, 28),
+                     grain: Grain::Day});
+    assert_eq!(daybeforelastfeb.next().unwrap(),
+               Range{start: dt(2013, 2, 27), end: dt(2013, 2, 28),
+                     grain: Grain::Day});
+    assert_eq!(daybeforelastfeb.next().unwrap(),
+               Range{start: dt(2012, 2, 28), end: dt(2012, 2, 29),
+                     grain: Grain::Day});
+
+    // backward: 5th-to-last day of february
+    // NOTE: frame will be adjusted first in the context of date
+    let daybeforelastfeb = Seq::lastof(
+        5, Seq::from_grain(Grain::Day), Seq::month_back(2));
+    let mut daybeforelastfeb = daybeforelastfeb(dt(2015, 2, 26));
+    assert_eq!(daybeforelastfeb.next().unwrap(),
+               Range{start: dt(2014, 2, 24), end: dt(2014, 2, 25),
+                     grain: Grain::Day});
 }
 
 #[test]
@@ -360,6 +458,21 @@ fn test_intersect() {
                      grain: Grain::Day});
     assert_eq!(mon28th.next().unwrap(),
                Range{start: dt(2017, 8, 28), end: dt(2017, 8, 29),
+                     grain: Grain::Day});
+    // backward: monday 28th
+    let mon28th = Seq::intersect(Seq::weekday_back(1), Seq::nthof(
+        28, Seq::from_grain(Grain::Day), Seq::from_grain_back(Grain::Month)));
+    let mut mon28th = mon28th(dt(2016, 2, 25));
+    assert_eq!(mon28th.next().unwrap(),
+               Range{start: dt(2015, 12, 28), end: dt(2015, 12, 29),
+                     grain: Grain::Day});
+
+    // backward-2: monday 28th
+    let mon28th = Seq::intersect(Seq::weekday_back(1), Seq::nthof(
+        28, Seq::from_grain(Grain::Day), Seq::from_grain_back(Grain::Month)));
+    let mut mon28th = mon28th(dt(2015, 12, 29));
+    assert_eq!(mon28th.next().unwrap(),
+               Range{start: dt(2015, 12, 28), end: dt(2015, 12, 29),
                      grain: Grain::Day});
 
     // tuesdays 3pm

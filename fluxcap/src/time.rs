@@ -168,7 +168,7 @@ impl<'a> TimeMachine<'a> {
                 "small_int" => TmEl::SmallInt(u32::from_str(t).unwrap()),
                 "this" | "next" | "the" | "of" | "christmas" | "last" | "and" |
                 "after" | "today" | "tomorrow" | "until" | "since" | "ago" |
-                "between" | "in" | "a" | "before"
+                "between" | "in" | "a" | "before" | "yesterday"
                   => TmEl::Nop,
                 _ => panic!("Unknown terminal={:?} lexeme={:?}", terminal, t)
             }
@@ -176,8 +176,8 @@ impl<'a> TimeMachine<'a> {
         //////////////////////////////////////////////////////////////////////
         ev.action("mday -> ordinal", |mut n| {
             let n = pull!(TmEl::Ordinal, n.swap_remove(0));
-            TmEl::Seq(Seq::nthof(n, Seq::from_grain(Grain::Day),
-                       Seq::from_grain(Grain::Month)))
+            TmEl::Seq(Seq::nthof(n, Seq::grain(Grain::Day),
+                       Seq::grain(Grain::Month)))
         });
         //////////////////////////////////////////////////////////////////////
         ev.action("seq -> mday", |mut n| n.swap_remove(0));
@@ -207,21 +207,21 @@ impl<'a> TimeMachine<'a> {
             let seqwday = pull!(TmEl::Seq, n.remove(0));
             let mday = pull!(TmEl::Ordinal, n.remove(0));
             let seqmonth = pull!(TmEl::Seq, n.remove(1));
-            let dom = Seq::nthof(mday, Seq::from_grain(Grain::Day), seqmonth);
+            let dom = Seq::nthof(mday, Seq::grain(Grain::Day), seqmonth);
             TmEl::Seq(Seq::intersect(dom, seqwday))
         });
         ev.action("seq -> weekday month ordinal", |mut n| {
             let seqwday = pull!(TmEl::Seq, n.remove(0));
             let seqmonth = pull!(TmEl::Seq, n.remove(0));
             let mday = pull!(TmEl::Ordinal, n.remove(0));
-            let dom = Seq::nthof(mday, Seq::from_grain(Grain::Day), seqmonth);
+            let dom = Seq::nthof(mday, Seq::grain(Grain::Day), seqmonth);
             TmEl::Seq(Seq::intersect(dom, seqwday))
         });
         ev.action("seq -> christmas", |_| TmEl::Seq(
-            Seq::nthof(25, Seq::from_grain(Grain::Day), Seq::month(12))));
+            Seq::nthof(25, Seq::grain(Grain::Day), Seq::month(12))));
         ev.action("seq -> grain", |mut n| {
             let grain = pull!(TmEl::Grain, n.remove(0));
-            TmEl::Seq(Seq::from_grain(grain))
+            TmEl::Seq(Seq::grain(grain))
         });
         ev.action("seq -> year", |mut n| {
             TmEl::Seq(Seq::year(pull!(TmEl::Year, n.remove(0))))
@@ -252,10 +252,11 @@ impl<'a> TimeMachine<'a> {
         });
         //////////////////////////////////////////////////////////////////////
         ev.action("time -> today", |_|
-            TmEl::This(Seq::from_grain(Grain::Day)));
+            TmEl::This(Seq::grain(Grain::Day)));
         ev.action("time -> tomorrow", |_|
-            TmEl::Next(Seq::from_grain(Grain::Day), 1));
-        //ev.action("time -> yesterday", ...);
+            TmEl::Next(Seq::grain(Grain::Day), 1));
+        ev.action("time -> yesterday", |_|
+            TmEl::This(Seq::grain_back(Grain::Day, false)));
         ev.action("time -> this seq", |mut n|
             TmEl::This(pull!(TmEl::Seq, n.swap_remove(1))));
         ev.action("time -> next seq", |mut n|
@@ -358,10 +359,10 @@ impl<'a> TimeMachine<'a> {
                         .count() as u32)
                 },
                 &TmEl::Ago(n, grain) =>
-                    TimeEl::Time(Seq::from_grain(lower_grain(grain))
+                    TimeEl::Time(Seq::grain(lower_grain(grain))
                                  .this(reftime).shift(grain, -(n as i32))),
                 &TmEl::In(n, grain) =>
-                    TimeEl::Time(Seq::from_grain(lower_grain(grain))
+                    TimeEl::Time(Seq::grain(lower_grain(grain))
                                  .this(reftime).shift(grain, (n as i32))),
                 &TmEl::After(n, grain, ref t0) =>
                     TimeEl::Time(t0.range(reftime).shift(grain, (n as i32))),

@@ -4,7 +4,7 @@ type Date = chrono::NaiveDate;
 
 use lexers::DelimTokenizer;
 use earlgrey::{ParserBuilder, EarleyParser, EarleyEvaler};
-use kronos::{Range, Seq, Grain};
+use kronos::{Range, Seq, Grain, TimeDir};
 use std::str::FromStr;
 
 #[derive(Clone)]
@@ -13,6 +13,7 @@ enum TmEl {
     Ordinal(u32),
     Seq(Seq),
     Next(Seq, u32),
+    Last(Seq, u32),
     This(Seq),
     Fixed(Seq, i32),
     Grain(Grain),
@@ -31,7 +32,8 @@ enum TmEl {
 impl TmEl {
     fn range(&self, reftime: DateTime) -> Range {
         match self {
-            &TmEl::Next(ref x, n) => x.next(reftime, n),
+            &TmEl::Next(ref x, n) => x.next(reftime, TimeDir::Future, n),
+            &TmEl::Last(ref x, n) => x.next(reftime, TimeDir::Past, n),
             &TmEl::This(ref x) => x.this(reftime),
             &TmEl::Fixed(ref x, y) =>
                 x.this(Date::from_ymd(y, 1, 1).and_hms(0, 0, 0)),
@@ -115,7 +117,7 @@ impl<'a> TimeMachine<'a> {
               | 'yesterday'
               | 'this' seq
               | 'next' seq
-              | 'last' seq
+              | 'last' shifted_seq
               | shifted_seq
               | the_seq year
               ;
@@ -256,12 +258,13 @@ impl<'a> TimeMachine<'a> {
         ev.action("time -> tomorrow", |_|
             TmEl::Next(Seq::grain(Grain::Day), 1));
         ev.action("time -> yesterday", |_|
-            TmEl::This(Seq::grain_back(Grain::Day, false)));
+            TmEl::Last(Seq::grain(Grain::Day), 1));
         ev.action("time -> this seq", |mut n|
             TmEl::This(pull!(TmEl::Seq, n.swap_remove(1))));
         ev.action("time -> next seq", |mut n|
             TmEl::Next(pull!(TmEl::Seq, n.swap_remove(1)), 1));
-        //ev.action("time -> last seq", ...);
+        ev.action("time -> last shifted_seq", |mut n|
+            TmEl::Last(pull!(TmEl::Seq, n.swap_remove(1)), 1));
         ev.action("time -> shifted_seq", |mut n|
             TmEl::This(pull!(TmEl::Seq, n.swap_remove(0))));
         ev.action("time -> the_seq year", |mut n| {
@@ -338,14 +341,14 @@ impl<'a> TimeMachine<'a> {
             match &t[0] {
                 &TmEl::Until(ref x, ref tm) => {
                     let deadline = tm.range(reftime);
-                    TimeEl::Count(x(reftime)
+                    TimeEl::Count(x(reftime, TimeDir::Future)
                         .skip_while(|r| r.end <= reftime)
                         .take_while(|r| r.start < deadline.start)
                         .count() as u32)
                 },
                 &TmEl::Since(ref x, ref tm) => {
                     let fromtm = tm.range(reftime);
-                    TimeEl::Count(x(fromtm.start)
+                    TimeEl::Count(x(fromtm.start, TimeDir::Future)
                         .skip_while(|r| r.end <= fromtm.start)
                         .take_while(|r| r.start <= reftime)
                         .count() as u32)
@@ -353,7 +356,7 @@ impl<'a> TimeMachine<'a> {
                 &TmEl::Between(ref x, ref t0, ref t1) => {
                     let t0 = t0.range(reftime);
                     let t1 = t1.range(reftime);
-                    TimeEl::Count(x(t0.start)
+                    TimeEl::Count(x(t0.start, TimeDir::Future)
                         .skip_while(|r| r.end <= t0.start)
                         .take_while(|r| r.start < t1.start)
                         .count() as u32)

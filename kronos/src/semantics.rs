@@ -264,17 +264,15 @@ impl Seq {
             }))))
     }
 
-    // TODO: check beore_last
-    //pub fn after_next(seq: Seq, n: u32) -> Seq {
-        //assert!(n > 0);
-        //Seq(Rc::new(move |reftime, timedir| {
-            //let mut seq = seq(reftime, timedir).peekable();
-            //if seq.peek().unwrap().start <= reftime {
-                //seq.next();
-            //}
-            //Box::new(seq.skip(n as usize))
-        //}))
-    //}
+    // TODO: before_last
+    pub fn after_next(seq: Seq, n: u32) -> Seq {
+        assert!(n > 0);
+        Seq(Rc::new(move |reftime, _| {
+            let mut seq = seq(reftime, TimeDir::Future).peekable();
+            if seq.peek().unwrap().start <= reftime { seq.next(); }
+            Box::new(seq.skip(n as usize))
+        }))
+    }
 
     // apply a transform to each range emited by seq
     // to suppress a value emit Option::None
@@ -286,45 +284,44 @@ impl Seq {
         }))
     }
 
-    //// duckling intervals http://tinyurl.com/hk2vu34
-    //// eg: 2nd monday of june to next month, tuesday to friday
-    //// NOTE: the first range emitted may not contain 'reftime' if 'reftime'
-    //// is not contained within the first element of the <from> sequence
-    //// TODO: interval is broken should compute END then backtrack to START
-    //pub fn interval(from: Seq, to: Seq, inclusive: bool) -> Seq {
-        //// We'll only use first element of 'to' anchored on 'from'.
-        //// 'to' must always go into the future
-        //assert_eq!(to.1, TimeDir::Future);
-        //let timedir = from.1;
-        //Seq(Rc::new(move |reftime| {
-            //let to = to.clone();
-            //let mut fuse = 0;
-            //Box::new(from(reftime).map(move |ibegin| {
-                //let iend = to(ibegin.start).next().unwrap();
-                //let range = match inclusive {
-                    //true => Range{
-                        //start: ibegin.start,
-                        //end: iend.end,
-                        //grain: ibegin.grain},
-                    //false => Range{
-                        //start: ibegin.start,
-                        //end: iend.start,
-                        //grain: ibegin.grain},
-                //};
-                //match range.end < range.start {
-                    //true => None,
-                    //false => Some(range)
-                //}
-            //}).flat_map(move |ival| {
-                //fuse = if ival.is_some() { 0 } else { fuse + 1 };
-                //if fuse >= INFINITE_FUSE {
-                    //panic!("Seq::interval INFINITE_FUSE blown");
-                //}
-                //ival
-            //}))
-        //}), timedir)
-    //}
+    // duckling intervals http://tinyurl.com/hk2vu34
+    // eg: 2nd monday of june to next month, tuesday to friday
+    // TODO: not thorougly tested
+    pub fn interval(from: Seq, to: Seq, inclusive: bool) -> Seq {
+        let grain =
+            from(Date::from_ymd(2016, 1, 1).and_hms(0, 0, 0), TimeDir::Future)
+            .next().unwrap().grain;
+        Seq(Rc::new(move |reftime, timedir| {
+            let reftime = utils::truncate(reftime, utils::next_grain(grain));
+            let to = to.clone();
+            let mut fuse = 0;
+            Box::new(from(reftime, timedir).map(move |ibegin| {
+                let iend = to(ibegin.start, TimeDir::Future).next().unwrap();
+                let range = match inclusive {
+                    true => Range{
+                        start: ibegin.start,
+                        end: iend.end,
+                        grain: ibegin.grain},
+                    false => Range{
+                        start: ibegin.start,
+                        end: iend.start,
+                        grain: ibegin.grain},
+                };
+                match range.end < range.start {
+                    true => None,
+                    false => Some(range)
+                }
+            }).flat_map(move |ival| {
+                fuse = if ival.is_some() { 0 } else { fuse + 1 };
+                if fuse >= INFINITE_FUSE {
+                    panic!("Seq::interval INFINITE_FUSE blown");
+                }
+                ival
+            }))
+        }))
+    }
 
+    // TODO: latent?
     pub fn merge(merged: Seq, n: u32) -> Seq {
         assert!(n > 0);
         Seq(Rc::new(move |reftime, timedir| {
@@ -406,7 +403,6 @@ impl Seq {
         }
     }
 }
-
 
 impl Range {
     pub fn intersect(&self, other: &Range) -> Option<Range> {

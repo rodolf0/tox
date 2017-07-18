@@ -585,55 +585,55 @@ fn test_intersect() {
                      grain: Grain::Day});
 }
 
-//#[test]
-//fn test_interval() {
-    //// monday to friday
-    //let mon2fri = Seq::interval(Seq::weekday(1), Seq::weekday(5), true);
-    //let mut mon2fri = mon2fri(dt(2016, 2, 25));
-    //assert_eq!(mon2fri.next().unwrap(),
-               //Range{start: dt(2016, 2, 29), end: dt(2016, 3, 5),
-                     //grain: Grain::Day});
-    //assert_eq!(mon2fri.next().unwrap(),
-               //Range{start: dt(2016, 3, 7), end: dt(2016, 3, 12),
-                     //grain: Grain::Day});
+#[test]
+fn test_interval() {
+    // monday to friday
+    let mon2fri = Seq::interval(Seq::weekday(1), Seq::weekday(5), true);
+    let mut mon2fri = mon2fri(dt(2016, 2, 25), TimeDir::Future);
+    assert_eq!(mon2fri.next().unwrap(),
+               Range{start: dt(2016, 2, 22), end: dt(2016, 2, 27),
+                     grain: Grain::Day});
+    assert_eq!(mon2fri.next().unwrap(),
+               Range{start: dt(2016, 2, 29), end: dt(2016, 3, 5),
+                     grain: Grain::Day});
 
-    //// 2nd of june until end of month
-    //let june2ndtileom = Seq::interval(
-        //Seq::nthof(2, Seq::grain(Grain::Day), Seq::month(6)),
-        //Seq::month(6), true);
-    //let mut june2ndtileom = june2ndtileom(dt(2016, 2, 25));
-    //assert_eq!(june2ndtileom.next().unwrap(),
-               //Range{start: dt(2016, 6, 2), end: dt(2016, 7, 1),
-                     //grain: Grain::Day});
-    //assert_eq!(june2ndtileom.next().unwrap(),
-               //Range{start: dt(2017, 6, 2), end: dt(2017, 7, 1),
-                     //grain: Grain::Day});
+    // 2nd of june until end of month
+    let june2ndtileom = Seq::interval(
+        Seq::nthof(2, Seq::grain(Grain::Day), Seq::month(6)),
+        Seq::month(6), true);
+    let mut june2ndtileom = june2ndtileom(dt(2016, 2, 25), TimeDir::Future);
+    assert_eq!(june2ndtileom.next().unwrap(),
+               Range{start: dt(2016, 6, 2), end: dt(2016, 7, 1),
+                     grain: Grain::Day});
+    assert_eq!(june2ndtileom.next().unwrap(),
+               Range{start: dt(2017, 6, 2), end: dt(2017, 7, 1),
+                     grain: Grain::Day});
 
-    //// afternoon
-    //let afternoon = Seq::interval(
-        //Seq::nthof(13, Seq::grain(Grain::Hour),
-                   //Seq::grain(Grain::Day)),
-        //Seq::nthof(19, Seq::grain(Grain::Hour),
-                   //Seq::grain(Grain::Day)), false);
-    //let mut afternoon = afternoon(dt(2016, 2, 25));
-    //assert_eq!(afternoon.next().unwrap(),
-               //Range{start: dttm(2016, 2, 25, 12, 0, 0),
-                     //end: dttm(2016, 2, 25, 18, 0, 0),
-                     //grain: Grain::Hour});
-    //assert_eq!(afternoon.next().unwrap(),
-               //Range{start: dttm(2016, 2, 26, 12, 0, 0),
-                     //end: dttm(2016, 2, 26, 18, 0, 0),
-                     //grain: Grain::Hour});
+    // afternoon
+    let afternoon = Seq::interval(
+        Seq::nthof(13, Seq::grain(Grain::Hour),
+                   Seq::grain(Grain::Day)),
+        Seq::nthof(19, Seq::grain(Grain::Hour),
+                   Seq::grain(Grain::Day)), false);
+    let mut afternoon = afternoon(dt(2016, 2, 25), TimeDir::Future);
+    assert_eq!(afternoon.next().unwrap(),
+               Range{start: dttm(2016, 2, 25, 12, 0, 0),
+                     end: dttm(2016, 2, 25, 18, 0, 0),
+                     grain: Grain::Hour});
+    assert_eq!(afternoon.next().unwrap(),
+               Range{start: dttm(2016, 2, 26, 12, 0, 0),
+                     end: dttm(2016, 2, 26, 18, 0, 0),
+                     grain: Grain::Hour});
 
-    //// spring south hem
-    //let southspring = Seq::interval(
-        //Seq::nthof(21, Seq::grain(Grain::Day), Seq::month(9)),
-        //Seq::nthof(21, Seq::grain(Grain::Day), Seq::month(12)), true);
-    //let mut sspring = southspring(dt(2016, 2, 25));
-    //assert_eq!(sspring.next().unwrap(),
-               //Range{start: dt(2016, 9, 21), end: dt(2016, 12, 22),
-                     //grain: Grain::Day});
-//}
+    // spring south hem
+    let southspring = Seq::interval(
+        Seq::nthof(21, Seq::grain(Grain::Day), Seq::month(9)),
+        Seq::nthof(21, Seq::grain(Grain::Day), Seq::month(12)), true);
+    let mut sspring = southspring(dt(2016, 2, 25), TimeDir::Future);
+    assert_eq!(sspring.next().unwrap(),
+               Range{start: dt(2016, 9, 21), end: dt(2016, 12, 22),
+                     grain: Grain::Day});
+}
 
 #[test]
 fn test_merge() {

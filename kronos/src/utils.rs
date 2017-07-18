@@ -6,6 +6,19 @@ pub type DateTime = chrono::NaiveDateTime;
 pub type Date = chrono::NaiveDate;
 pub type Duration = chrono::Duration;
 
+pub fn next_grain(g: Grain) -> Grain {
+    match g {
+        Grain::Second => Grain::Minute,
+        Grain::Minute => Grain::Hour,
+        Grain::Hour => Grain::Day,
+        Grain::Day => Grain::Week,
+        Grain::Week => Grain::Month,
+        Grain::Month => Grain::Year,
+        Grain::Quarter => Grain::Year,
+        Grain::Year => Grain::Year,
+    }
+}
+
 pub fn truncate(d: DateTime, g: Grain) -> DateTime {
     use Grain::*;
     match g {

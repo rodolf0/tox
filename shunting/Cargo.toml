@@ -3,13 +3,15 @@ name = "shunting"
 version = "0.0.3"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "A shunting-yard math parser"
+license = "MIT"
+repository = "https://github.com/rodolf0/tox"
 
 [features]
 default = ["dynlink-eval"]
 dynlink-eval = ["dylib"]
 
 [dependencies]
-lexers = { version = "0.0.4", path = "../lexers" }
+lexers = { version = "0.0.5", path = "../lexers" }
 rustyline = "1.0.0"
 rand = "0.3"
 

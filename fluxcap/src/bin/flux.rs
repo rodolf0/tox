@@ -27,9 +27,13 @@ fn main() {
     }
 
     for r in tm.eval(reftime, &input) {
-        match r {
-            fluxcap::TimeEl::Time(r) =>
+        match &r {
+            &fluxcap::TimeEl::Time(ref r) if r.grain <= kronos::Grain::Day =>
                 println!("({:?}) {}", r.grain, r.start.format(fmt(r.grain))),
+            &fluxcap::TimeEl::Time(ref r) =>
+                println!("({:?}) {} - {}", r.grain,
+                         r.start.format(fmt(r.grain)),
+                         r.end.format(fmt(r.grain))),
             _ => println!("{:?}", r),
         }
     }

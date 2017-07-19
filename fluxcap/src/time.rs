@@ -239,7 +239,10 @@ impl<'a> TimeMachine<'a> {
             let shifted = pull!(TmEl::Seq, n.swap_remove(0));
             TmEl::Seq(Seq::after_next(shifted, 1))
         });
-        //ev.action("shifted_seq -> the_seq before last", ...);
+        ev.action("shifted_seq -> the_seq before last", |mut n| {
+            let shifted = pull!(TmEl::Seq, n.swap_remove(0));
+            TmEl::Seq(Seq::before_last(shifted, 1))
+        });
         //////////////////////////////////////////////////////////////////////
         ev.action("nthof -> ordinal seq of shifted_seq", |mut n| {
             let nth = pull!(TmEl::Ordinal, n.remove(0));

@@ -264,13 +264,19 @@ impl Seq {
             }))))
     }
 
-    // TODO: before_last
     pub fn after_next(seq: Seq, n: u32) -> Seq {
         assert!(n > 0);
         Seq(Rc::new(move |reftime, _| {
             let mut seq = seq(reftime, TimeDir::Future).peekable();
             if seq.peek().unwrap().start <= reftime { seq.next(); }
             Box::new(seq.skip(n as usize))
+        }))
+    }
+
+    pub fn before_last(seq: Seq, n: u32) -> Seq {
+        assert!(n > 0);
+        Seq(Rc::new(move |reftime, _| {
+            Box::new(seq(reftime, TimeDir::Past).skip(n as usize))
         }))
     }
 

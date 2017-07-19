@@ -1,6 +1,6 @@
 [package]
 name = "fluxcap"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "time expression parsing inspired on duckling"
 license = "MIT"
@@ -10,4 +10,4 @@ repository = "https://github.com/rodolf0/tox"
 chrono = "0.4"
 lexers = { version = "0.0.5", path = "../lexers" }
 earlgrey = { version = "0.0.7", path = "../earlgrey" }
-kronos = { version = "0.0.4", path = "../kronos" }
+kronos = { version = "0.0.5", path = "../kronos" }

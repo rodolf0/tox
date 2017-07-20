@@ -337,7 +337,10 @@ impl<'a> TimeMachine<'a> {
         let mut tokenizer = DelimTokenizer::from_str(time, ", ", true);
         let state = match self.0.parse(&mut tokenizer) {
             Ok(state) => state,
-            Err(e) => panic!("Time parse failed: {:?}", e),
+            Err(e) => {
+                eprintln!("Time parse failed: {:?}", e);
+                return Vec::new();
+            }
         };
         self.1.eval_all(&state).into_iter().map(|t| {
             assert!(t.len() == 1);

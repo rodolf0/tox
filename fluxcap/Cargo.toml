@@ -1,6 +1,6 @@
 [package]
 name = "fluxcap"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "time expression parsing inspired on duckling"
 license = "MIT"

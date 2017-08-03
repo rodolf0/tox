@@ -1,24 +1,36 @@
-use types::Grammar;
+#![deny(warnings)]
+
+use grammar::Grammar;
 use trees::EarleyEvaler;
 
+
 #[derive(Debug,Clone,PartialEq)]
-pub enum Subtree {
+pub enum Tree {
     // ("[+-]", "+")
     Leaf(String, String),
     // ("E -> E [+-] E", [("n", "5"), ("[+-]", "+"), ("E -> E * E", [...])])
-    Node(String, Vec<Subtree>),
+    Node(String, Vec<Tree>),
 }
 
-impl Subtree {
+#[derive(Clone,Debug)]
+pub enum Sexpr {
+    Atom(String),
+    List(Vec<Sexpr>),
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+impl Tree {
     pub fn print(&self) {
         self.print_helper("")
     }
+
     fn print_helper(&self, level: &str) {
         match self {
-            &Subtree::Leaf(ref sym, ref lexeme) => {
+            &Tree::Leaf(ref sym, ref lexeme) => {
                 println!("{}`-- {:?} ==> {:?}", level, sym, lexeme);
             },
-            &Subtree::Node(ref spec, ref subn) => {
+            &Tree::Node(ref spec, ref subn) => {
                 println!("{}`-- {:?}", level, spec);
                 if let Some((last, rest)) = subn.split_last() {
                     let l = format!("{}  |", level);
@@ -29,30 +41,24 @@ impl Subtree {
             }
         }
     }
-}
 
-pub fn subtree_evaler<'a>(g: Grammar) -> EarleyEvaler<'a, Subtree> {
-    let mut evaler = EarleyEvaler::new(
-        |sym, tok| Subtree::Leaf(sym.to_string(), tok.to_string())
-    );
-    for rule in g.rules() {
-        evaler.action(&rule.clone(), move |nodes|
-                      Subtree::Node(rule.clone(), nodes));
+    pub fn builder<'a>(g: Grammar) -> EarleyEvaler<'a, Tree> {
+        let mut evaler = EarleyEvaler::new(
+            |sym, tok| Tree::Leaf(sym.to_string(), tok.to_string())
+        );
+        for rule in g.str_rules() {
+            evaler.action(&rule.to_string(), move |nodes|
+                          Tree::Node(rule.to_string(), nodes));
+        }
+        evaler
     }
-    evaler
-}
-
-
-#[derive(Clone,Debug)]
-pub enum Sexpr {
-    Atom(String),
-    List(Vec<Sexpr>),
 }
 
 impl Sexpr {
     pub fn print(&self) {
         self.print_helper("")
     }
+
     fn print_helper(&self, level: &str) {
         match self {
             &Sexpr::Atom(ref lexeme) => {

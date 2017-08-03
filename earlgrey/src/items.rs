@@ -9,8 +9,8 @@ use std::rc::Rc;
 
 #[derive(PartialEq,Eq,Hash)]
 pub enum Trigger {
-    Completion(Rc<Item>, Rc<Item>),
-    Scan(Rc<Item>, String),
+    Complete(Rc<Item>),
+    Scan(String),
 }
 
 // Earley items
@@ -19,8 +19,8 @@ pub struct Item {
     pub dot: usize,      // dot position within the rule
     pub start: usize,    // stream position where item starts
     pub end: usize,      // stream position where item ends
-    // backpointers leading to this item: (source-item, Scan/Completion)
-    bp: cell::RefCell<HashSet<Trigger>>
+    // backpointers leading to this item: (source-item, Scan/Complete)
+    bp: cell::RefCell<HashSet<(Rc<Item>, Trigger)>>
 }
 
 // StateSets keep deduped elements tracking insertion order
@@ -72,7 +72,9 @@ impl Item {
         self.rule.symbol_at(self.dot).map(|s| &**s)
     }
 
-    pub fn source(&self) -> cell::Ref<HashSet<Trigger>> { self.bp.borrow() }
+    pub fn source(&self) -> cell::Ref<HashSet<(Rc<Item>, Trigger)>> {
+        self.bp.borrow()
+    }
 
     // check if other item's next-symbol matches our rule's name
     fn can_complete(&self, other: &Rc<Item>) -> bool {
@@ -99,7 +101,7 @@ impl Item {
     // produce an Item after scanning a token
     pub fn scan_new(source: &Rc<Item>, end: usize, input: &str) -> Item {
         let mut _bp = HashSet::new();
-        _bp.insert(Trigger::Scan(source.clone(), input.to_string()));
+        _bp.insert((source.clone(), Trigger::Scan(input.to_string())));
         Item{rule: source.rule.clone(), dot: source.dot+1,
              start: source.start, end: end, bp: cell::RefCell::new(_bp)}
     }
@@ -107,7 +109,7 @@ impl Item {
     // produce an Item by completing another one
     fn complete_new(source: &Rc<Item>, trigger: &Rc<Item>, end: usize) -> Item {
         let mut _bp = HashSet::new();
-        _bp.insert(Trigger::Completion(source.clone(), trigger.clone()));
+        _bp.insert((source.clone(), Trigger::Complete(trigger.clone())));
         Item{rule: source.rule.clone(), dot: source.dot+1,
              start: source.start, end: end, bp: cell::RefCell::new(_bp)}
     }
@@ -244,7 +246,7 @@ mod tests {
         assert_eq!(i2, item(gen_rule1(), 3, 0, 1));
         // Assert i2 has back pointer
         assert_eq!(i2.source().len(), 1);
-        assert!(i2.source().contains(&Trigger::Scan(i, "3".to_string())));
+        assert!(i2.source().contains(&(i, Trigger::Scan("3".to_string()))));
     }
 
     #[test]

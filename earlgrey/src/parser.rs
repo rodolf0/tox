@@ -6,7 +6,7 @@ use std::iter::FromIterator;
 use std::rc::Rc;
 
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq,Debug)]
 pub struct ParseError;
 
 pub struct EarleyParser {
@@ -23,6 +23,9 @@ impl EarleyParser {
 
     pub fn parse<S>(&self, tok: S) -> Result<ParseTrees, ParseError>
             where S: Iterator<Item=String> { self._parse(tok, false) }
+
+    pub fn debug<S>(&self, tok: S) -> Result<ParseTrees, ParseError>
+            where S: Iterator<Item=String> { self._parse(tok, true) }
 
     fn _parse<S>(&self, mut tok: S, debug: bool)
             -> Result<ParseTrees, ParseError> where S: Iterator<Item=String> {
@@ -77,10 +80,10 @@ impl EarleyParser {
         // Verbose, debug state-sets
         if debug {
             for (idx, stateset) in states.iter().enumerate() {
-                println!("=== {} ===", idx);
-                for item in stateset.iter() { println!("{:?}", item); }
+                eprintln!("=== {} ===", idx);
+                for item in stateset.iter() { eprintln!("{:?}", item); }
             }
-            println!("=========");
+            eprintln!("=========");
         }
 
         // Check that at least one item is a. complete, b. starts at the idx 0,

@@ -5,16 +5,16 @@ mod items;
 mod parser;
 pub use parser::{EarleyParser, ParseError};
 
-//mod util;
-//mod trees;
+mod trees;
+pub use trees::EarleyEvaler;
+
+mod util;
+pub use util::{Sexpr, Tree};
 
 //mod ebnf;
-
-//pub use trees::EarleyEvaler;
 //pub use ebnf::{ParserBuilder, Treeresult};
-//pub use util::{Sexpr, subtree_evaler};
 
-//#[cfg(test)]
-//mod parser_test;
+#[cfg(test)]
+mod parser_test;
 //#[cfg(test)]
 //mod ebnf_test;

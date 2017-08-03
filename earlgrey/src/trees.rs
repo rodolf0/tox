@@ -1,13 +1,22 @@
-use types::{Item, Trigger};
+#![deny(warnings)]
+
+use items::{Item, Trigger};
 use parser::ParseTrees;
 use std::collections::HashMap;
 use std::rc::Rc;
+
+#[derive(Debug)]
+pub enum EvalError {
+    MissingAction(String),
+}
 
 pub struct EarleyEvaler<'a, ASTNode: Clone> {
     actions: HashMap<String, Box<Fn(Vec<ASTNode>)->ASTNode + 'a>>,
     tokenizer: Box<Fn(&str, &str)->ASTNode + 'a>,
     debug: bool,
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
     pub fn new<F>(tokenizer: F) -> EarleyEvaler<'a, ASTNode>
@@ -28,56 +37,64 @@ impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
         }
     }
 
+    // Register semantic actions to act when rules are matched
     pub fn action<F>(&mut self, rule: &str, action: F)
             where F: 'a + Fn(Vec<ASTNode>) -> ASTNode {
         self.actions.insert(rule.to_string(), Box::new(action));
     }
 
-    // source is always a prediction, can't be anything else cause it's on the left side,
-    // trigger is either a scan or a completion, only those can advance a prediction,
-    // to write this helper just draw a tree of the backpointers and see how they link
-    fn walker(&self, root: &Rc<Item>) -> Vec<ASTNode> {
-        // 1. collect arguments for semantic actions
+    // Source is always a prediction, can't be anything else cause it's on the
+    // left side. Trigger is either a scan or a completion, only those can
+    // advance a prediction. To write this helper just draw a tree of the
+    // backpointers and see how they link
+    fn walker(&self, root: &Rc<Item>) -> Result<Vec<ASTNode>, EvalError> {
         let mut args = Vec::new();
+        // 1. collect arguments for semantic actions
         let bp = root.source();
         if let Some(&(ref prediction, ref trigger)) = bp.iter().next() {
             // explore left side of the root
-            args.extend(self.walker(prediction));
+            args.extend(try!(self.walker(prediction)));
             // explore right side of the root
-            match trigger {
-                &Trigger::Completion(ref itm) => args.extend(self.walker(itm)),
+            args.extend(match trigger {
+                &Trigger::Complete(ref item) => try!(self.walker(item)),
                 &Trigger::Scan(ref token) => {
                     let symbol = prediction.next_symbol().unwrap().name();
-                    args.push((self.tokenizer)(&symbol, token));
+                    vec![(self.tokenizer)(&symbol, token)]
                 }
-            };
+            });
         }
 
         // 2.if rule is complete, execute semantic action, else keep collecting
         if root.complete() {
-            let rulename = root.str_rule();
+            let rulename = root.rule.to_string();
             return match self.actions.get(&rulename) {
-                None => panic!("No action for rule: {}", rulename),
+                None => Err(EvalError::MissingAction(rulename)),
                 Some(action) => {
-                    if self.debug { println!("Reduction: {}", rulename); }
-                    vec!(action(args))
+                    if self.debug { eprintln!("Reduction: {}", rulename); }
+                    Ok(vec![action(args)])
                 }
             };
         }
-        args
+        Ok(args)
+    }
+
+    // for non-ambiguous grammars this retreieves the only possible parse
+    pub fn eval(&self, ptrees: &ParseTrees) -> Result<ASTNode, EvalError> {
+        // walker will always return a Vec of size 1 because root.complete
+        Ok(self.walker(ptrees.0.first().unwrap())?.swap_remove(0))
     }
 
     fn walker_all(&self, root: &Rc<Item>) -> Vec<Vec<ASTNode>> {
         // reduce function to call on complete items
-        let rulename = root.str_rule();
+        let rulename = root.rule.to_string();
         let reduce = |semargs| {
             match root.complete() {
                 false => semargs,
                 true => match self.actions.get(&rulename) {
                     None => panic!("No action for rule: {}", rulename),
                     Some(action) => {
-                        if self.debug { println!("Reduction: {}", rulename); }
-                        vec!(action(semargs))
+                        if self.debug { eprintln!("Reduction: {}", rulename); }
+                        vec![action(semargs)]
                     }
                 }
             }
@@ -86,13 +103,13 @@ impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
         let mut trees = Vec::new();
         let source = root.source();
         if source.len() == 0 {
-            return vec!(reduce(vec!()));
+            return vec![reduce(Vec::new())];
         }
         for &(ref prediction, ref trigger) in source.iter() {
             // get left-side-tree of each source
             for mut args in self.walker_all(prediction) {
                 match trigger {
-                    &Trigger::Completion(ref itm) => {
+                    &Trigger::Complete(ref itm) => {
                         // collect right-side-tree of each source
                         for trig in self.walker_all(itm) {
                             let mut args = args.clone();
@@ -111,14 +128,14 @@ impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
         trees
     }
 
-    // for non-ambiguous grammars this retreieve the only possible parse
-    pub fn eval(&self, ptrees: &ParseTrees) -> Vec<ASTNode> {
-        self.walker(ptrees.0.first().unwrap())
-    }
-
-    pub fn eval_all(&self, ptrees: &ParseTrees) -> Vec<Vec<ASTNode>> {
-        ptrees.0.iter()
+    // Retrieves all parse trees
+    pub fn eval_all(&self, ptrees: &ParseTrees)
+            -> Result<Vec<ASTNode>, EvalError> {
+        Ok(ptrees.0.iter()
             .flat_map(|root| self.walker_all(root).into_iter())
-            .collect()
+            .map(|mut t| t.swap_remove(0)) // see comment on 'eval', is it true?
+            .collect())
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////

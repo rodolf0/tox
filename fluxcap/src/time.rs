@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 extern crate chrono;
 type DateTime = chrono::NaiveDateTime;
 type Date = chrono::NaiveDate;
@@ -6,6 +8,7 @@ use lexers::DelimTokenizer;
 use earlgrey::{ParserBuilder, EarleyParser, EarleyEvaler};
 use kronos::{Range, Seq, Grain, TimeDir};
 use std::str::FromStr;
+
 
 #[derive(Clone)]
 enum TmEl {
@@ -150,13 +153,11 @@ impl<'a> TimeMachine<'a> {
                 kc::ordinal(d).or(kc::short_ordinal(d)).is_some())
             .plug_terminal("grain", |g| Grain::from_str(g).is_some())
             .plug_terminal("year", |y| match i32::from_str(y) {
-                Ok(year) if year > 999 && year < 2200 => true,
-                _ => false
-            })
+                Ok(year) if year > 999 && year < 2200 => true, _ => false})
             .plug_terminal("small_int", |u| match u32::from_str(u) {
-                Ok(u) if u < 100 => true, _ => false
-            })
-            .into_parser("TimeEl", &grammar);
+                Ok(u) if u < 100 => true, _ => false})
+            .into_parser("TimeEl", &grammar)
+            .unwrap_or_else(|e| panic!("TimeMachine grammar BUG: {:?}", e));
 
         let mut ev = EarleyEvaler::new(|terminal, t| {
             match terminal {
@@ -338,13 +339,14 @@ impl<'a> TimeMachine<'a> {
         let state = match self.0.parse(&mut tokenizer) {
             Ok(state) => state,
             Err(e) => {
-                eprintln!("Time parse failed: {:?}", e);
+                eprintln!("TimeMachine {:?} for '{}'", e, time);
                 return Vec::new();
             }
         };
-        self.1.eval_all(&state).into_iter().map(|t| {
-            assert!(t.len() == 1);
-            match &t[0] {
+        self.1.eval_all(&state)
+              .unwrap_or_else(|e| panic!("TimeMachine Error: {:?}", e))
+              .into_iter().map(|tree| {
+            match &tree {
                 &TmEl::Until(ref x, ref tm) => {
                     let deadline = tm.range(reftime);
                     TimeEl::Count(x(reftime, TimeDir::Future)

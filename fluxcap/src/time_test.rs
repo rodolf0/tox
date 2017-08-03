@@ -1,9 +1,12 @@
+#![deny(warnings)]
+
 extern crate chrono;
 type DateTime = chrono::NaiveDateTime;
 
 use time::{TimeMachine, TimeEl};
 use kronos::Grain as g;
 use kronos;
+
 
 fn d(year: i32, month: u32, day: u32) -> DateTime {
     use chrono::naive::NaiveDate as Date;

@@ -121,11 +121,13 @@ impl GrammarBuilder {
     }
 
     pub fn add_symbol<S: Into<Symbol>>(&mut self, symbol: S, ignoredup: bool) {
+        // NOTE: we check existence to avoid new symbols stomping on pluged ones
         let symbol = symbol.into();
-        let x = self.symbols.insert(symbol.name().to_string(), Rc::new(symbol));
-        if x.is_some() && !ignoredup {
+        if !self.symbols.contains_key(symbol.name()) {
+            self.symbols.insert(symbol.name().to_string(), Rc::new(symbol));
+        } else if !ignoredup {
             self.error =
-                Some(GrammarError::DuplicateSym(x.unwrap().name().to_string()));
+                Some(GrammarError::DuplicateSym(symbol.name().to_string()));
         }
     }
 

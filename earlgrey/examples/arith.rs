@@ -52,6 +52,7 @@ fn build_grammar() -> earlgrey::Grammar {
       //.rule("args",   &["args", ",", "expr"])
       //.rule::<_, &str>("args",   &[])
       .into_grammar("assign")
+      .expect("Bad Gramar")
 }
 
 struct Tokenizer(lexers::Scanner<char>);
@@ -126,7 +127,7 @@ fn main() {
             Ok(state) => {
                 rl.borrow_mut().add_history_entry(&expr);
                 let val = evaler.eval(&state);
-                println!("{:?}", val[0]);
+                println!("{:?}", val);
             }
         }
     }

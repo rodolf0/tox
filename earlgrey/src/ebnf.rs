@@ -1,9 +1,16 @@
-use lexers::{EbnfTokenizer, Scanner};
+#![deny(warnings)]
+
+extern crate lexers;
+use grammar::{Grammar, GrammarBuilder};
 use parser::{EarleyParser, ParseError};
-use trees::EarleyEvaler;
-use types::{Grammar, GrammarBuilder};
-use util::Sexpr;
+use self::lexers::EbnfTokenizer;
 use std::cell::RefCell;
+use trees::EarleyEvaler;
+use util::Sexpr;
+
+
+#[derive(Debug)]
+pub struct EbnfError(String);
 
 // https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form
 pub fn ebnf_grammar() -> Grammar {
@@ -41,10 +48,11 @@ pub fn ebnf_grammar() -> Grammar {
       .rule("<Atom>", &["{", "<Body>", "}"])
       .rule("<Atom>", &["(", "<Body>", ")"])
       .into_grammar("<RuleList>")
+      .expect("Bad EBNF Grammar")
 }
 
 pub struct ParserBuilder(GrammarBuilder);
-pub type Treeresult = Result<Vec<Vec<Sexpr>>, ParseError>;
+pub type Treeresult = Result<Vec<Sexpr>, EbnfError>;
 
 macro_rules! pull {
     ($p:path, $e:expr) => (match $e {
@@ -56,13 +64,13 @@ macro_rules! pull {
 impl ParserBuilder {
     pub fn new() -> ParserBuilder { ParserBuilder(GrammarBuilder::new()) }
 
-    fn builder(gb: GrammarBuilder, grammar: &str, dbg: bool) -> GrammarBuilder {
-        let ebnf_parser = EarleyParser::new(ebnf_grammar());
+    fn builder(gb: GrammarBuilder, grammar: &str, dbg: bool)
+            -> Result<GrammarBuilder, ParseError> {
         let mut tokenizer = EbnfTokenizer::from_str(grammar);
-        let state = ebnf_parser.parse(&mut tokenizer).unwrap_or_else(
-            |e| panic!("ParserBuilder error: {:?}", e));
+        let ebnf_parser = EarleyParser::new(ebnf_grammar());
+        let state = try!(ebnf_parser.parse(&mut tokenizer));
 
-        #[derive(Clone, Debug)]
+        #[derive(Clone,Debug)]
         enum G {Body(Vec<Vec<String>>), Part(Vec<String>), Atom(String), Nop}
 
         let gb = RefCell::new(gb);
@@ -70,10 +78,10 @@ impl ParserBuilder {
             let mut ev = EarleyEvaler::new(|symbol, token| {
                 match symbol {
                     "<Id>" => {
-                        if dbg {println!("Adding non-term {:?}", token);}
+                        if dbg {eprintln!("Adding non-term {:?}", token);}
                         gb.borrow_mut().add_symbol(token, true);
                     }, "<Chars>" => {
-                        if dbg {println!("Adding terminal {:?}", token);}
+                        if dbg {eprintln!("Adding terminal {:?}", token);}
                         let tok = token.to_string();
                         gb.borrow_mut().add_symbol(
                             (token, move |s: &str| s == tok), true);
@@ -88,7 +96,7 @@ impl ParserBuilder {
                 let body = pull!(G::Body, n.remove(1));
                 let mut t_gb = gb.borrow_mut();
                 for rule in body {
-                    if dbg {println!("Adding rule {:?} -> {:?}", id, rule);}
+                    if dbg {eprintln!("Adding rule {:?} -> {:?}", id, rule);}
                     t_gb.add_rule(id.as_ref(), rule.as_slice());
                 }
                 G::Nop
@@ -117,10 +125,10 @@ impl ParserBuilder {
                 let aux = gb.borrow().unique_symbol_name();
                 let body = pull!(G::Body, n.remove(1));
                 let mut t_gb = gb.borrow_mut();
-                if dbg {println!("Adding non-term {:?}", aux);}
+                if dbg {eprintln!("Adding non-term {:?}", aux);}
                 t_gb.add_symbol(aux.as_ref(), false);
                 for rule in body {
-                    if dbg {println!("Adding rule {:?} -> {:?}", aux, rule);}
+                    if dbg {eprintln!("Adding rule {:?} -> {:?}", aux, rule);}
                     t_gb.add_rule(aux.as_ref(), rule.as_slice());
                 }
                 G::Atom(aux)
@@ -130,12 +138,12 @@ impl ParserBuilder {
                 let aux = gb.borrow().unique_symbol_name();
                 let body = pull!(G::Body, n.remove(1));
                 let mut t_gb = gb.borrow_mut();
-                if dbg {println!("Adding non-term {:?}", aux);}
+                if dbg {eprintln!("Adding non-term {:?}", aux);}
                 t_gb.add_symbol(aux.as_ref(), false);
                 for rule in body {
                     if dbg {
-                        println!("Adding rule {:?} -> []", aux);
-                        println!("Adding rule {:?} -> {:?}", aux, rule);
+                        eprintln!("Adding rule {:?} -> []", aux);
+                        eprintln!("Adding rule {:?} -> {:?}", aux, rule);
                     }
                     t_gb.add_rule(aux.as_ref(), rule.as_slice());
                     t_gb.add_rule::<_, String>(aux.as_ref(), &[]);
@@ -147,12 +155,12 @@ impl ParserBuilder {
                 let aux = gb.borrow().unique_symbol_name();
                 let body = pull!(G::Body, n.remove(1));
                 let mut t_gb = gb.borrow_mut();
-                if dbg {println!("Adding non-term {:?}", aux);}
+                if dbg {eprintln!("Adding non-term {:?}", aux);}
                 t_gb.add_symbol(aux.as_ref(), false);
                 for mut rule in body {
                     if dbg {
-                        println!("Adding rule {:?} -> []", aux);
-                        println!("Adding rule {:?} -> {:?}", aux, rule);
+                        eprintln!("Adding rule {:?} -> []", aux);
+                        eprintln!("Adding rule {:?} -> {:?}", aux, rule);
                     }
                     rule.push(aux.clone());
                     t_gb.add_rule(aux.as_ref(), rule.as_slice());
@@ -160,39 +168,55 @@ impl ParserBuilder {
                 }
                 G::Atom(aux)
             });
-            if ev.eval_all(&state).len() != 1 {
-                panic!("EBNF grammar shouldn't be ambiguous!");
+            if ev.eval_all(&state).expect("EBNF Bug").len() != 1 {
+                panic!("EBNF grammar Bug: shouldn't be ambiguous!");
             }
         }
-        gb.into_inner()
+        Ok(gb.into_inner())
     }
 
-    pub fn into_parser(self, start: &str, grammar: &str) -> EarleyParser {
-        let gb = ParserBuilder::builder(self.0, grammar, false);
-        EarleyParser::new(gb.into_grammar(start))
+    // Plug-in functions that parse Terminals before we build the grammar
+    pub fn plug_terminal<N, F>(mut self, name: N, pred: F) -> Self
+            where N: Into<String>, F: 'static + Fn(&str)->bool {
+        self.0.add_symbol((name.into().as_ref(), pred), false);
+        ParserBuilder(self.0)
     }
 
-    pub fn treeficator<'a>(self, start: &str, grammar: &'a str)
-            -> Box<Fn(&mut Scanner<String>)->Treeresult + 'a> {
+    // Build a parser for the provided grammar in EBNF syntax
+    pub fn into_parser(self, start: &str, grammar: &str)
+            -> Result<EarleyParser, EbnfError> {
         let grammar = ParserBuilder::builder(self.0, grammar, false)
-            .into_grammar(start);
-        // Add semantic actions that flatten the parse tree
+                        .or_else(|e| Err(EbnfError(format!("{:?}", e))))?
+                        .into_grammar(start)
+                        .or_else(|e| Err(EbnfError(format!("{:?}", e))))?;
+        Ok(EarleyParser::new(grammar))
+    }
+
+    // Build an evaluator that accepts grammar and builds Sexpr's from input
+    pub fn treeficator<'a>(self, start: &str, grammar: &'a str)
+            -> Box<Fn(&mut Iterator<Item=String>)->Treeresult + 'a> {
+        // 1. build a grammar builder for the user's grammar
+        let grammar = ParserBuilder::builder(self.0, grammar, false)
+            .unwrap_or_else(|e| panic!("treeficator error: {:?}", e))
+            .into_grammar(start)
+            .unwrap_or_else(|e| panic!("treeficator error: {:?}", e));
+
+        // 2. Add semantic actions that flatten the parse tree
         let mut ev = EarleyEvaler::new(|_, tok| Sexpr::Atom(tok.to_string()));
-        for rule in grammar.rules() {
-            ev.action(&rule.clone(), move |mut nodes| match nodes.len() {
+        for rule in grammar.str_rules() {
+            ev.action(&rule, move |mut nodes| match nodes.len() {
                 1 => nodes.swap_remove(0),
                 _ => Sexpr::List(nodes),
             });
         }
+
+        // 3. return a function that applies the parser+evaler to any input
         let parser = EarleyParser::new(grammar);
         Box::new(move |mut tokenizer| {
-            parser.parse(&mut tokenizer).map(|state| ev.eval_all(&state))
+            let state = parser.parse(&mut tokenizer)
+                        .or_else(|e| Err(EbnfError(format!("{:?}", e))))?;
+            ev.eval_all(&state)
+                .or_else(|e| Err(EbnfError(format!("{:?}", e))))
         })
-    }
-
-    pub fn plug_terminal<N, F>(mut self, name: N, pred: F) -> ParserBuilder
-            where N: Into<String>, F: 'static + Fn(&str)->bool {
-        self.0.add_symbol((name.into(), pred), false);
-        ParserBuilder(self.0)
     }
 }

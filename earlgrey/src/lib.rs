@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 mod grammar;
 pub use grammar::{GrammarBuilder, Grammar};
 
@@ -11,10 +13,10 @@ pub use trees::EarleyEvaler;
 mod util;
 pub use util::{Sexpr, Tree};
 
-//mod ebnf;
-//pub use ebnf::{ParserBuilder, Treeresult};
+mod ebnf;
+pub use ebnf::{ParserBuilder, Treeresult};
 
 #[cfg(test)]
 mod parser_test;
-//#[cfg(test)]
-//mod ebnf_test;
+#[cfg(test)]
+mod ebnf_test;

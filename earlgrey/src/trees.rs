@@ -5,34 +5,35 @@ use parser::ParseTrees;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Debug)]
+
+#[derive(Clone,Debug)]
 pub enum EvalError {
     MissingAction(String),
 }
 
 pub struct EarleyEvaler<'a, ASTNode: Clone> {
     actions: HashMap<String, Box<Fn(Vec<ASTNode>)->ASTNode + 'a>>,
-    tokenizer: Box<Fn(&str, &str)->ASTNode + 'a>,
+    node_builder: Box<Fn(&str, &str)->ASTNode + 'a>,
     debug: bool,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
-    pub fn new<F>(tokenizer: F) -> EarleyEvaler<'a, ASTNode>
+    pub fn new<F>(node_builder: F) -> EarleyEvaler<'a, ASTNode>
             where F: 'a + Fn(&str, &str) -> ASTNode {
         EarleyEvaler{
             actions: HashMap::new(),
-            tokenizer: Box::new(tokenizer),
+            node_builder: Box::new(node_builder),
             debug: false,
         }
     }
 
-    pub fn debug<F>(tokenizer: F) -> EarleyEvaler<'a, ASTNode>
+    pub fn debug<F>(node_builder: F) -> EarleyEvaler<'a, ASTNode>
             where F: 'a + Fn(&str, &str) -> ASTNode {
         EarleyEvaler{
             actions: HashMap::new(),
-            tokenizer: Box::new(tokenizer),
+            node_builder: Box::new(node_builder),
             debug: true,
         }
     }
@@ -59,7 +60,7 @@ impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
                 &Trigger::Complete(ref item) => try!(self.walker(item)),
                 &Trigger::Scan(ref token) => {
                     let symbol = prediction.next_symbol().unwrap().name();
-                    vec![(self.tokenizer)(&symbol, token)]
+                    vec![(self.node_builder)(&symbol, token)]
                 }
             });
         }
@@ -84,17 +85,18 @@ impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
         Ok(self.walker(ptrees.0.first().unwrap())?.swap_remove(0))
     }
 
-    fn walker_all(&self, root: &Rc<Item>) -> Vec<Vec<ASTNode>> {
+    fn walker_all(&self, root: &Rc<Item>)
+            -> Vec<Result<Vec<ASTNode>, EvalError>> {
         // reduce function to call on complete items
         let rulename = root.rule.to_string();
-        let reduce = |semargs| {
+        let reduce = |args: Vec<ASTNode>| -> Result<Vec<ASTNode>, EvalError> {
             match root.complete() {
-                false => semargs,
+                false => Ok(args),
                 true => match self.actions.get(&rulename) {
-                    None => panic!("No action for rule: {}", rulename),
+                    None => Err(EvalError::MissingAction(rulename.clone())),
                     Some(action) => {
                         if self.debug { eprintln!("Reduction: {}", rulename); }
-                        vec![action(semargs)]
+                        Ok(vec![action(args)])
                     }
                 }
             }
@@ -107,11 +109,19 @@ impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
         }
         for &(ref prediction, ref trigger) in source.iter() {
             // get left-side-tree of each source
-            for mut args in self.walker_all(prediction) {
+            for args in self.walker_all(prediction) {
+                let mut args = match args {
+                    Ok(args) => args, // unpack args
+                    Err(e) => return vec![Err(e)]
+                };
                 match trigger {
                     &Trigger::Complete(ref itm) => {
                         // collect right-side-tree of each source
                         for trig in self.walker_all(itm) {
+                            let trig = match trig {
+                                Ok(trig) => trig,
+                                Err(e) => return vec![Err(e)]
+                            };
                             let mut args = args.clone();
                             args.extend(trig);
                             trees.push(reduce(args));
@@ -119,7 +129,7 @@ impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
                     },
                     &Trigger::Scan(ref token) => {
                         let symbol = prediction.next_symbol().unwrap().name();
-                        args.push((self.tokenizer)(&symbol, token));
+                        args.push((self.node_builder)(&symbol, token));
                         trees.push(reduce(args));
                     }
                 };
@@ -131,10 +141,13 @@ impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
     // Retrieves all parse trees
     pub fn eval_all(&self, ptrees: &ParseTrees)
             -> Result<Vec<ASTNode>, EvalError> {
-        Ok(ptrees.0.iter()
-            .flat_map(|root| self.walker_all(root).into_iter())
-            .map(|mut t| t.swap_remove(0)) // see comment on 'eval', is it true?
-            .collect())
+        let maybe_trees = ptrees.0.iter()
+            .flat_map(|root| self.walker_all(root).into_iter());
+        let mut trees = Vec::new();
+        for tree in maybe_trees {
+            trees.push(try!(tree).swap_remove(0));
+        }
+        Ok(trees)
     }
 }
 

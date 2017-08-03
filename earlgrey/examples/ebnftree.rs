@@ -38,7 +38,7 @@ fn main() {
         .treeficator("expr", &grammar);
 
     match trificator(&mut Tokenizer::from_str(&input)) {
-        Ok(trees) => for t in trees { t[0].print(); },
+        Ok(trees) => for t in trees { t.print(); },
         Err(e) => println!("{:?}", e)
     }
 }

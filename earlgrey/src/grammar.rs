@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 
 #[derive(Debug,PartialEq)]
-pub enum Error {
+pub enum GrammarError {
     MissingSym(String),
     DuplicateSym(String),
     DuplicateRule(String),
@@ -33,7 +33,7 @@ pub struct Grammar {
 pub struct GrammarBuilder {
     symbols: HashMap<String, Rc<Symbol>>,
     rules: Vec<Rc<Rule>>,
-    error: Option<Error>,
+    error: Option<GrammarError>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -59,6 +59,7 @@ impl<'a, F> From<(&'a str, F)> for Symbol
 }
 
 // Symbol implements Hash + PartialEq so they can be uniq'd in HashSets
+// Symbols are deduped by name ONLY
 impl hash::Hash for Symbol {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {
@@ -124,7 +125,7 @@ impl GrammarBuilder {
         let x = self.symbols.insert(symbol.name().to_string(), Rc::new(symbol));
         if x.is_some() && !ignoredup {
             self.error =
-                Some(Error::DuplicateSym(x.unwrap().name().to_string()));
+                Some(GrammarError::DuplicateSym(x.unwrap().name().to_string()));
         }
     }
 
@@ -138,12 +139,12 @@ impl GrammarBuilder {
         // check for missing symbols first
         if let Some(s) = spec.iter()
                 .filter(|s| !self.symbols.contains_key(s.as_ref())).next() {
-            self.error = Some(Error::MissingSym(s.as_ref().to_string()));
+            self.error = Some(GrammarError::MissingSym(s.as_ref().to_string()));
             return;
         }
         let head = head.into();
         if !self.symbols.contains_key(&head) {
-            self.error = Some(Error::MissingSym(head));
+            self.error = Some(GrammarError::MissingSym(head));
             return;
         }
         let rule = Rule{
@@ -154,7 +155,7 @@ impl GrammarBuilder {
         // check for duplicate rules
         let rulestr = rule.to_string();
         if self.rules.iter().any(|r| r.to_string() == rulestr) {
-            self.error = Some(Error::DuplicateRule(rulestr));
+            self.error = Some(GrammarError::DuplicateRule(rulestr));
             return;
         }
         self.rules.push(Rc::new(rule));
@@ -166,14 +167,14 @@ impl GrammarBuilder {
         self
     }
 
-    pub fn into_grammar<S>(self, start: S) -> Result<Grammar, Error>
+    pub fn into_grammar<S>(self, start: S) -> Result<Grammar, GrammarError>
             where S: Into<String> {
         if let Some(e) = self.error {
             return Err(e);
         }
         let start = start.into();
         if !self.symbols.contains_key(&start) {
-            return Err(Error::MissingSym(start));
+            return Err(GrammarError::MissingSym(start));
         }
         Ok(Grammar{start: start, rules: self.rules})
     }
@@ -188,7 +189,7 @@ impl GrammarBuilder {
 
 #[cfg(test)]
 mod tests {
-    use super::{GrammarBuilder, Error};
+    use super::{GrammarBuilder, GrammarError};
 
     #[test]
     fn build_grammar() {
@@ -208,7 +209,8 @@ mod tests {
             .symbol("Sum")
             .symbol("Sum")
             .into_grammar("Sum");
-        assert_eq!(g.unwrap_err(), Error::DuplicateSym("Sum".to_string()));
+        assert_eq!(g.unwrap_err(),
+                   GrammarError::DuplicateSym("Sum".to_string()));
     }
 
     #[test]
@@ -222,7 +224,7 @@ mod tests {
             .rule("Sum", &["Num"])
             .into_grammar("Sum");
         assert_eq!(g.unwrap_err(),
-                   Error::DuplicateRule("Sum -> Sum + Num".to_string()));
+                   GrammarError::DuplicateRule("Sum -> Sum + Num".to_string()));
     }
 
     #[test]
@@ -232,12 +234,12 @@ mod tests {
             .symbol(("Num", |n: &str| n.chars().all(|c| "123".contains(c))))
             .rule("Sum", &["Num"])
             .into_grammar("Xum");
-        assert_eq!(g.unwrap_err(), Error::MissingSym("Xum".to_string()));
+        assert_eq!(g.unwrap_err(), GrammarError::MissingSym("Xum".to_string()));
 
         let g = GrammarBuilder::new()
             .symbol("Sum")
             .rule("Sum", &["Num"])
             .into_grammar("Sum");
-        assert_eq!(g.unwrap_err(), Error::MissingSym("Num".to_string()));
+        assert_eq!(g.unwrap_err(), GrammarError::MissingSym("Num".to_string()));
     }
 }

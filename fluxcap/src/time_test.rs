@@ -3,7 +3,7 @@
 extern crate chrono;
 type DateTime = chrono::NaiveDateTime;
 
-use time::{TimeMachine, TimeEl};
+use time_machine::{TimeMachine, TimeEl};
 use kronos::Grain as g;
 use kronos;
 

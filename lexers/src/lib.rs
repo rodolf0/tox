@@ -1,12 +1,14 @@
 mod scanner;
 mod helpers;
-mod tokenizers;
+mod delim_tokenizer;
 mod ebnf_tokenizer;
+mod lisp_tokenizer;
+mod math_tokenizer;
 
 pub use scanner::{Scanner, Nexter};
-pub use tokenizers::{MathTokenizer, MathToken};
-pub use tokenizers::{LispTokenizer, LispToken};
-pub use tokenizers::DelimTokenizer;
+pub use math_tokenizer::{MathTokenizer, MathToken};
+pub use delim_tokenizer::DelimTokenizer;
+pub use lisp_tokenizer::{LispTokenizer, LispToken};
 pub use ebnf_tokenizer::EbnfTokenizer;
 
 pub use helpers::scan_identifier;
@@ -17,7 +19,3 @@ pub use helpers::scan_xob_integers;
 
 #[cfg(test)]
 mod scanner_test;
-#[cfg(test)]
-mod helpers_test;
-#[cfg(test)]
-mod tokenizers_test;

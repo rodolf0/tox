@@ -4,3 +4,4 @@ version = "0.1.0"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 
 [dependencies]
+lexers = { version = "0.0.5", path = "../lexers" }

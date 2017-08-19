@@ -1,13 +1,17 @@
 #![deny(warnings)]
 
-//mod lox_grammar;
 use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
 
+mod lox_scanner;
+use lox_scanner::LoxScanner;
 
 fn run(source: String) {
-    eprintln!("{}", source);
+    let mut tokens = LoxScanner::scanner(source);
+    while let Some(t) = tokens.next() {
+        eprintln!("{:?}", t);
+    }
 }
 
 fn main() {

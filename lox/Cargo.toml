@@ -1,0 +1,6 @@
+[package]
+name = "lox"
+version = "0.1.0"
+authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
+
+[dependencies]

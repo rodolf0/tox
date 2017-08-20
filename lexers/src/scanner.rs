@@ -1,13 +1,13 @@
-use std::iter::FromIterator;
+#![deny(warnings)]
+
 use std::collections::HashSet;
 use std::hash::Hash;
 
-pub trait Nexter<T> {
-    fn get_item(&mut self) -> Option<T>;
-}
+//pub trait Scanner: Iterator {
+//}
 
 pub struct Scanner<T: Clone> {
-    src: Option<Box<Nexter<T>>>,
+    src: Option<Box<Iterator<Item=T>>>,
     buf: Vec<T>,
     pos: isize,
 }
@@ -25,12 +25,15 @@ impl<T: Clone> Iterator for Scanner<T> {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 impl<T: Clone> Scanner<T> {
-    pub fn new(source: Box<Nexter<T>>) -> Scanner<T> {
+    pub fn new(source: Box<Iterator<Item=T>>) -> Scanner<T> {
         Scanner{src: Some(source), buf: Vec::new(), pos: -1}
     }
 
     pub fn from_buf<V: IntoIterator<Item=T>>(source: V) -> Scanner<T> {
+        use std::iter::FromIterator;
         Scanner{src: None, buf: Vec::from_iter(source.into_iter()), pos: -1}
     }
 
@@ -56,7 +59,7 @@ impl<T: Clone> Scanner<T> {
     fn prep_buffer(&mut self) {
         if let Some(ref mut nexter) = self.src {
             while self.pos >= (self.buf.len() as isize) {
-                if let Some(tok) = nexter.get_item() {
+                if let Some(tok) = nexter.next() {
                     self.buf.push(tok);
                 } else {
                     break;
@@ -131,7 +134,7 @@ impl<T: Clone + Hash + Eq> Scanner<T> {
 
     // Find an element in the 'any' set or EOF, return if the scanner advanced,
     // After until a call to self.curr() returns the last non-matching char
-    pub fn until(&mut self, any: &HashSet<T>) -> bool {
+    pub fn until_any(&mut self, any: &HashSet<T>) -> bool {
         let mut advanced = false;
         while let Some(next) = self.peek() {
             if any.contains(&next) { break; }
@@ -150,6 +153,7 @@ impl Scanner<char> {
     }
 
     pub fn extract_string(&mut self) -> String {
+        use std::iter::FromIterator;
         let tokens = String::from_iter(self.view().iter().cloned());
         self.ignore();
         tokens

@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use scanner::{Nexter, Scanner};
+use scanner::Scanner;
 
 
 // A tokenizer that splits input on each delimiter
@@ -12,22 +12,23 @@ pub struct DelimTokenizer {
 
 impl DelimTokenizer {
     pub fn from_str<S>(src: &str, delims: S, remove: bool) -> Scanner<String>
-    where S: Into<String> {
+            where S: Into<String> {
         Scanner::new(Box::new(
             DelimTokenizer{src: Scanner::from_str(src),
                 delims: delims.into(), remove: remove}))
     }
 }
 
-impl Nexter<String> for DelimTokenizer {
-    fn get_item(&mut self) -> Option<String> {
+impl Iterator for DelimTokenizer {
+    type Item = String;
+    fn next(&mut self) -> Option<Self::Item> {
         if self.src.until_any_char(&self.delims) {
             Some(self.src.extract_string())
         } else if let Some(c) = self.src.accept_any_char(&self.delims) {
             self.src.ignore();
             match self.remove {
                 false => Some(c.to_string()),
-                true => self.get_item()
+                true => self.next()
             }
         } else {
             None

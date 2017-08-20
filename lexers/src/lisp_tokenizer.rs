@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
 use helpers;
-use scanner::{Nexter, Scanner};
+use scanner::Scanner;
 use std::str::FromStr;
 
 
@@ -23,8 +23,9 @@ impl LispTokenizer {
     }
 }
 
-impl Nexter<LispToken> for LispTokenizer {
-    fn get_item(&mut self) -> Option<LispToken> {
+impl Iterator for LispTokenizer {
+    type Item = LispToken;
+    fn next(&mut self) -> Option<Self::Item> {
         self.0.ignore_ws();
         if let Some(s) = helpers::scan_quoted_string(&mut self.0, '"') {
             Some(LispToken::String(s))

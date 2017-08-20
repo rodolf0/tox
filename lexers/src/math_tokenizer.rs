@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
 use helpers;
-use scanner::{Nexter, Scanner};
+use scanner::Scanner;
 use std::str::FromStr;
 
 
@@ -62,8 +62,9 @@ impl MathTokenizer {
     }
 }
 
-impl Nexter<MathToken> for MathTokenizer {
-    fn get_item(&mut self) -> Option<MathToken> {
+impl Iterator for MathTokenizer {
+    type Item = MathToken;
+    fn next(&mut self) -> Option<Self::Item> {
         let token = self.get_token();
         self.prev = token.clone();
         token

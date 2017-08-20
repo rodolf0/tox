@@ -1,5 +1,7 @@
+#![deny(warnings)]
+
 use helpers;
-use scanner::{Scanner, Nexter};
+use scanner::Scanner;
 
 pub struct EbnfTokenizer(Scanner<char>, Vec<String>);
 
@@ -9,8 +11,9 @@ impl EbnfTokenizer {
     }
 }
 
-impl Nexter<String> for EbnfTokenizer {
-    fn get_item(&mut self) -> Option<String> {
+impl Iterator for EbnfTokenizer {
+    type Item = String;
+    fn next(&mut self) -> Option<Self::Item> {
         // used for accumulating string parts
         if !self.1.is_empty() {
             return self.1.pop();

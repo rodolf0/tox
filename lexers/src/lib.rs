@@ -5,7 +5,7 @@ mod ebnf_tokenizer;
 mod lisp_tokenizer;
 mod math_tokenizer;
 
-pub use scanner::{Scanner, Nexter};
+pub use scanner::Scanner;
 pub use math_tokenizer::{MathTokenizer, MathToken};
 pub use delim_tokenizer::DelimTokenizer;
 pub use lisp_tokenizer::{LispTokenizer, LispToken};

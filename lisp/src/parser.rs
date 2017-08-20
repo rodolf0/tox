@@ -55,7 +55,7 @@ pub struct Parser;
 
 impl Parser {
     pub fn parse_str(expr: &str) -> Result<LispExpr, ParseError> {
-        Self::parse(&mut LispTokenizer::from_str(expr))
+        Self::parse(&mut LispTokenizer::scanner(expr))
     }
 
     fn parse(lex: &mut Scanner<LispToken>) -> Result<LispExpr, ParseError> {

@@ -18,7 +18,7 @@ pub enum LispToken {
 pub struct LispTokenizer(Scanner<char>);
 
 impl LispTokenizer {
-    pub fn from_str(source: &str) -> Scanner<LispToken> {
+    pub fn scanner(source: &str) -> Scanner<LispToken> {
         Scanner::new(Box::new(LispTokenizer(Scanner::from_str(source))))
     }
 }
@@ -82,7 +82,7 @@ mod tests {
                  LispToken::String(format!("\"hello\"")), LispToken::CParen],
         ];
         for (input, expected) in inputs.iter().zip(expect.iter()) {
-            let mut lx = LispTokenizer::from_str(input);
+            let mut lx = LispTokenizer::scanner(input);
             for exp in expected.iter() { assert_eq!(*exp, lx.next().unwrap()); }
             assert_eq!(lx.next(), None);
         }

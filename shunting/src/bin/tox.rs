@@ -19,7 +19,7 @@ mod repl {
     }
 
     pub fn parse_statement(cx: &mut MathContext, input: &str) {
-        let mut ml = MathTokenizer::from_str(input);
+        let mut ml = MathTokenizer::scanner(input);
         let backtrack = ml.pos();
         if let (Some(MathToken::Variable(var)), Some(assig)) = (ml.next(), ml.next()) {
             if assig == MathToken::BOp(format!("=")) {

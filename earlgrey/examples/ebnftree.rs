@@ -3,8 +3,9 @@ extern crate earlgrey;
 
 struct Tokenizer(lexers::Scanner<char>);
 
-impl lexers::Nexter<String> for Tokenizer {
-    fn get_item(&mut self) -> Option<String> {
+impl Iterator for Tokenizer {
+    type Item = String;
+    fn next(&mut self) -> Option<Self::Item> {
         self.0.ignore_ws();
         lexers::scan_math_op(&mut self.0)
             .or_else(|| lexers::scan_number(&mut self.0))
@@ -13,7 +14,7 @@ impl lexers::Nexter<String> for Tokenizer {
 }
 
 impl Tokenizer {
-    fn from_str(input: &str) -> lexers::Scanner<String> {
+    fn scanner(input: &str) -> lexers::Scanner<String> {
         lexers::Scanner::new(
             Box::new(Tokenizer(lexers::Scanner::from_str(&input))))
     }
@@ -37,7 +38,7 @@ fn main() {
         .plug_terminal("num", |n| f64::from_str(n).is_ok())
         .treeficator("expr", &grammar);
 
-    match trificator(&mut Tokenizer::from_str(&input)) {
+    match trificator(&mut Tokenizer::scanner(&input)) {
         Ok(trees) => for t in trees { t.print(); },
         Err(e) => println!("{:?}", e)
     }

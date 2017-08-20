@@ -57,8 +57,9 @@ fn build_grammar() -> earlgrey::Grammar {
 
 struct Tokenizer(lexers::Scanner<char>);
 
-impl lexers::Nexter<String> for Tokenizer {
-    fn get_item(&mut self) -> Option<String> {
+impl Iterator for Tokenizer {
+    type Item = String;
+    fn next(&mut self) -> Option<Self::Item> {
         self.0.ignore_ws();
         lexers::scan_math_op(&mut self.0)
             .or_else(|| lexers::scan_number(&mut self.0))
@@ -67,7 +68,7 @@ impl lexers::Nexter<String> for Tokenizer {
 }
 
 impl Tokenizer {
-    fn from_str(input: &str) -> lexers::Scanner<String> {
+    fn scanner(input: &str) -> lexers::Scanner<String> {
         lexers::Scanner::new(
             Box::new(Tokenizer(lexers::Scanner::from_str(&input))))
     }
@@ -122,7 +123,7 @@ fn main() {
     let parser = earlgrey::EarleyParser::new(build_grammar());
     let evaler = semanter();
     for expr in input {
-        match parser.parse(&mut Tokenizer::from_str(&expr)) {
+        match parser.parse(&mut Tokenizer::scanner(&expr)) {
             Err(e) => println!("Parse err: {:?}", e),
             Ok(state) => {
                 rl.borrow_mut().add_history_entry(&expr);

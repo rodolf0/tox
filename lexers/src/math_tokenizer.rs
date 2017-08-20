@@ -21,7 +21,7 @@ pub struct MathTokenizer {
 }
 
 impl MathTokenizer {
-    pub fn from_str(source: &str) -> Scanner<MathToken> {
+    pub fn scanner(source: &str) -> Scanner<MathToken> {
         Scanner::new(Box::new(
             MathTokenizer{src: Scanner::from_str(source), prev: None}))
     }
@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn test1() {
-        let mut lx = MathTokenizer::from_str("3+4*2/-(1-5)^2^3");
+        let mut lx = MathTokenizer::scanner("3+4*2/-(1-5)^2^3");
         let expect = [
             MathToken::Number(3.0),
             MathToken::BOp(format!("+")),
@@ -107,7 +107,7 @@ mod tests {
 
     #[test]
     fn test2() {
-        let mut lx = MathTokenizer::from_str("3.4e-2 * sin(x)/(7! % -4) * max(2, x)");
+        let mut lx = MathTokenizer::scanner("3.4e-2 * sin(x)/(7! % -4) * max(2, x)");
         let expect = [
             MathToken::Number(3.4e-2),
             MathToken::BOp(format!("*")),
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn test3() {
-        let mut lx = MathTokenizer::from_str("sqrt(-(1-x^2) / (1 + x^2))");
+        let mut lx = MathTokenizer::scanner("sqrt(-(1-x^2) / (1 + x^2))");
         let expect = [
             MathToken::Function(format!("sqrt"), 0),
             MathToken::OParen,
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn test4() {
-        let mut lx = MathTokenizer::from_str("x---y");
+        let mut lx = MathTokenizer::scanner("x---y");
         let expect = [
             MathToken::Variable(format!("x")),
             MathToken::BOp(format!("-")),
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn test5() {
-        let mut lx = MathTokenizer::from_str("max(0, 1, 3)");
+        let mut lx = MathTokenizer::scanner("max(0, 1, 3)");
         let expect = [
             MathToken::Function(format!("max"), 0),
             MathToken::OParen,

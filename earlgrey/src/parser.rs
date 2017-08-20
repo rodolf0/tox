@@ -119,7 +119,7 @@ mod tests {
             .rule("Start", &["+", "+"])
             .into_grammar("Start")
             .expect("Bad Grammar");
-        let mut input = DelimTokenizer::from_str("+++", "+", false);
+        let mut input = DelimTokenizer::scanner("+++", "+", false);
         let out = EarleyParser::new(g).parse(&mut input);
         assert_eq!(out.unwrap_err(), ParseError);
     }
@@ -136,7 +136,7 @@ mod tests {
           .rule("Num", &["Number"])
           .into_grammar("Sum")
           .expect("Bad Grammar");
-        let mut input = DelimTokenizer::from_str("1+", "+*", false);
+        let mut input = DelimTokenizer::scanner("1+", "+*", false);
         let out = EarleyParser::new(g).parse(&mut input);
         assert_eq!(out.unwrap_err(), ParseError);
     }
@@ -152,7 +152,7 @@ mod tests {
           .into_grammar("S")
           .expect("Bad Grammar");
         // Earley's corner case that generates spurious trees for bbb
-        let mut input = DelimTokenizer::from_str("b b b", " ", true);
+        let mut input = DelimTokenizer::scanner("b b b", " ", true);
         EarleyParser::new(grammar).parse(&mut input)
             .expect("Broken Parser");
     }
@@ -171,7 +171,7 @@ mod tests {
           .rule("N", &["[0-9]"])
           .into_grammar("S")
           .expect("Bad grammar");
-        let mut input = DelimTokenizer::from_str("1+2", "+", false);
+        let mut input = DelimTokenizer::scanner("1+2", "+", false);
         EarleyParser::new(grammar).parse(&mut input)
             .expect("Broken Parser");
     }
@@ -190,7 +190,7 @@ mod tests {
           .rule("N", &["[0-9]"])
           .into_grammar("P")
           .expect("Bad grammar");
-        let mut input = DelimTokenizer::from_str("1^2", "^", false);
+        let mut input = DelimTokenizer::scanner("1^2", "^", false);
         EarleyParser::new(grammar).parse(&mut input)
             .expect("Broken Parser");
     }
@@ -207,7 +207,7 @@ mod tests {
           .rule("B", &vec!["A"])
           .into_grammar("A")
           .expect("Bad grammar");
-        let mut input = DelimTokenizer::from_str("", "-", false);
+        let mut input = DelimTokenizer::scanner("", "-", false);
         EarleyParser::new(grammar).parse(&mut input)
             .expect("Broken Parser");
     }

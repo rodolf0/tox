@@ -49,7 +49,7 @@ pub fn learn(g: earlgrey::Grammar, td: &TrainingSet) -> HashMap<String, f64> {
 
     // count occurences of rules eg: <S> -> <range>: 120
     for (ex, expected) in &td.examples {
-        let mut tokens = lexers::DelimTokenizer::from_str(&ex, ", ", true);
+        let mut tokens = lexers::DelimTokenizer::scanner(&ex, ", ", true);
 
         match p.parse(&mut tokens) {
             Err(err) => panic!("Learning error: {:?}", err),

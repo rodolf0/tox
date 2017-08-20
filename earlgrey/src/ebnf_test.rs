@@ -14,7 +14,7 @@ fn build_ebnf_grammar() {
 fn minimal_parser() {
     let g = r#" Number := "0" ; "#;
     let p = ParserBuilder::new().into_parser("Number", &g).unwrap();
-    let mut tok = DelimTokenizer::from_str("0", " ", true);
+    let mut tok = DelimTokenizer::scanner("0", " ", true);
     let state = p.parse(&mut tok).unwrap();
     let trees = Tree::builder(p.g.clone()).eval_all(&state);
     println!("{:?}", trees);
@@ -31,7 +31,7 @@ fn arith_parser() {
         Number := "0" | "1" | "2" | "3" ;
     "#;
     let p = ParserBuilder::new().into_parser("expr", &g).unwrap();
-    let mut tok = DelimTokenizer::from_str("3 + 2 + 1", " ", true);
+    let mut tok = DelimTokenizer::scanner("3 + 2 + 1", " ", true);
     let state = p.parse(&mut tok).unwrap();
     let trees = Tree::builder(p.g.clone()).eval_all(&state);
     println!("{:?}", trees);
@@ -46,7 +46,7 @@ fn repetition() {
         b := "0" | "1" ;
     "#;
     let p = ParserBuilder::new().into_parser("arg", &g).unwrap();
-    let mut tok = DelimTokenizer::from_str("1 , 0 , 1", " ", true);
+    let mut tok = DelimTokenizer::scanner("1 , 0 , 1", " ", true);
     let state = p.parse(&mut tok).unwrap();
     let trees = Tree::builder(p.g.clone()).eval_all(&state);
     assert_eq!(format!("{:?}", trees.unwrap()),
@@ -60,12 +60,12 @@ fn option() {
         d := "0" | "1" | "2";
     "#;
     let p = ParserBuilder::new().into_parser("complex", &g).unwrap();
-    let mut tok = DelimTokenizer::from_str("1", " ", true);
+    let mut tok = DelimTokenizer::scanner("1", " ", true);
     let state = p.parse(&mut tok).unwrap();
     let trees = Tree::builder(p.g.clone()).eval_all(&state);
     assert_eq!(format!("{:?}", trees.unwrap()),
                r#"[Node("complex -> d <Uniq-3>", [Node("d -> 1", [Leaf("1", "1")]), Node("<Uniq-3> -> ", [])])]"#);
-    let mut tok = DelimTokenizer::from_str("2 i", " ", true);
+    let mut tok = DelimTokenizer::scanner("2 i", " ", true);
     assert!(p.parse(&mut tok).is_ok());
 }
 
@@ -75,12 +75,12 @@ fn grouping() {
         row := ("a" | "b") ("0" | "1") ;
     "#;
     let p = ParserBuilder::new().into_parser("row", &g).unwrap();
-    let mut tok = DelimTokenizer::from_str("b 1", " ", true);
+    let mut tok = DelimTokenizer::scanner("b 1", " ", true);
     let state = p.parse(&mut tok).unwrap();
     let trees = Tree::builder(p.g.clone()).eval_all(&state);
     assert_eq!(format!("{:?}", trees.unwrap()),
                r#"[Node("row -> <Uniq-3> <Uniq-6>", [Node("<Uniq-3> -> b", [Leaf("b", "b")]), Node("<Uniq-6> -> 1", [Leaf("1", "1")])])]"#);
-    let mut tok = DelimTokenizer::from_str("a 0", " ", true);
+    let mut tok = DelimTokenizer::scanner("a 0", " ", true);
     assert!(p.parse(&mut tok).is_ok());
 }
 
@@ -94,7 +94,7 @@ fn plug_terminal() {
     let p = ParserBuilder::new()
         .plug_terminal("Number", |i| i8::from_str(i).is_ok())
         .into_parser("expr", &g).unwrap();
-    let mut tok = DelimTokenizer::from_str("3 + 1", " ", true);
+    let mut tok = DelimTokenizer::scanner("3 + 1", " ", true);
     let state = p.parse(&mut tok).unwrap();
     let trees = Tree::builder(p.g.clone()).eval_all(&state);
     assert_eq!(format!("{:?}", trees.unwrap()),

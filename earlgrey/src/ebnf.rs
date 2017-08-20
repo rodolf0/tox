@@ -66,7 +66,7 @@ impl ParserBuilder {
 
     fn builder(gb: GrammarBuilder, grammar: &str, dbg: bool)
             -> Result<GrammarBuilder, ParseError> {
-        let mut tokenizer = EbnfTokenizer::from_str(grammar);
+        let mut tokenizer = EbnfTokenizer::scanner(grammar);
         let ebnf_parser = EarleyParser::new(ebnf_grammar());
         let state = try!(ebnf_parser.parse(&mut tokenizer));
 

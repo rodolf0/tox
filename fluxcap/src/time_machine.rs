@@ -359,7 +359,7 @@ impl<'a> TimeMachine<'a> {
     }
 
     pub fn eval(&self, reftime: DateTime, time: &str) -> Vec<TimeEl> {
-        let mut tokenizer = DelimTokenizer::from_str(time, ", ", true);
+        let mut tokenizer = DelimTokenizer::scanner(time, ", ", true);
         let state = match self.0.parse(&mut tokenizer) {
             Ok(state) => state,
             Err(e) => {

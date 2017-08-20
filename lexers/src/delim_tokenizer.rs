@@ -11,7 +11,7 @@ pub struct DelimTokenizer {
 }
 
 impl DelimTokenizer {
-    pub fn from_str<S>(src: &str, delims: S, remove: bool) -> Scanner<String>
+    pub fn scanner<S>(src: &str, delims: S, remove: bool) -> Scanner<String>
             where S: Into<String> {
         Scanner::new(Box::new(
             DelimTokenizer{src: Scanner::from_str(src),
@@ -57,7 +57,7 @@ mod tests {
             vec!["1", "+", "2", "*", "3", "/", "5"],
         ];
         for (input, expected) in inputs.iter().zip(expect.iter()) {
-            let mut lx = DelimTokenizer::from_str(input.0, input.1, input.2);
+            let mut lx = DelimTokenizer::scanner(input.0, input.1, input.2);
             for exp in expected.iter() { assert_eq!(*exp, lx.next().unwrap()); }
             assert_eq!(lx.next(), None);
         }

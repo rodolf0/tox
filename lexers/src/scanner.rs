@@ -3,8 +3,6 @@
 use std::collections::HashSet;
 use std::hash::Hash;
 
-//pub trait Scanner: Iterator {
-//}
 
 pub struct Scanner<T: Clone> {
     src: Option<Box<Iterator<Item=T>>>,

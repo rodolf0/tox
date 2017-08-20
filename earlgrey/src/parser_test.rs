@@ -63,7 +63,7 @@ fn grammar_ambiguous() {
       .into_grammar("S")
       .expect("Bad grammar");
     // Earley's corner case that generates spurious trees for bbb
-    let mut input = DelimTokenizer::from_str("b b b", " ", true);
+    let mut input = DelimTokenizer::scanner("b b b", " ", true);
     let p = EarleyParser::new(grammar.clone());
     let ps = p.parse(&mut input).unwrap();
     // check we only get 2 trees
@@ -90,7 +90,7 @@ fn grammar_ambiguous_epsilon() {
       .into_grammar("S")
       .expect("Bad grammar");
     // Earley's corner case that generates spurious trees for bbb
-    let mut input = DelimTokenizer::from_str("b b b", " ", true);
+    let mut input = DelimTokenizer::scanner("b b b", " ", true);
     let ps = EarleyParser::new(g.clone()).parse(&mut input).unwrap();
     let trees = Tree::builder(g).eval_all(&ps).unwrap();
     check_trees(&trees, vec![
@@ -102,7 +102,7 @@ fn grammar_ambiguous_epsilon() {
 #[test]
 fn math_grammar_test() {
     let grammar = grammar_math();
-    let mut input = DelimTokenizer::from_str("1+(2*3-4)", "+*-/()", false);
+    let mut input = DelimTokenizer::scanner("1+(2*3-4)", "+*-/()", false);
     let p = EarleyParser::new(grammar.clone());
     let ps = p.parse(&mut input).unwrap();
     let evaler = Tree::builder(grammar);
@@ -127,7 +127,7 @@ fn left_recurse() {
       .rule("N", &["[0-9]"])
       .into_grammar("S")
       .expect("Bad grammar");
-    let mut input = DelimTokenizer::from_str("1+2", "+", false);
+    let mut input = DelimTokenizer::scanner("1+2", "+", false);
     let p = EarleyParser::new(grammar.clone());
     let ps = p.parse(&mut input).unwrap();
     let tree = Tree::builder(grammar).eval(&ps).unwrap();
@@ -151,7 +151,7 @@ fn right_recurse() {
       .into_grammar("P")
       .expect("Bad grammar");
     let p = EarleyParser::new(grammar.clone());
-    let mut input = DelimTokenizer::from_str("1^2", "^", false);
+    let mut input = DelimTokenizer::scanner("1^2", "^", false);
     let ps = p.parse(&mut input).unwrap();
     let tree = Tree::builder(grammar).eval(&ps).unwrap();
     check_trees(&vec![tree], vec![
@@ -172,7 +172,7 @@ fn bogus_empty() {
       .into_grammar("A")
       .expect("Bad grammar");
     let p = EarleyParser::new(grammar.clone());
-    let mut input = DelimTokenizer::from_str("", "-", false);
+    let mut input = DelimTokenizer::scanner("", "-", false);
     let ps = p.parse(&mut input).unwrap();
     // this generates an infinite number of parse trees, don't check/print them all
     let tree = Tree::builder(grammar).eval(&ps).unwrap();
@@ -241,7 +241,7 @@ fn math_ambiguous() {
       .into_grammar("E")
       .expect("Bad grammar");
     // number of trees here should match Catalan numbers if same operator
-    let mut input = DelimTokenizer::from_str("0*1*2*3*4*5", "*", false);
+    let mut input = DelimTokenizer::scanner("0*1*2*3*4*5", "*", false);
     let p = EarleyParser::new(grammar.clone());
     let ps = p.parse(&mut input).unwrap();
     let trees = Tree::builder(grammar).eval_all(&ps).unwrap();
@@ -301,7 +301,7 @@ fn math_various() {
         "(1+2)*3",
     ];
     for input in inputs.iter() {
-        let mut input = DelimTokenizer::from_str(input, "+*-/()^", false);
+        let mut input = DelimTokenizer::scanner(input, "+*-/()^", false);
         assert!(p.parse(&mut input).is_ok());
     }
 }
@@ -330,7 +330,7 @@ fn chained_terminals() {
           .into_grammar("E")
           .expect("Bad grammar");
         let p = EarleyParser::new(g);
-        let mut input = DelimTokenizer::from_str(tokens, "+", false);
+        let mut input = DelimTokenizer::scanner(tokens, "+", false);
         assert!(p.parse(&mut input).is_ok());
     }
 }
@@ -370,7 +370,7 @@ fn natural_lang() {
         "john saw the boy with the telescope",
     ];
     for input in inputs.iter() {
-        let mut input = DelimTokenizer::from_str(input, " ", true);
+        let mut input = DelimTokenizer::scanner(input, " ", true);
         assert!(p.parse(&mut input).is_ok());
     }
 }
@@ -394,7 +394,7 @@ fn small_math() -> Grammar {
 
 #[test]
 fn eval_actions() {
-    let mut input = DelimTokenizer::from_str("3+4*2", "+*", false);
+    let mut input = DelimTokenizer::scanner("3+4*2", "+*", false);
     let ps = EarleyParser::new(small_math()).parse(&mut input).unwrap();
     let mut ev = EarleyEvaler::new(|symbol, token| {
         match symbol {"n" => f64::from_str(token).unwrap(), _ => 0.0}
@@ -411,7 +411,7 @@ fn eval_actions() {
 
 #[test]
 fn build_ast() {
-    let mut input = DelimTokenizer::from_str("3+4*2", "+*", false);
+    let mut input = DelimTokenizer::scanner("3+4*2", "+*", false);
     let ps = EarleyParser::new(small_math()).parse(&mut input).unwrap();
 
     #[derive(Clone, Debug)]
@@ -440,7 +440,7 @@ fn build_ast() {
 
 #[test]
 fn build_sexpr() {
-    let mut input = DelimTokenizer::from_str("3+4*2", "+*", false);
+    let mut input = DelimTokenizer::scanner("3+4*2", "+*", false);
     let ps = EarleyParser::new(small_math()).parse(&mut input).unwrap();
 
     let mut ev = EarleyEvaler::new(|_, tok| Sexpr::Atom(tok.to_string()));

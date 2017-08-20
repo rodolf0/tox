@@ -42,7 +42,7 @@ pub struct ShuntingParser;
 
 impl ShuntingParser {
     pub fn parse_str(expr: &str) -> Result<RPNExpr, ParseError> {
-        Self::parse(&mut MathTokenizer::from_str(expr))
+        Self::parse(&mut MathTokenizer::scanner(expr))
     }
 
     pub fn parse(lex: &mut Scanner<MathToken>) -> Result<RPNExpr, ParseError> {

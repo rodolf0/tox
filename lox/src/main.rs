@@ -5,13 +5,15 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 
 mod lox_scanner;
+mod lox_parser;
 use lox_scanner::LoxScanner;
+use lox_parser::LoxParser;
 
 fn run(source: String) {
-    let mut tokens = LoxScanner::scanner(source);
-    while let Some(t) = tokens.next() {
-        eprintln!("{:?}", t);
-    }
+    let scanner = LoxScanner::scanner(source);
+    let mut parser = LoxParser::new(scanner);
+
+    eprintln!("{:?}", parser.parse());
 }
 
 fn main() {

@@ -17,9 +17,9 @@ pub enum TT {
 
 #[derive(Clone,Debug)]
 pub struct Token {
-    line: usize,
-    token: TT,
-    lexeme: String,
+    pub line: usize,
+    pub token: TT,
+    pub lexeme: String,
 }
 
 pub struct LoxScanner {
@@ -27,6 +27,7 @@ pub struct LoxScanner {
     line: usize,
     errors: bool,
 }
+
 
 impl LoxScanner {
     pub fn scanner(src: String) -> Scanner<Token> {

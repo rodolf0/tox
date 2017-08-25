@@ -1,7 +1,10 @@
 #![deny(warnings)]
 
 mod ebnf;
-pub use ebnf::{ParserBuilder, Treeresult};
+mod treeficator;
+
+pub use ebnf::{ParserBuilder, EbnfError};
+pub use treeficator::Treeresult;
 
 #[cfg(test)]
 mod ebnf_test;

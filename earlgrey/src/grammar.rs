@@ -118,9 +118,18 @@ impl GrammarBuilder {
         }
     }
 
+    pub fn add_nonterm<S: Into<String>>(&mut self, nt: S, ignoredup: bool) {
+        self.add_symbol(Symbol::NonTerm(nt.into()), ignoredup);
+    }
+
     pub fn nonterm<S: Into<String>>(mut self, nt: S) -> Self {
         self.add_symbol(Symbol::NonTerm(nt.into()), false);
         self
+    }
+
+    pub fn add_terminal<S, TM>(&mut self, nt: S, tm: TM, ignoredup: bool)
+            where S: Into<String>, TM: 'static + Fn(&str)->bool {
+        self.add_symbol(Symbol::Terminal(nt.into(), Box::new(tm)), ignoredup);
     }
 
     pub fn terminal<S, TM>(mut self, nt: S, tm: TM) -> Self

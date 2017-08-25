@@ -4,9 +4,31 @@ extern crate lexers;
 extern crate earlgrey;
 
 use self::lexers::DelimTokenizer;
-use self::earlgrey::Tree;
+use self::earlgrey::{Grammar, EarleyEvaler};
 use ebnf::{ebnf_grammar, ParserBuilder};
 
+
+#[derive(Debug,Clone,PartialEq)]
+pub enum Tree {
+    // ("[+-]", "+")
+    Leaf(String, String),
+    // ("E -> E [+-] E", [("n", "5"), ("[+-]", "+"), ("E -> E * E", [...])])
+    Node(String, Vec<Tree>),
+}
+
+impl Tree {
+    pub fn builder<'a>(g: Grammar) -> EarleyEvaler<'a, Tree> {
+        let mut evaler = EarleyEvaler::new(
+            |sym, tok| Tree::Leaf(sym.to_string(), tok.to_string()));
+        for rule in g.str_rules() {
+            evaler.action(&rule.to_string(), move |nodes|
+                          Tree::Node(rule.to_string(), nodes));
+        }
+        evaler
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn build_ebnf_grammar() {

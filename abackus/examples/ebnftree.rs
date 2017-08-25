@@ -3,7 +3,6 @@
 extern crate lexers;
 extern crate abackus;
 
-
 struct Tokenizer(lexers::Scanner<char>);
 
 impl Iterator for Tokenizer {

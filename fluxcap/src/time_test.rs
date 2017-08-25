@@ -1,15 +1,15 @@
 #![deny(warnings)]
 
+extern crate kronos;
 extern crate chrono;
-type DateTime = chrono::NaiveDateTime;
+type DateTime = self::chrono::NaiveDateTime;
 
 use time_machine::{TimeMachine, TimeEl};
-use kronos::Grain as g;
-use kronos;
+use self::kronos::Grain as g;
 
 
 fn d(year: i32, month: u32, day: u32) -> DateTime {
-    use chrono::naive::NaiveDate as Date;
+    use self::chrono::naive::NaiveDate as Date;
     Date::from_ymd(year, month, day).and_hms(0, 0, 0)
 }
 fn r(s: DateTime, e: DateTime, gr: kronos::Grain) -> TimeEl {

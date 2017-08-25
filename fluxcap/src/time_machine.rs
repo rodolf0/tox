@@ -1,13 +1,19 @@
 #![deny(warnings)]
 
+extern crate lexers;
+extern crate abackus;
+extern crate earlgrey;
 extern crate chrono;
+extern crate kronos;
+
 type DateTime = chrono::NaiveDateTime;
 type Date = chrono::NaiveDate;
 
-use earlgrey::{EarleyParser, EarleyEvaler, ParserBuilder};
-use kronos::constants as kc;
-use kronos::{Seq, Grain, TimeDir, Range};
-use lexers::DelimTokenizer;
+use self::lexers::DelimTokenizer;
+use self::earlgrey::{EarleyParser, EarleyEvaler};
+use self::abackus::ParserBuilder;
+use self::kronos::constants as kc;
+use self::kronos::{Seq, Grain, TimeDir, Range};
 use std::str::FromStr;
 
 

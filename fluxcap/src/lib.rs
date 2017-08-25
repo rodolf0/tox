@@ -1,7 +1,4 @@
-extern crate chrono;
-extern crate kronos;
-extern crate earlgrey;
-extern crate lexers;
+#![deny(warnings)]
 
 mod time_machine;
 pub use time_machine::{TimeMachine, TimeEl};

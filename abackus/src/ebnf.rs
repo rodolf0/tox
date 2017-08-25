@@ -1,12 +1,12 @@
 #![deny(warnings)]
 
 extern crate lexers;
-use grammar::{Grammar, GrammarBuilder};
-use parser::{EarleyParser, ParseError};
+extern crate earlgrey;
+
+use self::earlgrey::{Grammar, GrammarBuilder, EarleyParser, ParseError};
+use self::earlgrey::{EarleyEvaler, Sexpr};
 use self::lexers::EbnfTokenizer;
 use std::cell::RefCell;
-use trees::EarleyEvaler;
-use util::Sexpr;
 
 
 #[derive(Debug)]

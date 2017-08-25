@@ -1,9 +1,12 @@
 #![deny(warnings)]
 
 extern crate lexers;
+extern crate earlgrey;
+
 use self::lexers::DelimTokenizer;
+use self::earlgrey::Tree;
 use ebnf::{ebnf_grammar, ParserBuilder};
-use util::Tree;
+
 
 #[test]
 fn build_ebnf_grammar() {

@@ -6,16 +6,10 @@ description = "An earley parser library"
 license = "MIT"
 repository = "https://github.com/rodolf0/tox"
 
-[dependencies]
-lexers = { version = "0.0.5", path = "../lexers" }
-
 [[example]]
 name = "arith"
 path = "examples/arith.rs"
 
-[[example]]
-name = "ebnftree"
-path = "examples/ebnftree.rs"
-
 [dev-dependencies]
 rustyline = "1.0.0"
+lexers = { version = "0.0.5", path = "../lexers" }

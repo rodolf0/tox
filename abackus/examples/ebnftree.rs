@@ -1,5 +1,8 @@
+#![deny(warnings)]
+
 extern crate lexers;
-extern crate earlgrey;
+extern crate abackus;
+
 
 struct Tokenizer(lexers::Scanner<char>);
 
@@ -34,7 +37,7 @@ fn main() {
         collect::<Vec<String>>().join(" ");
 
     use std::str::FromStr;
-    let trificator = earlgrey::ParserBuilder::new()
+    let trificator = abackus::ParserBuilder::new()
         .plug_terminal("num", |n| f64::from_str(n).is_ok())
         .treeficator("expr", &grammar);
 

@@ -12,16 +12,18 @@ pub enum GrammarError {
     DuplicateRule(String),
 }
 
+//pub type TokenMatcher<T> = Box<Fn(&T)->bool>;
+
 pub enum Symbol {
     NonTerm(String),
     Terminal(String, Box<Fn(&str)->bool>),  // predicate that matches Terminal
+    //Terminal(String, TokenMatcher<T>),  // predicate that matches Terminal
 }
 
 #[derive(PartialEq,Hash)]
 pub struct Rule {
     pub head: String,
     pub spec: Vec<Rc<Symbol>>,
-    //prob: f64 = 1.0,
 }
 
 #[derive(Clone,Debug)]

@@ -24,20 +24,6 @@ pub struct LoxParser {
 
 pub type ExprResult = Result<Expr, String>;
 
-/* Grammar:
- *
- *  expression     := equality ;
- *  equality       := comparison { ( "!=" | "==" ) comparison } ;
- *  comparison     := addition { ( ">" | ">=" | "<" | "<=" ) addition } ;
- *  addition       := multiplication { ( "-" | "+" ) multiplication } ;
- *  multiplication := unary { ( "/" | "*" ) unary } ;
- *  unary          := ( "!" | "-" ) unary
- *                  | primary ;
- *  primary        := NUMBER | STRING | "false" | "true" | "nil"
- *                  | "(" expression ")" ;
- *
- */
-
 impl LoxParser {
     pub fn new(scanner: Scanner<Token>) -> Self {
         LoxParser{scanner: scanner, errors: false}
@@ -74,12 +60,39 @@ impl LoxParser {
     fn error<S: AsRef<str>>(&mut self, token: Option<Token>, msg: S) -> String {
         self.errors = true;
         match token {
-            Some(t) => format!("lox parser error: {:?} at line {}, {}",
+            Some(t) => format!("LoxParser error: {:?} at line {}, {}",
                                t.lexeme, t.line, msg.as_ref()),
-            _ => format!("lox parser error: EOF, {}", msg.as_ref()),
+            _ => format!("LoxParser error: EOF, {}", msg.as_ref()),
         }
     }
 
+    //fn synchronize(&mut self) {
+        //// sync on statement boundaries (ie: semicolon)
+        //// TODO: check for loops' semicolon
+        //while let Some(token) = self.scanner.next() {
+            //if token.token == TT::SEMICOLON {
+                //return self.scanner.ignore();
+            //}
+        //}
+    //}
+}
+
+
+/* Grammar:
+ *
+ *  expression     := equality ;
+ *  equality       := comparison { ( "!=" | "==" ) comparison } ;
+ *  comparison     := addition { ( ">" | ">=" | "<" | "<=" ) addition } ;
+ *  addition       := multiplication { ( "-" | "+" ) multiplication } ;
+ *  multiplication := unary { ( "/" | "*" ) unary } ;
+ *  unary          := ( "!" | "-" ) unary
+ *                  | primary ;
+ *  primary        := NUMBER | STRING | "false" | "true" | "nil"
+ *                  | "(" expression ")" ;
+ *
+ */
+
+impl LoxParser {
     fn expression(&mut self) -> ExprResult {
         self.equality()
     }
@@ -147,23 +160,23 @@ impl LoxParser {
         if self.accept(vec![TT::Num(0.0)]) {
             return Ok(match self.scanner.extract().swap_remove(0).token {
                 TT::Num(n) => Expr::Num(n),
-                o => panic!("Bug! unexpected token: {:?}", o),
+                o => panic!("LoxParser Bug! unexpected token: {:?}", o),
             });
         }
         if self.accept(vec![TT::Str("".to_string())]) {
             return Ok(match self.scanner.extract().swap_remove(0).token {
                 TT::Str(s) => Expr::Str(s),
-                o => panic!("Bug! unexpected token: {:?}", o),
+                o => panic!("LoxParser Bug! unexpected token: {:?}", o),
             });
         }
         if self.accept(vec![TT::OPAREN]) {
             self.scanner.ignore(); // skip OPAREN
             let expr = self.expression()?;
-            self.consume(vec![TT::CPAREN], "Expect ')' after expression")?;
+            self.consume(vec![TT::CPAREN], "expect ')' after expression")?;
             return Ok(Expr::Grouping(Box::new(expr)));
         }
         let bad_token = self.scanner.peek();
-        Err(self.error(bad_token, "Expected expression"))
+        Err(self.error(bad_token, "expected expression"))
     }
 
     pub fn parse(&mut self) -> ExprResult {

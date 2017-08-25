@@ -48,7 +48,7 @@ impl LoxScanner {
     }
 
     fn error<T: AsRef<str>>(&mut self, err: T) {
-        eprintln!("lox scanner error: {}", err.as_ref());
+        eprintln!("LoxScanner error: {}", err.as_ref());
         self.errors = true;
     }
 
@@ -128,7 +128,7 @@ impl LoxScanner {
             Some('\n') => { self.line += 1; None }, // track current line
             Some('"') => match self.scan_restof_string('"') {
                 true => self.tokenize(TT::Str(String::new())),
-                false => { self.error("Unterminated string"); None }
+                false => { self.error("unterminated string"); None }
             },
             Some(d) if d.is_digit(10) => {
                 self.src.prev(); // hacky but works

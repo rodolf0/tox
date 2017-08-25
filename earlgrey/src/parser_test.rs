@@ -1,14 +1,35 @@
 #![deny(warnings)]
 
 extern crate lexers;
+
+use self::lexers::{Scanner, DelimTokenizer};
 use grammar::{GrammarBuilder, Grammar};
 use parser::EarleyParser;
-use self::lexers::{Scanner, DelimTokenizer};
+use trees::EarleyEvaler;
 use std::fmt;
 use std::iter::FromIterator;
 use std::str::FromStr;
-use trees::EarleyEvaler;
-use util::{Sexpr, Tree};
+
+
+#[derive(Debug,Clone,PartialEq)]
+pub enum Tree {
+    // ("[+-]", "+")
+    Leaf(String, String),
+    // ("E -> E [+-] E", [("n", "5"), ("[+-]", "+"), ("E -> E * E", [...])])
+    Node(String, Vec<Tree>),
+}
+
+impl Tree {
+    pub fn builder<'a>(g: Grammar) -> EarleyEvaler<'a, Tree> {
+        let mut evaler = EarleyEvaler::new(
+            |sym, tok| Tree::Leaf(sym.to_string(), tok.to_string()));
+        for rule in g.str_rules() {
+            evaler.action(&rule.to_string(), move |nodes|
+                          Tree::Node(rule.to_string(), nodes));
+        }
+        evaler
+    }
+}
 
 fn grammar_math() -> Grammar {
     // Sum -> Sum + Mul | Mul
@@ -16,16 +37,16 @@ fn grammar_math() -> Grammar {
     // Pow -> Num ^ Pow | Num
     // Num -> Number | ( Sum )
     GrammarBuilder::new()
-      .symbol("Sum")
-      .symbol("Mul")
-      .symbol("Pow")
-      .symbol("Num")
-      .symbol(("Number", |n: &str| n.chars().all(|c| "1234567890".contains(c))))
-      .symbol(("[+-]", |n: &str| n.len() == 1 && "+-".contains(n)))
-      .symbol(("[*/]", |n: &str| n.len() == 1 && "*/".contains(n)))
-      .symbol(("[^]", |n: &str| { n == "^" }))
-      .symbol(("(", |n: &str| { n == "(" }))
-      .symbol((")", |n: &str| { n == ")" }))
+      .nonterm("Sum")
+      .nonterm("Mul")
+      .nonterm("Pow")
+      .nonterm("Num")
+      .terminal("Number", |n| n.chars().all(|c| "1234567890".contains(c)))
+      .terminal("[+-]", |n| n.len() == 1 && "+-".contains(n))
+      .terminal("[*/]", |n| n.len() == 1 && "*/".contains(n))
+      .terminal("[^]", |n| { n == "^" })
+      .terminal("(", |n| { n == "(" })
+      .terminal(")", |n| { n == ")" })
       .rule("Sum", &["Sum", "[+-]", "Mul"])
       .rule("Sum", &["Mul"])
       .rule("Mul", &["Mul", "[*/]", "Pow"])
@@ -56,8 +77,8 @@ fn check_trees<T: fmt::Debug>(trees: &Vec<T>, expected: Vec<&str>) {
 fn grammar_ambiguous() {
     // S -> SS | b
     let grammar = GrammarBuilder::new()
-      .symbol("S")
-      .symbol(("b", |n: &str| n == "b"))
+      .nonterm("S")
+      .terminal("b", |n| n == "b")
       .rule("S", &["S", "S"])
       .rule("S", &["b"])
       .into_grammar("S")
@@ -81,9 +102,9 @@ fn grammar_ambiguous_epsilon() {
     // S -> SSX | b
     // X -> <e>
     let g = GrammarBuilder::new()
-      .symbol("S")
-      .symbol("X")
-      .symbol(("b", |n: &str| n == "b"))
+      .nonterm("S")
+      .nonterm("X")
+      .terminal("b", |n| n == "b")
       .rule("S", &["S", "S", "X"])
       .rule::<_, &str>("X", &[])
       .rule("S", &["b"])
@@ -118,10 +139,10 @@ fn left_recurse() {
     // S -> S + N | N
     // N -> [0-9]
     let grammar = GrammarBuilder::new()
-      .symbol("S")
-      .symbol("N")
-      .symbol(("[+]", |n: &str| n == "+"))
-      .symbol(("[0-9]", |n: &str| "1234567890".contains(n)))
+      .nonterm("S")
+      .nonterm("N")
+      .terminal("[+]", |n| n == "+")
+      .terminal("[0-9]", |n| "1234567890".contains(n))
       .rule("S", &["S", "[+]", "N"])
       .rule("S", &["N"])
       .rule("N", &["[0-9]"])
@@ -141,10 +162,10 @@ fn right_recurse() {
     // P -> N ^ P | N
     // N -> [0-9]
     let grammar = GrammarBuilder::new()
-      .symbol("P")
-      .symbol("N")
-      .symbol(("[^]", |n: &str| n == "^"))
-      .symbol(("[0-9]", |n: &str| "1234567890".contains(n)))
+      .nonterm("P")
+      .nonterm("N")
+      .terminal("[^]", |n| n == "^")
+      .terminal("[0-9]", |n| "1234567890".contains(n))
       .rule("P", &["N", "[^]", "P"])
       .rule("P", &["N"])
       .rule("N", &["[0-9]"])
@@ -164,8 +185,8 @@ fn bogus_empty() {
     // A -> <empty> | B
     // B -> A
     let grammar = GrammarBuilder::new()
-      .symbol("A")
-      .symbol("B")
+      .nonterm("A")
+      .nonterm("B")
       .rule::<_, &str>("A", &[])
       .rule("A", &vec!["B"])
       .rule("B", &vec!["A"])
@@ -184,9 +205,9 @@ fn bogus_epsilon() {
     // Grammar for balanced parenthesis
     // P  -> '(' P ')' | P P | <epsilon>
     let grammar = GrammarBuilder::new()
-      .symbol("P")
-      .symbol(("(", |l: &str| l == "("))
-      .symbol((")", |l: &str| l == ")"))
+      .nonterm("P")
+      .terminal("(", |l| l == "(")
+      .terminal(")", |l| l == ")")
       .rule("P", &["(", "P", ")"])
       .rule("P", &["P", "P"])
       .rule::<_, &str>("P", &[])
@@ -208,14 +229,14 @@ fn grammar_example() {
     // Letters   -> oneletter Letters | <epsilon>
     // oneletter -> [a-zA-Z]
     let grammar = GrammarBuilder::new()
-      .symbol("Program")
-      .symbol("Letters")
-      .symbol(("oneletter", |l: &str| l.len() == 1 &&
-               l.chars().next().unwrap().is_alphabetic()))
-      .symbol(("m", |l: &str| l == "m"))
-      .symbol(("a", |l: &str| l == "a"))
-      .symbol(("i", |l: &str| l == "i"))
-      .symbol(("n", |l: &str| l == "n"))
+      .nonterm("Program")
+      .nonterm("Letters")
+      .terminal("oneletter", |l| l.len() == 1 &&
+               l.chars().next().unwrap().is_alphabetic())
+      .terminal("m", |l| l == "m")
+      .terminal("a", |l| l == "a")
+      .terminal("i", |l| l == "i")
+      .terminal("n", |l| l == "n")
       .rule("Program", &["Letters", "m", "a", "i", "n", "Letters"])
       .rule("Letters", &["oneletter", "Letters"])
       .rule::<_, &str>("Letters", &[])
@@ -230,11 +251,11 @@ fn grammar_example() {
 fn math_ambiguous() {
     // E -> E + E | E * E | n
     let grammar = GrammarBuilder::new()
-      .symbol("E")
-      .symbol(("+", |n: &str| n == "+"))
-      .symbol(("*", |n: &str| n == "*"))
-      .symbol(("n", |n: &str|
-          n.chars().all(|c| "1234567890".contains(c))))
+      .nonterm("E")
+      .terminal("+", |n| n == "+")
+      .terminal("*", |n| n == "*")
+      .terminal("n", |n|
+          n.chars().all(|c| "1234567890".contains(c)))
       .rule("E", &["E", "+", "E"])
       .rule("E", &["E", "*", "E"])
       .rule("E", &["n"])
@@ -322,9 +343,9 @@ fn chained_terminals() {
             2 => "+", 3 => "++", _ => unreachable!()
         };
         let g = GrammarBuilder::new()
-          .symbol("E")
-          .symbol("X")
-          .symbol(("+", |n: &str| n == "+"))
+          .nonterm("E")
+          .nonterm("X")
+          .terminal("+", |n| n == "+")
           .rule("E", &variant)
           .rule::<_, &str>("X", &[])
           .into_grammar("E")
@@ -338,22 +359,22 @@ fn chained_terminals() {
 #[test]
 fn natural_lang() {
     let g = GrammarBuilder::new()
-      .symbol(("N", |n: &str| {
+      .terminal("N", |n| {
         n == "time" || n == "flight" || n == "banana" ||
         n == "flies" || n == "boy" || n == "telescope"
-      }))
-      .symbol(("D", |n: &str| { n == "the" || n == "a" || n == "an" }))
-      .symbol(("V", |n: &str| {
+      })
+      .terminal("D", |n| { n == "the" || n == "a" || n == "an" })
+      .terminal("V", |n| {
         n == "book" || n == "eat" || n == "sleep" || n == "saw"
-      }))
-      .symbol(("P", |n: &str| {
+      })
+      .terminal("P", |n| {
         n == "with" || n == "in" || n == "on" || n == "at" || n == "through"
-      }))
-      .symbol(("[name]", |n: &str| n == "john" || n == "houston"))
-      .symbol("PP")
-      .symbol("NP")
-      .symbol("VP")
-      .symbol("S")
+      })
+      .terminal("[name]", |n| n == "john" || n == "houston")
+      .nonterm("PP")
+      .nonterm("NP")
+      .nonterm("VP")
+      .nonterm("S")
       .rule("NP", &["D", "N"])
       .rule("NP", &["[name]"])
       .rule("NP", &["NP", "PP"])
@@ -381,10 +402,10 @@ fn small_math() -> Grammar {
     // S -> S + E | E
     // E -> n ^ E | n
     GrammarBuilder::new()
-      .symbol("E")
-      .symbol(("+", |n: &str| n == "+"))
-      .symbol(("*", |n: &str| n == "*"))
-      .symbol(("n", |n: &str| "1234567890".contains(n)))
+      .nonterm("E")
+      .terminal("+", |n| n == "+")
+      .terminal("*", |n| n == "*")
+      .terminal("n", |n| "1234567890".contains(n))
       .rule("E", &["E", "*", "E"])
       .rule("E", &["E", "+", "E"])
       .rule("E", &["n"])
@@ -440,6 +461,12 @@ fn build_ast() {
 
 #[test]
 fn build_sexpr() {
+    #[derive(Clone,Debug)]
+    pub enum Sexpr {
+        Atom(String),
+        List(Vec<Sexpr>),
+    }
+
     let mut input = DelimTokenizer::scanner("3+4*2", "+*", false);
     let ps = EarleyParser::new(small_math()).parse(&mut input).unwrap();
 

@@ -114,8 +114,8 @@ mod tests {
     #[test]
     fn partial_parse() {
         let g = GrammarBuilder::new()
-            .symbol("Start")
-            .symbol(("+", |n: &str| n == "+"))
+            .nonterm("Start")
+            .terminal("+", |n| n == "+")
             .rule("Start", &["+", "+"])
             .into_grammar("Start")
             .expect("Bad Grammar");
@@ -127,10 +127,10 @@ mod tests {
     #[test]
     fn badparse() {
         let g = GrammarBuilder::new()
-          .symbol("Sum")
-          .symbol("Num")
-          .symbol(("Number", |n: &str| n.chars().all(|c| "1234".contains(c))))
-          .symbol(("[+-]", |n: &str| n.len() == 1 && "+-".contains(n)))
+          .nonterm("Sum")
+          .nonterm("Num")
+          .terminal("Number", |n| n.chars().all(|c| "1234".contains(c)))
+          .terminal("[+-]", |n| n.len() == 1 && "+-".contains(n))
           .rule("Sum", &["Sum", "[+-]", "Num"])
           .rule("Sum", &["Num"])
           .rule("Num", &["Number"])
@@ -145,8 +145,8 @@ mod tests {
     fn grammar_ambiguous() {
         // S -> SS | b
         let grammar = GrammarBuilder::new()
-          .symbol("S")
-          .symbol(("b", |n: &str| n == "b"))
+          .nonterm("S")
+          .terminal("b", |n| n == "b")
           .rule("S", &["S", "S"])
           .rule("S", &["b"])
           .into_grammar("S")
@@ -162,10 +162,10 @@ mod tests {
         // S -> S + N | N
         // N -> [0-9]
         let grammar = GrammarBuilder::new()
-          .symbol("S")
-          .symbol("N")
-          .symbol(("[+]", |n: &str| n == "+"))
-          .symbol(("[0-9]", |n: &str| "1234567890".contains(n)))
+          .nonterm("S")
+          .nonterm("N")
+          .terminal("[+]", |n| n == "+")
+          .terminal("[0-9]", |n| "1234567890".contains(n))
           .rule("S", &["S", "[+]", "N"])
           .rule("S", &["N"])
           .rule("N", &["[0-9]"])
@@ -181,10 +181,10 @@ mod tests {
         // P -> N ^ P | N
         // N -> [0-9]
         let grammar = GrammarBuilder::new()
-          .symbol("P")
-          .symbol("N")
-          .symbol(("[^]", |n: &str| n == "^"))
-          .symbol(("[0-9]", |n: &str| "1234567890".contains(n)))
+          .nonterm("P")
+          .nonterm("N")
+          .terminal("[^]", |n| n == "^")
+          .terminal("[0-9]", |n| "1234567890".contains(n))
           .rule("P", &["N", "[^]", "P"])
           .rule("P", &["N"])
           .rule("N", &["[0-9]"])
@@ -200,8 +200,8 @@ mod tests {
         // A -> <empty> | B
         // B -> A
         let grammar = GrammarBuilder::new()
-          .symbol("A")
-          .symbol("B")
+          .nonterm("A")
+          .nonterm("B")
           .rule::<_, &str>("A", &[])
           .rule("A", &vec!["B"])
           .rule("B", &vec!["A"])
@@ -217,9 +217,9 @@ mod tests {
         // Grammar for balanced parenthesis
         // P  -> '(' P ')' | P P | <epsilon>
         let grammar = GrammarBuilder::new()
-          .symbol("P")
-          .symbol(("(", |l: &str| l == "("))
-          .symbol((")", |l: &str| l == ")"))
+          .nonterm("P")
+          .terminal("(", |l| l == "(")
+          .terminal(")", |l| l == ")")
           .rule("P", &["(", "P", ")"])
           .rule("P", &["P", "P"])
           .rule::<_, &str>("P", &[])

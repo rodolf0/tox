@@ -11,5 +11,5 @@ name = "arith"
 path = "examples/arith.rs"
 
 [dev-dependencies]
-rustyline = "1.0.0"
 lexers = { version = "0.0.5", path = "../lexers" }
+rustyline = "1.0.0"

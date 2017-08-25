@@ -12,12 +12,9 @@ pub enum GrammarError {
     DuplicateRule(String),
 }
 
-//pub type TokenMatcher<T> = Box<Fn(&T)->bool>;
-
 pub enum Symbol {
     NonTerm(String),
     Terminal(String, Box<Fn(&str)->bool>),  // predicate that matches Terminal
-    //Terminal(String, TokenMatcher<T>),  // predicate that matches Terminal
 }
 
 #[derive(PartialEq,Hash)]
@@ -46,17 +43,6 @@ impl Symbol {
             &Symbol::NonTerm(ref name) => name,
             &Symbol::Terminal(ref name, _) => name,
         }
-    }
-}
-
-impl<'a> From<&'a str> for Symbol {
-    fn from(from: &str) -> Self { Symbol::NonTerm(from.to_string()) }
-}
-
-impl<'a, F> From<(&'a str, F)> for Symbol
-        where F: 'static + Fn(&str)->bool {
-    fn from(from: (&str, F)) -> Self {
-        Symbol::Terminal(from.0.to_string(), Box::new(from.1))
     }
 }
 
@@ -122,9 +108,8 @@ impl GrammarBuilder {
         GrammarBuilder{symbols: HashMap::new(), rules: Vec::new(), error: None}
     }
 
-    pub fn add_symbol<S: Into<Symbol>>(&mut self, symbol: S, ignoredup: bool) {
+    fn add_symbol(&mut self, symbol: Symbol, ignoredup: bool) {
         // NOTE: we check existence to avoid new symbols stomping on pluged ones
-        let symbol = symbol.into();
         if !self.symbols.contains_key(symbol.name()) {
             self.symbols.insert(symbol.name().to_string(), Rc::new(symbol));
         } else if !ignoredup {
@@ -133,8 +118,14 @@ impl GrammarBuilder {
         }
     }
 
-    pub fn symbol<S: Into<Symbol>>(mut self, symbol: S) -> Self {
-        self.add_symbol(symbol, false);
+    pub fn nonterm<S: Into<String>>(mut self, nt: S) -> Self {
+        self.add_symbol(Symbol::NonTerm(nt.into()), false);
+        self
+    }
+
+    pub fn terminal<S, TM>(mut self, nt: S, tm: TM) -> Self
+            where S: Into<String>, TM: 'static + Fn(&str)->bool {
+        self.add_symbol(Symbol::Terminal(nt.into(), Box::new(tm)), false);
         self
     }
 
@@ -198,9 +189,9 @@ mod tests {
     #[test]
     fn build_grammar() {
         let g = GrammarBuilder::new()
-            .symbol("Sum")
-            .symbol(("Num", |n: &str| n.chars().all(|c| "123".contains(c))))
-            .symbol(("+", |n: &str| n == "+"))
+            .nonterm("Sum")
+            .terminal("Num", |n| n.chars().all(|c| "123".contains(c)))
+            .terminal("+", |n| n == "+")
             .rule("Sum", &["Sum", "+", "Num"])
             .rule("Sum", &["Num"])
             .into_grammar("Sum");
@@ -210,8 +201,8 @@ mod tests {
     #[test]
     fn dup_symbol() {
         let g = GrammarBuilder::new()
-            .symbol("Sum")
-            .symbol("Sum")
+            .nonterm("Sum")
+            .nonterm("Sum")
             .into_grammar("Sum");
         assert_eq!(g.unwrap_err(),
                    GrammarError::DuplicateSym("Sum".to_string()));
@@ -220,9 +211,9 @@ mod tests {
     #[test]
     fn dup_rule() {
         let g = GrammarBuilder::new()
-            .symbol("Sum")
-            .symbol(("Num", |n: &str| n.chars().all(|c| "123".contains(c))))
-            .symbol(("+", |n: &str| n == "+"))
+            .nonterm("Sum")
+            .terminal("Num", |n| n.chars().all(|c| "123".contains(c)))
+            .terminal("+", |n| n == "+")
             .rule("Sum", &["Sum", "+", "Num"])
             .rule("Sum", &["Sum", "+", "Num"])
             .rule("Sum", &["Num"])
@@ -234,14 +225,14 @@ mod tests {
     #[test]
     fn missing_start() {
         let g = GrammarBuilder::new()
-            .symbol("Sum")
-            .symbol(("Num", |n: &str| n.chars().all(|c| "123".contains(c))))
+            .nonterm("Sum")
+            .terminal("Num", |n| n.chars().all(|c| "123".contains(c)))
             .rule("Sum", &["Num"])
             .into_grammar("Xum");
         assert_eq!(g.unwrap_err(), GrammarError::MissingSym("Xum".to_string()));
 
         let g = GrammarBuilder::new()
-            .symbol("Sum")
+            .nonterm("Sum")
             .rule("Sum", &["Num"])
             .into_grammar("Sum");
         assert_eq!(g.unwrap_err(), GrammarError::MissingSym("Num".to_string()));

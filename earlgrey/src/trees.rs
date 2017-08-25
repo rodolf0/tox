@@ -12,28 +12,30 @@ pub enum EvalError {
 }
 
 pub struct EarleyEvaler<'a, ASTNode: Clone> {
+    // semantic actions to execute when walking the tree
     actions: HashMap<String, Box<Fn(Vec<ASTNode>)->ASTNode + 'a>>,
-    node_builder: Box<Fn(&str, &str)->ASTNode + 'a>,
+    // leaf_builder creates ASTNodes given a rule-string + a token
+    leaf_builder: Box<Fn(&str, &str)->ASTNode + 'a>,
     debug: bool,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
-    pub fn new<F>(node_builder: F) -> EarleyEvaler<'a, ASTNode>
+    pub fn new<F>(leaf_builder: F) -> Self
             where F: 'a + Fn(&str, &str) -> ASTNode {
         EarleyEvaler{
             actions: HashMap::new(),
-            node_builder: Box::new(node_builder),
+            leaf_builder: Box::new(leaf_builder),
             debug: false,
         }
     }
 
-    pub fn debug<F>(node_builder: F) -> EarleyEvaler<'a, ASTNode>
+    pub fn debug<F>(leaf_builder: F) -> Self
             where F: 'a + Fn(&str, &str) -> ASTNode {
         EarleyEvaler{
             actions: HashMap::new(),
-            node_builder: Box::new(node_builder),
+            leaf_builder: Box::new(leaf_builder),
             debug: true,
         }
     }
@@ -60,7 +62,7 @@ impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
                 &Trigger::Complete(ref item) => try!(self.walker(item)),
                 &Trigger::Scan(ref token) => {
                     let symbol = prediction.next_symbol().unwrap().name();
-                    vec![(self.node_builder)(&symbol, token)]
+                    vec![(self.leaf_builder)(&symbol, token)]
                 }
             });
         }
@@ -129,7 +131,7 @@ impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
                     },
                     &Trigger::Scan(ref token) => {
                         let symbol = prediction.next_symbol().unwrap().name();
-                        args.push((self.node_builder)(&symbol, token));
+                        args.push((self.leaf_builder)(&symbol, token));
                         trees.push(reduce(args));
                     }
                 };

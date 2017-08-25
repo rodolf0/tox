@@ -201,9 +201,9 @@ mod tests {
         Rc::new(Rule{
             head: "S".to_string(),
             spec: vec![
-                Rc::new(Symbol::from("S")),
-                Rc::new(Symbol::from(("+-", testfn))),
-                Rc::new(Symbol::from(("d", |n: &str|
+                Rc::new(Symbol::NonTerm("S".to_string())),
+                Rc::new(Symbol::Terminal("+-".to_string(), Box::new(testfn))),
+                Rc::new(Symbol::Terminal("d".to_string(), Box::new(|n|
                                       n.chars().all(|c| "123".contains(c))))),
             ]})
     }
@@ -213,9 +213,9 @@ mod tests {
         Rc::new(Rule{
             head: "M".to_string(),
             spec: vec![
-                Rc::new(Symbol::from("M")),
-                Rc::new(Symbol::from(("*/", testfn))),
-                Rc::new(Symbol::from(("d", |n: &str|
+                Rc::new(Symbol::NonTerm("M".to_string())),
+                Rc::new(Symbol::Terminal("*/".to_string(), Box::new(testfn))),
+                Rc::new(Symbol::Terminal("d".to_string(), Box::new(|n|
                                       n.chars().all(|c| "123".contains(c))))),
             ]})
     }

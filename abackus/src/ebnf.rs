@@ -6,7 +6,7 @@ extern crate earlgrey;
 use self::lexers::EbnfTokenizer;
 use self::earlgrey::{
     Grammar, GrammarBuilder,
-    EarleyParser, ParseError, EarleyEvaler,
+    EarleyParser, ParseError, EarleyForest,
 };
 use std::cell::RefCell;
 
@@ -76,7 +76,7 @@ impl ParserBuilder {
 
         let gb = RefCell::new(gb);
         {
-            let mut ev = EarleyEvaler::new(|symbol, token| {
+            let mut ev = EarleyForest::new(|symbol, token| {
                 match symbol {
                     "<Id>" => {
                         if dbg {eprintln!("Adding non-term {:?}", token);}

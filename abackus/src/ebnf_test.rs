@@ -4,7 +4,7 @@ extern crate lexers;
 extern crate earlgrey;
 
 use self::lexers::DelimTokenizer;
-use self::earlgrey::{Grammar, EarleyEvaler};
+use self::earlgrey::{Grammar, EarleyForest};
 use ebnf::{ebnf_grammar, ParserBuilder};
 
 
@@ -17,8 +17,8 @@ pub enum Tree {
 }
 
 impl Tree {
-    pub fn builder<'a>(g: Grammar) -> EarleyEvaler<'a, Tree> {
-        let mut evaler = EarleyEvaler::new(
+    pub fn builder<'a>(g: Grammar) -> EarleyForest<'a, Tree> {
+        let mut evaler = EarleyForest::new(
             |sym, tok| Tree::Leaf(sym.to_string(), tok.to_string()));
         for rule in g.str_rules() {
             evaler.action(&rule.to_string(), move |nodes|

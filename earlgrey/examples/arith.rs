@@ -68,9 +68,9 @@ fn gamma(x: f64) -> f64 {
     unsafe { tgamma(x) }
 }
 
-fn semanter<'a>() -> earlgrey::EarleyEvaler<'a, f64> {
+fn semanter<'a>() -> earlgrey::EarleyForest<'a, f64> {
     use std::str::FromStr;
-    let mut ev = earlgrey::EarleyEvaler::new(|symbol, token| {
+    let mut ev = earlgrey::EarleyForest::new(|symbol, token| {
         match symbol {"[n]" => f64::from_str(token).unwrap(), _ => 0.0}
     });
     ev.action("expr -> term", |n| n[0]);

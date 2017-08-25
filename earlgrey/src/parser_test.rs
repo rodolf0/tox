@@ -5,7 +5,7 @@ extern crate lexers;
 use self::lexers::{Scanner, DelimTokenizer};
 use grammar::{GrammarBuilder, Grammar};
 use parser::EarleyParser;
-use trees::EarleyEvaler;
+use trees::EarleyForest;
 use std::fmt;
 use std::iter::FromIterator;
 use std::str::FromStr;
@@ -20,8 +20,8 @@ pub enum Tree {
 }
 
 impl Tree {
-    pub fn builder<'a>(g: Grammar) -> EarleyEvaler<'a, Tree> {
-        let mut evaler = EarleyEvaler::new(
+    pub fn builder<'a>(g: Grammar) -> EarleyForest<'a, Tree> {
+        let mut evaler = EarleyForest::new(
             |sym, tok| Tree::Leaf(sym.to_string(), tok.to_string()));
         for rule in g.str_rules() {
             evaler.action(&rule.to_string(), move |nodes|
@@ -417,7 +417,7 @@ fn small_math() -> Grammar {
 fn eval_actions() {
     let mut input = DelimTokenizer::scanner("3+4*2", "+*", false);
     let ps = EarleyParser::new(small_math()).parse(&mut input).unwrap();
-    let mut ev = EarleyEvaler::new(|symbol, token| {
+    let mut ev = EarleyForest::new(|symbol, token| {
         match symbol {"n" => f64::from_str(token).unwrap(), _ => 0.0}
     });
     ev.action("E -> E + E", |nodes| nodes[0] + nodes[2]);
@@ -440,7 +440,7 @@ fn build_ast() {
         BinOP(Box<MathAST>, String, Box<MathAST>),
         Num(f64),
     }
-    let mut ev = EarleyEvaler::new(|symbol, token| {
+    let mut ev = EarleyForest::new(|symbol, token| {
         match symbol {
             "n" => MathAST::Num(f64::from_str(token).unwrap()),
             _ => MathAST::Num(0.0)
@@ -470,7 +470,7 @@ fn build_sexpr() {
     let mut input = DelimTokenizer::scanner("3+4*2", "+*", false);
     let ps = EarleyParser::new(small_math()).parse(&mut input).unwrap();
 
-    let mut ev = EarleyEvaler::new(|_, tok| Sexpr::Atom(tok.to_string()));
+    let mut ev = EarleyForest::new(|_, tok| Sexpr::Atom(tok.to_string()));
     ev.action("E -> E + E", |nodes| Sexpr::List(nodes.clone()));
     ev.action("E -> E * E", |nodes| Sexpr::List(nodes.clone()));
     ev.action("E -> n", |nodes| nodes[0].clone());

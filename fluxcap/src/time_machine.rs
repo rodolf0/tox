@@ -10,7 +10,7 @@ type DateTime = chrono::NaiveDateTime;
 type Date = chrono::NaiveDate;
 
 use self::lexers::DelimTokenizer;
-use self::earlgrey::{EarleyParser, EarleyEvaler};
+use self::earlgrey::{EarleyParser, EarleyForest};
 use self::abackus::ParserBuilder;
 use self::kronos::constants as kc;
 use self::kronos::{Seq, Grain, TimeDir, Range};
@@ -83,9 +83,9 @@ fn time_parser() -> EarleyParser {
         .unwrap_or_else(|e| panic!("TimeMachine grammar BUG: {:?}", e))
 }
 
-fn time_evaler<'a>() -> EarleyEvaler<'a, T> {
+fn time_evaler<'a>() -> EarleyForest<'a, T> {
     // provide a function that evaluates tokens
-    let mut ev = EarleyEvaler::new(|terminal, t| match terminal {
+    let mut ev = EarleyForest::new(|terminal, t| match terminal {
         "weekday" => T::Seq(Seq::weekday(kc::weekday(t).unwrap())),
         "month" => T::Seq(Seq::month(kc::month(t).unwrap())),
         "ordinal" => T::Ord(kc::ordinal(t).or(kc::short_ordinal(t)).unwrap()),
@@ -351,7 +351,7 @@ impl T {
 }
 
 
-pub struct TimeMachine<'a>(EarleyParser, EarleyEvaler<'a, T>);
+pub struct TimeMachine<'a>(EarleyParser, EarleyForest<'a, T>);
 
 impl<'a> TimeMachine<'a> {
     pub fn new() -> TimeMachine<'a> {

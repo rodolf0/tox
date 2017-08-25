@@ -8,7 +8,7 @@ mod parser;
 pub use parser::{EarleyParser, ParseError};
 
 mod trees;
-pub use trees::EarleyEvaler;
+pub use trees::EarleyForest;
 
 #[cfg(test)]
 mod parser_test;

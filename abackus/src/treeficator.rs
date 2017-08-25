@@ -3,7 +3,7 @@
 extern crate earlgrey;
 
 use ebnf::{EbnfError, ParserBuilder};
-use self::earlgrey::{EarleyParser, EarleyEvaler};
+use self::earlgrey::{EarleyParser, EarleyForest};
 
 #[derive(Clone,Debug)]
 pub enum Sexpr {
@@ -43,7 +43,7 @@ impl ParserBuilder {
             .unwrap_or_else(|e| panic!("treeficator error: {:?}", e));
 
         // 2. Add semantic actions that flatten the parse tree
-        let mut ev = EarleyEvaler::new(|_, tok| Sexpr::Atom(tok.to_string()));
+        let mut ev = EarleyForest::new(|_, tok| Sexpr::Atom(tok.to_string()));
         for rule in grammar.str_rules() {
             ev.action(&rule, move |mut nodes| match nodes.len() {
                 1 => nodes.swap_remove(0),

@@ -11,7 +11,7 @@ pub enum EvalError {
     MissingAction(String),
 }
 
-pub struct EarleyEvaler<'a, ASTNode: Clone> {
+pub struct EarleyForest<'a, ASTNode: Clone> {
     // semantic actions to execute when walking the tree
     actions: HashMap<String, Box<Fn(Vec<ASTNode>)->ASTNode + 'a>>,
     // leaf_builder creates ASTNodes given a rule-string + a token
@@ -21,10 +21,10 @@ pub struct EarleyEvaler<'a, ASTNode: Clone> {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
+impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     pub fn new<F>(leaf_builder: F) -> Self
             where F: 'a + Fn(&str, &str) -> ASTNode {
-        EarleyEvaler{
+        EarleyForest{
             actions: HashMap::new(),
             leaf_builder: Box::new(leaf_builder),
             debug: false,
@@ -33,7 +33,7 @@ impl<'a, ASTNode: Clone> EarleyEvaler<'a, ASTNode> {
 
     pub fn debug<F>(leaf_builder: F) -> Self
             where F: 'a + Fn(&str, &str) -> ASTNode {
-        EarleyEvaler{
+        EarleyForest{
             actions: HashMap::new(),
             leaf_builder: Box::new(leaf_builder),
             debug: true,

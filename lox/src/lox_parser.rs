@@ -15,11 +15,14 @@ pub enum Expr {
     Num(f64),
     Str(String),
     Grouping(Box<Expr>),
+    Var(String),
+    Assign(String, Box<Expr>),
 }
 
 pub enum Stmt {
     Print(Expr),
     Expr(Expr),
+    Var(String, Expr),
 }
 
 pub type ExprResult = Result<Expr, String>;
@@ -85,13 +88,21 @@ impl LoxParser {
 /* Grammar:
  *
  *  program        := { statement } EOF ;
+ *
+ *  declaration    := varDecl
+ *                  | statement ;
+ *
+ *  varDecl        := "var" IDENTIFIER [ "=" expression ] ";" ;
+ *
  *  statement      := exprStmt
  *                  | printStmt ;
  *
  *  printStmt      := "print" expression ";" ;
  *
  *  exprStmt       := expression ";" ;
- *  expression     := equality ;
+ *  expression     := assignment ;
+ *  assignment     := identifier "=" assignment
+ *                  | equality ;
  *  equality       := comparison { ( "!=" | "==" ) comparison } ;
  *  comparison     := addition { ( ">" | ">=" | "<" | "<=" ) addition } ;
  *  addition       := multiplication { ( "-" | "+" ) multiplication } ;
@@ -99,12 +110,28 @@ impl LoxParser {
  *  unary          := ( "!" | "-" ) unary
  *                  | primary ;
  *  primary        := NUMBER | STRING | "false" | "true" | "nil"
- *                  | "(" expression ")" ;
+ *                  | "(" expression ")"
+ *                  | IDENTIFIER ;
  */
 
 impl LoxParser {
+    fn assignment(&mut self) -> ExprResult {
+        let expr = self.equality()?;
+        if self.accept(vec![TT::ASSIGN]) {
+            let maybe_bad = Some(self.scanner.extract().swap_remove(0));
+            // recursively parse right-hand-side
+            let value = self.assignment()?;
+            return match expr {
+                // assign to variable, later other lhs possible
+                Expr::Var(name) => Ok(Expr::Assign(name, Box::new(value))),
+                _ => Err(self.error(maybe_bad, "invalid assignment target"))
+            };
+        }
+        Ok(expr)
+    }
+
     fn expression(&mut self) -> ExprResult {
-        self.equality()
+        self.assignment()
     }
 
     fn equality(&mut self) -> ExprResult {
@@ -179,6 +206,12 @@ impl LoxParser {
                 o => panic!("LoxParser Bug! unexpected token: {:?}", o),
             });
         }
+        if self.accept(vec![TT::Id("".to_string())]) {
+            return Ok(match self.scanner.extract().swap_remove(0).token {
+                TT::Id(v) => Expr::Var(v),
+                o => panic!("LoxParser Bug! unexpected token: {:?}", o),
+            });
+        }
         if self.accept(vec![TT::OPAREN]) {
             self.scanner.ignore(); // skip OPAREN
             let expr = self.expression()?;
@@ -209,10 +242,33 @@ impl LoxParser {
         self.expr_stmt()
     }
 
+    fn var_declaration(&mut self) -> StmtResult {
+        if !self.accept(vec![TT::Id("".to_string())]) {
+            let bad_token = self.scanner.peek();
+            return Err(self.error(bad_token, "expect variable name"));
+        }
+        let name = self.scanner.extract().swap_remove(0).lexeme;
+        let mut init = Expr::Nil;
+        if self.accept(vec![TT::ASSIGN]) {
+            self.scanner.ignore(); // skip assign
+            init = self.expression()?;
+        }
+        self.consume(vec![TT::SEMICOLON], "expect ';' after variable decl")?;
+        Ok(Stmt::Var(name, init))
+    }
+
+    fn declaration(&mut self) -> StmtResult {
+        if self.accept(vec![TT::VAR]) {
+            self.scanner.ignore(); // skip var
+            return self.var_declaration();
+        }
+        self.statement()
+    }
+
     pub fn parse(&mut self) -> Result<Vec<Stmt>, String> {
         let mut statements = Vec::new();
         while self.scanner.peek().is_some() {
-            let stmt = self.statement()?;
+            let stmt = self.declaration()?;
             statements.push(stmt);
         }
         Ok(statements)

@@ -7,7 +7,7 @@ pub enum TT {
     // single char tokens
     OPAREN, CPAREN, OBRACE, CBRACE, COMMA, DOT,
     MINUS, PLUS, SEMICOLON, SLASH, STAR,
-    BANG, ASIG, NE, EQ, GT, GE, LT, LE,
+    BANG, ASSIGN, NE, EQ, GT, GE, LT, LE,
     // literals
     Id(String), Str(String), Num(f64),
     // keywords
@@ -110,7 +110,7 @@ impl LoxScanner {
             },
             Some('=') => match self.src.accept_char('=') {
                 true => self.tokenize(TT::EQ),
-                false => self.tokenize(TT::ASIG)
+                false => self.tokenize(TT::ASSIGN)
             },
             Some('<') => match self.src.accept_char('=') {
                 true => self.tokenize(TT::LE),

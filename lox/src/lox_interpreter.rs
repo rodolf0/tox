@@ -1,12 +1,13 @@
-//#![deny(warnings)]
+#![deny(warnings)]
 
-use lox_parser::{Expr, Stmt};
 use lox_scanner::TT;
+use lox_parser::{Expr, Stmt};
+use lox_environment::Environment;
 use std::fmt;
 
 
-#[derive(Debug,PartialEq)]
-enum V {
+#[derive(Clone,Debug,PartialEq)]
+pub enum V {
     Nil,
     Num(f64),
     Bool(bool),
@@ -44,13 +45,16 @@ impl fmt::Display for V {
 type EvalResult = Result<V, String>;
 
 pub struct LoxInterpreter {
+    env: Environment,
     errors: bool,
 }
 
 impl LoxInterpreter {
-    pub fn new() -> Self { LoxInterpreter{errors: false} }
+    pub fn new() -> Self {
+        LoxInterpreter{env: Environment::new(), errors: false}
+    }
 
-    fn eval(&self, expr: &Expr) -> EvalResult {
+    fn eval(&mut self, expr: &Expr) -> EvalResult {
         match expr {
             &Expr::Nil => Ok(V::Nil),
             &Expr::Num(n) => Ok(V::Num(n)),
@@ -90,6 +94,11 @@ impl LoxInterpreter {
                     TT::NE => Ok(V::Bool(lhs != rhs)),
                     _ => unreachable!("LoxIntepreter: bad Binary op {:?}", op)
                 }
+            },
+            &Expr::Var(ref var) => self.env.get(var),
+            &Expr::Assign(ref var, ref expr) => {
+                let value = self.eval(expr)?;
+                self.env.assign(var.clone(), value)
             }
         }
     }
@@ -104,6 +113,13 @@ impl LoxInterpreter {
                 &Stmt::Print(ref expr) => match self.eval(expr) {
                     Ok(value) => println!("{}", value),
                     Err(err) => { self.errors = true; return Some(err) }
+                },
+                &Stmt::Var(ref name, ref init) => {
+                    let value = match self.eval(init) {
+                        Err(err) => { self.errors = true; return Some(err) },
+                        Ok(value) => value
+                    };
+                    self.env.define(name.to_string(), value);
                 }
             }
         }

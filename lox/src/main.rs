@@ -7,6 +7,7 @@ use std::io::{self, Read, Write};
 mod lox_scanner;
 mod lox_parser;
 mod lox_interpreter;
+mod lox_environment;
 
 use lox_scanner::LoxScanner;
 use lox_parser::LoxParser;

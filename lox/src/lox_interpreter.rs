@@ -1,6 +1,6 @@
 //#![deny(warnings)]
 
-use lox_parser::Expr;
+use lox_parser::{Expr, Stmt};
 use lox_scanner::TT;
 use std::fmt;
 
@@ -94,13 +94,19 @@ impl LoxInterpreter {
         }
     }
 
-    pub fn interpret(&mut self, expr: &Expr) -> Result<String, String> {
-        match self.eval(expr) {
-            Ok(value) => Ok(format!("{}", value)),
-            Err(err) => {
-                self.errors = true;
-                Err(format!("LoxInterpreter error: {}", err))
+    pub fn interpret(&mut self, statements: &Vec<Stmt>) -> Option<String> {
+        for stmt in statements {
+            match stmt {
+                &Stmt::Expr(ref expr) => if let Err(err) = self.eval(expr) {
+                    self.errors = true;
+                    return Some(err);
+                },
+                &Stmt::Print(ref expr) => match self.eval(expr) {
+                    Ok(value) => println!("{}", value),
+                    Err(err) => { self.errors = true; return Some(err) }
+                }
             }
         }
+        None
     }
 }

@@ -17,12 +17,18 @@ pub enum Expr {
     Grouping(Box<Expr>),
 }
 
+pub enum Stmt {
+    Print(Expr),
+    Expr(Expr),
+}
+
+pub type ExprResult = Result<Expr, String>;
+pub type StmtResult = Result<Stmt, String>;
+
 pub struct LoxParser {
     scanner: Scanner<Token>,
     errors: bool,
 }
-
-pub type ExprResult = Result<Expr, String>;
 
 impl LoxParser {
     pub fn new(scanner: Scanner<Token>) -> Self {
@@ -38,9 +44,7 @@ impl LoxParser {
                 &TT::Num(_) => match ttype { &TT::Num(_) => true, _ => false },
                 other => other == ttype
             });
-            if found {
-                return true;
-            }
+            if found { return true; }
         }
         self.scanner.set_pos(backtrack);
         false
@@ -80,6 +84,13 @@ impl LoxParser {
 
 /* Grammar:
  *
+ *  program        := { statement } EOF ;
+ *  statement      := exprStmt
+ *                  | printStmt ;
+ *
+ *  printStmt      := "print" expression ";" ;
+ *
+ *  exprStmt       := expression ";" ;
  *  expression     := equality ;
  *  equality       := comparison { ( "!=" | "==" ) comparison } ;
  *  comparison     := addition { ( ">" | ">=" | "<" | "<=" ) addition } ;
@@ -89,7 +100,6 @@ impl LoxParser {
  *                  | primary ;
  *  primary        := NUMBER | STRING | "false" | "true" | "nil"
  *                  | "(" expression ")" ;
- *
  */
 
 impl LoxParser {
@@ -179,7 +189,32 @@ impl LoxParser {
         Err(self.error(bad_token, "expected expression"))
     }
 
-    pub fn parse(&mut self) -> ExprResult {
-        self.expression()
+    fn print_stmt(&mut self) -> StmtResult {
+        let expr = self.expression()?;
+        self.consume(vec![TT::SEMICOLON], "expect ';' after value")?;
+        Ok(Stmt::Print(expr))
+    }
+
+    fn expr_stmt(&mut self) -> StmtResult {
+        let expr = self.expression()?;
+        self.consume(vec![TT::SEMICOLON], "expect ';' after value")?;
+        Ok(Stmt::Expr(expr))
+    }
+
+    fn statement(&mut self) -> StmtResult {
+        if self.accept(vec![TT::PRINT]) {
+            self.scanner.ignore(); // skip print
+            return self.print_stmt();
+        }
+        self.expr_stmt()
+    }
+
+    pub fn parse(&mut self) -> Result<Vec<Stmt>, String> {
+        let mut statements = Vec::new();
+        while self.scanner.peek().is_some() {
+            let stmt = self.statement()?;
+            statements.push(stmt);
+        }
+        Ok(statements)
     }
 }

@@ -24,11 +24,16 @@ impl V {
             _ => true
         }
     }
-
     fn num(&self) -> Result<f64, String> {
         match self {
             &V::Num(ref n) => Ok(*n),
             o => Err(format!("expected V::Num, found {:?}", o))
+        }
+    }
+    fn str<'a>(&'a self) -> Result<&'a str, String> {
+        match self {
+            &V::Str(ref s) => Ok(s),
+            o => Err(format!("expected V::Str, found {:?}", o))
         }
     }
 }
@@ -69,6 +74,7 @@ impl LoxInterpreter {
                 match op.token {
                     TT::MINUS => Ok(V::Num(-expr.num()?)),
                     TT::BANG => Ok(V::Bool(!expr.is_truthy())),
+                    TT::DOLLAR => self.env.borrow().get(expr.str()?),
                     _ => unreachable!("LoxIntepreter: bad Unary op {:?}", op)
                 }
             },

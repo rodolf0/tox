@@ -114,7 +114,7 @@ impl LoxParser {
  *  comparison     := addition { ( ">" | ">=" | "<" | "<=" ) addition } ;
  *  addition       := multiplication { ( "-" | "+" ) multiplication } ;
  *  multiplication := unary { ( "/" | "*" ) unary } ;
- *  unary          := ( "!" | "-" ) unary
+ *  unary          := ( "!" | "-" | "$" ) unary
  *                  | primary ;
  *  primary        := NUMBER | STRING | "false" | "true" | "nil"
  *                  | "(" expression ")"
@@ -182,7 +182,7 @@ impl LoxParser {
     }
 
     fn unary(&mut self) -> ExprResult {
-        if self.accept(vec![TT::BANG, TT::MINUS]) {
+        if self.accept(vec![TT::BANG, TT::MINUS, TT::DOLLAR]) {
             let op = self.scanner.extract().swap_remove(0);
             let rhs = self.unary()?;
             return Ok(Expr::Unary(op, Box::new(rhs)));

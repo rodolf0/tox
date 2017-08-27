@@ -6,7 +6,7 @@ use self::lexers::{Scanner, scan_number, scan_identifier};
 pub enum TT {
     // single char tokens
     OPAREN, CPAREN, OBRACE, CBRACE, COMMA, DOT,
-    MINUS, PLUS, SEMICOLON, SLASH, STAR,
+    MINUS, PLUS, SEMICOLON, SLASH, STAR, DOLLAR,
     BANG, ASSIGN, NE, EQ, GT, GE, LT, LE,
     // literals
     Id(String), Str(String), Num(f64),
@@ -104,6 +104,7 @@ impl LoxScanner {
             Some('+') => self.tokenize(TT::PLUS),
             Some(';') => self.tokenize(TT::SEMICOLON),
             Some('*') => self.tokenize(TT::STAR),
+            Some('$') => self.tokenize(TT::DOLLAR),
             Some('!') => match self.src.accept_char('=') {
                 true => self.tokenize(TT::NE),
                 false => self.tokenize(TT::BANG)

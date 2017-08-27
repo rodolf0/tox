@@ -104,6 +104,14 @@ impl LoxInterpreter {
                     _ => unreachable!("LoxIntepreter: bad Binary op {:?}", op)
                 }
             },
+            &Expr::Logical(ref lhs, ref op, ref rhs) => {
+                let lhs = self.eval(lhs)?;
+                match op.token {
+                    TT::OR if lhs.is_truthy() => Ok(lhs),
+                    TT::AND if !lhs.is_truthy() => Ok(lhs),
+                    _ => self.eval(rhs)
+                }
+            },
             &Expr::Var(ref var) => self.env.borrow().get(var),
             &Expr::Assign(ref var, ref expr) => {
                 let value = self.eval(expr)?;

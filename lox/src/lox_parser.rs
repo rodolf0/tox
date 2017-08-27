@@ -8,6 +8,7 @@ use lox_scanner::{Token, TT};
 
 #[derive(Debug)]
 pub enum Expr {
+    Logical(Box<Expr>, Token, Box<Expr>),
     Binary(Box<Expr>, Token, Box<Expr>),
     Unary(Token, Box<Expr>),
     Bool(bool),
@@ -102,14 +103,15 @@ impl LoxParser {
  *                  | block ;
  *
  *  block          := "{" { declaration } "}" ;
- *
  *  printStmt      := "print" expression ";" ;
  *  ifStmt         := "if" "(" expression ")" statement [ "else" statement ] ;
- *
  *  exprStmt       := expression ";" ;
+ *
  *  expression     := assignment ;
  *  assignment     := identifier "=" assignment
- *                  | equality ;
+ *                  | logic_or ;
+ *  logic_or       := logic_and { "or" logic_and } ;
+ *  logic_and      := equality { "and" equality } ;
  *  equality       := comparison { ( "!=" | "==" ) comparison } ;
  *  comparison     := addition { ( ">" | ">=" | "<" | "<=" ) addition } ;
  *  addition       := multiplication { ( "-" | "+" ) multiplication } ;
@@ -123,7 +125,7 @@ impl LoxParser {
 
 impl LoxParser {
     fn assignment(&mut self) -> ExprResult {
-        let expr = self.equality()?;
+        let expr = self.logic_or()?;
         if self.accept(vec![TT::ASSIGN]) {
             let maybe_bad = Some(self.scanner.extract().swap_remove(0));
             // recursively parse right-hand-side
@@ -139,6 +141,26 @@ impl LoxParser {
 
     fn expression(&mut self) -> ExprResult {
         self.assignment()
+    }
+
+    fn logic_and(&mut self) -> ExprResult {
+        let mut expr = self.equality()?;
+        while self.accept(vec![TT::AND]) {
+            let op = self.scanner.extract().swap_remove(0);
+            let rhs = self.equality()?;
+            expr = Expr::Logical(Box::new(expr), op, Box::new(rhs));
+        }
+        Ok(expr)
+    }
+
+    fn logic_or(&mut self) -> ExprResult {
+        let mut expr = self.logic_and()?;
+        while self.accept(vec![TT::OR]) {
+            let op = self.scanner.extract().swap_remove(0);
+            let rhs = self.logic_and()?;
+            expr = Expr::Logical(Box::new(expr), op, Box::new(rhs));
+        }
+        Ok(expr)
     }
 
     fn equality(&mut self) -> ExprResult {

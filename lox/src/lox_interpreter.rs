@@ -3,6 +3,8 @@
 use lox_scanner::TT;
 use lox_parser::{Expr, Stmt};
 use lox_environment::Environment;
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::fmt;
 
 
@@ -45,13 +47,14 @@ impl fmt::Display for V {
 type EvalResult = Result<V, String>;
 
 pub struct LoxInterpreter {
-    env: Environment,
+    env: Rc<RefCell<Environment>>,
     errors: bool,
 }
 
 impl LoxInterpreter {
     pub fn new() -> Self {
-        LoxInterpreter{env: Environment::new(), errors: false}
+        LoxInterpreter{
+            env: Rc::new(RefCell::new(Environment::new(None))), errors: false}
     }
 
     fn eval(&mut self, expr: &Expr) -> EvalResult {
@@ -95,32 +98,59 @@ impl LoxInterpreter {
                     _ => unreachable!("LoxIntepreter: bad Binary op {:?}", op)
                 }
             },
-            &Expr::Var(ref var) => self.env.get(var),
+            &Expr::Var(ref var) => self.env.borrow().get(var),
             &Expr::Assign(ref var, ref expr) => {
                 let value = self.eval(expr)?;
-                self.env.assign(var.clone(), value)
+                self.env.borrow_mut().assign(var.clone(), value)
             }
         }
     }
 
+    fn exec_block(&mut self, statements: &Vec<Stmt>,
+                  env: Rc<RefCell<Environment>>) -> Option<String> {
+        let prev_env = self.env.clone();
+        self.env = env;
+        for stmt in statements {
+            if let Some(err) = self.execute(stmt) {
+                // restore interpreter's env
+                self.env = prev_env;
+                return Some(err);
+            }
+        }
+        // restore interpreter's env
+        self.env = prev_env;
+        None
+    }
+
+    fn execute(&mut self, stmt: &Stmt) -> Option<String> {
+        match stmt {
+            &Stmt::Expr(ref expr) => if let Err(err) = self.eval(expr) {
+                return Some(err);
+            },
+            &Stmt::Print(ref expr) => match self.eval(expr) {
+                Ok(value) => println!("{}", value),
+                Err(err) => return Some(err)
+            },
+            &Stmt::Var(ref name, ref init) => {
+                let value = match self.eval(init) {
+                    Ok(value) => value,
+                    Err(err) => return Some(err)
+                };
+                self.env.borrow_mut().define(name.to_string(), value);
+            },
+            &Stmt::Block(ref stmts) => {
+                let curenv = Environment::new(Some(self.env.clone()));
+                return self.exec_block(stmts, Rc::new(RefCell::new(curenv)));
+            }
+        }
+        None
+    }
+
     pub fn interpret(&mut self, statements: &Vec<Stmt>) -> Option<String> {
         for stmt in statements {
-            match stmt {
-                &Stmt::Expr(ref expr) => if let Err(err) = self.eval(expr) {
-                    self.errors = true;
-                    return Some(err);
-                },
-                &Stmt::Print(ref expr) => match self.eval(expr) {
-                    Ok(value) => println!("{}", value),
-                    Err(err) => { self.errors = true; return Some(err) }
-                },
-                &Stmt::Var(ref name, ref init) => {
-                    let value = match self.eval(init) {
-                        Err(err) => { self.errors = true; return Some(err) },
-                        Ok(value) => value
-                    };
-                    self.env.define(name.to_string(), value);
-                }
+            if let Some(err) = self.execute(stmt) {
+                self.errors = true;
+                return Some(err);
             }
         }
         None

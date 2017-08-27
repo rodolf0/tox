@@ -23,6 +23,7 @@ pub enum Stmt {
     Print(Expr),
     Expr(Expr),
     Var(String, Expr),
+    Block(Vec<Stmt>),
 }
 
 pub type ExprResult = Result<Expr, String>;
@@ -95,7 +96,10 @@ impl LoxParser {
  *  varDecl        := "var" IDENTIFIER [ "=" expression ] ";" ;
  *
  *  statement      := exprStmt
- *                  | printStmt ;
+ *                  | printStmt
+ *                  | block ;
+ *
+ *  block          := "{" { declaration } "}" ;
  *
  *  printStmt      := "print" expression ";" ;
  *
@@ -234,10 +238,24 @@ impl LoxParser {
         Ok(Stmt::Expr(expr))
     }
 
+    fn block_stmt(&mut self) -> Result<Vec<Stmt>, String> {
+        let mut statements = Vec::new();
+        while let Some(maybe_cbrace) = self.scanner.peek() {
+            if maybe_cbrace.token == TT::CBRACE { break; }
+            statements.push(self.declaration()?);
+        }
+        self.consume(vec![TT::CBRACE], "expect '}' after value")?;
+        Ok(statements)
+    }
+
     fn statement(&mut self) -> StmtResult {
         if self.accept(vec![TT::PRINT]) {
             self.scanner.ignore(); // skip print
             return self.print_stmt();
+        }
+        if self.accept(vec![TT::OBRACE]) {
+            self.scanner.ignore(); // skip obrace
+            return Ok(Stmt::Block(self.block_stmt()?));
         }
         self.expr_stmt()
     }

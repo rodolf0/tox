@@ -141,7 +141,20 @@ impl LoxInterpreter {
             &Stmt::Block(ref stmts) => {
                 let curenv = Environment::new(Some(self.env.clone()));
                 return self.exec_block(stmts, Rc::new(RefCell::new(curenv)));
-            }
+            },
+            &Stmt::If(ref expr, ref then_branch, ref else_branch) => {
+                let condition = match self.eval(expr) {
+                    Ok(cond) => cond,
+                    Err(err) => return Some(err)
+                };
+                return match condition.is_truthy() {
+                    true => self.execute(then_branch),
+                    false => match else_branch {
+                        &Some(ref eb) => self.execute(eb),
+                        _ => None
+                    }
+                };
+            },
         }
         None
     }

@@ -24,6 +24,7 @@ pub enum Stmt {
     Expr(Expr),
     Var(String, Expr),
     Block(Vec<Stmt>),
+    If(Expr, Box<Stmt>, Option<Box<Stmt>>),
 }
 
 pub type ExprResult = Result<Expr, String>;
@@ -96,12 +97,14 @@ impl LoxParser {
  *  varDecl        := "var" IDENTIFIER [ "=" expression ] ";" ;
  *
  *  statement      := exprStmt
+ *                  | ifStmt
  *                  | printStmt
  *                  | block ;
  *
  *  block          := "{" { declaration } "}" ;
  *
  *  printStmt      := "print" expression ";" ;
+ *  ifStmt         := "if" "(" expression ")" statement [ "else" statement ] ;
  *
  *  exprStmt       := expression ";" ;
  *  expression     := assignment ;
@@ -248,6 +251,19 @@ impl LoxParser {
         Ok(statements)
     }
 
+    fn if_stmt(&mut self) -> StmtResult {
+        self.consume(vec![TT::OPAREN], "expect '(' after 'if'")?;
+        let expr = self.expression()?;
+        self.consume(vec![TT::CPAREN], "expect ')' after 'if' condition")?;
+        let then_branch = self.statement()?;
+        if self.accept(vec![TT::ELSE]) {
+            self.scanner.ignore(); // skip else
+            let else_branch = Some(Box::new(self.statement()?));
+            return Ok(Stmt::If(expr, Box::new(then_branch), else_branch));
+        }
+        Ok(Stmt::If(expr, Box::new(then_branch), None))
+    }
+
     fn statement(&mut self) -> StmtResult {
         if self.accept(vec![TT::PRINT]) {
             self.scanner.ignore(); // skip print
@@ -256,6 +272,10 @@ impl LoxParser {
         if self.accept(vec![TT::OBRACE]) {
             self.scanner.ignore(); // skip obrace
             return Ok(Stmt::Block(self.block_stmt()?));
+        }
+        if self.accept(vec![TT::IF]) {
+            self.scanner.ignore(); // skip if
+            return self.if_stmt();
         }
         self.expr_stmt()
     }

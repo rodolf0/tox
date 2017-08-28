@@ -27,7 +27,7 @@ fn main() {
             Ok(stmts) => if let Some(err) = interpreter.interpret(&stmts) {
                 eprintln!("LoxInterpreter error: {}", err)
             },
-            Err(err) => eprintln!("{}", err)
+            Err(errors) => for e in errors { eprintln!("{}", e); }
         }
     };
 

@@ -65,9 +65,7 @@ impl LoxParser {
                 let bad_token = self.scanner.peek();
                 Err(self.error(bad_token, err))
             }
-        }
-    }
-
+        } }
     fn error<S: AsRef<str>>(&mut self, token: Option<Token>, msg: S) -> String {
         self.errors = true;
         match token {
@@ -77,21 +75,31 @@ impl LoxParser {
         }
     }
 
-    //fn synchronize(&mut self) {
-        //// sync on statement boundaries (ie: semicolon)
-        //// TODO: check for loops' semicolon
-        //while let Some(token) = self.scanner.next() {
-            //if token.token == TT::SEMICOLON {
-                //return self.scanner.ignore();
-            //}
-        //}
-    //}
+    fn synchronize(&mut self) {
+        while let Some(token) = self.scanner.next() {
+            // if we hit a semicolon we're probably about to start a statement
+            // we maybe inside a `for` clause, too bad, we're already panic'ing
+            if token.token == TT::SEMICOLON {
+                return self.scanner.ignore();
+            }
+            // alternatively if we've found a keyword we might be starting a
+            // statement, try to continue there
+            if let Some(peek) = self.scanner.peek() {
+                use self::TT::*;
+                match peek.token {
+                    CLASS | FUN | VAR | FOR | IF |
+                    WHILE | PRINT | RETURN | BREAK
+                    => return, _ => ()
+                }
+            }
+        }
+    }
 }
 
 
 /* Grammar:
  *
- *  program        := { statement } EOF ;
+ *  program        := { declaration } EOF ;
  *
  *  declaration    := varDecl
  *                  | statement ;
@@ -250,7 +258,7 @@ impl LoxParser {
         if self.accept(vec![TT::OPAREN]) {
             self.scanner.ignore(); // skip OPAREN
             let expr = self.expression()?;
-            self.consume(vec![TT::CPAREN], "expect ')' after expression")?;
+            self.consume(vec![TT::CPAREN], "expect ')' after group grouping")?;
             return Ok(Expr::Grouping(Box::new(expr)));
         }
         let bad_token = self.scanner.peek();
@@ -259,13 +267,13 @@ impl LoxParser {
 
     fn print_stmt(&mut self) -> StmtResult {
         let expr = self.expression()?;
-        self.consume(vec![TT::SEMICOLON], "expect ';' after value")?;
+        self.consume(vec![TT::SEMICOLON], "expect ';' after print expr")?;
         Ok(Stmt::Print(expr))
     }
 
     fn expr_stmt(&mut self) -> StmtResult {
         let expr = self.expression()?;
-        self.consume(vec![TT::SEMICOLON], "expect ';' after value")?;
+        self.consume(vec![TT::SEMICOLON], "expect ';' after expression")?;
         Ok(Stmt::Expr(expr))
     }
 
@@ -275,7 +283,7 @@ impl LoxParser {
             if maybe_cbrace.token == TT::CBRACE { break; }
             statements.push(self.declaration()?);
         }
-        self.consume(vec![TT::CBRACE], "expect '}' after value")?;
+        self.consume(vec![TT::CBRACE], "expect '}' after block")?;
         Ok(statements)
     }
 
@@ -378,12 +386,18 @@ impl LoxParser {
         self.statement()
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Stmt>, String> {
+    pub fn parse(&mut self) -> Result<Vec<Stmt>, Vec<String>> {
         let mut statements = Vec::new();
+        let mut errors = Vec::new();
         while self.scanner.peek().is_some() {
-            let stmt = self.declaration()?;
-            statements.push(stmt);
+            match self.declaration() {
+                Ok(stmt) => statements.push(stmt),
+                Err(err) => { errors.push(err); self.synchronize(); }
+            }
         }
-        Ok(statements)
+        match errors.len() > 0 {
+            true => Err(errors),
+            false => Ok(statements)
+        }
     }
 }

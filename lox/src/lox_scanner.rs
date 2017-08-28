@@ -11,7 +11,7 @@ pub enum TT {
     // literals
     Id(String), Str(String), Num(f64),
     // keywords
-    AND, CLASS, ELSE, FALSE, FUN, FOR, IF, NIL, OR,
+    AND, CLASS, ELSE, FALSE, FUN, FOR, IF, NIL, OR, BREAK,
     PRINT, RETURN, SUPER, THIS, TRUE, VAR, WHILE, EOF,
 }
 
@@ -80,6 +80,7 @@ impl LoxScanner {
             "if" => tok(TT::IF),
             "nil" => tok(TT::NIL),
             "or" => tok(TT::OR),
+            "break" => tok(TT::BREAK),
             "print" => tok(TT::PRINT),
             "return" => tok(TT::RETURN),
             "super" => tok(TT::SUPER),

@@ -27,6 +27,7 @@ pub enum Stmt {
     Block(Vec<Stmt>),
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     While(Expr, Box<Stmt>),
+    Break(usize),
 }
 
 pub type ExprResult = Result<Expr, String>;
@@ -110,6 +111,8 @@ impl LoxParser {
  *                  | ifStmt
  *                  | printStmt
  *                  | whileStmt
+ *                  | forStmt
+ *                  | breakStmt
  *                  | block ;
  *
  *  exprStmt       := expression ";" ;
@@ -119,6 +122,7 @@ impl LoxParser {
  *  forStmt        := "for" "(" varDecl | exprStmt | ";"
  *                            { expression } ";"
  *                            { expression } ")" statement ;
+ *  breakStmt      := "break" [ NUMBER ] ";" ;
  *  block          := "{" { declaration } "}" ;
  *
  *  expression     := assignment ;
@@ -339,6 +343,18 @@ impl LoxParser {
         Ok(match init {Some(init) => Stmt::Block(vec![init, body]), _ => body})
     }
 
+    fn break_stmt(&mut self) -> StmtResult {
+        let mut scopes = 1;
+        if self.accept(vec![TT::Num(0.0)]) {
+            scopes = match self.scanner.extract().swap_remove(0).token {
+                TT::Num(n) => n as usize,
+                o => panic!("LoxParser Bug! unexpected token: {:?}", o),
+            };
+        }
+        self.consume(vec![TT::SEMICOLON], "expect ';' 'break'")?;
+        Ok(Stmt::Break(scopes))
+    }
+
     fn statement(&mut self) -> StmtResult {
         if self.accept(vec![TT::PRINT]) {
             self.scanner.ignore(); // skip print
@@ -359,6 +375,10 @@ impl LoxParser {
         if self.accept(vec![TT::FOR]) {
             self.scanner.ignore(); // skip for
             return self.for_stmt();
+        }
+        if self.accept(vec![TT::BREAK]) {
+            self.scanner.ignore(); // skip break
+            return self.break_stmt();
         }
         self.expr_stmt()
     }

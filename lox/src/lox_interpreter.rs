@@ -54,12 +54,16 @@ type EvalResult = Result<V, String>;
 pub struct LoxInterpreter {
     env: Rc<RefCell<Environment>>,
     errors: bool,
+    break_loops: usize,
 }
 
 impl LoxInterpreter {
     pub fn new() -> Self {
         LoxInterpreter{
-            env: Rc::new(RefCell::new(Environment::new(None))), errors: false}
+            env: Rc::new(RefCell::new(Environment::new(None))),
+            errors: false,
+            break_loops: 0,
+        }
     }
 
     fn eval(&mut self, expr: &Expr) -> EvalResult {
@@ -124,16 +128,20 @@ impl LoxInterpreter {
                   env: Rc<RefCell<Environment>>) -> Option<String> {
         let prev_env = self.env.clone();
         self.env = env;
+        let mut exit = None;
         for stmt in statements {
+            // check if we're trying to break out of loops
+            if self.break_loops > 0 {
+                break;
+            }
             if let Some(err) = self.execute(stmt) {
-                // restore interpreter's env
-                self.env = prev_env;
-                return Some(err);
+                exit = Some(err);
+                break;
             }
         }
         // restore interpreter's env
         self.env = prev_env;
-        None
+        exit
     }
 
     fn execute(&mut self, stmt: &Stmt) -> Option<String> {
@@ -171,16 +179,20 @@ impl LoxInterpreter {
             },
             &Stmt::While(ref expr, ref body) => {
                 loop {
+                    // check if we're trying to break out of loops
+                    if self.break_loops > 0 {
+                        self.break_loops -= 1; // we just got out of one
+                        return None;
+                    }
                     let condition = match self.eval(expr) {
                         Err(err) => return Some(err),
                         Ok(cond) => cond
                     };
-                    if !condition.is_truthy() {
-                        return None;
-                    }
-                    self.execute(body);
+                    if !condition.is_truthy() { return None; }
+                    if let Some(err) = self.execute(body) { return Some(err); }
                 }
             },
+            &Stmt::Break(num_breaks) => (self.break_loops = num_breaks),
         }
         None
     }

@@ -1,0 +1,5 @@
+for (var y = 0; y < 10; y = y + 1)
+  for (var x = 0; x < 10; x = x + 1) {
+    if (x > 5 or y >= 3) break 2;
+    print y + " " + x;
+  }

@@ -169,6 +169,18 @@ impl LoxInterpreter {
                     }
                 };
             },
+            &Stmt::While(ref expr, ref body) => {
+                loop {
+                    let condition = match self.eval(expr) {
+                        Err(err) => return Some(err),
+                        Ok(cond) => cond
+                    };
+                    if !condition.is_truthy() {
+                        return None;
+                    }
+                    self.execute(body);
+                }
+            },
         }
         None
     }

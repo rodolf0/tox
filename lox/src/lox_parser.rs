@@ -26,6 +26,7 @@ pub enum Stmt {
     Var(String, Expr),
     Block(Vec<Stmt>),
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
+    While(Expr, Box<Stmt>),
 }
 
 pub type ExprResult = Result<Expr, String>;
@@ -100,12 +101,17 @@ impl LoxParser {
  *  statement      := exprStmt
  *                  | ifStmt
  *                  | printStmt
+ *                  | whileStmt
  *                  | block ;
  *
- *  block          := "{" { declaration } "}" ;
- *  printStmt      := "print" expression ";" ;
- *  ifStmt         := "if" "(" expression ")" statement [ "else" statement ] ;
  *  exprStmt       := expression ";" ;
+ *  ifStmt         := "if" "(" expression ")" statement [ "else" statement ] ;
+ *  printStmt      := "print" expression ";" ;
+ *  whileStmt      := "while" "(" expression ")" statement ;
+ *  forStmt        := "for" "(" varDecl | exprStmt | ";"
+ *                            { expression } ";"
+ *                            { expression } ")" statement ;
+ *  block          := "{" { declaration } "}" ;
  *
  *  expression     := assignment ;
  *  assignment     := identifier "=" assignment
@@ -275,15 +281,54 @@ impl LoxParser {
 
     fn if_stmt(&mut self) -> StmtResult {
         self.consume(vec![TT::OPAREN], "expect '(' after 'if'")?;
-        let expr = self.expression()?;
+        let condition = self.expression()?;
         self.consume(vec![TT::CPAREN], "expect ')' after 'if' condition")?;
         let then_branch = self.statement()?;
         if self.accept(vec![TT::ELSE]) {
             self.scanner.ignore(); // skip else
             let else_branch = Some(Box::new(self.statement()?));
-            return Ok(Stmt::If(expr, Box::new(then_branch), else_branch));
+            return Ok(Stmt::If(condition, Box::new(then_branch), else_branch));
         }
-        Ok(Stmt::If(expr, Box::new(then_branch), None))
+        Ok(Stmt::If(condition, Box::new(then_branch), None))
+    }
+
+    fn while_stmt(&mut self) -> StmtResult {
+        self.consume(vec![TT::OPAREN], "expect '(' after 'while'")?;
+        let condition = self.expression()?;
+        self.consume(vec![TT::CPAREN], "expect ')' after 'if' condition")?;
+        let body = self.statement()?;
+        Ok(Stmt::While(condition, Box::new(body)))
+    }
+
+    fn for_stmt(&mut self) -> StmtResult {
+        self.consume(vec![TT::OPAREN], "expect '(' after 'for'")?;
+        let init = if self.accept(vec![TT::SEMICOLON]) {
+            self.scanner.ignore(); // skip ';'
+            None
+        } else if self.accept(vec![TT::VAR]) {
+            self.scanner.ignore(); // skip var
+            Some(self.var_declaration()?)
+        } else {
+            Some(self.expr_stmt()?)
+        };
+        // parse loop condition
+        let condition = match self.scanner.peek() {
+            Some(ref t) if t.token != TT::SEMICOLON => self.expression()?,
+            _ => Expr::Bool(true)
+        };
+        self.consume(vec![TT::SEMICOLON], "expect ';' loop condition")?;
+        // parse loop increment
+        let increment = match self.scanner.peek() {
+            Some(ref t) if t.token != TT::CPAREN => Some(self.expression()?),
+            _ => None
+        };
+        self.consume(vec![TT::CPAREN], "expect ')' after 'for' clause")?;
+        // desugar forStmt into WhileStmt
+        let body = Stmt::While(condition, Box::new(match increment {
+            Some(inc) => Stmt::Block(vec![self.statement()?, Stmt::Expr(inc)]),
+            _ => self.statement()?
+        }));
+        Ok(match init {Some(init) => Stmt::Block(vec![init, body]), _ => body})
     }
 
     fn statement(&mut self) -> StmtResult {
@@ -298,6 +343,14 @@ impl LoxParser {
         if self.accept(vec![TT::IF]) {
             self.scanner.ignore(); // skip if
             return self.if_stmt();
+        }
+        if self.accept(vec![TT::WHILE]) {
+            self.scanner.ignore(); // skip while
+            return self.while_stmt();
+        }
+        if self.accept(vec![TT::FOR]) {
+            self.scanner.ignore(); // skip for
+            return self.for_stmt();
         }
         self.expr_stmt()
     }

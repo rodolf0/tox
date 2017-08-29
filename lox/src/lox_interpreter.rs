@@ -10,9 +10,9 @@ use std::fmt;
 
 
 pub trait Callable {
-    fn call(&self, &LoxInterpreter, &Vec<V>) -> V;
+    fn call(&self, &mut LoxInterpreter, &Vec<V>) -> V;
     fn arity(&self) -> usize;
-    fn id<'a>(&self) -> &'a str;
+    fn id(&self) -> String;
 }
 
 #[derive(Clone)]
@@ -59,7 +59,7 @@ impl fmt::Debug for V {
             &V::Bool(ref b) => write!(f, "{}", b),
             &V::Num(ref n) => write!(f, "{}", n),
             &V::Str(ref s) => write!(f, "\"{}\"", s),
-            &V::Callable(ref c) => write!(f, "\"Callable({})\"", c.id()),
+            &V::Callable(ref c) => write!(f, "\"{}\"", c.id()),
         }
     }
 }
@@ -83,11 +83,42 @@ impl PartialEq for V {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+struct LoxFunction {
+    name: String,
+    params: Vec<String>,
+    body: Vec<Stmt>,
+    enclosing: Option<Rc<RefCell<Environment>>>,
+}
+
+impl Callable for LoxFunction {
+    fn call(&self, interp: &mut LoxInterpreter, args: &Vec<V>) -> V {
+        let mut environ = Environment::new(self.enclosing.clone());
+        for (i, param) in self.params.iter().enumerate() {
+            environ.define(param.to_string(), args[i].clone());
+        }
+        let r = interp.exec_block(&self.body, Rc::new(RefCell::new(environ)));
+        // TODO: get rid of this at some point ... call should return Result?
+        if let Some(err) = r {
+            eprintln!("func err: {}", err);
+        }
+        V::Nil
+    }
+    fn arity(&self) -> usize {
+        self.params.len()
+    }
+    fn id(&self) -> String {
+        format!("<fn {}({})>", self.name, self.params.join(","))
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 type EvalResult = Result<V, String>;
 
 pub struct LoxInterpreter {
-    env: Rc<RefCell<Environment>>,
+    environ: Rc<RefCell<Environment>>,
     errors: bool,
     break_loops: usize,
 }
@@ -95,7 +126,7 @@ pub struct LoxInterpreter {
 impl LoxInterpreter {
     pub fn new() -> Self {
         LoxInterpreter{
-            env: Rc::new(RefCell::new(native_fn_env())),
+            environ: Rc::new(RefCell::new(native_fn_env())),
             errors: false,
             break_loops: 0,
         }
@@ -113,7 +144,7 @@ impl LoxInterpreter {
                 match op.token {
                     TT::MINUS => Ok(V::Num(-expr.num()?)),
                     TT::BANG => Ok(V::Bool(!expr.is_truthy())),
-                    TT::DOLLAR => self.env.borrow().get(expr.str()?),
+                    TT::DOLLAR => self.environ.borrow().get(expr.str()?),
                     _ => unreachable!("LoxIntepreter: bad Unary op {:?}", op)
                 }
             },
@@ -151,10 +182,10 @@ impl LoxInterpreter {
                     _ => self.eval(rhs)
                 }
             },
-            &Expr::Var(ref var) => self.env.borrow().get(var),
+            &Expr::Var(ref var) => self.environ.borrow().get(&var.lexeme),
             &Expr::Assign(ref var, ref expr) => {
                 let value = self.eval(expr)?;
-                self.env.borrow_mut().assign(var.clone(), value)
+                self.environ.borrow_mut().assign(var.lexeme.clone(), value)
             },
             &Expr::Call(ref callee, ref args) => {
                 let callee = self.eval(callee)?.call()?;
@@ -166,28 +197,26 @@ impl LoxInterpreter {
                 for arg in args {
                     arguments.push(self.eval(arg)?);
                 }
-                Ok(callee.call(&self, &arguments))
+                Ok(callee.call(self, &arguments))
             }
         }
     }
 
     fn exec_block(&mut self, statements: &Vec<Stmt>,
                   env: Rc<RefCell<Environment>>) -> Option<String> {
-        let prev_env = self.env.clone();
-        self.env = env;
+        let prev_env = self.environ.clone();
+        self.environ = env;
         let mut exit = None;
         for stmt in statements {
             // check if we're trying to break out of loops
-            if self.break_loops > 0 {
-                break;
-            }
+            if self.break_loops > 0 { break; }
             if let Some(err) = self.execute(stmt) {
                 exit = Some(err);
                 break;
             }
         }
         // restore interpreter's env
-        self.env = prev_env;
+        self.environ = prev_env;
         exit
     }
 
@@ -205,10 +234,10 @@ impl LoxInterpreter {
                     Ok(value) => value,
                     Err(err) => return Some(err)
                 };
-                self.env.borrow_mut().define(name.to_string(), value);
+                self.environ.borrow_mut().define(name.to_string(), value);
             },
             &Stmt::Block(ref stmts) => {
-                let curenv = Environment::new(Some(self.env.clone()));
+                let curenv = Environment::new(Some(self.environ.clone()));
                 return self.exec_block(stmts, Rc::new(RefCell::new(curenv)));
             },
             &Stmt::If(ref expr, ref then_branch, ref else_branch) => {
@@ -240,6 +269,16 @@ impl LoxInterpreter {
                 }
             },
             &Stmt::Break(num_breaks) => (self.break_loops = num_breaks),
+            &Stmt::Function(ref name, ref params, ref body) => {
+                let function = LoxFunction{
+                    name: name.to_string(),
+                    params: params.clone(),
+                    body: body.clone(),
+                    enclosing: Some(self.environ.clone())
+                };
+                self.environ.borrow_mut().define(
+                    name.to_string(), V::Callable(Rc::new(function)));
+            }
         }
         None
     }

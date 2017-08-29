@@ -6,22 +6,22 @@ use self::lexers::Scanner;
 use lox_scanner::{Token, TT};
 
 
-#[derive(Debug)]
+#[derive(Clone,Debug)]
 pub enum Expr {
     Logical(Box<Expr>, Token, Box<Expr>),
     Binary(Box<Expr>, Token, Box<Expr>),
     Unary(Token, Box<Expr>),
-    Bool(bool),
     Nil,
+    Bool(bool),
     Num(f64),
     Str(String),
     Grouping(Box<Expr>),
-    Var(String),
-    Assign(String, Box<Expr>),
+    Var(Token),
+    Assign(Token, Box<Expr>),
     Call(Box<Expr>, Vec<Expr>),
-    // TODO Call(Box<Expr>, Vec<Expr>, Token), // closing paren token used for errors
 }
 
+#[derive(Clone)]
 pub enum Stmt {
     Print(Expr),
     Expr(Expr),
@@ -30,6 +30,7 @@ pub enum Stmt {
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     While(Expr, Box<Stmt>),
     Break(usize),
+    Function(String, Vec<String>, Vec<Stmt>),
 }
 
 pub type ExprResult = Result<Expr, String>;
@@ -61,14 +62,16 @@ impl LoxParser {
     }
 
     fn consume<S: AsRef<str>>(&mut self, token_types: Vec<TT>,
-                              err: S) -> Result<(), String> {
+                              err: S) -> Result<Token, String> {
         match self.accept(token_types) {
-            true => { self.scanner.ignore(); Ok(()) },
+            true => Ok(self.scanner.extract().swap_remove(0)),
             false => {
                 let bad_token = self.scanner.peek();
                 Err(self.error(bad_token, err))
             }
-        } }
+        }
+    }
+
     fn error<S: AsRef<str>>(&mut self, token: Option<Token>, msg: S) -> String {
         self.errors = true;
         match token {
@@ -105,7 +108,12 @@ impl LoxParser {
  *  program        := { declaration } EOF ;
  *
  *  declaration    := varDecl
+ *                  | funDecl
  *                  | statement ;
+ *
+ *  funDecl        := "fun" function ;
+ *  function       := IDENTIFIER "(" [ parameters ] ")" block ;
+ *  parameters     := IDENTIFIER { "," IDENTIFIER } ;
  *
  *  varDecl        := "var" IDENTIFIER [ "=" expression ] ";" ;
  *
@@ -227,14 +235,19 @@ impl LoxParser {
 
     fn call_expr(&mut self) -> ExprResult {
         let mut primary = self.primary()?;
+        // if there's an OPAREN crawl thread the function Call chain
         while self.accept(vec![TT::OPAREN]) {
-            self.scanner.ignore(); // skip OPAREN
+            self.scanner.ignore(); // skip oparen
             let mut arguments = Vec::new();
-            while let Some(maybe_cparen) = self.scanner.peek() {
-                if maybe_cparen.token == TT::CPAREN { break; }
-                arguments.push(self.expression()?);
+            if !self.accept(vec![TT::CPAREN]) { // 0-arg case
+                loop {
+                    arguments.push(self.expression()?);
+                    if !self.accept(vec![TT::COMMA]) { break; }
+                    self.scanner.ignore(); // skip comma
+                }
+                self.consume(vec![TT::CPAREN], "expect ')' after call args")?;
             }
-            self.consume(vec![TT::CPAREN], "expect ')' after call arguments")?;
+            self.scanner.ignore(); // skip cparen if accepted
             primary = Expr::Call(Box::new(primary), arguments);
         }
         Ok(primary)
@@ -273,10 +286,7 @@ impl LoxParser {
             });
         }
         if self.accept(vec![TT::Id("".to_string())]) {
-            return Ok(match self.scanner.extract().swap_remove(0).token {
-                TT::Id(v) => Expr::Var(v),
-                o => panic!("LoxParser Bug! unexpected token: {:?}", o),
-            });
+            return Ok(Expr::Var(self.scanner.extract().swap_remove(0)));
         }
         if self.accept(vec![TT::OPAREN]) {
             self.scanner.ignore(); // skip OPAREN
@@ -403,24 +413,45 @@ impl LoxParser {
     }
 
     fn var_declaration(&mut self) -> StmtResult {
-        if !self.accept(vec![TT::Id("".to_string())]) {
-            let bad_token = self.scanner.peek();
-            return Err(self.error(bad_token, "expect variable name"));
-        }
-        let name = self.scanner.extract().swap_remove(0).lexeme;
+        let name = self.consume(
+            vec![TT::Id("".to_string())], "expect variable name")?;
         let mut init = Expr::Nil;
         if self.accept(vec![TT::ASSIGN]) {
             self.scanner.ignore(); // skip assign
             init = self.expression()?;
         }
         self.consume(vec![TT::SEMICOLON], "expect ';' after variable decl")?;
-        Ok(Stmt::Var(name, init))
+        Ok(Stmt::Var(name.lexeme, init))
+    }
+
+    fn fun_declaration(&mut self, kind: &str) -> StmtResult {
+        let name = self.consume(
+            vec![TT::Id("".to_string())], format!("expect {} name", kind))?;
+        self.consume(vec![TT::OPAREN], format!("expect '(' after {}", kind))?;
+        let mut params = Vec::new();
+        if !self.accept(vec![TT::CPAREN]) {
+            loop {
+                let parameter = self.consume(
+                    vec![TT::Id("".to_string())], "expect parameter name")?;
+                params.push(parameter.lexeme);
+                if !self.accept(vec![TT::COMMA]) { break; }
+                self.scanner.ignore(); // skip comma
+            }
+            self.consume(vec![TT::CPAREN], "expect ')' after parameters")?;
+        }
+        self.consume(
+            vec![TT::OBRACE], format!("expect '{{' before {} body ", kind))?;
+        Ok(Stmt::Function(name.lexeme, params, self.block_stmt()?))
     }
 
     fn declaration(&mut self) -> StmtResult {
         if self.accept(vec![TT::VAR]) {
             self.scanner.ignore(); // skip var
             return self.var_declaration();
+        }
+        if self.accept(vec![TT::FUN]) {
+            self.scanner.ignore(); // skip fun
+            return self.fun_declaration("function");
         }
         self.statement()
     }

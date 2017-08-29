@@ -1,4 +1,4 @@
-//#![deny(warnings)]
+#![deny(warnings)]
 
 use std::env;
 use std::fs::File;
@@ -8,6 +8,7 @@ mod lox_scanner;
 mod lox_parser;
 mod lox_interpreter;
 mod lox_environment;
+mod lox_native;
 
 use lox_scanner::LoxScanner;
 use lox_parser::LoxParser;

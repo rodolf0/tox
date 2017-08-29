@@ -3,17 +3,25 @@
 use lox_scanner::TT;
 use lox_parser::{Expr, Stmt};
 use lox_environment::Environment;
+use lox_native::native_fn_env;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::fmt;
 
 
-#[derive(Clone,Debug,PartialEq)]
+pub trait Callable {
+    fn call(&self, &LoxInterpreter, &Vec<V>) -> V;
+    fn arity(&self) -> usize;
+    fn id<'a>(&self) -> &'a str;
+}
+
+#[derive(Clone)]
 pub enum V {
     Nil,
     Num(f64),
     Bool(bool),
     Str(String),
+    Callable(Rc<Callable>),
 }
 
 impl V {
@@ -36,18 +44,45 @@ impl V {
             o => Err(format!("expected V::Str, found {:?}", o))
         }
     }
+    fn call(&self) -> Result<Rc<Callable>, String> {
+        match self {
+            &V::Callable(ref c) => Ok(c.clone()),
+            o => Err(format!("expected V::Callable, found {:?}", o))
+        }
+    }
 }
 
-impl fmt::Display for V {
+impl fmt::Debug for V {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &V::Nil => write!(f, "nil"),
             &V::Bool(ref b) => write!(f, "{}", b),
             &V::Num(ref n) => write!(f, "{}", n),
             &V::Str(ref s) => write!(f, "\"{}\"", s),
+            &V::Callable(ref c) => write!(f, "\"Callable({})\"", c.id()),
         }
     }
 }
+
+impl fmt::Display for V {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
+}
+
+impl PartialEq for V {
+    fn eq(&self, other: &V) -> bool {
+        match (self, other) {
+            (&V::Nil, &V::Nil) => true,
+            (&V::Num(ref a), &V::Num(ref b)) => a == b,
+            (&V::Bool(ref a), &V::Bool(ref b)) => a == b,
+            (&V::Str(ref a), &V::Str(ref b)) => a == b,
+            (&V::Callable(ref a), &V::Callable(ref b)) => a.id() == b.id(),
+            _ => false,
+        }
+    }
+}
+
 
 type EvalResult = Result<V, String>;
 
@@ -60,7 +95,7 @@ pub struct LoxInterpreter {
 impl LoxInterpreter {
     pub fn new() -> Self {
         LoxInterpreter{
-            env: Rc::new(RefCell::new(Environment::new(None))),
+            env: Rc::new(RefCell::new(native_fn_env())),
             errors: false,
             break_loops: 0,
         }
@@ -120,6 +155,18 @@ impl LoxInterpreter {
             &Expr::Assign(ref var, ref expr) => {
                 let value = self.eval(expr)?;
                 self.env.borrow_mut().assign(var.clone(), value)
+            },
+            &Expr::Call(ref callee, ref args) => {
+                let callee = self.eval(callee)?.call()?;
+                if callee.arity() != args.len() {
+                    return Err(format!("wrong arity for {} expected {} not {}",
+                                       callee.id(), callee.arity(), args.len()))
+                }
+                let mut arguments = Vec::new();
+                for arg in args {
+                    arguments.push(self.eval(arg)?);
+                }
+                Ok(callee.call(&self, &arguments))
             }
         }
     }

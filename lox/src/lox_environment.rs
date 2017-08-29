@@ -16,8 +16,8 @@ impl Environment {
         Environment{values: HashMap::new(), enclosing: enclosing}
     }
 
-    pub fn define(&mut self, name: String, val: V) {
-        self.values.insert(name, val);
+    pub fn define<S: Into<String>>(&mut self, name: S, val: V) {
+        self.values.insert(name.into(), val);
     }
 
     pub fn get(&self, name: &str) -> Result<V, String> {
@@ -26,7 +26,7 @@ impl Environment {
         } else if let Some(ref enc) = self.enclosing {
             return enc.borrow().get(name);
         }
-        Err(format!("undefined variable '{}'", name))
+        Err(format!("undefined entity '{}'", name))
     }
 
     pub fn assign(&mut self, name: String, val: V) -> Result<V, String> {
@@ -36,6 +36,6 @@ impl Environment {
         } else if let Some(ref mut enc) = self.enclosing {
             return enc.borrow_mut().assign(name, val);
         }
-        Err(format!("undefined variable '{}'", name))
+        Err(format!("undefined entity '{}'", name))
     }
 }

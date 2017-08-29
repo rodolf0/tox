@@ -18,6 +18,8 @@ pub enum Expr {
     Grouping(Box<Expr>),
     Var(String),
     Assign(String, Box<Expr>),
+    Call(Box<Expr>, Vec<Expr>),
+    // TODO Call(Box<Expr>, Vec<Expr>, Token), // closing paren token used for errors
 }
 
 pub enum Stmt {
@@ -135,7 +137,9 @@ impl LoxParser {
  *  addition       := multiplication { ( "-" | "+" ) multiplication } ;
  *  multiplication := unary { ( "/" | "*" ) unary } ;
  *  unary          := ( "!" | "-" | "$" ) unary
- *                  | primary ;
+ *                  | call_expr;
+ *  call_expr      := primary { "(" [ arguments ] ")" } ; // hi precedence op()
+ *  arguments      := expression { "," expression } ;
  *  primary        := NUMBER | STRING | "false" | "true" | "nil"
  *                  | "(" expression ")"
  *                  | IDENTIFIER ;
@@ -221,13 +225,28 @@ impl LoxParser {
         Ok(expr)
     }
 
+    fn call_expr(&mut self) -> ExprResult {
+        let mut primary = self.primary()?;
+        while self.accept(vec![TT::OPAREN]) {
+            self.scanner.ignore(); // skip OPAREN
+            let mut arguments = Vec::new();
+            while let Some(maybe_cparen) = self.scanner.peek() {
+                if maybe_cparen.token == TT::CPAREN { break; }
+                arguments.push(self.expression()?);
+            }
+            self.consume(vec![TT::CPAREN], "expect ')' after call arguments")?;
+            primary = Expr::Call(Box::new(primary), arguments);
+        }
+        Ok(primary)
+    }
+
     fn unary(&mut self) -> ExprResult {
         if self.accept(vec![TT::BANG, TT::MINUS, TT::DOLLAR]) {
             let op = self.scanner.extract().swap_remove(0);
             let rhs = self.unary()?;
             return Ok(Expr::Unary(op, Box::new(rhs)));
         }
-        self.primary()
+        self.call_expr()
     }
 
     fn primary(&mut self) -> ExprResult {

@@ -99,11 +99,9 @@ impl Callable for LoxFunction {
             environ.define(param.to_string(), args[i].clone());
         }
         // keep track of return boundaries
-        let depth = interp.func_depth;
-        interp.func_depth += 1;
-        let retval =
-            interp.exec_block(&self.body, Rc::new(RefCell::new(environ)));
-        interp.func_depth = depth;
+        let retval = interp.exec_block(
+            &self.body, Rc::new(RefCell::new(environ)),
+            Nesting{func: true, loops: 0});
         interp.funreturn = false;
         retval
     }
@@ -120,12 +118,16 @@ impl Callable for LoxFunction {
 type EvalResult = Result<V, String>;
 pub type ExecResult = Result<V, String>;
 
+#[derive(Clone)]
+struct Nesting {
+    func: bool,
+    loops: usize,
+}
+
 pub struct LoxInterpreter {
     environ: Rc<RefCell<Environment>>,
     break_loops: usize,
     funreturn: bool,
-    break_depth: usize,
-    func_depth: usize,
 }
 
 impl LoxInterpreter {
@@ -134,8 +136,6 @@ impl LoxInterpreter {
             environ: Rc::new(RefCell::new(native_fn_env())),
             break_loops: 0,
             funreturn: false,
-            break_depth: 0,
-            func_depth: 0,
         }
     }
 
@@ -211,12 +211,13 @@ impl LoxInterpreter {
     }
 
     fn exec_block(&mut self, statements: &Vec<Stmt>,
-                  env: Rc<RefCell<Environment>>) -> ExecResult {
+                  env: Rc<RefCell<Environment>>,
+                  nesting: Nesting) -> ExecResult {
         let prev_env = self.environ.clone();
         self.environ = env;
         let mut retval = Ok(V::Nil);
         for stmt in statements {
-            retval = self.execute(stmt);
+            retval = self.execute(stmt, nesting.clone());
             if retval.is_err() || self.funreturn || self.break_loops > 0 {
                 break;
             }
@@ -226,7 +227,7 @@ impl LoxInterpreter {
         retval
     }
 
-    fn execute(&mut self, stmt: &Stmt) -> ExecResult {
+    fn execute(&mut self, stmt: &Stmt, nesting: Nesting) -> ExecResult {
         match stmt {
             &Stmt::Expr(ref expr) => self.eval(expr),
             &Stmt::Print(ref expr) => {
@@ -240,43 +241,37 @@ impl LoxInterpreter {
             },
             &Stmt::Block(ref stmts) => {
                 let curenv = Environment::new(Some(self.environ.clone()));
-                self.exec_block(stmts, Rc::new(RefCell::new(curenv)))
+                self.exec_block(stmts, Rc::new(RefCell::new(curenv)), nesting)
             },
             &Stmt::If(ref expr, ref then_branch, ref else_branch) => {
                 let condition = self.eval(expr)?;
                 match condition.is_truthy() {
-                    true => self.execute(then_branch),
+                    true => self.execute(then_branch, nesting),
                     _ => match else_branch {
-                        &Some(ref else_branch) => self.execute(else_branch),
+                        &Some(ref else_b) => self.execute(else_b, nesting),
                         _ => Ok(V::Nil)
                     }
                 }
             },
             &Stmt::While(ref condition, ref body) => {
-                let depth = self.break_depth;
-                self.break_depth += 1;
-                let mut retval = Ok(V::Nil);
                 loop {
                     // check if we're trying to break out of loops
                     if self.break_loops > 0 {
                         self.break_loops -= 1; // we just got out of one
-                        break;
+                        return Ok(V::Nil);
                     }
-                    retval = self.eval(condition);
-                    if retval.is_err() { break; }
-                    if let Ok(ref cond) = retval {
-                        if !cond.is_truthy() { break; }
+                    let condition = self.eval(condition)?;
+                    if !condition.is_truthy() {
+                        return Ok(V::Nil);
                     }
-                    retval = self.execute(body);
-                    if retval.is_err() { break; }
+                    self.execute(body, Nesting{
+                        func: nesting.func, loops: nesting.loops+1})?;
                 }
-                self.break_depth = depth;
-                retval
             },
             &Stmt::Break(num_breaks) => {
-                if self.break_depth < num_breaks {
+                if nesting.loops < num_breaks {
                     return Err(format!("can't break {} times, depth {}",
-                                       num_breaks, self.break_depth));
+                                       num_breaks, nesting.loops));
                 }
                 self.break_loops = num_breaks;
                 Ok(V::Nil)
@@ -293,7 +288,7 @@ impl LoxInterpreter {
                 Ok(V::Nil)
             },
             &Stmt::Return(ref expr) => {
-                if self.func_depth < 1 {
+                if !nesting.func {
                     return Err("can't return outside of function".to_string());
                 }
                 let retval = self.eval(expr)?;
@@ -305,7 +300,7 @@ impl LoxInterpreter {
 
     pub fn interpret(&mut self, statements: &Vec<Stmt>) -> ExecResult {
         for stmt in statements {
-            self.execute(stmt)?;
+            self.execute(stmt, Nesting{func: false, loops: 0})?;
         }
         Ok(V::Nil)
     }

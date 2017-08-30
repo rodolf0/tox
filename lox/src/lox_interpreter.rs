@@ -10,7 +10,7 @@ use std::fmt;
 
 
 pub trait Callable {
-    fn call(&self, &mut LoxInterpreter, &Vec<V>) -> V;
+    fn call(&self, &mut LoxInterpreter, &Vec<V>) -> ExecResult;
     fn arity(&self) -> usize;
     fn id(&self) -> String;
 }
@@ -89,21 +89,23 @@ struct LoxFunction {
     name: String,
     params: Vec<String>,
     body: Vec<Stmt>,
-    enclosing: Option<Rc<RefCell<Environment>>>,
+    closure: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Callable for LoxFunction {
-    fn call(&self, interp: &mut LoxInterpreter, args: &Vec<V>) -> V {
-        let mut environ = Environment::new(self.enclosing.clone());
+    fn call(&self, interp: &mut LoxInterpreter, args: &Vec<V>) -> ExecResult {
+        let mut environ = Environment::new(self.closure.clone());
         for (i, param) in self.params.iter().enumerate() {
             environ.define(param.to_string(), args[i].clone());
         }
-        let r = interp.exec_block(&self.body, Rc::new(RefCell::new(environ)));
-        // TODO: get rid of this at some point ... call should return Result?
-        if let Some(err) = r {
-            eprintln!("func err: {}", err);
-        }
-        V::Nil
+        // keep track of return boundaries
+        let depth = interp.func_depth;
+        interp.func_depth += 1;
+        let retval =
+            interp.exec_block(&self.body, Rc::new(RefCell::new(environ)));
+        interp.func_depth = depth;
+        interp.funreturn = false;
+        retval
     }
     fn arity(&self) -> usize {
         self.params.len()
@@ -116,19 +118,24 @@ impl Callable for LoxFunction {
 ///////////////////////////////////////////////////////////////////////////////
 
 type EvalResult = Result<V, String>;
+pub type ExecResult = Result<V, String>;
 
 pub struct LoxInterpreter {
     environ: Rc<RefCell<Environment>>,
-    errors: bool,
     break_loops: usize,
+    funreturn: bool,
+    break_depth: usize,
+    func_depth: usize,
 }
 
 impl LoxInterpreter {
     pub fn new() -> Self {
         LoxInterpreter{
             environ: Rc::new(RefCell::new(native_fn_env())),
-            errors: false,
             break_loops: 0,
+            funreturn: false,
+            break_depth: 0,
+            func_depth: 0,
         }
     }
 
@@ -171,7 +178,8 @@ impl LoxInterpreter {
                     TT::LE => Ok(V::Bool(lhs.num()? <= rhs.num()?)),
                     TT::EQ => Ok(V::Bool(lhs == rhs)),
                     TT::NE => Ok(V::Bool(lhs != rhs)),
-                    _ => unreachable!("LoxIntepreter: bad Binary op {:?}", op)
+                    _ => unreachable!("LoxIntepreter: bad binop {:?} {:?} {:?}",
+                                      lhs, op, rhs)
                 }
             },
             &Expr::Logical(ref lhs, ref op, ref rhs) => {
@@ -197,99 +205,108 @@ impl LoxInterpreter {
                 for arg in args {
                     arguments.push(self.eval(arg)?);
                 }
-                Ok(callee.call(self, &arguments))
+                callee.call(self, &arguments)
             }
         }
     }
 
     fn exec_block(&mut self, statements: &Vec<Stmt>,
-                  env: Rc<RefCell<Environment>>) -> Option<String> {
+                  env: Rc<RefCell<Environment>>) -> ExecResult {
         let prev_env = self.environ.clone();
         self.environ = env;
-        let mut exit = None;
+        let mut retval = Ok(V::Nil);
         for stmt in statements {
-            // check if we're trying to break out of loops
-            if self.break_loops > 0 { break; }
-            if let Some(err) = self.execute(stmt) {
-                exit = Some(err);
+            retval = self.execute(stmt);
+            if retval.is_err() || self.funreturn || self.break_loops > 0 {
                 break;
             }
         }
         // restore interpreter's env
         self.environ = prev_env;
-        exit
+        retval
     }
 
-    fn execute(&mut self, stmt: &Stmt) -> Option<String> {
+    fn execute(&mut self, stmt: &Stmt) -> ExecResult {
         match stmt {
-            &Stmt::Expr(ref expr) => if let Err(err) = self.eval(expr) {
-                return Some(err);
-            },
-            &Stmt::Print(ref expr) => match self.eval(expr) {
-                Ok(value) => println!("{}", value),
-                Err(err) => return Some(err)
-            },
+            &Stmt::Expr(ref expr) => self.eval(expr),
+            &Stmt::Print(ref expr) => {
+                println!("{}", self.eval(expr)?);
+                Ok(V::Nil)
+            }
             &Stmt::Var(ref name, ref init) => {
-                let value = match self.eval(init) {
-                    Ok(value) => value,
-                    Err(err) => return Some(err)
-                };
+                let value = self.eval(init)?;
                 self.environ.borrow_mut().define(name.to_string(), value);
+                Ok(V::Nil)
             },
             &Stmt::Block(ref stmts) => {
                 let curenv = Environment::new(Some(self.environ.clone()));
-                return self.exec_block(stmts, Rc::new(RefCell::new(curenv)));
+                self.exec_block(stmts, Rc::new(RefCell::new(curenv)))
             },
             &Stmt::If(ref expr, ref then_branch, ref else_branch) => {
-                let condition = match self.eval(expr) {
-                    Ok(cond) => cond,
-                    Err(err) => return Some(err)
-                };
-                return match condition.is_truthy() {
+                let condition = self.eval(expr)?;
+                match condition.is_truthy() {
                     true => self.execute(then_branch),
-                    false => match else_branch {
-                        &Some(ref eb) => self.execute(eb),
-                        _ => None
+                    _ => match else_branch {
+                        &Some(ref else_branch) => self.execute(else_branch),
+                        _ => Ok(V::Nil)
                     }
-                };
+                }
             },
-            &Stmt::While(ref expr, ref body) => {
+            &Stmt::While(ref condition, ref body) => {
+                let depth = self.break_depth;
+                self.break_depth += 1;
+                let mut retval = Ok(V::Nil);
                 loop {
                     // check if we're trying to break out of loops
                     if self.break_loops > 0 {
                         self.break_loops -= 1; // we just got out of one
-                        return None;
+                        break;
                     }
-                    let condition = match self.eval(expr) {
-                        Err(err) => return Some(err),
-                        Ok(cond) => cond
-                    };
-                    if !condition.is_truthy() { return None; }
-                    if let Some(err) = self.execute(body) { return Some(err); }
+                    retval = self.eval(condition);
+                    if retval.is_err() { break; }
+                    if let Ok(ref cond) = retval {
+                        if !cond.is_truthy() { break; }
+                    }
+                    retval = self.execute(body);
+                    if retval.is_err() { break; }
                 }
+                self.break_depth = depth;
+                retval
             },
-            &Stmt::Break(num_breaks) => (self.break_loops = num_breaks),
+            &Stmt::Break(num_breaks) => {
+                if self.break_depth < num_breaks {
+                    return Err(format!("can't break {} times, depth {}",
+                                       num_breaks, self.break_depth));
+                }
+                self.break_loops = num_breaks;
+                Ok(V::Nil)
+            },
             &Stmt::Function(ref name, ref params, ref body) => {
                 let function = LoxFunction{
                     name: name.to_string(),
                     params: params.clone(),
                     body: body.clone(),
-                    enclosing: Some(self.environ.clone())
+                    closure: Some(self.environ.clone())
                 };
                 self.environ.borrow_mut().define(
                     name.to_string(), V::Callable(Rc::new(function)));
+                Ok(V::Nil)
+            },
+            &Stmt::Return(ref expr) => {
+                if self.func_depth < 1 {
+                    return Err("can't return outside of function".to_string());
+                }
+                let retval = self.eval(expr)?;
+                self.funreturn = true;
+                Ok(retval)
             }
         }
-        None
     }
 
-    pub fn interpret(&mut self, statements: &Vec<Stmt>) -> Option<String> {
+    pub fn interpret(&mut self, statements: &Vec<Stmt>) -> ExecResult {
         for stmt in statements {
-            if let Some(err) = self.execute(stmt) {
-                self.errors = true;
-                return Some(err);
-            }
+            self.execute(stmt)?;
         }
-        None
+        Ok(V::Nil)
     }
 }

@@ -25,8 +25,8 @@ fn main() {
         let scanner = LoxScanner::scanner(source);
         let mut parser = LoxParser::new(scanner);
         match parser.parse() {
-            Ok(stmts) => if let Some(err) = interpreter.interpret(&stmts) {
-                eprintln!("LoxInterpreter error: {}", err)
+            Ok(stmts) => if let Err(error) = interpreter.interpret(&stmts) {
+                eprintln!("LoxInterpreter error: {}", error)
             },
             Err(errors) => for e in errors { eprintln!("{}", e); }
         }

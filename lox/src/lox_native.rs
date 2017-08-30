@@ -9,8 +9,8 @@ use std::rc::Rc;
 pub struct Clock;
 
 impl Callable for Clock {
-    fn call(&self, _: &mut LoxInterpreter, _: &Vec<V>) -> V {
-        V::Num(time::precise_time_ns() as f64)
+    fn call(&self, _: &mut LoxInterpreter, _: &Vec<V>) -> Result<V, String> {
+        Ok(V::Num(time::precise_time_ns() as f64))
     }
     fn arity(&self) -> usize { 0 }
     fn id(&self) -> String { "clock".to_string() }

@@ -236,7 +236,9 @@ impl LoxInterpreter {
             }
             &Stmt::Var(ref name, ref init) => {
                 let value = self.eval(init)?;
-                self.environ.borrow_mut().define(name.to_string(), value);
+                let mut newenv = Environment::new(Some(self.environ.clone()));
+                newenv.define(name.to_string(), value);
+                self.environ = Rc::new(RefCell::new(newenv));
                 Ok(V::Nil)
             },
             &Stmt::Block(ref stmts) => {
@@ -283,8 +285,9 @@ impl LoxInterpreter {
                     body: body.clone(),
                     closure: Some(self.environ.clone())
                 };
-                self.environ.borrow_mut().define(
-                    name.to_string(), V::Callable(Rc::new(function)));
+                let mut newenv = Environment::new(Some(self.environ.clone()));
+                newenv.define(name.to_string(), V::Callable(Rc::new(function)));
+                self.environ = Rc::new(RefCell::new(newenv));
                 Ok(V::Nil)
             },
             &Stmt::Return(ref expr) => {

@@ -2,11 +2,12 @@
 
 extern crate lexers;
 use self::lexers::Scanner;
-
 use lox_scanner::{Token, TT};
+use std::rc::Rc;
 
 
-#[derive(Clone,Debug)]
+// NOTE: do _NOT_ derive Clone, or modify id so its constant across Expr life
+#[derive(Debug)]
 pub enum Expr {
     Logical(Box<Expr>, Token, Box<Expr>),
     Binary(Box<Expr>, Token, Box<Expr>),
@@ -21,7 +22,12 @@ pub enum Expr {
     Call(Box<Expr>, Vec<Expr>),
 }
 
-#[derive(Clone)]
+impl Expr {
+    pub fn id(&self) -> usize { self as *const _ as usize }
+}
+
+// NOTE: do _NOT_ define Clone because we use address of Expr as symtab id
+//       we need that address to stay the same for the Resolver
 pub enum Stmt {
     Print(Expr),
     Expr(Expr),
@@ -30,7 +36,7 @@ pub enum Stmt {
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     While(Expr, Box<Stmt>),
     Break(usize),
-    Function(String, Vec<String>, Vec<Stmt>),
+    Function(String, Vec<String>, Rc<Vec<Stmt>>),
     Return(Expr),
 }
 
@@ -457,7 +463,7 @@ impl LoxParser {
         }
         self.consume(
             vec![TT::OBRACE], format!("expect '{{' before {} body ", kind))?;
-        Ok(Stmt::Function(name.lexeme, params, self.block_stmt()?))
+        Ok(Stmt::Function(name.lexeme, params, Rc::new(self.block_stmt()?)))
     }
 
     fn declaration(&mut self) -> StmtResult {

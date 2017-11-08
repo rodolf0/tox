@@ -88,7 +88,7 @@ impl PartialEq for V {
 struct LoxFunction {
     name: String,
     params: Vec<String>,
-    body: Vec<Stmt>,
+    body: Rc<Vec<Stmt>>,
     closure: Option<Rc<RefCell<Environment>>>,
 }
 

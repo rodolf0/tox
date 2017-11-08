@@ -14,20 +14,23 @@ use lox_scanner::LoxScanner;
 use lox_parser::LoxParser;
 use lox_interpreter::LoxInterpreter;
 
+
 fn main() {
     if env::args().len() > 2 {
         eprintln!("usage: lox [script]");
         return;
     }
 
-    let mut interpreter = LoxInterpreter::new();
-    let mut run = |source: String| {
+    let run = |source: String| {
         let scanner = LoxScanner::scanner(source);
         let mut parser = LoxParser::new(scanner);
+        let mut interpreter = LoxInterpreter::new();
         match parser.parse() {
-            Ok(stmts) => if let Err(error) = interpreter.interpret(&stmts) {
-                eprintln!("LoxInterpreter error: {}", error)
-            },
+            Ok(stmts) => {
+                if let Err(error) = interpreter.interpret(&stmts) {
+                    eprintln!("LoxInterpreter error: {}", error)
+                }
+            }
             Err(errors) => for e in errors { eprintln!("{}", e); }
         }
     };

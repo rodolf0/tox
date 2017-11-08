@@ -9,10 +9,12 @@ mod lox_parser;
 mod lox_interpreter;
 mod lox_environment;
 mod lox_native;
+mod lox_resolver;
 
 use lox_scanner::LoxScanner;
 use lox_parser::LoxParser;
 use lox_interpreter::LoxInterpreter;
+use lox_resolver::Resolver;
 
 
 fn main() {
@@ -27,8 +29,11 @@ fn main() {
         let mut interpreter = LoxInterpreter::new();
         match parser.parse() {
             Ok(stmts) => {
-                if let Err(error) = interpreter.interpret(&stmts) {
-                    eprintln!("LoxInterpreter error: {}", error)
+                match Resolver::new(&mut interpreter).resolve(&stmts) {
+                    Ok(_) => if let Err(error) = interpreter.interpret(&stmts) {
+                        eprintln!("LoxInterpreter error: {}", error)
+                    },
+                    Err(error) => eprintln!("Resolve error: {}", error)
                 }
             }
             Err(errors) => for e in errors { eprintln!("{}", e); }

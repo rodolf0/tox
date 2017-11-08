@@ -1,12 +1,13 @@
 #![deny(warnings)]
 
-use lox_scanner::TT;
+use lox_scanner::{TT, Token};
 use lox_parser::{Expr, Stmt};
 use lox_environment::Environment;
 use lox_native::native_fn_env;
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::collections::HashMap;
 use std::fmt;
+use std::rc::Rc;
 
 
 pub trait Callable {
@@ -100,7 +101,7 @@ impl Callable for LoxFunction {
         }
         // keep track of return boundaries
         let retval = interp.exec_block(
-            &self.body, Rc::new(RefCell::new(environ)),
+            &*self.body, Rc::new(RefCell::new(environ)),
             Nesting{func: true, loops: 0});
         interp.funreturn = false;
         retval
@@ -125,18 +126,36 @@ struct Nesting {
 }
 
 pub struct LoxInterpreter {
+    globals: Rc<RefCell<Environment>>,
     environ: Rc<RefCell<Environment>>,
     break_loops: usize,
     funreturn: bool,
+    // keep a link to lookup variables
+    locals: HashMap<usize, usize>,
 }
 
 impl LoxInterpreter {
     pub fn new() -> Self {
+        let globals = Rc::new(RefCell::new(native_fn_env()));
         LoxInterpreter{
-            environ: Rc::new(RefCell::new(native_fn_env())),
+            globals: globals.clone(),
+            environ: globals,
             break_loops: 0,
             funreturn: false,
+            locals: HashMap::new(),
         }
+    }
+
+    pub fn resolve(&mut self, expr: usize, depth: usize) {
+        self.locals.insert(expr, depth);
+    }
+
+    fn lookup_var(&self, expr: &Expr, token: &Token) -> EvalResult {
+        let name = &token.lexeme;
+        if let Some(depth) = self.locals.get(&expr.id()) {
+            return self.environ.borrow().get_at(*depth, name);
+        }
+        self.globals.borrow().get(name)
     }
 
     fn eval(&mut self, expr: &Expr) -> EvalResult {
@@ -145,13 +164,13 @@ impl LoxInterpreter {
             &Expr::Num(n) => Ok(V::Num(n)),
             &Expr::Str(ref s) => Ok(V::Str(s.to_string())),
             &Expr::Bool(ref b) => Ok(V::Bool(*b)),
-            &Expr::Grouping(ref expr) => self.eval(&*expr),
-            &Expr::Unary(ref op, ref expr) => {
-                let expr = self.eval(expr)?;
+            &Expr::Grouping(ref gexpr) => self.eval(&*gexpr),
+            &Expr::Unary(ref op, ref uexpr) => {
+                let uexpr = self.eval(uexpr)?;
                 match op.token {
-                    TT::MINUS => Ok(V::Num(-expr.num()?)),
-                    TT::BANG => Ok(V::Bool(!expr.is_truthy())),
-                    TT::DOLLAR => self.environ.borrow().get(expr.str()?),
+                    TT::MINUS => Ok(V::Num(-uexpr.num()?)),
+                    TT::BANG => Ok(V::Bool(!uexpr.is_truthy())),
+                    TT::DOLLAR => self.environ.borrow().get(uexpr.str()?),
                     _ => unreachable!("LoxIntepreter: bad Unary op {:?}", op)
                 }
             },
@@ -190,10 +209,14 @@ impl LoxInterpreter {
                     _ => self.eval(rhs)
                 }
             },
-            &Expr::Var(ref var) => self.environ.borrow().get(&var.lexeme),
-            &Expr::Assign(ref var, ref expr) => {
-                let value = self.eval(expr)?;
-                self.environ.borrow_mut().assign(var.lexeme.clone(), value)
+            &Expr::Var(ref var) => self.lookup_var(expr, &var),
+            &Expr::Assign(ref var, ref aexpr) => {
+                let value = self.eval(aexpr)?;
+                if let Some(depth) = self.locals.get(&expr.id()) {
+                    return self.environ.borrow_mut()
+                        .assign_at(*depth, var.lexeme.clone(), value);
+                }
+                self.globals.borrow_mut().assign(var.lexeme.clone(), value)
             },
             &Expr::Call(ref callee, ref args) => {
                 let callee = self.eval(callee)?.call()?;
@@ -236,9 +259,7 @@ impl LoxInterpreter {
             }
             &Stmt::Var(ref name, ref init) => {
                 let value = self.eval(init)?;
-                let mut newenv = Environment::new(Some(self.environ.clone()));
-                newenv.define(name.to_string(), value);
-                self.environ = Rc::new(RefCell::new(newenv));
+                self.environ.borrow_mut().define(name.to_string(), value);
                 Ok(V::Nil)
             },
             &Stmt::Block(ref stmts) => {
@@ -285,9 +306,8 @@ impl LoxInterpreter {
                     body: body.clone(),
                     closure: Some(self.environ.clone())
                 };
-                let mut newenv = Environment::new(Some(self.environ.clone()));
-                newenv.define(name.to_string(), V::Callable(Rc::new(function)));
-                self.environ = Rc::new(RefCell::new(newenv));
+                self.environ.borrow_mut().define(
+                    name.to_string(), V::Callable(Rc::new(function)));
                 Ok(V::Nil)
             },
             &Stmt::Return(ref expr) => {

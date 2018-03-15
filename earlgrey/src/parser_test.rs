@@ -438,12 +438,12 @@ fn build_ast() {
     #[derive(Clone, Debug)]
     enum MathAST {
         BinOP(Box<MathAST>, String, Box<MathAST>),
-        Num(f64),
+        Num(u64),
     }
     let mut ev = EarleyForest::new(|symbol, token| {
         match symbol {
-            "n" => MathAST::Num(f64::from_str(token).unwrap()),
-            _ => MathAST::Num(0.0)
+            "n" => MathAST::Num(u64::from_str(token).unwrap()),
+            _ => MathAST::Num(0)
         }
     });
     ev.action("E -> E * E", |nodes| MathAST::BinOP(

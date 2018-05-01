@@ -340,9 +340,9 @@ impl T {
                              .this(reftime).shift(grain, -(n as i32))),
             &T::In(n, grain) =>
                 TimeEl::Time(Seq::grain(lower_grain(grain))
-                             .this(reftime).shift(grain, (n as i32))),
+                             .this(reftime).shift(grain, n as i32)),
             &T::After(n, grain, ref t0) =>
-                TimeEl::Time(t0.range(reftime).shift(grain, (n as i32))),
+                TimeEl::Time(t0.range(reftime).shift(grain, n as i32)),
             &T::Before(n, grain, ref t0) =>
                 TimeEl::Time(t0.range(reftime).shift(grain, -(n as i32))),
             other => TimeEl::Time(other.range(reftime))

@@ -68,7 +68,7 @@ impl fmt::Debug for Item {
 impl Item {
     pub fn complete(&self) -> bool { self.dot >= self.rule.spec.len() }
 
-    pub fn next_symbol<'a>(&'a self) -> Option<&'a Symbol> {
+    pub fn next_symbol(&self) -> Option<&Symbol> {
         self.rule.symbol_at(self.dot).map(|s| &**s)
     }
 
@@ -94,7 +94,7 @@ impl Item {
 
     // build a new Item for a prediction
     pub fn predict_new(rule: &Rc<Rule>, start: usize) -> Item {
-        Item{rule: rule.clone(), dot: 0, start: start, end: start,
+        Item{rule: rule.clone(), dot: 0, start, end: start,
              bp: cell::RefCell::new(HashSet::new())}
     }
 
@@ -103,7 +103,7 @@ impl Item {
         let mut _bp = HashSet::new();
         _bp.insert((source.clone(), Trigger::Scan(input.to_string())));
         Item{rule: source.rule.clone(), dot: source.dot+1,
-             start: source.start, end: end, bp: cell::RefCell::new(_bp)}
+             start: source.start, end, bp: cell::RefCell::new(_bp)}
     }
 
     // produce an Item by completing another one
@@ -111,7 +111,7 @@ impl Item {
         let mut _bp = HashSet::new();
         _bp.insert((source.clone(), Trigger::Complete(trigger.clone())));
         Item{rule: source.rule.clone(), dot: source.dot+1,
-             start: source.start, end: end, bp: cell::RefCell::new(_bp)}
+             start: source.start, end, bp: cell::RefCell::new(_bp)}
     }
 }
 
@@ -133,7 +133,7 @@ impl iter::FromIterator<Item> for StateSet {
 
 impl Index<usize> for StateSet {
     type Output = Rc<Item>;
-    fn index<'b>(&'b self, idx: usize) -> &'b Rc<Item> { self.order.index(idx) }
+    fn index(&self, idx: usize) -> &Rc<Item> { self.order.index(idx) }
 }
 
 impl fmt::Debug for StateSet {

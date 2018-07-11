@@ -29,6 +29,7 @@ pub struct Grammar {
     pub rules: Vec<Rc<Rule>>,
 }
 
+#[derive(Default)]
 pub struct GrammarBuilder {
     symbols: HashMap<String, Rc<Symbol>>,
     rules: Vec<Rc<Rule>>,
@@ -39,9 +40,9 @@ pub struct GrammarBuilder {
 
 impl Symbol {
     pub fn name(&self) -> &str {
-        match self {
-            &Symbol::NonTerm(ref name) => name,
-            &Symbol::Terminal(ref name, _) => name,
+        match *self {
+            Symbol::NonTerm(ref name) => name,
+            Symbol::Terminal(ref name, _) => name,
         }
     }
 }
@@ -50,9 +51,9 @@ impl Symbol {
 // Symbols are deduped by name ONLY
 impl hash::Hash for Symbol {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        match self {
-            &Symbol::NonTerm(ref name) => name.hash(state),
-            &Symbol::Terminal(ref name, _) => name.hash(state)
+        match *self {
+            Symbol::NonTerm(ref name) => name.hash(state),
+            Symbol::Terminal(ref name, _) => name.hash(state)
         }
     }
 }
@@ -104,10 +105,6 @@ impl Grammar {
 ///////////////////////////////////////////////////////////////////////////////
 
 impl GrammarBuilder {
-    pub fn new() -> GrammarBuilder {
-        GrammarBuilder{symbols: HashMap::new(), rules: Vec::new(), error: None}
-    }
-
     fn add_symbol(&mut self, symbol: Symbol, ignoredup: bool) {
         // NOTE: we check existence to avoid new symbols stomping on pluged ones
         if !self.symbols.contains_key(symbol.name()) {
@@ -142,7 +139,7 @@ impl GrammarBuilder {
             where H: Into<String>, S: AsRef<str> {
         // check for missing symbols first
         if let Some(s) = spec.iter()
-                .filter(|s| !self.symbols.contains_key(s.as_ref())).next() {
+                .find(|s| !self.symbols.contains_key(s.as_ref())) {
             self.error = Some(GrammarError::MissingSym(s.as_ref().to_string()));
             return;
         }
@@ -152,7 +149,7 @@ impl GrammarBuilder {
             return;
         }
         let rule = Rule{
-            head: head,
+            head,
             spec: spec.into_iter()
                     .map(|s| self.symbols[s.as_ref()].clone()).collect()
         };
@@ -180,7 +177,7 @@ impl GrammarBuilder {
         if !self.symbols.contains_key(&start) {
             return Err(GrammarError::MissingSym(start));
         }
-        Ok(Grammar{start: start, rules: self.rules})
+        Ok(Grammar{start, rules: self.rules})
     }
 
     // used to generate symbols programatically
@@ -197,7 +194,7 @@ mod tests {
 
     #[test]
     fn build_grammar() {
-        let g = GrammarBuilder::new()
+        let g = GrammarBuilder::default()
             .nonterm("Sum")
             .terminal("Num", |n| n.chars().all(|c| "123".contains(c)))
             .terminal("+", |n| n == "+")
@@ -209,7 +206,7 @@ mod tests {
 
     #[test]
     fn dup_symbol() {
-        let g = GrammarBuilder::new()
+        let g = GrammarBuilder::default()
             .nonterm("Sum")
             .nonterm("Sum")
             .into_grammar("Sum");
@@ -219,7 +216,7 @@ mod tests {
 
     #[test]
     fn dup_rule() {
-        let g = GrammarBuilder::new()
+        let g = GrammarBuilder::default()
             .nonterm("Sum")
             .terminal("Num", |n| n.chars().all(|c| "123".contains(c)))
             .terminal("+", |n| n == "+")
@@ -233,14 +230,14 @@ mod tests {
 
     #[test]
     fn missing_start() {
-        let g = GrammarBuilder::new()
+        let g = GrammarBuilder::default()
             .nonterm("Sum")
             .terminal("Num", |n| n.chars().all(|c| "123".contains(c)))
             .rule("Sum", &["Num"])
             .into_grammar("Xum");
         assert_eq!(g.unwrap_err(), GrammarError::MissingSym("Xum".to_string()));
 
-        let g = GrammarBuilder::new()
+        let g = GrammarBuilder::default()
             .nonterm("Sum")
             .rule("Sum", &["Num"])
             .into_grammar("Sum");

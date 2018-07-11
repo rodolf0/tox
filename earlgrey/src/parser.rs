@@ -95,10 +95,11 @@ impl EarleyParser {
             .filter(|item| item.start == 0 && item.complete())
             .cloned()
             .collect::<Vec<_>>();
-        match parse_trees.is_empty() {
-            true => Err(ParseError),
-            false => Ok(ParseTrees(parse_trees)),
+
+        if parse_trees.is_empty() {
+            return Err(ParseError);
         }
+        Ok(ParseTrees(parse_trees))
     }
 }
 
@@ -113,7 +114,7 @@ mod tests {
 
     #[test]
     fn partial_parse() {
-        let g = GrammarBuilder::new()
+        let g = GrammarBuilder::default()
             .nonterm("Start")
             .terminal("+", |n| n == "+")
             .rule("Start", &["+", "+"])
@@ -126,7 +127,7 @@ mod tests {
 
     #[test]
     fn badparse() {
-        let g = GrammarBuilder::new()
+        let g = GrammarBuilder::default()
           .nonterm("Sum")
           .nonterm("Num")
           .terminal("Number", |n| n.chars().all(|c| "1234".contains(c)))
@@ -144,7 +145,7 @@ mod tests {
     #[test]
     fn grammar_ambiguous() {
         // S -> SS | b
-        let grammar = GrammarBuilder::new()
+        let grammar = GrammarBuilder::default()
           .nonterm("S")
           .terminal("b", |n| n == "b")
           .rule("S", &["S", "S"])
@@ -161,7 +162,7 @@ mod tests {
     fn left_recurse() {
         // S -> S + N | N
         // N -> [0-9]
-        let grammar = GrammarBuilder::new()
+        let grammar = GrammarBuilder::default()
           .nonterm("S")
           .nonterm("N")
           .terminal("[+]", |n| n == "+")
@@ -180,7 +181,7 @@ mod tests {
     fn test_right_recurse() {
         // P -> N ^ P | N
         // N -> [0-9]
-        let grammar = GrammarBuilder::new()
+        let grammar = GrammarBuilder::default()
           .nonterm("P")
           .nonterm("N")
           .terminal("[^]", |n| n == "^")
@@ -199,7 +200,7 @@ mod tests {
     fn bogus_empty() {
         // A -> <empty> | B
         // B -> A
-        let grammar = GrammarBuilder::new()
+        let grammar = GrammarBuilder::default()
           .nonterm("A")
           .nonterm("B")
           .rule::<_, &str>("A", &[])
@@ -216,7 +217,7 @@ mod tests {
     fn bogus_epsilon() {
         // Grammar for balanced parenthesis
         // P  -> '(' P ')' | P P | <epsilon>
-        let grammar = GrammarBuilder::new()
+        let grammar = GrammarBuilder::default()
           .nonterm("P")
           .terminal("(", |l| l == "(")
           .terminal(")", |l| l == ")")

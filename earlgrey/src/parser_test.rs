@@ -36,7 +36,7 @@ fn grammar_math() -> Grammar {
     // Mul -> Mul * Pow | Pow
     // Pow -> Num ^ Pow | Num
     // Num -> Number | ( Sum )
-    GrammarBuilder::new()
+    GrammarBuilder::default()
       .nonterm("Sum")
       .nonterm("Mul")
       .nonterm("Pow")
@@ -76,7 +76,7 @@ fn check_trees<T: fmt::Debug>(trees: &Vec<T>, expected: Vec<&str>) {
 #[test]
 fn grammar_ambiguous() {
     // S -> SS | b
-    let grammar = GrammarBuilder::new()
+    let grammar = GrammarBuilder::default()
       .nonterm("S")
       .terminal("b", |n| n == "b")
       .rule("S", &["S", "S"])
@@ -101,7 +101,7 @@ fn grammar_ambiguous() {
 fn grammar_ambiguous_epsilon() {
     // S -> SSX | b
     // X -> <e>
-    let g = GrammarBuilder::new()
+    let g = GrammarBuilder::default()
       .nonterm("S")
       .nonterm("X")
       .terminal("b", |n| n == "b")
@@ -138,7 +138,7 @@ fn math_grammar_test() {
 fn left_recurse() {
     // S -> S + N | N
     // N -> [0-9]
-    let grammar = GrammarBuilder::new()
+    let grammar = GrammarBuilder::default()
       .nonterm("S")
       .nonterm("N")
       .terminal("[+]", |n| n == "+")
@@ -161,7 +161,7 @@ fn left_recurse() {
 fn right_recurse() {
     // P -> N ^ P | N
     // N -> [0-9]
-    let grammar = GrammarBuilder::new()
+    let grammar = GrammarBuilder::default()
       .nonterm("P")
       .nonterm("N")
       .terminal("[^]", |n| n == "^")
@@ -184,7 +184,7 @@ fn right_recurse() {
 fn bogus_empty() {
     // A -> <empty> | B
     // B -> A
-    let grammar = GrammarBuilder::new()
+    let grammar = GrammarBuilder::default()
       .nonterm("A")
       .nonterm("B")
       .rule::<_, &str>("A", &[])
@@ -204,7 +204,7 @@ fn bogus_empty() {
 fn bogus_epsilon() {
     // Grammar for balanced parenthesis
     // P  -> '(' P ')' | P P | <epsilon>
-    let grammar = GrammarBuilder::new()
+    let grammar = GrammarBuilder::default()
       .nonterm("P")
       .terminal("(", |l| l == "(")
       .terminal(")", |l| l == ")")
@@ -228,7 +228,7 @@ fn grammar_example() {
     // Program   -> Letters 'm' 'a' 'i' 'n' Letters
     // Letters   -> oneletter Letters | <epsilon>
     // oneletter -> [a-zA-Z]
-    let grammar = GrammarBuilder::new()
+    let grammar = GrammarBuilder::default()
       .nonterm("Program")
       .nonterm("Letters")
       .terminal("oneletter", |l| l.len() == 1 &&
@@ -250,7 +250,7 @@ fn grammar_example() {
 #[test]
 fn math_ambiguous() {
     // E -> E + E | E * E | n
-    let grammar = GrammarBuilder::new()
+    let grammar = GrammarBuilder::default()
       .nonterm("E")
       .terminal("+", |n| n == "+")
       .terminal("*", |n| n == "*")
@@ -342,7 +342,7 @@ fn chained_terminals() {
         let tokens = match variant.len() {
             2 => "+", 3 => "++", _ => unreachable!()
         };
-        let g = GrammarBuilder::new()
+        let g = GrammarBuilder::default()
           .nonterm("E")
           .nonterm("X")
           .terminal("+", |n| n == "+")
@@ -358,7 +358,7 @@ fn chained_terminals() {
 
 #[test]
 fn natural_lang() {
-    let g = GrammarBuilder::new()
+    let g = GrammarBuilder::default()
       .terminal("N", |n| {
         n == "time" || n == "flight" || n == "banana" ||
         n == "flies" || n == "boy" || n == "telescope"
@@ -401,7 +401,7 @@ fn natural_lang() {
 fn small_math() -> Grammar {
     // S -> S + E | E
     // E -> n ^ E | n
-    GrammarBuilder::new()
+    GrammarBuilder::default()
       .nonterm("E")
       .terminal("+", |n| n == "+")
       .terminal("*", |n| n == "*")

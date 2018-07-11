@@ -58,9 +58,9 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
             // explore left side of the root
             args.extend(try!(self.walker(prediction)));
             // explore right side of the root
-            args.extend(match trigger {
-                &Trigger::Complete(ref item) => try!(self.walker(item)),
-                &Trigger::Scan(ref token) => {
+            args.extend(match *trigger {
+                Trigger::Complete(ref item) => try!(self.walker(item)),
+                Trigger::Scan(ref token) => {
                     let symbol = prediction.next_symbol().unwrap().name();
                     vec![(self.leaf_builder)(&symbol, token)]
                 }
@@ -92,15 +92,16 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
         // reduce function to call on complete items
         let rulename = root.rule.to_string();
         let reduce = |args: Vec<ASTNode>| -> Result<Vec<ASTNode>, EvalError> {
-            match root.complete() {
-                false => Ok(args),
-                true => match self.actions.get(&rulename) {
+            if root.complete() {
+                match self.actions.get(&rulename) {
                     None => Err(EvalError::MissingAction(rulename.clone())),
                     Some(action) => {
                         if self.debug { eprintln!("Reduction: {}", rulename); }
                         Ok(vec![action(args)])
                     }
                 }
+            } else {
+                Ok(args)
             }
         };
         // explore treespace
@@ -116,8 +117,8 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
                     Ok(args) => args, // unpack args
                     Err(e) => return vec![Err(e)]
                 };
-                match trigger {
-                    &Trigger::Complete(ref itm) => {
+                match *trigger {
+                    Trigger::Complete(ref itm) => {
                         // collect right-side-tree of each source
                         for trig in self.walker_all(itm) {
                             let trig = match trig {
@@ -129,7 +130,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
                             trees.push(reduce(args));
                         }
                     },
-                    &Trigger::Scan(ref token) => {
+                    Trigger::Scan(ref token) => {
                         let symbol = prediction.next_symbol().unwrap().name();
                         args.push((self.leaf_builder)(&symbol, token));
                         trees.push(reduce(args));

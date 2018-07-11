@@ -5,7 +5,7 @@ use std::cell::RefCell;
 
 fn build_grammar() -> earlgrey::Grammar {
     use std::str::FromStr;;
-    earlgrey::GrammarBuilder::new()
+    earlgrey::GrammarBuilder::default()
       .nonterm("expr")
       .nonterm("term")
       .nonterm("factor")

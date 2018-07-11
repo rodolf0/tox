@@ -3,7 +3,6 @@
 use grammar::{Symbol, Rule};
 use std::{cell, fmt, hash, iter, slice};
 use std::collections::HashSet;
-use std::ops::Index;
 use std::rc::Rc;
 
 
@@ -23,13 +22,6 @@ pub struct Item {
     bp: cell::RefCell<HashSet<(Rc<Item>, Trigger)>>
 }
 
-// StateSets keep deduped elements tracking insertion order
-pub struct StateSet {
-    order: Vec<Rc<Item>>,
-    dedup: HashSet<Rc<Item>>,
-}
-
-///////////////////////////////////////////////////////////////////////////////
 
 // Items are deduped only by rule, dot, start, end (ie: not bp)
 // This is needed to insert into StateSet merging back-pointers
@@ -117,6 +109,13 @@ impl Item {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// StateSets keep deduped elements tracking insertion order
+pub struct StateSet {
+    order: Vec<Rc<Item>>,
+    dedup: HashSet<Rc<Item>>,
+}
+
+
 impl Extend<Item> for StateSet {
     fn extend<I: IntoIterator<Item=Item>>(&mut self, iterable: I) {
         for item in iterable { self.push(item); }
@@ -129,11 +128,6 @@ impl iter::FromIterator<Item> for StateSet {
         ss.extend(iterable.into_iter());
         ss
     }
-}
-
-impl Index<usize> for StateSet {
-    type Output = Rc<Item>;
-    fn index(&self, idx: usize) -> &Rc<Item> { self.order.index(idx) }
 }
 
 impl fmt::Debug for StateSet {

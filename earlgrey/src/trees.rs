@@ -56,6 +56,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
         let bp = root.source();
         if let Some(&(ref prediction, ref trigger)) = bp.iter().next() {
             // explore left side of the root
+            // TODO: remove try!
             args.extend(try!(self.walker(prediction)));
             // explore right side of the root
             args.extend(match *trigger {

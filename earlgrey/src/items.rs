@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
 use grammar::{Symbol, Rule};
-use std::{cell, fmt, hash, iter, slice};
+use std::{cell, fmt, hash, iter};
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -107,81 +107,64 @@ impl Item {
     }
 }
 
+
 ///////////////////////////////////////////////////////////////////////////////
 
-// StateSets keep deduped elements tracking insertion order
-pub struct StateSet {
-    order: Vec<Rc<Item>>,
-    dedup: HashSet<Rc<Item>>,
-}
 
+#[derive(Default)]
+pub struct StateSet(HashSet<Rc<Item>>);
+
+impl StateSet {
+
+    // Add Earley Items into the set. If the Item already exists we merge bp
+    // StateSets override insertion to merge back-pointers for existing Items.
+    // See implementations of Hash + PartialEq + Eq for Item excluding Item::bp
+    fn insert(&mut self, item: Item) {
+        if let Some(existent) = self.0.get(&item) {
+            existent.bp.borrow_mut().extend(item.bp.into_inner());
+            return;
+        }
+        self.0.insert(Rc::new(item));
+    }
+
+    pub fn len(&self) -> usize { self.0.len() }
+
+    pub fn iter(&self) -> impl Iterator<Item=&Rc<Item>> { self.0.iter() }
+
+    // Produce new items by advancing the dot on items completed by 'item' trig
+    pub fn completed_by(&self, item: &Rc<Item>, at: usize) -> Vec<Item> {
+        self.0.iter()
+            .filter(|source| item.can_complete(source))
+            .map(|source| Item::complete_new(source, item, at))
+            .collect()
+    }
+
+    // Produce new items by advancing the dot on items that can 'scan' lexeme
+    pub fn advanced_by_scan(&self, lexeme: &str, end: usize) -> Vec<Item> {
+        self.0.iter()
+            .filter(|item| item.can_scan(lexeme))
+            .map(|item| Item::scan_new(item, end, lexeme))
+            .collect()
+    }
+}
 
 impl Extend<Item> for StateSet {
     fn extend<I: IntoIterator<Item=Item>>(&mut self, iterable: I) {
-        for item in iterable { self.push(item); }
+        for item in iterable { self.insert(item); }
     }
 }
 
 impl iter::FromIterator<Item> for StateSet {
     fn from_iter<I: IntoIterator<Item=Item>>(iterable: I) -> Self {
-        let mut ss = StateSet::new();
+        let mut ss = StateSet::default();
         ss.extend(iterable.into_iter());
         ss
     }
 }
 
-impl fmt::Debug for StateSet {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.order.fmt(f) }
-}
-
-// Statesets are filled with Items via push/extend, these are boxed to share BP
-// See implementations of Hash + PartialEq + Eq for Item excluding Item::bp
-impl StateSet {
-    pub fn new() -> StateSet {
-        StateSet{order: Vec::new(), dedup: HashSet::new()}
-    }
-
-    // Add Earley Items into the set. If the Item already exists we merge bp
-    fn push(&mut self, item: Item) {
-        if let Some(existent) = self.dedup.get(&item) {
-            existent.bp.borrow_mut().extend(item.bp.into_inner());
-            return;
-        }
-        let item = Rc::new(item);
-        self.order.push(item.clone());
-        self.dedup.insert(item);
-    }
-
-    pub fn len(&self) -> usize { self.dedup.len() }
-
-    // Iterate on insertion order
-    pub fn iter<'a>(&'a self) -> slice::Iter<'a, Rc<Item>> { self.order.iter() }
-
-    // get all items whose rule head matches
-    pub fn filter_rule_head<'a, S: Into<String>>(&'a self, head: S) ->
-           Box<Iterator<Item=&'a Rc<Item>> + 'a> {
-        let head = head.into();
-        Box::new(self.order.iter().filter(move |it| it.rule.head == head))
-    }
-
-    // Produce new items by advancing the dot on items completed by 'item' trig
-    pub fn completed_by(&self, item: &Rc<Item>, at: usize) -> Vec<Item> {
-        self.order.iter()
-            .filter(|source| item.can_complete(source))
-            .map(|source| Item::complete_new(source, item, at))
-            .collect::<Vec<_>>()
-    }
-
-    // Produce new items by advancing the dot on items that can 'scan' lexeme
-    pub fn advanced_by_scan(&self, lexeme: &str, end: usize) -> Vec<Item> {
-        self.order.iter()
-            .filter(|item| item.can_scan(lexeme))
-            .map(|item| Item::scan_new(item, end, lexeme))
-            .collect::<Vec<_>>()
-    }
-}
 
 ///////////////////////////////////////////////////////////////////////////////
+
 
 #[cfg(test)]
 mod tests {
@@ -247,15 +230,15 @@ mod tests {
     fn stateset_dups() {
         let rule = gen_rule2();
         //check that items are deduped in statesets
-        let mut ss = StateSet::new();
-        ss.push(item(rule.clone(), 0, 0, 0));
-        ss.push(item(rule.clone(), 0, 0, 0));
+        let mut ss = StateSet::default();
+        ss.insert(item(rule.clone(), 0, 0, 0));
+        ss.insert(item(rule.clone(), 0, 0, 0));
         assert_eq!(ss.len(), 1);
-        ss.push(item(rule.clone(), 1, 0, 1));
+        ss.insert(item(rule.clone(), 1, 0, 1));
         assert_eq!(ss.len(), 2);
-        ss.push(item(rule.clone(), 1, 0, 1));
+        ss.insert(item(rule.clone(), 1, 0, 1));
         assert_eq!(ss.len(), 2);
-        ss.push(item(rule.clone(), 2, 0, 1));
+        ss.insert(item(rule.clone(), 2, 0, 1));
         assert_eq!(ss.len(), 3);
     }
 }

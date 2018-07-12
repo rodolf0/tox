@@ -91,8 +91,9 @@ impl EarleyParser {
         // It spans the whole input because we search at the last stateset
         let parse_trees = states
             .last().ok_or(ParseError)?
-            .filter_rule_head(self.g.start.as_ref())
-            .filter(|item| item.start == 0 && item.complete())
+            .iter()
+            .filter(|item| item.start == 0 && item.complete() &&
+                           item.rule.head == self.g.start)
             .cloned()
             .collect::<Vec<_>>();
 

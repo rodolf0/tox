@@ -19,6 +19,7 @@ pub struct Item {
     pub start: usize,    // stream position where item starts
     pub end: usize,      // stream position where item ends
     // backpointers leading to this item: (source-item, Scan/Complete)
+    // TODO: define Backpointer newtype
     bp: cell::RefCell<HashSet<(Rc<Item>, Trigger)>>
 }
 
@@ -64,6 +65,7 @@ impl Item {
         self.rule.symbol_at(self.dot).map(|s| &**s)
     }
 
+    // TODO: return Vec<BackPoiner> a copy is fine here?
     pub fn source(&self) -> cell::Ref<HashSet<(Rc<Item>, Trigger)>> {
         self.bp.borrow()
     }
@@ -115,13 +117,13 @@ impl Item {
 pub struct StateSet(HashSet<Rc<Item>>);
 
 impl StateSet {
-
     // Add Earley Items into the set. If the Item already exists we merge bp
     // StateSets override insertion to merge back-pointers for existing Items.
     // See implementations of Hash + PartialEq + Eq for Item excluding Item::bp
     fn insert(&mut self, item: Item) {
         if let Some(existent) = self.0.get(&item) {
-            existent.bp.borrow_mut().extend(item.bp.into_inner());
+            let back_pointers = item.bp.into_inner();
+            existent.bp.borrow_mut().extend(back_pointers);
             return;
         }
         self.0.insert(Rc::new(item));
@@ -132,7 +134,7 @@ impl StateSet {
     pub fn iter(&self) -> impl Iterator<Item=&Rc<Item>> { self.0.iter() }
 
     // Produce new items by advancing the dot on items completed by 'item' trig
-    pub fn completed_by(&self, item: &Rc<Item>, at: usize) -> Vec<Item> {
+    pub fn completed_at(&self, item: &Rc<Item>, at: usize) -> Vec<Item> {
         self.0.iter()
             .filter(|source| item.can_complete(source))
             .map(|source| Item::complete_new(source, item, at))
@@ -160,6 +162,13 @@ impl iter::FromIterator<Item> for StateSet {
         ss.extend(iterable.into_iter());
         ss
     }
+}
+
+use std::collections::hash_set;
+impl iter::IntoIterator for StateSet {
+    type Item = Rc<Item>;
+    type IntoIter = hash_set::IntoIter<Rc<Item>>;
+    fn into_iter(self) -> Self::IntoIter { self.0.into_iter() }
 }
 
 

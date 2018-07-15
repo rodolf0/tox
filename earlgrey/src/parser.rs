@@ -2,7 +2,6 @@
 
 use grammar::{Symbol, Grammar};
 use items::{Item, StateSet};
-use std::iter::FromIterator;
 use std::rc::Rc;
 
 
@@ -31,50 +30,55 @@ impl EarleyParser {
             -> Result<ParseTrees, ParseError> where S: Iterator<Item=String> {
 
         // 0. Populate S0, add items for each rule matching the start symbol
-        let mut states = Vec::new();
-        states.push(StateSet::from_iter(
-                    self.g.rules_for(&self.g.start)
-                        .into_iter()
-                        .map(|r| Item::predict_new(&r, 0))));
+        let s0: StateSet = self.g.rules_for(&self.g.start).into_iter()
+                    .map(|r| Item::predict_new(&r, 0))
+                    .collect();
 
-        // 1. Go through states while there's more, will be one per input token
-        let mut state_idx = 0;
-        while states.len() > state_idx {
+        let mut states = vec![s0];
 
-            // 2. predict/complete until this StateSet stops growing
-            let mut prev_size = -1;
-            while (states[state_idx].len() as isize) != prev_size {
-                prev_size = states[state_idx].len() as isize;
+        // New states are generated from input stream (Scans)
+        for idx in 0.. {
+            if states.len() <= idx { break; }
 
-                // 3. produce new items: run through all items in this StateSet
-                let mut new_items = Vec::new();
-                for itm in states[state_idx].iter() {
-                    new_items.extend(match itm.next_symbol() {
-                        // Prediction
-                        Some(&Symbol::NonTerm(ref name)) =>
-                            self.g.rules_for(name.as_ref())
-                            .into_iter()
-                            .map(|r| Item::predict_new(&r, state_idx))
-                            .collect(),
-                        // Completion
-                        None => states[itm.start].completed_by(&itm, state_idx),
-                        // Scans processed later
-                        _ => Vec::new(),
-                    });
-                }
-                states[state_idx].extend(new_items);
+            // Predic/Complete until no new Items are added to the StateSet
+            loop {
+                let (new_items, prev_item_count) = {
+                    let state = &states[idx];
+                    let new_items: Vec<Item> = state.iter()
+                        .flat_map(|item| match item.next_symbol() {
+
+                            // Prediction: add rules starting with next symbol
+                            Some(Symbol::NonTerm(ref name)) =>
+                                self.g.rules_for(name).into_iter()
+                                    .map(|rule| Item::predict_new(&rule, idx))
+                                    .collect(),
+
+                            // Completion: add items with rules that completed
+                            None =>
+                                states[item.start].completed_at(item, idx),
+
+                            // Scans: these will populate next state, ignore
+                            Some(Symbol::Terminal(_, _)) => Vec::new(),
+
+                        }).collect();
+
+                    (new_items, state.len())
+                };
+
+                // keep adding new items to this StateSet until no more changes
+                let state = &mut states[idx];
+                state.extend(new_items);
+                if state.len() == prev_item_count { break; }
             }
 
-            // 4. Scan input to populate Si+1
+            // Bootstrap Si+1 next state with rules that accept the next token
             if let Some(lexeme) = tok.next() {
-                let scans =
-                    states[state_idx].advanced_by_scan(&lexeme, state_idx+1);
-                states.push(StateSet::from_iter(scans));
-                assert_eq!(states.len(), state_idx + 2);
+                let scans = states[idx]
+                    .advanced_by_scan(&lexeme, idx+1)
+                    .into_iter()
+                    .collect();
+                states.push(scans);
             }
-
-            // 5. Mark this StateSet processed
-            state_idx += 1;
         }
 
         // Verbose, debug state-sets
@@ -89,13 +93,11 @@ impl EarleyParser {
         // Check that at least one item is a. complete, b. starts at the idx 0,
         // and c. that the name of the rule matches the starting symbol.
         // It spans the whole input because we search at the last stateset
-        let parse_trees = states
-            .last().ok_or(ParseError)?
-            .iter()
+        let parse_trees: Vec<_> = states.pop().ok_or(ParseError)?
+            .into_iter()
             .filter(|item| item.start == 0 && item.complete() &&
                            item.rule.head == self.g.start)
-            .cloned()
-            .collect::<Vec<_>>();
+            .collect();
 
         if parse_trees.is_empty() {
             return Err(ParseError);

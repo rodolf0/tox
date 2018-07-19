@@ -19,7 +19,6 @@ pub struct Item {
     pub start: usize,    // stream position where item starts
     pub end: usize,      // stream position where item ends
     // backpointers leading to this item: (source-item, Scan/Complete)
-    // TODO: define Backpointer newtype
     bp: cell::RefCell<HashSet<(Rc<Item>, Trigger)>>
 }
 
@@ -65,7 +64,7 @@ impl Item {
         self.rule.symbol_at(self.dot).map(|s| &**s)
     }
 
-    // TODO: return Vec<BackPoiner> a copy is fine here?
+    // only ever borrowed non-mutable ref returned for public consumption
     pub fn source(&self) -> cell::Ref<HashSet<(Rc<Item>, Trigger)>> {
         self.bp.borrow()
     }

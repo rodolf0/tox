@@ -10,6 +10,7 @@ pub struct ParseError;
 
 pub struct EarleyParser {
     pub g: Grammar,
+    debug: bool,
 }
 
 #[derive(Debug)]
@@ -18,15 +19,11 @@ pub struct ParseTrees(pub Vec<Rc<Item>>);
 ///////////////////////////////////////////////////////////////////////////////
 
 impl EarleyParser {
-    pub fn new(grammar: Grammar) -> EarleyParser { EarleyParser{g: grammar} }
+    pub fn new(grammar: Grammar) -> EarleyParser {
+        EarleyParser{g: grammar, debug: false}
+    }
 
-    pub fn parse<S>(&self, tok: S) -> Result<ParseTrees, ParseError>
-            where S: Iterator<Item=String> { self._parse(tok, false) }
-
-    pub fn debug<S>(&self, tok: S) -> Result<ParseTrees, ParseError>
-            where S: Iterator<Item=String> { self._parse(tok, true) }
-
-    fn _parse<S>(&self, mut tok: S, debug: bool)
+    pub fn parse<S>(&self, mut tok: S)
             -> Result<ParseTrees, ParseError> where S: Iterator<Item=String> {
 
         // 0. Populate S0, add items for each rule matching the start symbol
@@ -82,7 +79,7 @@ impl EarleyParser {
         }
 
         // Verbose, debug state-sets
-        if debug {
+        if self.debug {
             for (idx, stateset) in states.iter().enumerate() {
                 eprintln!("=== {} ===", idx);
                 for item in stateset.iter() { eprintln!("{:?}", item); }

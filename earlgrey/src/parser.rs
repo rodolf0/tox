@@ -5,8 +5,14 @@ use items::{Item, StateSet};
 use std::rc::Rc;
 
 
-#[derive(PartialEq,Debug)]
-pub struct ParseError;
+#[derive(Debug,PartialEq)]
+pub enum Error {
+    ParseError,
+    MissingAction(String),
+    MissingSym(String),
+    DuplicateSym(String),
+    DuplicateRule(String),
+}
 
 pub struct EarleyParser {
     pub g: Grammar,
@@ -24,7 +30,7 @@ impl EarleyParser {
     }
 
     pub fn parse<S>(&self, mut tok: S)
-            -> Result<ParseTrees, ParseError> where S: Iterator<Item=String> {
+            -> Result<ParseTrees, Error> where S: Iterator<Item=String> {
 
         // 0. Populate S0, add items for each rule matching the start symbol
         let s0: StateSet = self.g.rules_for(&self.g.start).into_iter()
@@ -90,14 +96,14 @@ impl EarleyParser {
         // Check that at least one item is a. complete, b. starts at the idx 0,
         // and c. that the name of the rule matches the starting symbol.
         // It spans the whole input because we search at the last stateset
-        let parse_trees: Vec<_> = states.pop().ok_or(ParseError)?
+        let parse_trees: Vec<_> = states.pop().ok_or(Error::ParseError)?
             .into_iter()
             .filter(|item| item.start == 0 && item.complete() &&
                            item.rule.head == self.g.start)
             .collect();
 
         if parse_trees.is_empty() {
-            return Err(ParseError);
+            return Err(Error::ParseError);
         }
         Ok(ParseTrees(parse_trees))
     }
@@ -110,7 +116,7 @@ mod tests {
     extern crate lexers;
     use grammar::GrammarBuilder;
     use self::lexers::{Scanner, DelimTokenizer};
-    use super::{EarleyParser, ParseError};
+    use super::{EarleyParser, Error};
 
     #[test]
     fn partial_parse() {
@@ -122,7 +128,7 @@ mod tests {
             .expect("Bad Grammar");
         let mut input = DelimTokenizer::scanner("+++", "+", false);
         let out = EarleyParser::new(g).parse(&mut input);
-        assert_eq!(out.unwrap_err(), ParseError);
+        assert_eq!(out.unwrap_err(), Error::ParseError);
     }
 
     #[test]
@@ -139,7 +145,7 @@ mod tests {
           .expect("Bad Grammar");
         let mut input = DelimTokenizer::scanner("1+", "+*", false);
         let out = EarleyParser::new(g).parse(&mut input);
-        assert_eq!(out.unwrap_err(), ParseError);
+        assert_eq!(out.unwrap_err(), Error::ParseError);
     }
 
     #[test]

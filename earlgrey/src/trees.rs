@@ -1,16 +1,10 @@
 #![deny(warnings)]
 
 use items::{Item, Trigger};
-use parser::ParseTrees;
+use parser::{ParseTrees, Error};
 use std::collections::HashMap;
 use std::rc::Rc;
 
-
-// TODO: merge into single error type across earlgrey
-#[derive(Clone,Debug)]
-pub enum EvalError {
-    MissingAction(String),
-}
 
 // Semantic actions to execute when walking the tree
 type SemAction<'a, ASTNode> = Box<Fn(Vec<ASTNode>) -> ASTNode + 'a>;
@@ -44,12 +38,12 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 
 impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     fn reduce(&self, root: &Rc<Item>, args: Vec<ASTNode>)
-            -> Result<Vec<ASTNode>, EvalError> {
+            -> Result<Vec<ASTNode>, Error> {
         // if item is not complete, keep collecting args
         if !root.complete() { return Ok(args) }
         let rulename = root.rule.to_string();
         match self.actions.get(&rulename) {
-            None => Err(EvalError::MissingAction(rulename)),
+            None => Err(Error::MissingAction(rulename)),
             Some(action) => {
                 if self.debug { eprintln!("Reduction: {}", rulename); }
                 Ok(vec![action(args)])
@@ -64,7 +58,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     // left side. Trigger is either a scan or a completion, only those can
     // advance a prediction. To write this helper just draw a tree of the
     // backpointers and see how they link
-    fn walker(&self, root: &Rc<Item>) -> Result<Vec<ASTNode>, EvalError> {
+    fn walker(&self, root: &Rc<Item>) -> Result<Vec<ASTNode>, Error> {
         let mut args = Vec::new();
         // collect arguments for semantic actions
         let source = root.source();
@@ -85,7 +79,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     }
 
     // for non-ambiguous grammars this retreieves the only possible parse
-    pub fn eval(&self, ptrees: &ParseTrees) -> Result<ASTNode, EvalError> {
+    pub fn eval(&self, ptrees: &ParseTrees) -> Result<ASTNode, Error> {
         // walker will always return a Vec of size 1 because root.complete
         Ok(self.walker(ptrees.0.first().expect("BUG: ParseTrees empty"))?
            .swap_remove(0))
@@ -95,8 +89,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 
 impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 
-    fn walker_all(&self, root: &Rc<Item>)
-            -> Result<Vec<Vec<ASTNode>>, EvalError> {
+    fn walker_all(&self, root: &Rc<Item>) -> Result<Vec<Vec<ASTNode>>, Error> {
         let source = root.source();
         if source.len() == 0 {
             return Ok(vec![self.reduce(root, Vec::new())?]);
@@ -127,8 +120,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     }
 
     // Retrieves all parse trees
-    pub fn eval_all(&self, ptrees: &ParseTrees)
-            -> Result<Vec<ASTNode>, EvalError> {
+    pub fn eval_all(&self, ptrees: &ParseTrees) -> Result<Vec<ASTNode>, Error> {
         let mut trees = Vec::new();
         for root in &ptrees.0 {
             trees.extend(

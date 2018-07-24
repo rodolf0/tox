@@ -3,14 +3,8 @@
 use std::collections::HashMap;
 use std::{fmt, hash};
 use std::rc::Rc;
+use parser::Error;
 
-
-#[derive(Debug,PartialEq)]
-pub enum GrammarError {
-    MissingSym(String),
-    DuplicateSym(String),
-    DuplicateRule(String),
-}
 
 pub enum Symbol {
     NonTerm(String),
@@ -33,7 +27,7 @@ pub struct Grammar {
 pub struct GrammarBuilder {
     symbols: HashMap<String, Rc<Symbol>>,
     rules: Vec<Rc<Rule>>,
-    error: Option<GrammarError>,
+    error: Option<Error>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -111,7 +105,7 @@ impl GrammarBuilder {
             self.symbols.insert(symbol.name().to_string(), Rc::new(symbol));
         } else if !ignoredup {
             self.error =
-                Some(GrammarError::DuplicateSym(symbol.name().to_string()));
+                Some(Error::DuplicateSym(symbol.name().to_string()));
         }
     }
 
@@ -140,12 +134,12 @@ impl GrammarBuilder {
         // check for missing symbols first
         if let Some(s) = spec.iter()
                 .find(|s| !self.symbols.contains_key(s.as_ref())) {
-            self.error = Some(GrammarError::MissingSym(s.as_ref().to_string()));
+            self.error = Some(Error::MissingSym(s.as_ref().to_string()));
             return;
         }
         let head = head.into();
         if !self.symbols.contains_key(&head) {
-            self.error = Some(GrammarError::MissingSym(head));
+            self.error = Some(Error::MissingSym(head));
             return;
         }
         let rule = Rule{
@@ -156,7 +150,7 @@ impl GrammarBuilder {
         // check for duplicate rules
         let rulestr = rule.to_string();
         if self.rules.iter().any(|r| r.to_string() == rulestr) {
-            self.error = Some(GrammarError::DuplicateRule(rulestr));
+            self.error = Some(Error::DuplicateRule(rulestr));
             return;
         }
         self.rules.push(Rc::new(rule));
@@ -168,14 +162,14 @@ impl GrammarBuilder {
         self
     }
 
-    pub fn into_grammar<S>(self, start: S) -> Result<Grammar, GrammarError>
+    pub fn into_grammar<S>(self, start: S) -> Result<Grammar, Error>
             where S: Into<String> {
         if let Some(e) = self.error {
             return Err(e);
         }
         let start = start.into();
         if !self.symbols.contains_key(&start) {
-            return Err(GrammarError::MissingSym(start));
+            return Err(Error::MissingSym(start));
         }
         Ok(Grammar{start, rules: self.rules})
     }
@@ -190,7 +184,7 @@ impl GrammarBuilder {
 
 #[cfg(test)]
 mod tests {
-    use super::{GrammarBuilder, GrammarError};
+    use super::{GrammarBuilder, Error};
 
     #[test]
     fn build_grammar() {
@@ -211,7 +205,7 @@ mod tests {
             .nonterm("Sum")
             .into_grammar("Sum");
         assert_eq!(g.unwrap_err(),
-                   GrammarError::DuplicateSym("Sum".to_string()));
+                   Error::DuplicateSym("Sum".to_string()));
     }
 
     #[test]
@@ -225,7 +219,7 @@ mod tests {
             .rule("Sum", &["Num"])
             .into_grammar("Sum");
         assert_eq!(g.unwrap_err(),
-                   GrammarError::DuplicateRule("Sum -> Sum + Num".to_string()));
+                   Error::DuplicateRule("Sum -> Sum + Num".to_string()));
     }
 
     #[test]
@@ -235,12 +229,12 @@ mod tests {
             .terminal("Num", |n| n.chars().all(|c| "123".contains(c)))
             .rule("Sum", &["Num"])
             .into_grammar("Xum");
-        assert_eq!(g.unwrap_err(), GrammarError::MissingSym("Xum".to_string()));
+        assert_eq!(g.unwrap_err(), Error::MissingSym("Xum".to_string()));
 
         let g = GrammarBuilder::default()
             .nonterm("Sum")
             .rule("Sum", &["Num"])
             .into_grammar("Sum");
-        assert_eq!(g.unwrap_err(), GrammarError::MissingSym("Num".to_string()));
+        assert_eq!(g.unwrap_err(), Error::MissingSym("Num".to_string()));
     }
 }

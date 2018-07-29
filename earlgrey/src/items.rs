@@ -92,9 +92,9 @@ impl Item {
     }
 
     // produce an Item after scanning a token
-    pub fn scan_new(source: &Rc<Item>, end: usize, input: &str) -> Item {
+    fn scan_new(source: &Rc<Item>, end: usize, input: String) -> Item {
         let mut _bp = HashSet::new();
-        _bp.insert((source.clone(), Trigger::Scan(input.to_string())));
+        _bp.insert((source.clone(), Trigger::Scan(input)));
         Item{rule: source.rule.clone(), dot: source.dot+1,
              start: source.start, end, bp: cell::RefCell::new(_bp)}
     }
@@ -144,7 +144,7 @@ impl StateSet {
     pub fn advanced_by_scan(&self, lexeme: &str, end: usize) -> Vec<Item> {
         self.0.iter()
             .filter(|item| item.can_scan(lexeme))
-            .map(|item| Item::scan_new(item, end, lexeme))
+            .map(|item| Item::scan_new(item, end, lexeme.to_string()))
             .collect()
     }
 }
@@ -227,7 +227,7 @@ mod tests {
         let i = Rc::new(item(gen_rule1(), 2, 0, 0));
         // i Item is doted after '/*', so it can scan a digit
         assert!(i.can_scan("1"));
-        let i2 = Item::scan_new(&i, 1, "3");
+        let i2 = Item::scan_new(&i, 1, "3".to_string());
         assert_eq!(i2, item(gen_rule1(), 3, 0, 1));
         // Assert i2 has back pointer
         assert_eq!(i2.source().len(), 1);

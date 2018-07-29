@@ -115,25 +115,33 @@ impl EarleyParser {
 mod tests {
     extern crate lexers;
     use grammar::GrammarBuilder;
-    use self::lexers::{Scanner, DelimTokenizer};
     use super::{EarleyParser, Error};
+
+    fn good(parser: &EarleyParser, input: &str) {
+        assert!(parser.parse(input.split_whitespace()).is_ok());
+    }
+
+    fn fail(parser: &EarleyParser, input: &str) {
+        assert_eq!(parser.parse(input.split_whitespace()).unwrap_err(),
+                   Error::ParseError);
+    }
 
     #[test]
     fn partial_parse() {
-        let g = GrammarBuilder::default()
+        let grammar = GrammarBuilder::default()
             .nonterm("Start")
             .terminal("+", |n| n == "+")
             .rule("Start", &["+", "+"])
             .into_grammar("Start")
             .expect("Bad Grammar");
-        let mut input = DelimTokenizer::scanner("+++", "+", false);
-        let out = EarleyParser::new(g).parse(&mut input);
-        assert_eq!(out.unwrap_err(), Error::ParseError);
+        let p = EarleyParser::new(grammar);
+        fail(&p, "+ + +");
+        good(&p, "+ +");
     }
 
     #[test]
     fn badparse() {
-        let g = GrammarBuilder::default()
+        let grammar = GrammarBuilder::default()
           .nonterm("Sum")
           .nonterm("Num")
           .terminal("Number", |n| n.chars().all(|c| "1234".contains(c)))
@@ -143,13 +151,13 @@ mod tests {
           .rule("Num", &["Number"])
           .into_grammar("Sum")
           .expect("Bad Grammar");
-        let mut input = DelimTokenizer::scanner("1+", "+*", false);
-        let out = EarleyParser::new(g).parse(&mut input);
-        assert_eq!(out.unwrap_err(), Error::ParseError);
+        let p = EarleyParser::new(grammar);
+        fail(&p, "1 +");
     }
 
     #[test]
     fn grammar_ambiguous() {
+        // Earley's corner case that generates spurious trees for bbb
         // S -> SS | b
         let grammar = GrammarBuilder::default()
           .nonterm("S")
@@ -158,10 +166,11 @@ mod tests {
           .rule("S", &["b"])
           .into_grammar("S")
           .expect("Bad Grammar");
-        // Earley's corner case that generates spurious trees for bbb
-        let mut input = DelimTokenizer::scanner("b b b", " ", true);
-        EarleyParser::new(grammar).parse(&mut input)
-            .expect("Broken Parser");
+        let p = EarleyParser::new(grammar);
+        good(&p, "b b b b");
+        good(&p, "b b b"); // tricky case
+        good(&p, "b b");
+        good(&p, "b");
     }
 
     #[test]
@@ -178,13 +187,15 @@ mod tests {
           .rule("N", &["[0-9]"])
           .into_grammar("S")
           .expect("Bad grammar");
-        let mut input = DelimTokenizer::scanner("1+2", "+", false);
-        EarleyParser::new(grammar).parse(&mut input)
-            .expect("Broken Parser");
+        let p = EarleyParser::new(grammar);
+        good(&p, "1 + 2");
+        good(&p, "1 + 2 + 3");
+        fail(&p, "1 2 + 3");
+        fail(&p, "+ 3");
     }
 
     #[test]
-    fn test_right_recurse() {
+    fn right_recurse() {
         // P -> N ^ P | N
         // N -> [0-9]
         let grammar = GrammarBuilder::default()
@@ -197,9 +208,12 @@ mod tests {
           .rule("N", &["[0-9]"])
           .into_grammar("P")
           .expect("Bad grammar");
-        let mut input = DelimTokenizer::scanner("1^2", "^", false);
-        EarleyParser::new(grammar).parse(&mut input)
-            .expect("Broken Parser");
+        let p = EarleyParser::new(grammar);
+        good(&p, "1 ^ 2");
+        fail(&p, "3 ^ ");
+        good(&p, "1 ^ 2 ^ 4");
+        good(&p, "1 ^ 2 ^ 4 ^ 5");
+        fail(&p, "1 2 ^ 4");
     }
 
     #[test]
@@ -214,9 +228,10 @@ mod tests {
           .rule("B", &vec!["A"])
           .into_grammar("A")
           .expect("Bad grammar");
-        let mut input = DelimTokenizer::scanner("", "-", false);
-        EarleyParser::new(grammar).parse(&mut input)
-            .expect("Broken Parser");
+        let p = EarleyParser::new(grammar);
+        good(&p, "");
+        good(&p, " ");
+        fail(&p, "X");
     }
 
     #[test]
@@ -232,9 +247,11 @@ mod tests {
           .rule::<_, &str>("P", &[])
           .into_grammar("P")
           .expect("Bad grammar");
-        let mut input = Scanner::from_buf("".split_whitespace()
-                                          .map(|s| s.to_string()));
-        EarleyParser::new(grammar).parse(&mut input)
-            .expect("Broken Parser");
+        let p = EarleyParser::new(grammar);
+        good(&p, "");
+        good(&p, "( )");
+        good(&p, "( ( ) )");
+        fail(&p, "( ) )");
+        fail(&p, ")");
     }
 }

@@ -31,9 +31,6 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
             where Action: Fn(Vec<ASTNode>) -> ASTNode + 'a {
         self.actions.insert(rule.to_string(), Box::new(action));
     }
-
-    // TODO: provide an estimate
-    pub fn num_trees(&self) -> Option<u32> { None }
 }
 
 impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
@@ -129,4 +126,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
         }
         Ok(trees)
     }
+
+    // TODO: provide an estimate
+    pub fn num_trees(&self) -> Option<u32> { None }
 }

@@ -113,7 +113,6 @@ impl EarleyParser {
 
 #[cfg(test)]
 mod tests {
-    extern crate lexers;
     use grammar::GrammarBuilder;
     use super::{EarleyParser, Error};
 

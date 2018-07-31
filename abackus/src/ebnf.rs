@@ -11,13 +11,10 @@ use self::earlgrey::{
 use std::cell::RefCell;
 
 
-#[derive(Debug)]
-pub struct EbnfError(pub String);
-
 // https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form
 pub fn ebnf_grammar() -> Grammar {
     GrammarBuilder::default()
-      .terminal("<Id>", move |s|  // in sync w lexers::scan_identifier TODO: ??
+      .terminal("<Id>", move |s|
                 s.chars().enumerate().all(|(i, c)|
                     i == 0 && c.is_alphabetic() ||
                     i > 0 && (c.is_alphanumeric() || c == '_')))
@@ -55,11 +52,9 @@ pub fn ebnf_grammar() -> Grammar {
       .expect("Bad EBNF Grammar")
 }
 
-macro_rules! pull {
-    ($p:path, $e:expr) => (match $e {
-        $p(value) => value,
-        n @ _ => panic!("Bad pull match={:?}", n)
-    })
+// enable / disable debug information
+macro_rules! debug {
+    ($fmt:expr, $($args:expr),*) => (if false { eprintln!($fmt, $($args),*); })
 }
 
 
@@ -69,114 +64,155 @@ pub struct ParserBuilder(pub GrammarBuilder);
 #[derive(Clone,Debug)]
 enum G {Body(Vec<Vec<String>>), Part(Vec<String>), Atom(String), Nop}
 
+// use to destructure G enum into a specific alternative
+macro_rules! pull {
+    ($p:path, $e:expr) => (match $e {
+        $p(value) => value,
+        n @ _ => panic!("Bad pull match={:?}", n)
+    })
+}
+
 impl ParserBuilder {
+    // Parsing terminals / non-terminal leaf nodes
+    fn evaler<'a>(gb: &'a RefCell<GrammarBuilder>) -> EarleyForest<'a, G> {
+        EarleyForest::new(move |symbol, token| {
+            match symbol {
+                "<Id>" => {
+                    debug!("Adding non-term {:?}", token);
+                    gb.borrow_mut().add_nonterm(token, true);
+                },
+                "<Chars>" => {
+                    debug!("Adding terminal {:?}", token);
+                    let tok = token.to_string();
+                    gb.borrow_mut()
+                        .add_terminal(token, move |s| s == tok, true);
+                },
+                _ => ()
+            }
+            G::Atom(token.to_string())
+        })
+    }
 
-    pub fn builder(gb: GrammarBuilder, grammar: &str, dbg: bool)
+    fn action_rule<'a>(ev: &mut EarleyForest<'a, G>,
+                       gb: &'a RefCell<GrammarBuilder>) {
+        ev.action("<Rule> -> <Id> := <Body> ;", move |mut n| {
+            let id = pull!(G::Atom, n.remove(0));
+            let body = pull!(G::Body, n.remove(1));
+            let mut t_gb = gb.borrow_mut();
+            for rule in body {
+                debug!("Adding rule {:?} -> {:?}", id, rule);
+                t_gb.add_rule(id.as_ref(), rule.as_slice());
+            }
+            G::Nop
+        });
+    }
+
+    fn action_body<'a>(ev: &mut EarleyForest<'a, G>) {
+        ev.action("<Body> -> <Body> | <Part>", |mut n| {
+            let mut body = pull!(G::Body, n.remove(0));
+            body.push(pull!(G::Part, n.remove(1)));
+            G::Body(body)
+        });
+        ev.action("<Body> -> <Part>", |mut n| {
+            let part = pull!(G::Part, n.remove(0));
+            G::Body(vec!(part))
+        });
+    }
+
+    fn action_part<'a>(ev: &mut EarleyForest<'a, G>) {
+        ev.action("<Part> -> <Part> <Atom>", |mut n| {
+            let mut part = pull!(G::Part, n.remove(0));
+            part.push(pull!(G::Atom, n.remove(0)));
+            G::Part(part)
+        });
+        ev.action("<Part> -> <Atom>", |mut n| {
+            G::Part(vec!(pull!(G::Atom, n.remove(0))))
+        });
+    }
+
+    fn action_grouping<'a>(ev: &mut EarleyForest<'a, G>,
+                           gb: &'a RefCell<GrammarBuilder>) {
+        ev.action("<Atom> -> ( <Body> )", move |mut n| {
+            let aux = gb.borrow().unique_symbol_name();
+            debug!("Adding non-term {:?}", aux);
+            let mut t_gb = gb.borrow_mut();
+            t_gb.add_nonterm(aux.as_ref(), false);
+            let body = pull!(G::Body, n.remove(1));
+            for rule in body {
+                debug!("Adding rule {:?} -> {:?}", aux, rule);
+                t_gb.add_rule(aux.as_ref(), rule.as_slice());
+            }
+            G::Atom(aux)
+        });
+    }
+
+    fn action_optional<'a>(ev: &mut EarleyForest<'a, G>,
+                           gb: &'a RefCell<GrammarBuilder>) {
+        ev.action("<Atom> -> [ <Body> ]", move |mut n| {
+            // <Atom> -> aux ; aux -> <e> | <Body> ;
+            let aux = gb.borrow().unique_symbol_name();
+            debug!("Adding non-term {:?}", aux);
+            let mut t_gb = gb.borrow_mut();
+            t_gb.add_nonterm(aux.as_ref(), false);
+            let body = pull!(G::Body, n.remove(1));
+            for rule in body {
+                debug!("Adding rule {:?} -> {:?}", aux, rule);
+                t_gb.add_rule(aux.as_ref(), rule.as_slice());
+                debug!("Adding rule {:?} -> []", aux);
+                t_gb.add_rule::<_, String>(aux.as_ref(), &[]);
+            }
+            G::Atom(aux)
+        });
+    }
+
+    fn action_repeat<'a>(ev: &mut EarleyForest<'a, G>,
+                         gb: &'a RefCell<GrammarBuilder>) {
+        ev.action("<Atom> -> { <Body> }", move |mut n| {
+            // <Atom> -> aux ; aux -> <e> | <Body> aux ;
+            let aux = gb.borrow().unique_symbol_name();
+            debug!("Adding non-term {:?}", aux);
+            let mut t_gb = gb.borrow_mut();
+            t_gb.add_nonterm(aux.as_ref(), false);
+            let body = pull!(G::Body, n.remove(1));
+            for mut rule in body {
+                rule.push(aux.clone());
+                debug!("Adding rule {:?} -> {:?}", aux, rule);
+                t_gb.add_rule(aux.as_ref(), rule.as_slice());
+                debug!("Adding rule {:?} -> []", aux);
+                t_gb.add_rule::<_, String>(aux.as_ref(), &[]);
+            }
+            G::Atom(aux)
+        });
+    }
+
+    // Parse a user grammar into a builder where we can plug terminal matchers
+    pub fn parse_grammar(gb: GrammarBuilder, user_grammar_spec: &str)
             -> Result<GrammarBuilder, Error> {
-
-        let ebnf_parser = EarleyParser::new(ebnf_grammar());
-        let earley_state = ebnf_parser.parse(EbnfTokenizer::scanner(grammar))?;
-
-        let gb = RefCell::new(gb);
+        let user_grammar_builder = RefCell::new(gb);
         {
-            let mut ev = EarleyForest::new(|symbol, token| {
-                match symbol {
-                    "<Id>" => {
-                        if dbg {eprintln!("Adding non-term {:?}", token);}
-                        gb.borrow_mut().add_nonterm(token, true);
-                    }, "<Chars>" => {
-                        if dbg {eprintln!("Adding terminal {:?}", token);}
-                        let tok = token.to_string();
-                        gb.borrow_mut()
-                            .add_terminal(token, move |s| s == tok, true);
-                    }, _ => ()
-                }
-                G::Atom(token.to_string())
-            });
+            let mut ev = ParserBuilder::evaler(&user_grammar_builder);
             ev.action("<RuleList> -> <RuleList> <Rule>", |_| G::Nop);
             ev.action("<RuleList> -> <Rule>", |_| G::Nop);
-            ev.action("<Rule> -> <Id> := <Body> ;", |mut n| {
-                let id = pull!(G::Atom, n.remove(0));
-                let body = pull!(G::Body, n.remove(1));
-                let mut t_gb = gb.borrow_mut();
-                for rule in body {
-                    if dbg {eprintln!("Adding rule {:?} -> {:?}", id, rule);}
-                    t_gb.add_rule(id.as_ref(), rule.as_slice());
-                }
-                G::Nop
-            });
-            ev.action("<Body> -> <Body> | <Part>", |mut n| {
-                let mut body = pull!(G::Body, n.remove(0));
-                body.push(pull!(G::Part, n.remove(1)));
-                G::Body(body)
-            });
-            ev.action("<Body> -> <Part>", |mut n| {
-                let part = pull!(G::Part, n.remove(0));
-                G::Body(vec!(part))
-            });
-            ev.action("<Part> -> <Part> <Atom>", |mut n| {
-                let mut part = pull!(G::Part, n.remove(0));
-                part.push(pull!(G::Atom, n.remove(0)));
-                G::Part(part)
-            });
-            ev.action("<Part> -> <Atom>", |mut n| {
-                G::Part(vec!(pull!(G::Atom, n.remove(0))))
-            });
+            ParserBuilder::action_rule(&mut ev, &user_grammar_builder);
+            ParserBuilder::action_body(&mut ev);
+            ParserBuilder::action_part(&mut ev);
+            ParserBuilder::action_grouping(&mut ev, &user_grammar_builder);
+            ParserBuilder::action_optional(&mut ev, &user_grammar_builder);
+            ParserBuilder::action_repeat(&mut ev, &user_grammar_builder);
             ev.action("<Atom> -> <Id>", |mut n| n.remove(0));
             ev.action("<Atom> -> ' <Chars> '", |mut n| n.remove(1));
             ev.action("<Atom> -> \" <Chars> \"", |mut n| n.remove(1));
-            ev.action("<Atom> -> ( <Body> )", |mut n| {
-                let aux = gb.borrow().unique_symbol_name();
-                let body = pull!(G::Body, n.remove(1));
-                let mut t_gb = gb.borrow_mut();
-                if dbg {eprintln!("Adding non-term {:?}", aux);}
-                t_gb.add_nonterm(aux.as_ref(), false);
-                for rule in body {
-                    if dbg {eprintln!("Adding rule {:?} -> {:?}", aux, rule);}
-                    t_gb.add_rule(aux.as_ref(), rule.as_slice());
-                }
-                G::Atom(aux)
-            });
-            ev.action("<Atom> -> [ <Body> ]", |mut n| {
-                // <Atom> -> aux ; aux -> <e> | <Body> ;
-                let aux = gb.borrow().unique_symbol_name();
-                let body = pull!(G::Body, n.remove(1));
-                let mut t_gb = gb.borrow_mut();
-                if dbg {eprintln!("Adding non-term {:?}", aux);}
-                t_gb.add_nonterm(aux.as_ref(), false);
-                for rule in body {
-                    if dbg {
-                        eprintln!("Adding rule {:?} -> []", aux);
-                        eprintln!("Adding rule {:?} -> {:?}", aux, rule);
-                    }
-                    t_gb.add_rule(aux.as_ref(), rule.as_slice());
-                    t_gb.add_rule::<_, String>(aux.as_ref(), &[]);
-                }
-                G::Atom(aux)
-            });
-            ev.action("<Atom> -> { <Body> }", |mut n| {
-                // <Atom> -> aux ; aux -> <e> | <Body> aux ;
-                let aux = gb.borrow().unique_symbol_name();
-                let body = pull!(G::Body, n.remove(1));
-                let mut t_gb = gb.borrow_mut();
-                if dbg {eprintln!("Adding non-term {:?}", aux);}
-                t_gb.add_nonterm(aux.as_ref(), false);
-                for mut rule in body {
-                    if dbg {
-                        eprintln!("Adding rule {:?} -> []", aux);
-                        eprintln!("Adding rule {:?} -> {:?}", aux, rule);
-                    }
-                    rule.push(aux.clone());
-                    t_gb.add_rule(aux.as_ref(), rule.as_slice());
-                    t_gb.add_rule::<_, String>(aux.as_ref(), &[]);
-                }
-                G::Atom(aux)
-            });
-            if ev.eval_all(&earley_state).expect("EBNF Bug").len() != 1 {
+            // Build parser for EBNF grammar
+            let ebnf = EarleyParser::new(ebnf_grammar());
+            // Use EBNF parser to parse the user provided grammar
+            let state = ebnf.parse(EbnfTokenizer::scanner(user_grammar_spec))?;
+            // Forge user's grammar builder by executing semantic actions
+            if ev.eval_all(&state)?.len() != 1 {
                 panic!("BUG: EBNF grammar shouldn't be ambiguous!");
             }
         }
-        Ok(gb.into_inner())
+        // User's GrammarBuilder has all rules and non-terminals from the spec
+        Ok(user_grammar_builder.into_inner())
     }
 
     // Plug-in functions that parse Terminals before we build the grammar
@@ -189,9 +225,9 @@ impl ParserBuilder {
     // Build a parser for the provided grammar in EBNF syntax
     pub fn into_parser(self, start: &str, grammar: &str)
             -> Result<EarleyParser, Error> {
-        let earley_grammar =
-            ParserBuilder::builder(self.0, grammar, false)?
+        let user_grammar =
+            ParserBuilder::parse_grammar(self.0, grammar)?
                 .into_grammar(start)?;
-        Ok(EarleyParser::new(earley_grammar))
+        Ok(EarleyParser::new(user_grammar))
     }
 }

@@ -35,9 +35,9 @@ pub type Treeresult = Result<Vec<Sexpr>, Error>;
 impl ParserBuilder {
     // Build an evaluator that accepts grammar and builds Sexpr's from input
     pub fn treeficator<'a>(self, start: &str, grammar: &'a str)
-            -> Box<Fn(&mut Iterator<Item=String>)->Treeresult + 'a> {
+            -> impl Fn(&mut Iterator<Item=String>)->Treeresult + 'a {
         // 1. build a grammar builder for the user's grammar
-        let grammar = ParserBuilder::builder(self.0, grammar, false)
+        let grammar = ParserBuilder::parse_grammar(self.0, grammar)
             .unwrap_or_else(|e| panic!("treeficator error: {:?}", e))
             .into_grammar(start)
             .unwrap_or_else(|e| panic!("treeficator error: {:?}", e));
@@ -53,6 +53,6 @@ impl ParserBuilder {
 
         // 3. return a function that applies the parser+evaler to any input
         let parser = EarleyParser::new(grammar);
-        Box::new(move |tokenizer| ev.eval_all(&parser.parse(tokenizer)?))
+        move |tokenizer| ev.eval_all(&parser.parse(tokenizer)?)
     }
 }

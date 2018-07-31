@@ -6,7 +6,7 @@ extern crate earlgrey;
 use self::lexers::EbnfTokenizer;
 use self::earlgrey::{
     Grammar, GrammarBuilder,
-    EarleyParser, ParseError, EarleyForest,
+    EarleyParser, Error, EarleyForest,
 };
 use std::cell::RefCell;
 
@@ -16,9 +16,11 @@ pub struct EbnfError(pub String);
 
 // https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form
 pub fn ebnf_grammar() -> Grammar {
-    GrammarBuilder::new()
-      .terminal("<Id>", move |s|  // in sync w lexers::scan_identifier
-                s.chars().all(|c| c.is_alphanumeric() || c == '_'))
+    GrammarBuilder::default()
+      .terminal("<Id>", move |s|  // in sync w lexers::scan_identifier TODO: ??
+                s.chars().enumerate().all(|(i, c)|
+                    i == 0 && c.is_alphabetic() ||
+                    i > 0 && (c.is_alphanumeric() || c == '_')))
       .terminal("<Chars>", move |s| s.chars().all(|c| !c.is_control()))
       .terminal(":=", |s| s == ":=")
       .terminal(";", |s| s == ";")
@@ -53,8 +55,6 @@ pub fn ebnf_grammar() -> Grammar {
       .expect("Bad EBNF Grammar")
 }
 
-pub struct ParserBuilder(pub GrammarBuilder);
-
 macro_rules! pull {
     ($p:path, $e:expr) => (match $e {
         $p(value) => value,
@@ -62,17 +62,20 @@ macro_rules! pull {
     })
 }
 
+
+#[derive(Default)]
+pub struct ParserBuilder(pub GrammarBuilder);
+
+#[derive(Clone,Debug)]
+enum G {Body(Vec<Vec<String>>), Part(Vec<String>), Atom(String), Nop}
+
 impl ParserBuilder {
-    pub fn new() -> ParserBuilder { ParserBuilder(GrammarBuilder::new()) }
 
     pub fn builder(gb: GrammarBuilder, grammar: &str, dbg: bool)
-            -> Result<GrammarBuilder, ParseError> {
-        let mut tokenizer = EbnfTokenizer::scanner(grammar);
-        let ebnf_parser = EarleyParser::new(ebnf_grammar());
-        let state = try!(ebnf_parser.parse(&mut tokenizer));
+            -> Result<GrammarBuilder, Error> {
 
-        #[derive(Clone,Debug)]
-        enum G {Body(Vec<Vec<String>>), Part(Vec<String>), Atom(String), Nop}
+        let ebnf_parser = EarleyParser::new(ebnf_grammar());
+        let earley_state = ebnf_parser.parse(EbnfTokenizer::scanner(grammar))?;
 
         let gb = RefCell::new(gb);
         {
@@ -169,8 +172,8 @@ impl ParserBuilder {
                 }
                 G::Atom(aux)
             });
-            if ev.eval_all(&state).expect("EBNF Bug").len() != 1 {
-                panic!("EBNF grammar Bug: shouldn't be ambiguous!");
+            if ev.eval_all(&earley_state).expect("EBNF Bug").len() != 1 {
+                panic!("BUG: EBNF grammar shouldn't be ambiguous!");
             }
         }
         Ok(gb.into_inner())
@@ -185,11 +188,10 @@ impl ParserBuilder {
 
     // Build a parser for the provided grammar in EBNF syntax
     pub fn into_parser(self, start: &str, grammar: &str)
-            -> Result<EarleyParser, EbnfError> {
-        let grammar = ParserBuilder::builder(self.0, grammar, false)
-                        .or_else(|e| Err(EbnfError(format!("{:?}", e))))?
-                        .into_grammar(start)
-                        .or_else(|e| Err(EbnfError(format!("{:?}", e))))?;
-        Ok(EarleyParser::new(grammar))
+            -> Result<EarleyParser, Error> {
+        let earley_grammar =
+            ParserBuilder::builder(self.0, grammar, false)?
+                .into_grammar(start)?;
+        Ok(EarleyParser::new(earley_grammar))
     }
 }

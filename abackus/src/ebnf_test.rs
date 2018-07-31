@@ -38,7 +38,7 @@ fn build_ebnf_grammar() {
 #[test]
 fn minimal_parser() {
     let g = r#" Number := "0" ; "#;
-    let p = ParserBuilder::new().into_parser("Number", &g).unwrap();
+    let p = ParserBuilder::default().into_parser("Number", &g).unwrap();
     let mut tok = DelimTokenizer::scanner("0", " ", true);
     let state = p.parse(&mut tok).unwrap();
     let trees = Tree::builder(p.g.clone()).eval_all(&state);
@@ -55,7 +55,7 @@ fn arith_parser() {
 
         Number := "0" | "1" | "2" | "3" ;
     "#;
-    let p = ParserBuilder::new().into_parser("expr", &g).unwrap();
+    let p = ParserBuilder::default().into_parser("expr", &g).unwrap();
     let mut tok = DelimTokenizer::scanner("3 + 2 + 1", " ", true);
     let state = p.parse(&mut tok).unwrap();
     let trees = Tree::builder(p.g.clone()).eval_all(&state);
@@ -70,7 +70,7 @@ fn repetition() {
         arg := b { "," b } ;
         b := "0" | "1" ;
     "#;
-    let p = ParserBuilder::new().into_parser("arg", &g).unwrap();
+    let p = ParserBuilder::default().into_parser("arg", &g).unwrap();
     let mut tok = DelimTokenizer::scanner("1 , 0 , 1", " ", true);
     let state = p.parse(&mut tok).unwrap();
     let trees = Tree::builder(p.g.clone()).eval_all(&state);
@@ -84,7 +84,7 @@ fn option() {
         complex := d [ "i" ];
         d := "0" | "1" | "2";
     "#;
-    let p = ParserBuilder::new().into_parser("complex", &g).unwrap();
+    let p = ParserBuilder::default().into_parser("complex", &g).unwrap();
     let mut tok = DelimTokenizer::scanner("1", " ", true);
     let state = p.parse(&mut tok).unwrap();
     let trees = Tree::builder(p.g.clone()).eval_all(&state);
@@ -99,7 +99,7 @@ fn grouping() {
     let g = r#"
         row := ("a" | "b") ("0" | "1") ;
     "#;
-    let p = ParserBuilder::new().into_parser("row", &g).unwrap();
+    let p = ParserBuilder::default().into_parser("row", &g).unwrap();
     let mut tok = DelimTokenizer::scanner("b 1", " ", true);
     let state = p.parse(&mut tok).unwrap();
     let trees = Tree::builder(p.g.clone()).eval_all(&state);
@@ -116,7 +116,7 @@ fn plug_terminal() {
         expr := Number
               | expr "+" Number ;
     "#;
-    let p = ParserBuilder::new()
+    let p = ParserBuilder::default()
         .plug_terminal("Number", |i| i8::from_str(i).is_ok())
         .into_parser("expr", &g).unwrap();
     let mut tok = DelimTokenizer::scanner("3 + 1", " ", true);

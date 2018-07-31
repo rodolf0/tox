@@ -2,8 +2,8 @@
 
 extern crate earlgrey;
 
-use ebnf::{EbnfError, ParserBuilder};
-use self::earlgrey::{EarleyParser, EarleyForest};
+use ebnf::ParserBuilder;
+use self::earlgrey::{EarleyParser, EarleyForest, Error};
 
 #[derive(Clone,Debug)]
 pub enum Sexpr {
@@ -30,7 +30,7 @@ impl Sexpr {
     }
 }
 
-pub type Treeresult = Result<Vec<Sexpr>, EbnfError>;
+pub type Treeresult = Result<Vec<Sexpr>, Error>;
 
 impl ParserBuilder {
     // Build an evaluator that accepts grammar and builds Sexpr's from input
@@ -53,11 +53,6 @@ impl ParserBuilder {
 
         // 3. return a function that applies the parser+evaler to any input
         let parser = EarleyParser::new(grammar);
-        Box::new(move |mut tokenizer| {
-            let state = parser.parse(&mut tokenizer)
-                        .or_else(|e| Err(EbnfError(format!("{:?}", e))))?;
-            ev.eval_all(&state)
-                .or_else(|e| Err(EbnfError(format!("{:?}", e))))
-        })
+        Box::new(move |tokenizer| ev.eval_all(&parser.parse(tokenizer)?))
     }
 }

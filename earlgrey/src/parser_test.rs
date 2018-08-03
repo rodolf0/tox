@@ -31,6 +31,7 @@ fn check_trees<T: fmt::Debug>(trees: &Vec<T>, expected: Vec<&str>) {
     let mut expect = HashSet::<&str>::from_iter(expected);
     for t in trees {
         let debug_string = format!("{:?}", t);
+        eprintln!("Removing {}", debug_string);
         assert!(expect.remove(debug_string.as_str()));
     }
     assert_eq!(0, expect.len());

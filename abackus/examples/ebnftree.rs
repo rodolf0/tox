@@ -38,7 +38,7 @@ fn main() {
     use std::str::FromStr;
     let trificator = abackus::ParserBuilder::default()
         .plug_terminal("num", |n| f64::from_str(n).is_ok())
-        .treeficator("expr", &grammar);
+        .sexprificator(&grammar, "expr");
 
     match trificator(&mut Tokenizer::scanner(&input)) {
         Ok(trees) => for t in trees { t.print(); },

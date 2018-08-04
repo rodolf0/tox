@@ -54,7 +54,7 @@ impl MathTokenizer {
             }
         } else if let Some(num) = helpers::scan_number(&mut self.src) {
             Some(MathToken::Number(f64::from_str(&num).unwrap()))
-        } else if let Some(_) = self.src.next() {
+        } else if self.src.next().is_some() {
             Some(MathToken::Unknown(self.src.extract_string()))
         } else {
             None

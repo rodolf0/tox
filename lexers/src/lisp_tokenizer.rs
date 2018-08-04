@@ -35,28 +35,27 @@ impl Iterator for LispTokenizer {
                 ')' => LispToken::CParen,
                 '\'' => LispToken::Quote,
                 '`' => LispToken::QuasiQuote,
-                ',' => match self.0.accept_char('@') {
-                    true => LispToken::UnQSplice,
-                    false => LispToken::UnQuote,
+
+                ',' => {
+                    if self.0.accept_char('@') { LispToken::UnQSplice }
+                    else { LispToken::UnQuote }
                 },
                 _ => unreachable!()
             };
             self.0.ignore();
             Some(token)
-        } else {
-            if self.0.until_any_char(") \n\r\t") { // or til EOF
-                let token = self.0.extract_string();
-                match &token[..] {
-                    "#t" => Some(LispToken::True),
-                    "#f" => Some(LispToken::False),
-                    num  => match f64::from_str(num) {
-                        Ok(n) => Some(LispToken::Number(n)),
-                        Err(_)  => Some(LispToken::Symbol(token.clone())),
-                    }
+        } else if self.0.until_any_char(") \n\r\t") { // or til EOF
+            let token = self.0.extract_string();
+            match &token[..] {
+                "#t" => Some(LispToken::True),
+                "#f" => Some(LispToken::False),
+                num  => match f64::from_str(num) {
+                    Ok(n) => Some(LispToken::Number(n)),
+                    Err(_)  => Some(LispToken::Symbol(token.clone())),
                 }
-            } else {
-                None
             }
+        } else {
+            None
         }
     }
 }

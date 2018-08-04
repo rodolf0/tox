@@ -15,7 +15,7 @@ impl DelimTokenizer {
             where S: Into<String> {
         Scanner::new(Box::new(
             DelimTokenizer{src: Scanner::from_str(src),
-                delims: delims.into(), remove: remove}))
+                delims: delims.into(), remove}))
     }
 }
 
@@ -26,10 +26,7 @@ impl Iterator for DelimTokenizer {
             Some(self.src.extract_string())
         } else if let Some(c) = self.src.accept_any_char(&self.delims) {
             self.src.ignore();
-            match self.remove {
-                false => Some(c.to_string()),
-                true => self.next()
-            }
+            if self.remove { self.next() } else { Some(c.to_string()) }
         } else {
             None
         }

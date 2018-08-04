@@ -68,7 +68,7 @@ enum G {Body(Vec<Vec<String>>), Part(Vec<String>), Atom(String), Nop}
 macro_rules! pull {
     ($p:path, $e:expr) => (match $e {
         $p(value) => value,
-        n @ _ => panic!("Bad pull match={:?}", n)
+        n => panic!("Bad pull match={:?}", n)
     })
 }
 

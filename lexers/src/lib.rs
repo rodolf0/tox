@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 mod scanner;
 mod helpers;
 mod delim_tokenizer;

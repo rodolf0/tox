@@ -127,7 +127,7 @@ impl<T: Clone + Hash + Eq> Scanner<T> {
     pub fn skip_all(&mut self, over: &HashSet<T>) -> bool {
         let mut advanced = false;
         while self.accept_any(over).is_some() { advanced = true; }
-        return advanced;
+        advanced
     }
 
     // Find an element in the 'any' set or EOF, return if the scanner advanced,
@@ -139,7 +139,7 @@ impl<T: Clone + Hash + Eq> Scanner<T> {
             self.next();
             advanced = true;
         }
-        return advanced;
+        advanced
     }
 }
 
@@ -178,7 +178,7 @@ impl Scanner<char> {
     pub fn skip_all_chars(&mut self, over: &str) -> bool {
         let mut advanced = false;
         while self.accept_any_char(over).is_some() { advanced = true; }
-        return advanced;
+        advanced
     }
 
     pub fn skip_ws(&mut self) -> bool { self.skip_all_chars(WHITE) }
@@ -195,6 +195,6 @@ impl Scanner<char> {
             self.next();
             advanced = true;
         }
-        return advanced;
+        advanced
     }
 }

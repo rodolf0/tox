@@ -25,9 +25,9 @@ impl Sexpr {
     pub fn print(&self) { self.print_helper("") }
 
     fn print_helper(&self, level: &str) {
-        match self {
-            &Sexpr::Atom(ref lexeme) => println!("{}`-- {:?}", level, lexeme),
-            &Sexpr::List(ref subn) => {
+        match *self {
+            Sexpr::Atom(ref lexeme) => println!("{}`-- {:?}", level, lexeme),
+            Sexpr::List(ref subn) => {
                 println!("{}`--", level);
                 if let Some((last, rest)) = subn.split_last() {
                     let l = format!("{}  |", level);

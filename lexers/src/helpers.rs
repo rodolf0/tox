@@ -57,15 +57,14 @@ pub fn scan_math_op(scanner: &mut Scanner<char>) -> Option<String> {
 // scan integers like 0x34 0b10101 0o657
 pub fn scan_xob_integers(scanner: &mut Scanner<char>) -> Option<String> {
     let backtrack = scanner.pos();
-    if scanner.accept_any_char("0").is_some() {
-        if match scanner.accept_any_char("xob") {
+    if scanner.accept_any_char("0").is_some() &&
+        match scanner.accept_any_char("xob") {
             Some('x') => scanner.skip_all_chars("0123456789ABCDEFabcdef"),
             Some('o') => scanner.skip_all_chars("01234567"),
             Some('b') => scanner.skip_all_chars("01"),
             _ => false,
         } {
-            return Some(scanner.extract_string());
-        }
+        return Some(scanner.extract_string());
     }
     scanner.set_pos(backtrack);
     None
@@ -90,7 +89,7 @@ pub fn scan_identifier(scanner: &mut Scanner<char>) -> Option<String> {
     let alnum = concat!("0123456789",
                         "abcdefghijklmnopqrstuvwxyz",
                         "ABCDEFGHIJKLMNOPQRSTUVWXYZ_");
-    if scanner.accept_any_char(alfa).is_none() { return None; }
+    scanner.accept_any_char(alfa)?;
     scanner.skip_all_chars(alnum);
     Some(scanner.extract_string())
 }

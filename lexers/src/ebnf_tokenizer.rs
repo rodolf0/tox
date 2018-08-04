@@ -50,6 +50,6 @@ impl Iterator for EbnfTokenizer {
         if let Some(id) = helpers::scan_identifier(&mut s) {
             return Some(id);
         }
-        return None;
+        None
     }
 }

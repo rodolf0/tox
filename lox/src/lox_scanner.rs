@@ -32,7 +32,10 @@ pub struct LoxScanner {
 impl LoxScanner {
     pub fn scanner(src: String) -> Scanner<Token> {
         Scanner::new(Box::new(
-            LoxScanner{src: Scanner::from_str(&src), line: 1, errors: false}))
+            LoxScanner{
+                src: Scanner::from_buf(src.chars()),
+                line: 1,
+                errors: false}))
     }
 
     fn tokenize(&mut self, literal: TT) -> Option<Token> {

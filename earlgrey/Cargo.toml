@@ -1,6 +1,6 @@
 [package]
 name = "earlgrey"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "An earley parser library"
 license = "MIT"
@@ -11,5 +11,5 @@ name = "arith"
 path = "examples/arith.rs"
 
 [dev-dependencies]
-lexers = { version = "0.0.5", path = "../lexers" }
+lexers = { version = "0.0.6", path = "../lexers" }
 rustyline = "1.0.0"

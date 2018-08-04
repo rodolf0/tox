@@ -58,7 +58,7 @@ impl Iterator for Tokenizer {
 impl Tokenizer {
     fn scanner(input: &str) -> lexers::Scanner<String> {
         lexers::Scanner::new(
-            Box::new(Tokenizer(lexers::Scanner::from_str(&input))))
+            Box::new(Tokenizer(lexers::Scanner::from_buf(input.chars()))))
     }
 }
 

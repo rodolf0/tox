@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 extern crate chrono;
 use chrono::{Datelike, Timelike};
 use semantics::Grain;

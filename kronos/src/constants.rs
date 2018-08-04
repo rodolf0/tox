@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 pub fn weekday(d: &str) -> Option<u32> {
     match d {
         "sunday"    | "sundays"    | "sun" => Some(0),

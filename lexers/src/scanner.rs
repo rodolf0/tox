@@ -146,10 +146,6 @@ impl<T: Clone + Hash + Eq> Scanner<T> {
 static WHITE: &str = " \n\r\t";
 
 impl Scanner<char> {
-    pub fn from_str(source: &str) -> Scanner<char> {
-        Scanner{src: None, buf: source.chars().collect(), pos: -1}
-    }
-
     pub fn extract_string(&mut self) -> String {
         use std::iter::FromIterator;
         let tokens = String::from_iter(self.view().iter().cloned());

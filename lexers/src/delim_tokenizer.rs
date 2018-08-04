@@ -14,7 +14,7 @@ impl DelimTokenizer {
     pub fn scanner<S>(src: &str, delims: S, remove: bool) -> Scanner<String>
             where S: Into<String> {
         Scanner::new(Box::new(
-            DelimTokenizer{src: Scanner::from_str(src),
+            DelimTokenizer{src: Scanner::from_buf(src.chars()),
                 delims: delims.into(), remove}))
     }
 }

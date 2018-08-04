@@ -69,7 +69,7 @@ fn time_parser() -> EarleyParser {
     TimeEl := time | count | time_shift ;
     "#;
 
-    ParserBuilder::new()
+    ParserBuilder::default()
         .plug_terminal("weekday", |d| kc::weekday(d).is_some())
         .plug_terminal("month", |d| kc::month(d).is_some())
         .plug_terminal("ordinal",

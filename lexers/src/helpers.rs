@@ -111,7 +111,7 @@ mod tests {
             "-38.657e3", "53.845e+5", "65.987E-4", "-4.4e+2i", "-6.14e-5i",
         ];
         for t in tests.iter() {
-            let mut s = Scanner::from_str(t);
+            let mut s = Scanner::from_buf(t.chars());
             assert_eq!(Some(t.to_string()), scan_number(&mut s));
         }
     }
@@ -123,7 +123,7 @@ mod tests {
             "*", "**", "^", "!", "+", "-", "/", "%",
         ];
         for t in tests.iter() {
-            let mut s = Scanner::from_str(t);
+            let mut s = Scanner::from_buf(t.chars());
             assert_eq!(Some(t.to_string()), scan_math_op(&mut s));
         }
     }
@@ -132,7 +132,7 @@ mod tests {
     fn test_scan_identifiers() {
         let tests = vec!["id1", "func", "anyword", "_00", "bla23"];
         for t in tests.iter() {
-            let mut s = Scanner::from_str(t);
+            let mut s = Scanner::from_buf(t.chars());
             assert_eq!(Some(t.to_string()), scan_identifier(&mut s));
         }
     }
@@ -144,7 +144,7 @@ mod tests {
             r"'another test \' with an escaped quote'",
         ];
         for t in tests.iter() {
-            let mut s = Scanner::from_str(t);
+            let mut s = Scanner::from_buf(t.chars());
             assert_eq!(Some(t.to_string()), scan_quoted_string(&mut s, '\''));
         }
     }

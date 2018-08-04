@@ -8,7 +8,9 @@ pub struct EbnfTokenizer(Scanner<char>, Vec<String>);
 
 impl EbnfTokenizer {
     pub fn scanner(src: &str) -> Scanner<String> {
-        Scanner::new(Box::new(EbnfTokenizer(Scanner::from_str(src), vec!())))
+        Scanner::new(
+            Box::new(
+                EbnfTokenizer(Scanner::from_buf(src.chars()), vec!())))
     }
 }
 

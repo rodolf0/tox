@@ -19,7 +19,7 @@ pub struct LispTokenizer(Scanner<char>);
 
 impl LispTokenizer {
     pub fn scanner(source: &str) -> Scanner<LispToken> {
-        Scanner::new(Box::new(LispTokenizer(Scanner::from_str(source))))
+        Scanner::new(Box::new(LispTokenizer(Scanner::from_buf(source.chars()))))
     }
 }
 

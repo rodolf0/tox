@@ -23,7 +23,7 @@ pub struct MathTokenizer {
 impl MathTokenizer {
     pub fn scanner(source: &str) -> Scanner<MathToken> {
         Scanner::new(Box::new(
-            MathTokenizer{src: Scanner::from_str(source), prev: None}))
+            MathTokenizer{src: Scanner::from_buf(source.chars()), prev: None}))
     }
 
     // when would a minus be unary? we need to know the prev token

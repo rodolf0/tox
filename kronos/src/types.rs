@@ -87,7 +87,7 @@ pub enum Grain {
     Day,
     Week,
     Month,
-    Quarter, // TODO: remove from here
+    Quarter,
     Year,
 }
 
@@ -117,6 +117,12 @@ pub trait TimeSequence<'a> {
     // End-time of Ranges must be greater than reference DateTime.
     // First Range may contain reference DateTime or start after if discont.
     fn future(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + 'a>;
+
+    fn future2(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + 'a> {
+        let t0 = t0.clone();
+        Box::new(self.future(&t0)
+            .skip_while(move |range| range.end <= t0))
+    }
 
     // Yield instances of this sequence into the past
     // Start-time of emited Ranges must be less-or-equal than t0.

@@ -23,11 +23,11 @@ impl Grains {
 impl<'a> TimeSequence<'a> for Grains {
     fn grain(&self) -> Grain { self.0 }
 
-    fn future(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, true)
     }
 
-    fn past_inclusive(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, false)
     }
 }
@@ -69,8 +69,8 @@ fn test_seq_grain() {
         Range{start: dt(2014, 1, 1), end: dt(2015, 1, 1), grain: Grain::Year});
     assert_eq!(years.next().unwrap(),
         Range{start: dt(2013, 1, 1), end: dt(2014, 1, 1), grain: Grain::Year});
-    // if inclusive, past_inclusive renders same year
-    let mut years = Grains(Grain::Year).past_inclusive(&t0_27feb);
+    // if inclusive, _past_raw renders same year
+    let mut years = Grains(Grain::Year)._past_raw(&t0_27feb);
     assert_eq!(years.next().unwrap(),
         Range{start: dt(2015, 1, 1), end: dt(2016, 1, 1), grain: Grain::Year});
 }
@@ -94,7 +94,7 @@ fn test_smaller_grains() {
         Range{start: dttm(2015, 2, 27, 23, 19, 0),
               end: dttm(2015, 2, 27, 23, 20, 0), grain: Grain::Minute});
     let mut min =
-        Grains(Grain::Minute).past_inclusive(&dttm(2015, 2, 27, 23, 20, 0));
+        Grains(Grain::Minute)._past_raw(&dttm(2015, 2, 27, 23, 20, 0));
     assert_eq!(min.next().unwrap(),
         Range{start: dttm(2015, 2, 27, 23, 20, 0),
               end: dttm(2015, 2, 27, 23, 21, 0), grain: Grain::Minute});
@@ -106,7 +106,7 @@ fn test_smaller_grains() {
               end: dttm(2015, 2, 27, 23, 20, 0), grain: Grain::Minute});
     // inclusive past
     let mut min =
-        Grains(Grain::Minute).past_inclusive(&dttm(2015, 2, 27, 23, 20, 25));
+        Grains(Grain::Minute)._past_raw(&dttm(2015, 2, 27, 23, 20, 25));
     assert_eq!(min.next().unwrap(),
         Range{start: dttm(2015, 2, 27, 23, 20, 0),
               end: dttm(2015, 2, 27, 23, 21, 0), grain: Grain::Minute});

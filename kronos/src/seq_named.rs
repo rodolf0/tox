@@ -22,11 +22,11 @@ impl Weekday {
 impl<'a> TimeSequence<'a> for Weekday {
     fn grain(&self) -> Grain { Grain::Day }
 
-    fn future(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, true)
     }
 
-    fn past_inclusive(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, false)
     }
 }
@@ -51,15 +51,14 @@ impl Month {
 impl<'a> TimeSequence<'a> for Month {
     fn grain(&self) -> Grain { Grain::Month }
 
-    fn future(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, true)
     }
 
-    fn past_inclusive(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, false)
     }
 }
-
 
 
 #[cfg(test)]
@@ -81,7 +80,7 @@ fn test_weekday() {
         start: dt(2018, 8, 6), end: dt(2018, 8, 7), grain: Grain::Day});
 
     // Standing on monday, prev monday is same day
-    let it = monday.past_inclusive(&t0_monday).next().unwrap();
+    let it = monday._past_raw(&t0_monday).next().unwrap();
     assert_eq!(it, Range{
         start: dt(2018, 8, 6), end: dt(2018, 8, 7), grain: Grain::Day});
     // if non-inclusive then prev monday
@@ -90,7 +89,7 @@ fn test_weekday() {
         start: dt(2018, 7, 30), end: dt(2018, 7, 31), grain: Grain::Day});
 
     // Standing on tuesday, prev monday is a day before
-    let it = monday.past_inclusive(&t0_tuesday).next().unwrap();
+    let it = monday._past_raw(&t0_tuesday).next().unwrap();
     assert_eq!(it, Range{
         start: dt(2018, 8, 6), end: dt(2018, 8, 7), grain: Grain::Day});
     let it = monday.past(&t0_tuesday).next().unwrap();
@@ -98,7 +97,7 @@ fn test_weekday() {
         start: dt(2018, 8, 6), end: dt(2018, 8, 7), grain: Grain::Day});
 
     // Standing on sunday, prev monday is a week before
-    let it = monday.past_inclusive(&t0_sunday).next().unwrap();
+    let it = monday._past_raw(&t0_sunday).next().unwrap();
     assert_eq!(it, Range{
         start: dt(2018, 7, 30), end: dt(2018, 7, 31), grain: Grain::Day});
     let it = monday.past(&t0_sunday).next().unwrap();
@@ -118,7 +117,7 @@ fn test_month() {
         start: dt(2018, 4, 1), end: dt(2018, 5, 1), grain: Grain::Month});
 
     // Standing on april, prev april is same month
-    let it = Month(4).past_inclusive(&t0_april).next().unwrap();
+    let it = Month(4)._past_raw(&t0_april).next().unwrap();
     assert_eq!(it, Range{
         start: dt(2018, 4, 1), end: dt(2018, 5, 1), grain: Grain::Month});
     // if non-inclusive, standing on april, past apr is in 2017
@@ -127,7 +126,7 @@ fn test_month() {
         start: dt(2017, 4, 1), end: dt(2017, 5, 1), grain: Grain::Month});
 
     // Standing on may, prev april is prev month
-    let it = Month(4).past_inclusive(&t0_may).next().unwrap();
+    let it = Month(4)._past_raw(&t0_may).next().unwrap();
     assert_eq!(it, Range{
         start: dt(2018, 4, 1), end: dt(2018, 5, 1), grain: Grain::Month});
     let it = Month(4).past(&t0_may).next().unwrap();
@@ -135,7 +134,7 @@ fn test_month() {
         start: dt(2018, 4, 1), end: dt(2018, 5, 1), grain: Grain::Month});
 
     // Standing on march, prev april is prev year
-    let it = Month(4).past_inclusive(&t0_march).next().unwrap();
+    let it = Month(4)._past_raw(&t0_march).next().unwrap();
     assert_eq!(it, Range{
         start: dt(2017, 4, 1), end: dt(2017, 5, 1), grain: Grain::Month});
     let it = Month(4).past(&t0_march).next().unwrap();

@@ -110,29 +110,33 @@ pub struct Range {
 }
 
 pub trait TimeSequence<'a> {
-    // Finest resolution this sequence can produce
+    // Resolution of Ranges produced by this sequence
     fn grain(&self) -> Grain;
 
     // Yield instances of this sequence into the future.
-    // End-time of Ranges must be greater than reference DateTime.
-    // First Range may contain reference DateTime or start after if discont.
-    fn future(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + 'a>;
-
-    fn future2(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + 'a> {
-        let t0 = t0.clone();
-        Box::new(self.future(&t0)
-            .skip_while(move |range| range.end <= t0))
-    }
+    // End-time of Ranges must be greater than reference t0 DateTime.
+    // NOTE: First Range may start after t0 if for example discontinuous.
+    fn _future_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + 'a>;
 
     // Yield instances of this sequence into the past
-    // Start-time of emited Ranges must be less-or-equal than t0.
-    fn past_inclusive(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a>;
+    // Start-time of emited Ranges must be less-or-equal than reference t0.
+    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a>;
+
+    // NOTE: past_raw and future_raw are mainly used internaly.
+    // Their first elements may overlap and are needed for composing NthOf.
+    // End-user wants future + past which have no overlap in emitted Ranges
+
+    fn future(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + 'a> {
+        let t0 = t0.clone();
+        Box::new(self._future_raw(&t0)
+            .skip_while(move |range| range.end <= t0))
+    }
 
     // End-time of emited Ranges must be less-or-equal than reference DateTime.
     // Complement of "future" where end-time must be greater than t0.
     fn past(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a> {
         let t0 = t0.clone();
-        Box::new(self.past_inclusive(&t0)
+        Box::new(self._past_raw(&t0)
             .skip_while(move |range| range.end > t0))
     }
 }

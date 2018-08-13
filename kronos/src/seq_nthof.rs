@@ -17,11 +17,11 @@ impl<'a, Frame, Win> TimeSequence<'a> for NthOf<Frame, Win>
     // grain is taken from <win> which is actual instance within frame
     fn grain(&self) -> Grain { self.1.grain() }
 
-    fn future(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a> {
         let win = self.1.clone();
         let nth = self.0;
-        Box::new(self.2.future(t0)
-            .map(move |outer| win.future(&outer.start)
+        Box::new(self.2._future_raw(t0)
+            .map(move |outer| win._future_raw(&outer.start)
                 // only consider elements of <win> started within <frame>
                 .take_while(|inner| inner.start < outer.end)
                 .nth(nth - 1))
@@ -30,11 +30,11 @@ impl<'a, Frame, Win> TimeSequence<'a> for NthOf<Frame, Win>
         )
     }
 
-    fn past_inclusive(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a> {
         let win = self.1.clone();
         let nth = self.0;
-        Box::new(self.2.past_inclusive(t0)
-            .map(move |outer| win.future(&outer.start)
+        Box::new(self.2._past_raw(t0)
+            .map(move |outer| win._future_raw(&outer.start)
                 // only consider elements of <win> started within <frame>
                 .take_while(|inner| inner.start < outer.end)
                 .nth(nth - 1))
@@ -120,7 +120,7 @@ fn test_nthof_past() {
 
     // past inclusive
     let thirdhour = NthOf(3, Grains(Grain::Hour), Weekday(6));
-    let mut thirdhour = thirdhour.past_inclusive(&dttm(2016, 3, 19, 2, 25, 0));
+    let mut thirdhour = thirdhour._past_raw(&dttm(2016, 3, 19, 2, 25, 0));
     assert_eq!(thirdhour.next().unwrap(),
         Range{start: dttm(2016, 3, 19, 2, 0, 0),
               end: dttm(2016, 3, 19, 3, 0, 0), grain: Grain::Hour});
@@ -146,7 +146,7 @@ fn test_nthof_past() {
     assert_eq!(atwenty8th.next().unwrap(),
         Range{start: dt(2022, 1, 28), end: dt(2022, 1, 29), grain: Grain::Day});
     // past-inclusive
-    let mut atwenty8th = twenty8th.past_inclusive(&t0_28th);
+    let mut atwenty8th = twenty8th._past_raw(&t0_28th);
     assert_eq!(atwenty8th.next().unwrap(),
         Range{start: dt(2022, 2, 28), end: dt(2022, 3, 1), grain: Grain::Day});
 }
@@ -180,7 +180,7 @@ fn test_nth_discontinuous() {
 
     // backward: 29th of february past-inclusive
     let feb29th = NthOf(29, Grains(Grain::Day), Month(2));
-    let mut feb29th = feb29th.past_inclusive(&dt(2016, 2, 25));
+    let mut feb29th = feb29th._past_raw(&dt(2016, 2, 25));
     assert_eq!(feb29th.next().unwrap(),
         Range{start: dt(2016, 2, 29), end: dt(2016, 3, 1), grain: Grain::Day});
 }
@@ -217,14 +217,14 @@ fn test_nth_composed() {
     assert_eq!(past.next().unwrap(),
         Range{start: dt(2013, 5, 10), end: dt(2013, 5, 11), grain: Grain::Day});
 
-    let mut past_inclusive = y5th10thday.past_inclusive(&dt(2015, 3, 11));
-    assert_eq!(past_inclusive.next().unwrap(),
+    let mut _past_raw = y5th10thday._past_raw(&dt(2015, 3, 11));
+    assert_eq!(_past_raw.next().unwrap(),
         Range{start: dt(2015, 5, 10), end: dt(2015, 5, 11), grain: Grain::Day});
 
     // the 3rd hour of 2nd day of the month
     let day2 = NthOf(2, Grains(Grain::Day), Grains(Grain::Month));
     let hour3day2 = NthOf(3, Grains(Grain::Hour), day2);
-    let mut future = hour3day2.future2(&dt(2015, 3, 11));
+    let mut future = hour3day2.future(&dt(2015, 3, 11));
     assert_eq!(future.next().unwrap(),
         Range{start: dttm(2015, 4, 2, 2, 0, 0),
               end: dttm(2015, 4, 2, 3, 0, 0), grain: Grain::Hour});

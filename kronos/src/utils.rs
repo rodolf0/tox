@@ -1,13 +1,14 @@
 #![deny(warnings)]
 
 extern crate chrono;
-use chrono::{Datelike, Timelike};
-use semantics::Grain;
+use chrono::{Datelike, Timelike, Weekday};
+use types::Grain;
 
 pub type DateTime = chrono::NaiveDateTime;
 pub type Date = chrono::NaiveDate;
 pub type Duration = chrono::Duration;
 
+// TODO: change name + include virtual grains in same enum
 pub fn next_grain(g: Grain) -> Grain {
     match g {
         Grain::Second => Grain::Minute,
@@ -22,7 +23,7 @@ pub fn next_grain(g: Grain) -> Grain {
 }
 
 pub fn truncate(d: DateTime, g: Grain) -> DateTime {
-    use Grain::*;
+    use types::Grain::*;
     match g {
         Second => d.with_nanosecond(0).unwrap(),
         Minute => d.date().and_hms(d.hour(), d.minute(), 0),
@@ -41,22 +42,38 @@ pub fn truncate(d: DateTime, g: Grain) -> DateTime {
     }
 }
 
-pub fn find_dow(mut date: Date, dow: u32) -> Date {
+pub fn find_dow(mut date: Date, dow: u32, future: bool) -> Date {
     while date.weekday().num_days_from_sunday() != dow {
-        date = date.succ();
+        date = if future { date.succ() } else { date.pred() }
     }
     date
 }
 
-pub fn find_month(mut date: Date, month: u32) -> Date {
+pub fn find_month(mut date: Date, month: u32, future: bool) -> Date {
     while date.month() != month {
-        date = dtshift::add(date, 0, 1, 0);
+        date = if future {
+            dtshift::add(date, 0, 1, 0)
+        } else {
+            dtshift::sub(date, 0, 1, 0)
+        }
+    }
+    date
+}
+
+pub fn find_weekend(mut date: Date, future: bool) -> Date {
+    if date.weekday() == Weekday::Sun { date = date.pred(); }
+    while date.weekday() != Weekday::Sat {
+        date = if future {
+            date.succ()
+        } else {
+            date.pred()
+        };
     }
     date
 }
 
 pub fn shift_datetime(d: DateTime, grain: Grain, n: i32) -> DateTime {
-    use Grain::*;
+    use types::Grain::*;
     let m = if n >= 0 {n as u32} else {(-n) as u32};
     let shiftfn = if n >= 0 {dtshift::add} else {dtshift::sub};
     match grain {
@@ -65,9 +82,9 @@ pub fn shift_datetime(d: DateTime, grain: Grain, n: i32) -> DateTime {
         Hour => d + Duration::hours(n as i64),
         Day => d + Duration::days(n as i64),
         Week => d + Duration::weeks(n as i64),
-        Month => DateTime::new(shiftfn(d.date(), 0, m, 0), d.time()),
-        Quarter => DateTime::new(shiftfn(d.date(), 0, 3 * m, 0), d.time()),
-        Year => DateTime::new(shiftfn(d.date(), m, 0, 0), d.time()),
+        Month => shiftfn(d.date(), 0, m, 0).and_time(d.time()),
+        Quarter => shiftfn(d.date(), 0, 3 * m, 0).and_time(d.time()),
+        Year => shiftfn(d.date(), m, 0, 0).and_time(d.time()),
     }
 }
 

@@ -21,7 +21,7 @@ impl Grains {
 }
 
 impl<'a> TimeSequence<'a> for Grains {
-    fn grain(&self) -> Grain { self.0 }
+    fn resolution(&self) -> Grain { self.0 }
 
     fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, true)

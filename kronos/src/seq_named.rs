@@ -20,7 +20,7 @@ impl Weekday {
 }
 
 impl<'a> TimeSequence<'a> for Weekday {
-    fn grain(&self) -> Grain { Grain::Day }
+    fn resolution(&self) -> Grain { Grain::Day }
 
     fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, true)
@@ -49,7 +49,7 @@ impl Month {
 }
 
 impl<'a> TimeSequence<'a> for Month {
-    fn grain(&self) -> Grain { Grain::Month }
+    fn resolution(&self) -> Grain { Grain::Month }
 
     fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, true)
@@ -77,7 +77,7 @@ impl Weekend {
 }
 
 impl<'a> TimeSequence<'a> for Weekend {
-    fn grain(&self) -> Grain { Grain::Day }
+    fn resolution(&self) -> Grain { Grain::Day }
 
     fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, true)

@@ -49,7 +49,7 @@ impl<'a, Frame, Win> TimeSequence<'a> for LastOf<Frame, Win>
           for<'b> Win: TimeSequence<'b> + Clone + 'a
 {
     // grain is taken from <win> which is actual instance within frame
-    fn grain(&self) -> Grain { self.1.grain() }
+    fn resolution(&self) -> Grain { self.1.resolution() }
 
     fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a> {
         self._base(t0, true)

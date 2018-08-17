@@ -10,13 +10,17 @@
 // base:
 // - named bases (tuesday)
 // - base by granularity (month)
-// - range base (weekend, mon 2.30pm to tues 3am)
+//
+// - interval based (weekend, mon 2.30pm to tues 3am)
 //   - monday to friday
 //   - afternoon (13hs - 19hs)
 //
 // - disjoint (mon, wed and fri)
 //   - mon 2.30pm to tue 1am and fri 4 to 5pm
 //   - each iteration picks one of the options
+//
+// - SET operations - union / intersect / etc
+//
 // - multiple-base eg: 2 days -> mon+tue, wed+thu, fri+sat ...
 //
 // filters:
@@ -26,15 +30,6 @@
 //
 //
 // * composite durations: 3hs and 20 minutes
-//
-// * SET operations - union / intersect / etc
-//
-// granularity: inferred from base
-//
-// Bases implement a trait that anchors them (eg: Monday how to turn into datetime?)
-//
-// base.eval_at(instant, future) -> iterator<Range>
-
 
 
 // * is moving to the past different in all types?
@@ -72,14 +67,15 @@
 
 
 
-// TimeSequence is a floating description of a set of time Ranges.
-// They can be evaluated in the context of an instant to produce time Ranges.
-
 extern crate chrono;
 
 pub type DateTime = chrono::NaiveDateTime;
 pub type Date = chrono::NaiveDate;
 pub type Duration = chrono::Duration;
+
+
+// TODO: Fortnight is not aligned to any known frame its just 14 nights
+
 
 #[derive(Debug,PartialEq,Eq,PartialOrd,Ord,Clone,Copy)]
 pub enum Grain {
@@ -98,21 +94,22 @@ pub enum Grain {
     Millenium,
 }
 
-// TODO: Fortnight is not aligned to any known frame its just 14 nights
-
-
 
 // Ranges are right-open intervals of time, ie: [start, end)
 #[derive(Clone,Debug,PartialEq)]
 pub struct Range {
     pub start: DateTime, // included
     pub end: DateTime,   // excluded
-    pub grain: Grain,
+    pub grain: Grain,    // resolution of start/end
 }
+
+
+// TimeSequence is a floating description of a set of time Ranges.
+// They can be evaluated in the context of an instant to produce time Ranges.
 
 pub trait TimeSequence<'a> {
     // Resolution of Ranges produced by this sequence
-    fn grain(&self) -> Grain;
+    fn resolution(&self) -> Grain;
 
     // Yield instances of this sequence into the future.
     // End-time of Ranges must be greater than reference t0 DateTime.

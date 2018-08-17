@@ -10,17 +10,22 @@ pub struct NthOf<Frame, Win>(usize, Win, Frame)
     where for<'a> Frame: TimeSequence<'a>,
           for<'a> Win: TimeSequence<'a> + Clone;
 
-impl<'a, Frame, Win> TimeSequence<'a> for NthOf<Frame, Win>
+
+impl<'a, Frame, Win> NthOf<Frame, Win>
     where for<'b> Frame: TimeSequence<'b>,
           for<'b> Win: TimeSequence<'b> + Clone + 'a
 {
-    // grain is taken from <win> which is actual instance within frame
-    fn grain(&self) -> Grain { self.1.grain() }
-
-    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a> {
+    fn _base(&self, t0: &DateTime, future: bool)
+        -> Box<Iterator<Item=Range> + 'a>
+    {
+        let frame = if future {
+            self.2._future_raw(t0)
+        } else {
+            self.2._past_raw(t0)
+        };
         let win = self.1.clone();
         let nth = self.0;
-        Box::new(self.2._future_raw(t0)
+        Box::new(frame
             .map(move |outer| win._future_raw(&outer.start)
                 // only consider elements of <win> started within <frame>
                 .take_while(|inner| inner.start < outer.end)
@@ -30,17 +35,21 @@ impl<'a, Frame, Win> TimeSequence<'a> for NthOf<Frame, Win>
         )
     }
 
+}
+
+impl<'a, Frame, Win> TimeSequence<'a> for NthOf<Frame, Win>
+    where for<'b> Frame: TimeSequence<'b>,
+          for<'b> Win: TimeSequence<'b> + Clone + 'a
+{
+    // grain is taken from <win> which is actual instance within frame
+    fn grain(&self) -> Grain { self.1.grain() }
+
+    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a> {
+        self._base(t0, true)
+    }
+
     fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a> {
-        let win = self.1.clone();
-        let nth = self.0;
-        Box::new(self.2._past_raw(t0)
-            .map(move |outer| win._future_raw(&outer.start)
-                // only consider elements of <win> started within <frame>
-                .take_while(|inner| inner.start < outer.end)
-                .nth(nth - 1))
-            .enumerate()
-            .filter_map(|(i, elem)| { assert!(i <= INFINITE_FUSE); elem })
-        )
+        self._base(t0, false)
     }
 }
 

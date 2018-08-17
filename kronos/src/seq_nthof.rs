@@ -185,18 +185,17 @@ fn test_nth_discontinuous() {
         Range{start: dt(2016, 2, 29), end: dt(2016, 3, 1), grain: Grain::Day});
 }
 
+#[test]
+fn test_nth_non_aligned() {
+    use seq_named::{Weekend, Month};
 
-//#[test]
-//fn test_nth_non_aligned() {
-    //let firstwkendjan = Seq::nthof(1, Seq::weekend(), Seq::month(1));
-    //let mut firstwkendjan = firstwkendjan(dt(2016, 9, 4), TimeDir::Future);
-    //assert_eq!(firstwkendjan.next().unwrap(),
-               //Range{start: dt(2016, 12, 31), end: dt(2017, 1, 2),
-                     //grain: Grain::Day});
-    //assert_eq!(firstwkendjan.next().unwrap(),
-               //Range{start: dt(2018, 1, 6), end: dt(2018, 1, 8),
-                     //grain: Grain::Day});
-//}
+    let firstwkendjan = NthOf(1, Weekend, Month(1));
+    let mut firstwkendjan = firstwkendjan.future(&dt(2016, 9, 4));
+    assert_eq!(firstwkendjan.next().unwrap(),
+        Range{start: dt(2016, 12, 31), end: dt(2017, 1, 2), grain: Grain::Day});
+    assert_eq!(firstwkendjan.next().unwrap(),
+        Range{start: dt(2018, 1, 6), end: dt(2018, 1, 8), grain: Grain::Day});
+}
 
 #[test]
 fn test_nth_composed() {

@@ -61,6 +61,34 @@ impl<'a> TimeSequence<'a> for Month {
 }
 
 
+#[derive(Clone)]
+pub struct Weekend;
+
+impl Weekend {
+    fn _base(&self, t0: &DateTime, future: bool) -> Box<Iterator<Item=Range>> {
+        let base = utils::find_weekend(t0.date(), future).and_hms(0, 0, 0);
+        let sign = if future { 1 } else { -1 };
+        Box::new((0..).map(move |x| Range{
+            start: base + Duration::days(sign * x * 7),
+            end: base + Duration::days(sign * x * 7 + 2),
+            grain: Grain::Day
+        }))
+    }
+}
+
+impl<'a> TimeSequence<'a> for Weekend {
+    fn grain(&self) -> Grain { Grain::Day }
+
+    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+        self._base(t0, true)
+    }
+
+    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+        self._base(t0, false)
+    }
+}
+
+
 #[cfg(test)]
 fn dt(year: i32, month: u32, day: u32) -> DateTime {
     use types::Date;
@@ -140,4 +168,34 @@ fn test_month() {
     let it = Month(4).past(&t0_march).next().unwrap();
     assert_eq!(it, Range{
         start: dt(2017, 4, 1), end: dt(2017, 5, 1), grain: Grain::Month});
+}
+
+#[test]
+fn test_weekend() {
+    // start from a Wednesday
+    let mut weekend = Weekend.future(&dt(2016, 3, 23));
+    assert_eq!(weekend.next().unwrap(),
+        Range{start: dt(2016, 3, 26), end: dt(2016, 3, 28), grain: Grain::Day});
+    assert_eq!(weekend.next().unwrap(),
+        Range{start: dt(2016, 4, 2), end: dt(2016, 4, 4), grain: Grain::Day});
+
+    // start from Saturday
+    let mut weekend = Weekend.future(&dt(2016, 3, 12));
+    assert_eq!(weekend.next().unwrap(),
+        Range{start: dt(2016, 3, 12), end: dt(2016, 3, 14), grain: Grain::Day});
+
+    // start from Sunday
+    let mut weekend = Weekend.future(&dt(2016, 3, 20));
+    assert_eq!(weekend.next().unwrap(),
+        Range{start: dt(2016, 3, 19), end: dt(2016, 3, 21), grain: Grain::Day});
+
+    // from Sunday going backward
+    let mut weekend = Weekend.past(&dt(2016, 3, 20));
+    assert_eq!(weekend.next().unwrap(),
+        Range{start: dt(2016, 3, 12), end: dt(2016, 3, 14), grain: Grain::Day});
+
+    // from Sunday going backward raw
+    let mut weekend = Weekend._past_raw(&dt(2016, 3, 20));
+    assert_eq!(weekend.next().unwrap(),
+        Range{start: dt(2016, 3, 19), end: dt(2016, 3, 21), grain: Grain::Day});
 }

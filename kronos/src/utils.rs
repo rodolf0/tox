@@ -1,12 +1,9 @@
 #![deny(warnings)]
 
 extern crate chrono;
-use chrono::{Datelike, Timelike, Weekday};
-use types::Grain;
+use chrono::Datelike;
+use types::{Grain, Date, DateTime, Duration};
 
-pub type DateTime = chrono::NaiveDateTime;
-pub type Date = chrono::NaiveDate;
-pub type Duration = chrono::Duration;
 
 // TODO: change name + include virtual grains in same enum
 pub fn next_grain(g: Grain) -> Grain {
@@ -19,12 +16,14 @@ pub fn next_grain(g: Grain) -> Grain {
         Grain::Month => Grain::Year,
         Grain::Quarter => Grain::Year,
         Grain::Year => Grain::Year,
+        _ => panic!("next_grain: TODO implement")
     }
 }
 
-pub fn truncate(d: DateTime, g: Grain) -> DateTime {
+pub fn truncate(d: DateTime, granularity: Grain) -> DateTime {
+    use chrono::Timelike;
     use types::Grain::*;
-    match g {
+    match granularity {
         Second => d.with_nanosecond(0).unwrap(),
         Minute => d.date().and_hms(d.hour(), d.minute(), 0),
         Hour => d.date().and_hms(d.hour(), 0, 0),
@@ -35,10 +34,22 @@ pub fn truncate(d: DateTime, g: Grain) -> DateTime {
         },
         Month => Date::from_ymd(d.year(), d.month(), 1).and_hms(0, 0, 0),
         Quarter => {
-            let qstart = 1 + 3 * (d.month()/4);
-            Date::from_ymd(d.year(), qstart, 1).and_hms(0, 0, 0)
+            let quarter_start = 1 + 3 * ((d.month()-1) / 3);
+            Date::from_ymd(d.year(), quarter_start, 1).and_hms(0, 0, 0)
+        },
+        Half => {
+            let half_start = 1 + 6 * ((d.month() - 1) / 6);
+            Date::from_ymd(d.year(), half_start, 1).and_hms(0, 0, 0)
         },
         Year => Date::from_ymd(d.year(), 1, 1).and_hms(0, 0, 0),
+        Lustrum =>
+            Date::from_ymd(d.year() - d.year() % 5, 1, 1).and_hms(0, 0, 0),
+        Decade =>
+            Date::from_ymd(d.year() - d.year() % 10, 1, 1).and_hms(0, 0, 0),
+        Century =>
+            Date::from_ymd(d.year() - d.year() % 100, 1, 1).and_hms(0, 0, 0),
+        Millenium =>
+            Date::from_ymd(d.year() - d.year() % 1000, 1, 1).and_hms(0, 0, 0),
     }
 }
 
@@ -61,6 +72,7 @@ pub fn find_month(mut date: Date, month: u32, future: bool) -> Date {
 }
 
 pub fn find_weekend(mut date: Date, future: bool) -> Date {
+    use chrono::Weekday;
     if date.weekday() == Weekday::Sun { date = date.pred(); }
     while date.weekday() != Weekday::Sat {
         date = if future {
@@ -72,11 +84,11 @@ pub fn find_weekend(mut date: Date, future: bool) -> Date {
     date
 }
 
-pub fn shift_datetime(d: DateTime, grain: Grain, n: i32) -> DateTime {
+pub fn shift_datetime(d: DateTime, granularity: Grain, n: i32) -> DateTime {
     use types::Grain::*;
     let m = if n >= 0 {n as u32} else {(-n) as u32};
     let shiftfn = if n >= 0 {dtshift::add} else {dtshift::sub};
-    match grain {
+    match granularity {
         Second => d + Duration::seconds(n as i64),
         Minute => d + Duration::minutes(n as i64),
         Hour => d + Duration::hours(n as i64),
@@ -84,7 +96,12 @@ pub fn shift_datetime(d: DateTime, grain: Grain, n: i32) -> DateTime {
         Week => d + Duration::weeks(n as i64),
         Month => shiftfn(d.date(), 0, m, 0).and_time(d.time()),
         Quarter => shiftfn(d.date(), 0, 3 * m, 0).and_time(d.time()),
+        Half => shiftfn(d.date(), 0, 6 * m, 0).and_time(d.time()),
         Year => shiftfn(d.date(), m, 0, 0).and_time(d.time()),
+        Lustrum => shiftfn(d.date(), 5 * m, 0, 0).and_time(d.time()),
+        Decade => shiftfn(d.date(), 10 * m, 0, 0).and_time(d.time()),
+        Century => shiftfn(d.date(), 100 * m, 0, 0).and_time(d.time()),
+        Millenium => shiftfn(d.date(), 1000 * m, 0, 0).and_time(d.time()),
     }
 }
 

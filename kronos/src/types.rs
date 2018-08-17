@@ -27,6 +27,8 @@
 //
 // * composite durations: 3hs and 20 minutes
 //
+// * SET operations - union / intersect / etc
+//
 // granularity: inferred from base
 //
 // Bases implement a trait that anchors them (eg: Monday how to turn into datetime?)
@@ -88,18 +90,17 @@ pub enum Grain {
     Week,
     Month,
     Quarter,
+    Half,
     Year,
+    Lustrum,
+    Decade,
+    Century,
+    Millenium,
 }
 
-enum VirtualGrain {
-    Millenium,
-    Century,
-    Decade,
-    Lustrum,
-    Half,
-    Quarter,
-    Fortnight,
-}
+// TODO: Fortnight is not aligned to any known frame its just 14 nights
+
+
 
 // Ranges are right-open intervals of time, ie: [start, end)
 #[derive(Clone,Debug,PartialEq)]

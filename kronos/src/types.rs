@@ -1,5 +1,4 @@
-//#![deny(warnings)]
-
+#![deny(warnings)]
 
 
 // duckling links
@@ -7,63 +6,34 @@
 // - https://duckling.wit.ai/#limitations
 // - https://github.com/wit-ai/duckling_old/blob/6b7e2e1bdbd50299cee4075ff48d7323c05758bc/src/duckling/time/pred.clj#L333
 
-// base:
-// - named bases (tuesday)
-// - base by granularity (month)
 //
 // - interval based (weekend, mon 2.30pm to tues 3am)
 //   - monday to friday
 //   - afternoon (13hs - 19hs)
 //
-// - disjoint (mon, wed and fri)
-//   - mon 2.30pm to tue 1am and fri 4 to 5pm
-//   - each iteration picks one of the options
+// - union
+//   - (mon, wed and fri)
+//   - (mon 2.30pm to tue 1am) and (fri 4 to 5pm)
 //
-// - SET operations - union / intersect / etc
+// - intersect
+//   - mondays of march
+//   - tuesday 29th
+//   - Q: what if alignment is not exact?
+//   - Q: what if no intersection? empty set FUSE?
 //
+// - difference
+//   - Days except Friday
+//
+//
+// * composite durations: 3hs and 20 minutes -> grains
+// - interval
+//   - monday to friday (range of 5 days)
 // - multiple-base eg: 2 days -> mon+tue, wed+thu, fri+sat ...
 //
 // filters:
 // - ever other month
-// - of june (is this a filter or a base?)
 // - shift-by-2 (eg 2 days after monday)
 //
-//
-// * composite durations: 3hs and 20 minutes
-
-
-// * is moving to the past different in all types?
-//
-// * should future/past first element contain reftime?
-//   - maybe should assume past contains it too?
-//   - provide Range fn contains(t0)
-//   - if t0 is standing in first range going past / future, should it return it?
-//     - eg: Monday if t0 is Monday
-//
-// * in which case do we not-want this?
-//   - seems past should also contain t0 if part of it is to be accounted yet
-//   - rephrase trait past method:
-//     start-time of ranges must be less-or-eq than reference
-//
-// * call past(strict=true) instead of latent? ... ie: range ends before-eq t0
-//   - strict means end-time must be less-or-eq than t0
-//
-//   - strict for future means that start-time must be greater-or-eq than t0
-//
-// * strict needed in:
-//   - 3rd hour of the weekend when t0 is within weekend and going to the past
-//     if you're past 3rd hour ... you want this weekend too
-//
-//   - seems 'strict' can be defined directly by lastof / nthof
-//   - don't expose 'strict' in interface?
-//
-// * strict shouldn't be part of the TimeSequence interface, it should be
-//   an adaptor
-//
-// * eval method (future/past) exposed to user shouldn't have 'strict' option
-//  - there should be an internal version that does have it for composition
-//
-
 
 
 
@@ -109,6 +79,7 @@ pub struct Range {
 
 pub trait TimeSequence<'a> {
     // Resolution of Ranges produced by this sequence
+    // TODO: remove or add Mixed
     fn resolution(&self) -> Grain;
 
     // Yield instances of this sequence into the future.

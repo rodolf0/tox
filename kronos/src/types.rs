@@ -45,7 +45,7 @@ pub type Duration = chrono::Duration;
 
 
 // TODO: Fortnight is not aligned to any known frame its just 14 nights
-
+// TOOD: distinguish between Grain and Resolution (that of Range)
 
 #[derive(Debug,PartialEq,Eq,PartialOrd,Ord,Clone,Copy)]
 pub enum Grain {
@@ -71,6 +71,24 @@ pub struct Range {
     pub start: DateTime, // included
     pub end: DateTime,   // excluded
     pub grain: Grain,    // resolution of start/end
+}
+
+impl Range {
+    pub fn intersect(&self, other: &Range) -> Option<Range> {
+        use std::cmp;
+        if self.start < other.end && self.end > other.start {
+            return Some(Range{
+                start: cmp::max(self.start, other.start),
+                end: cmp::min(self.end, other.end),
+                grain: cmp::min(self.grain, other.grain)
+            });
+        }
+        None
+    }
+
+    pub fn len(&self) -> Duration {
+        self.end.signed_duration_since(self.start)
+    }
 }
 
 

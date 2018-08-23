@@ -11,20 +11,6 @@
 //   - monday to friday
 //   - afternoon (13hs - 19hs)
 //
-// - union
-//   - (mon, wed and fri)
-//   - (mon 2.30pm to tue 1am) and (fri 4 to 5pm)
-//
-// - intersect
-//   - mondays of march
-//   - tuesday 29th
-//   - Q: what if alignment is not exact?
-//   - Q: what if no intersection? empty set FUSE?
-//
-// - difference
-//   - Days except Friday
-//
-//
 // * composite durations: 3hs and 20 minutes -> grains
 // - interval
 //   - monday to friday (range of 5 days)

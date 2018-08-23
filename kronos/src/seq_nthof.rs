@@ -6,7 +6,7 @@ use types::{DateTime, Range, Grain, TimeSequence};
 const INFINITE_FUSE: usize = 1000;
 
 #[derive(Clone)]
-pub struct NthOf<Frame, Win>(usize, Win, Frame)
+pub struct NthOf<Frame, Win>(pub usize, pub Win, pub Frame)
     where for<'a> Frame: TimeSequence<'a>,
           for<'a> Win: TimeSequence<'a> + Clone;
 

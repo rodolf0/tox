@@ -33,6 +33,9 @@ impl<'a> TimeSequence<'a> for Grains {
 }
 
 
+// TODO: multigrain ? a month and 3 days
+
+
 #[cfg(test)]
 fn dt(year: i32, month: u32, day: u32) -> DateTime {
     use types::Date;

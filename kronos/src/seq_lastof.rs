@@ -7,7 +7,7 @@ use types::{DateTime, Range, Grain, TimeSequence};
 const INFINITE_FUSE: usize = 1000;
 
 #[derive(Clone)]
-pub struct LastOf<Frame, Win>(usize, Win, Frame)
+pub struct LastOf<Frame, Win>(pub usize, pub Win, pub Frame)
     where for<'a> Frame: TimeSequence<'a>,
           for<'a> Win: TimeSequence<'a> + Clone;
 

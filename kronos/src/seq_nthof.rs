@@ -54,32 +54,28 @@ impl<'a, Frame, Win> TimeSequence<'a> for NthOf<Frame, Win>
 #[cfg(test)]
 mod test {
     use super::*;
-    use types::Grain;
+    use types::{Date, Grain};
+    use seq_grain::Grains;
+    use seq_named::{Weekday, Weekend, Month};
 
     fn dt(year: i32, month: u32, day: u32) -> DateTime {
-        use types::Date;
         Date::from_ymd(year, month, day).and_hms(0, 0, 0)
     }
 
-    #[cfg(test)]
     fn dttm(year: i32, month: u32, day: u32, h: u32, m: u32, s: u32) -> DateTime {
-        use types::Date;
         Date::from_ymd(year, month, day).and_hms(h, m, s)
     }
 
     #[test]
     #[should_panic]
-    fn test_nthof_fuse() {
+    fn nthof_fuse() {
         use seq_grain::Grains;
         let thirtysecond = NthOf(32, Grains(Grain::Day), Grains(Grain::Month));
         thirtysecond.future(&dt(2016, 8, 31)).next();
     }
 
     #[test]
-    fn test_nthof_basic() {
-        use seq_grain::Grains;
-        use seq_named::{Weekday, Month};
-
+    fn nthof_basic() {
         // 3rd day of the month
         let day3 = NthOf(3, Grains(Grain::Day), Grains(Grain::Month));
         let mut day3 = day3.future(&dt(2016, 2, 2));
@@ -114,10 +110,7 @@ mod test {
     }
 
     #[test]
-    fn test_nthof_past() {
-        use seq_grain::Grains;
-        use seq_named::{Weekday, Month};
-
+    fn nthof_past() {
         // backward: 3rd hour of Saturday, looking into the past
         let thirdhour = NthOf(3, Grains(Grain::Hour), Weekday(6));
         let mut thirdhour = thirdhour.past(&dttm(2016, 3, 19, 8, 0, 0));
@@ -162,10 +155,7 @@ mod test {
     }
 
     #[test]
-    fn test_nth_discontinuous() {
-        use seq_grain::Grains;
-        use seq_named::Month;
-
+    fn nth_discontinuous() {
         let feb29th = NthOf(29, Grains(Grain::Day), Month(2));
         let mut feb29th = feb29th.future(&dt(2015, 2, 25));
         assert_eq!(feb29th.next().unwrap(),
@@ -196,9 +186,7 @@ mod test {
     }
 
     #[test]
-    fn test_nth_non_aligned() {
-        use seq_named::{Weekend, Month};
-
+    fn nth_non_aligned() {
         let firstwkendjan = NthOf(1, Weekend, Month(1));
         let mut firstwkendjan = firstwkendjan.future(&dt(2016, 9, 4));
         assert_eq!(firstwkendjan.next().unwrap(),
@@ -208,9 +196,7 @@ mod test {
     }
 
     #[test]
-    fn test_nth_composed() {
-        use seq_grain::Grains;
-
+    fn nth_composed() {
         // the 5th instance of 10th-day-of-the-month (each year) aka May 10th
         let mo10th = NthOf(10, Grains(Grain::Day), Grains(Grain::Month));
         let y5th10thday = NthOf(5, mo10th, Grains(Grain::Year));

@@ -58,18 +58,16 @@ impl<'a, SeqA, SeqB> TimeSequence<'a> for Except<SeqA, SeqB>
 #[cfg(test)]
 mod test {
     use super::*;
-    use types::Grain;
+    use types::{Date, Grain};
+    use seq_grain::Grains;
+    use seq_named::{Weekday, Month};
 
     fn dt(year: i32, month: u32, day: u32) -> DateTime {
-        use types::Date;
         Date::from_ymd(year, month, day).and_hms(0, 0, 0)
     }
 
     #[test]
-    fn test_except() {
-        use seq_grain::Grains;
-        use seq_named::Weekday;
-
+    fn except_basic() {
         // days except Friday and thursdays
         let except = Except(Except(Grains(Grain::Day), Weekday(5)), Weekday(4));
         let mut fut = except.future(&dt(2018, 8, 22));
@@ -93,9 +91,7 @@ mod test {
 
 
     #[test]
-    fn test_except_diff_grains() {
-        use seq_named::{Weekday, Month};
-
+    fn except_diff_grains() {
         // mondays except september
         let except = Except(Weekday(1), Month(9));
         let mut fut = except.future(&dt(2018, 8, 22));

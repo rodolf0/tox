@@ -70,24 +70,22 @@ impl<'a, SeqA, SeqB> TimeSequence<'a> for Intersect<SeqA, SeqB>
 #[cfg(test)]
 mod test {
     use super::*;
-    use types::Grain;
+    use types::{Date, Grain};
+    use seq_named::{Weekday, Month};
+    use seq_nthof::NthOf;
+    use seq_grain::Grains;
+    use seq_union::Union;
 
     fn dt(year: i32, month: u32, day: u32) -> DateTime {
-        use types::Date;
         Date::from_ymd(year, month, day).and_hms(0, 0, 0)
     }
 
     fn dttm(year: i32, month: u32, day: u32, h: u32, m: u32, s: u32) -> DateTime {
-        use types::Date;
         Date::from_ymd(year, month, day).and_hms(h, m, s)
     }
 
     #[test]
-    fn test_intersect() {
-        use seq_named::Weekday;
-        use seq_nthof::NthOf;
-        use seq_grain::Grains;
-
+    fn intersect_basic() {
         // monday 28th
         let twenty8th = NthOf(28, Grains(Grain::Day), Grains(Grain::Month));
         let mon28th = Intersect(Weekday(1), twenty8th);
@@ -118,11 +116,7 @@ mod test {
     }
 
     #[test]
-    fn test_intersect2() {
-        use seq_named::{Weekday, Month};
-        use seq_nthof::NthOf;
-        use seq_grain::Grains;
-
+    fn intersect2() {
         // tuesdays 3pm
         let mut tue3pm = Intersect(Weekday(2),
             NthOf(16, Grains(Grain::Hour), Grains(Grain::Day)))
@@ -155,10 +149,7 @@ mod test {
 
 
     #[test]
-    fn test_intersect_union() {
-        use seq_named::{Weekday, Month};
-        use seq_union::Union;
-
+    fn intersect_union() {
         // mondays + wednesdays of June
         let monwedjune = Intersect(Union(Weekday(1), Weekday(3)), Month(6));
         let mut fut = monwedjune.future(&dt(2016, 2, 25));

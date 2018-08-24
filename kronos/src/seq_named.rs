@@ -86,15 +86,14 @@ impl<'a> TimeSequence<'a> for Weekend {
 #[cfg(test)]
 mod test {
     use super::*;
-    use types::Grain;
+    use types::{Date, Grain};
 
     fn dt(year: i32, month: u32, day: u32) -> DateTime {
-        use types::Date;
         Date::from_ymd(year, month, day).and_hms(0, 0, 0)
     }
 
     #[test]
-    fn test_weekday() {
+    fn weekday() {
         let monday = Weekday(1);
         let t0_sunday = dt(2018, 8, 5);
         let t0_monday = dt(2018, 8, 6);
@@ -132,7 +131,7 @@ mod test {
     }
 
     #[test]
-    fn test_month() {
+    fn month() {
         let t0_april = dt(2018, 4, 3);
         let t0_may = dt(2018, 5, 1);
         let t0_march = dt(2018, 3, 12);
@@ -169,7 +168,7 @@ mod test {
     }
 
     #[test]
-    fn test_weekend() {
+    fn weekend() {
         // start from a Wednesday
         let mut weekend = Weekend.future(&dt(2016, 3, 23));
         assert_eq!(weekend.next().unwrap(),

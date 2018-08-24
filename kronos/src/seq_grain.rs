@@ -34,15 +34,14 @@ impl<'a> TimeSequence<'a> for Grains {
 #[cfg(test)]
 mod test {
     use super::*;
-    use types::Grain;
+    use types::{Date, Grain};
 
     fn dt(year: i32, month: u32, day: u32) -> DateTime {
-        use types::Date;
         Date::from_ymd(year, month, day).and_hms(0, 0, 0)
     }
 
     #[test]
-    fn test_seq_grain() {
+    fn grain_basic() {
         let t0_27feb = dt(2015, 2, 27);
         let t0_1jan = dt(2016, 1, 1);
 
@@ -78,12 +77,11 @@ mod test {
     }
 
     fn dttm(year: i32, month: u32, day: u32, h: u32, m: u32, s: u32) -> DateTime {
-        use types::Date;
         Date::from_ymd(year, month, day).and_hms(h, m, s)
     }
 
     #[test]
-    fn test_smaller_grains() {
+    fn smaller_grains() {
         let mut minute = Grains(Grain::Minute).future(&dt(2015, 2, 27));
         assert_eq!(minute.next().unwrap(),
             Range{start: dttm(2015, 2, 27, 0, 0, 0),
@@ -118,7 +116,7 @@ mod test {
     }
 
     #[test]
-    fn test_virtual_grains() {
+    fn virtual_grains() {
         let mut quarters = Grains(Grain::Quarter).future(&dt(2015, 2, 27));
         assert_eq!(quarters.next().unwrap(),
             Range{start: dt(2015, 1, 1), end: dt(2015, 4, 1), grain: Grain::Quarter});

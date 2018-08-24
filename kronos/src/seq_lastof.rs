@@ -61,26 +61,24 @@ impl<'a, Frame, Win> TimeSequence<'a> for LastOf<Frame, Win>
 #[cfg(test)]
 mod test {
     use super::*;
-    use types::Grain;
+    use types::{Date, Grain};
+    use seq_grain::Grains;
+    use seq_named::{Weekend, Month};
+
 
     fn dt(year: i32, month: u32, day: u32) -> DateTime {
-        use types::Date;
         Date::from_ymd(year, month, day).and_hms(0, 0, 0)
     }
 
     #[test]
     #[should_panic]
-    fn test_lastof_fuse() {
-        use seq_grain::Grains;
+    fn lastof_fuse() {
         let badlastof = LastOf(32, Grains(Grain::Day), Grains(Grain::Month));
         badlastof.future(&dt(2015, 2, 25)).next();
     }
 
     #[test]
-    fn test_lastof() {
-        use seq_grain::Grains;
-        use seq_named::{Weekend, Month};
-
+    fn lastof() {
         // last weekend of the year
         let weekendofyear = LastOf(1, Weekend, Grains(Grain::Year));
         let mut weekendofyear = weekendofyear.future(&dt(2015, 2, 25));

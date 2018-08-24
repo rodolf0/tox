@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use types::{DateTime, Range, Grain, TimeSequence};
+use types::{DateTime, Range, TimeSequence};
 
 // Alternates SeqA and SeqB depending on what happens first
 // Union skips over Ranges totally contained by other sequence
@@ -62,10 +62,6 @@ impl<'a, SeqA, SeqB> TimeSequence<'a> for Union<SeqA, SeqB>
     where for<'b> SeqA: TimeSequence<'b>,
           for<'b> SeqB: TimeSequence<'b>
 {
-    // NOTE: resolution of A and B don't need to be the same, check Range items
-    // TODO: get rid of resolution? or return Resolution::Mixed
-    fn resolution(&self) -> Grain { self.1.resolution() }
-
     fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, true)
     }
@@ -77,71 +73,76 @@ impl<'a, SeqA, SeqB> TimeSequence<'a> for Union<SeqA, SeqB>
 
 
 #[cfg(test)]
-fn dt(year: i32, month: u32, day: u32) -> DateTime {
-    use types::Date;
-    Date::from_ymd(year, month, day).and_hms(0, 0, 0)
-}
+mod test {
+    use super::*;
+    use types::Grain;
 
-#[test]
-fn test_union() {
-    use seq_named::Weekday;
+    fn dt(year: i32, month: u32, day: u32) -> DateTime {
+        use types::Date;
+        Date::from_ymd(year, month, day).and_hms(0, 0, 0)
+    }
 
-    let mut monwed = Union(Weekday(1), Weekday(3)).future(&dt(2015, 2, 27));
-    assert_eq!(monwed.next().unwrap(),
-        Range{start: dt(2015, 3, 2), end: dt(2015, 3, 3), grain: Grain::Day});
-    assert_eq!(monwed.next().unwrap(),
-        Range{start: dt(2015, 3, 4), end: dt(2015, 3, 5), grain: Grain::Day});
-    assert_eq!(monwed.next().unwrap(),
-        Range{start: dt(2015, 3, 9), end: dt(2015, 3, 10), grain: Grain::Day});
+    #[test]
+    fn test_union() {
+        use seq_named::Weekday;
 
-    let monwed = Union(Weekday(1), Weekday(3));
-    let mut monwedfri = Union(monwed, Weekday(5)).future(&dt(2015, 2, 27));
-    assert_eq!(monwedfri.next().unwrap(),
-        Range{start: dt(2015, 2, 27), end: dt(2015, 2, 28), grain: Grain::Day});
-    assert_eq!(monwedfri.next().unwrap(),
-        Range{start: dt(2015, 3, 2), end: dt(2015, 3, 3), grain: Grain::Day});
-    assert_eq!(monwedfri.next().unwrap(),
-        Range{start: dt(2015, 3, 4), end: dt(2015, 3, 5), grain: Grain::Day});
-}
+        let mut monwed = Union(Weekday(1), Weekday(3)).future(&dt(2015, 2, 27));
+        assert_eq!(monwed.next().unwrap(),
+            Range{start: dt(2015, 3, 2), end: dt(2015, 3, 3), grain: Grain::Day});
+        assert_eq!(monwed.next().unwrap(),
+            Range{start: dt(2015, 3, 4), end: dt(2015, 3, 5), grain: Grain::Day});
+        assert_eq!(monwed.next().unwrap(),
+            Range{start: dt(2015, 3, 9), end: dt(2015, 3, 10), grain: Grain::Day});
 
-#[test]
-fn test_union_past() {
-    use seq_named::Weekday;
+        let monwed = Union(Weekday(1), Weekday(3));
+        let mut monwedfri = Union(monwed, Weekday(5)).future(&dt(2015, 2, 27));
+        assert_eq!(monwedfri.next().unwrap(),
+            Range{start: dt(2015, 2, 27), end: dt(2015, 2, 28), grain: Grain::Day});
+        assert_eq!(monwedfri.next().unwrap(),
+            Range{start: dt(2015, 3, 2), end: dt(2015, 3, 3), grain: Grain::Day});
+        assert_eq!(monwedfri.next().unwrap(),
+            Range{start: dt(2015, 3, 4), end: dt(2015, 3, 5), grain: Grain::Day});
+    }
 
-    let mut monwed = Union(Weekday(1), Weekday(3)).past(&dt(2015, 2, 27));
-    assert_eq!(monwed.next().unwrap(),
-        Range{start: dt(2015, 2, 25), end: dt(2015, 2, 26), grain: Grain::Day});
-    assert_eq!(monwed.next().unwrap(),
-        Range{start: dt(2015, 2, 23), end: dt(2015, 2, 24), grain: Grain::Day});
+    #[test]
+    fn test_union_past() {
+        use seq_named::Weekday;
 
-    let monwed = Union(Weekday(1), Weekday(3));
-    let mut monwedfri = Union(monwed, Weekday(5)).past(&dt(2015, 2, 27));
-    assert_eq!(monwedfri.next().unwrap(),
-        Range{start: dt(2015, 2, 25), end: dt(2015, 2, 26), grain: Grain::Day});
-    assert_eq!(monwedfri.next().unwrap(),
-        Range{start: dt(2015, 2, 23), end: dt(2015, 2, 24), grain: Grain::Day});
-    assert_eq!(monwedfri.next().unwrap(),
-        Range{start: dt(2015, 2, 20), end: dt(2015, 2, 21), grain: Grain::Day});
+        let mut monwed = Union(Weekday(1), Weekday(3)).past(&dt(2015, 2, 27));
+        assert_eq!(monwed.next().unwrap(),
+            Range{start: dt(2015, 2, 25), end: dt(2015, 2, 26), grain: Grain::Day});
+        assert_eq!(monwed.next().unwrap(),
+            Range{start: dt(2015, 2, 23), end: dt(2015, 2, 24), grain: Grain::Day});
 
-    // past-inclusive/raw
-    let monwed = Union(Weekday(1), Weekday(3));
-    let mut monwedfri = Union(monwed, Weekday(5))._past_raw(&dt(2015, 2, 27));
-    assert_eq!(monwedfri.next().unwrap(),
-        Range{start: dt(2015, 2, 27), end: dt(2015, 2, 28), grain: Grain::Day});
-}
+        let monwed = Union(Weekday(1), Weekday(3));
+        let mut monwedfri = Union(monwed, Weekday(5)).past(&dt(2015, 2, 27));
+        assert_eq!(monwedfri.next().unwrap(),
+            Range{start: dt(2015, 2, 25), end: dt(2015, 2, 26), grain: Grain::Day});
+        assert_eq!(monwedfri.next().unwrap(),
+            Range{start: dt(2015, 2, 23), end: dt(2015, 2, 24), grain: Grain::Day});
+        assert_eq!(monwedfri.next().unwrap(),
+            Range{start: dt(2015, 2, 20), end: dt(2015, 2, 21), grain: Grain::Day});
 
-#[test]
-fn test_diff_resolution() {
-    use seq_named::{Month, Weekday};
+        // past-inclusive/raw
+        let monwed = Union(Weekday(1), Weekday(3));
+        let mut monwedfri = Union(monwed, Weekday(5))._past_raw(&dt(2015, 2, 27));
+        assert_eq!(monwedfri.next().unwrap(),
+            Range{start: dt(2015, 2, 27), end: dt(2015, 2, 28), grain: Grain::Day});
+    }
 
-    let mut mon_or_march = Union(Weekday(1), Month(3)).future(&dt(2015, 2, 27));
-    assert_eq!(mon_or_march.next().unwrap(),
-        Range{start: dt(2015, 3, 1), end: dt(2015, 4, 1), grain: Grain::Month});
-    assert_eq!(mon_or_march.next().unwrap(),
-        Range{start: dt(2015, 4, 6), end: dt(2015, 4, 7), grain: Grain::Day});
-    assert_eq!(mon_or_march.next().unwrap(),
-        Range{start: dt(2015, 4, 13), end: dt(2015, 4, 14), grain: Grain::Day});
-    let mut mon_or_march = mon_or_march.skip(46);
-    assert_eq!(mon_or_march.next().unwrap(),
-        Range{start: dt(2016, 3, 1), end: dt(2016, 4, 1), grain: Grain::Month});
+    #[test]
+    fn test_diff_resolution() {
+        use seq_named::{Month, Weekday};
+
+        let mut mon_or_march = Union(Weekday(1), Month(3)).future(&dt(2015, 2, 27));
+        assert_eq!(mon_or_march.next().unwrap(),
+            Range{start: dt(2015, 3, 1), end: dt(2015, 4, 1), grain: Grain::Month});
+        assert_eq!(mon_or_march.next().unwrap(),
+            Range{start: dt(2015, 4, 6), end: dt(2015, 4, 7), grain: Grain::Day});
+        assert_eq!(mon_or_march.next().unwrap(),
+            Range{start: dt(2015, 4, 13), end: dt(2015, 4, 14), grain: Grain::Day});
+        let mut mon_or_march = mon_or_march.skip(46);
+        assert_eq!(mon_or_march.next().unwrap(),
+            Range{start: dt(2016, 3, 1), end: dt(2016, 4, 1), grain: Grain::Month});
+    }
 }

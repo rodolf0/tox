@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use types::{DateTime, Range, Grain, TimeSequence};
+use types::{DateTime, Range, TimeSequence};
 
 //   |------a------|
 //            |------b------|
@@ -45,8 +45,6 @@ impl<'a, SeqA, SeqB> TimeSequence<'a> for Except<SeqA, SeqB>
     where for<'b> SeqA: TimeSequence<'b>,
           for<'b> SeqB: TimeSequence<'b>
 {
-    fn resolution(&self) -> Grain { self.0.resolution() }
-
     fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, true)
     }
@@ -58,53 +56,58 @@ impl<'a, SeqA, SeqB> TimeSequence<'a> for Except<SeqA, SeqB>
 
 
 #[cfg(test)]
-fn dt(year: i32, month: u32, day: u32) -> DateTime {
-    use types::Date;
-    Date::from_ymd(year, month, day).and_hms(0, 0, 0)
-}
+mod test {
+    use super::*;
+    use types::Grain;
 
-#[test]
-fn test_except() {
-    use seq_grain::Grains;
-    use seq_named::Weekday;
+    fn dt(year: i32, month: u32, day: u32) -> DateTime {
+        use types::Date;
+        Date::from_ymd(year, month, day).and_hms(0, 0, 0)
+    }
 
-    // days except Friday and thursdays
-    let except = Except(Except(Grains(Grain::Day), Weekday(5)), Weekday(4));
-    let mut fut = except.future(&dt(2018, 8, 22));
-    assert_eq!(fut.next().unwrap(),
-        Range{start: dt(2018, 8, 22), end: dt(2018, 8, 23), grain: Grain::Day});
-    assert_eq!(fut.next().unwrap(),
-        Range{start: dt(2018, 8, 25), end: dt(2018, 8, 26), grain: Grain::Day});
-    assert_eq!(fut.next().unwrap(),
-        Range{start: dt(2018, 8, 26), end: dt(2018, 8, 27), grain: Grain::Day});
+    #[test]
+    fn test_except() {
+        use seq_grain::Grains;
+        use seq_named::Weekday;
 
-    let mut past = except.past(&dt(2018, 8, 19));
-    assert_eq!(past.next().unwrap(),
-        Range{start: dt(2018, 8, 18), end: dt(2018, 8, 19), grain: Grain::Day});
-    assert_eq!(past.next().unwrap(),
-        Range{start: dt(2018, 8, 15), end: dt(2018, 8, 16), grain: Grain::Day});
+        // days except Friday and thursdays
+        let except = Except(Except(Grains(Grain::Day), Weekday(5)), Weekday(4));
+        let mut fut = except.future(&dt(2018, 8, 22));
+        assert_eq!(fut.next().unwrap(),
+            Range{start: dt(2018, 8, 22), end: dt(2018, 8, 23), grain: Grain::Day});
+        assert_eq!(fut.next().unwrap(),
+            Range{start: dt(2018, 8, 25), end: dt(2018, 8, 26), grain: Grain::Day});
+        assert_eq!(fut.next().unwrap(),
+            Range{start: dt(2018, 8, 26), end: dt(2018, 8, 27), grain: Grain::Day});
 
-    let mut past = except.past(&dt(2018, 8, 17));
-    assert_eq!(past.next().unwrap(),
-        Range{start: dt(2018, 8, 15), end: dt(2018, 8, 16), grain: Grain::Day});
-}
+        let mut past = except.past(&dt(2018, 8, 19));
+        assert_eq!(past.next().unwrap(),
+            Range{start: dt(2018, 8, 18), end: dt(2018, 8, 19), grain: Grain::Day});
+        assert_eq!(past.next().unwrap(),
+            Range{start: dt(2018, 8, 15), end: dt(2018, 8, 16), grain: Grain::Day});
+
+        let mut past = except.past(&dt(2018, 8, 17));
+        assert_eq!(past.next().unwrap(),
+            Range{start: dt(2018, 8, 15), end: dt(2018, 8, 16), grain: Grain::Day});
+    }
 
 
-#[test]
-fn test_except_diff_grains() {
-    use seq_named::{Weekday, Month};
+    #[test]
+    fn test_except_diff_grains() {
+        use seq_named::{Weekday, Month};
 
-    // mondays except september
-    let except = Except(Weekday(1), Month(9));
-    let mut fut = except.future(&dt(2018, 8, 22));
-    assert_eq!(fut.next().unwrap(),
-        Range{start: dt(2018, 8, 27), end: dt(2018, 8, 28), grain: Grain::Day});
-    assert_eq!(fut.next().unwrap(),
-        Range{start: dt(2018, 10, 1), end: dt(2018, 10, 2), grain: Grain::Day});
+        // mondays except september
+        let except = Except(Weekday(1), Month(9));
+        let mut fut = except.future(&dt(2018, 8, 22));
+        assert_eq!(fut.next().unwrap(),
+            Range{start: dt(2018, 8, 27), end: dt(2018, 8, 28), grain: Grain::Day});
+        assert_eq!(fut.next().unwrap(),
+            Range{start: dt(2018, 10, 1), end: dt(2018, 10, 2), grain: Grain::Day});
 
-    // mondays except August - past
-    let except = Except(Weekday(1), Month(8));
-    let mut past = except.past(&dt(2018, 8, 22));
-    assert_eq!(past.next().unwrap(),
-        Range{start: dt(2018, 7, 30), end: dt(2018, 7, 31), grain: Grain::Day});
+        // mondays except August - past
+        let except = Except(Weekday(1), Month(8));
+        let mut past = except.past(&dt(2018, 8, 22));
+        assert_eq!(past.next().unwrap(),
+            Range{start: dt(2018, 7, 30), end: dt(2018, 7, 31), grain: Grain::Day});
+    }
 }

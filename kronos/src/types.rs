@@ -82,10 +82,6 @@ impl Range {
 // They can be evaluated in the context of an instant to produce time Ranges.
 
 pub trait TimeSequence<'a> {
-    // Resolution of Ranges produced by this sequence
-    // TODO: remove or add Mixed
-    fn resolution(&self) -> Grain;
-
     // Yield instances of this sequence into the future.
     // End-time of Ranges must be greater than reference t0 DateTime.
     // NOTE: First Range may start after t0 if for example discontinuous.

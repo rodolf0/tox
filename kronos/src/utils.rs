@@ -20,6 +20,22 @@ pub fn next_grain(g: Grain) -> Grain {
     }
 }
 
+pub fn enclosing_grain_from_duration(duration: Duration) -> Grain {
+    if duration <= Duration::seconds(1) { return Grain::Second }
+    if duration <= Duration::minutes(1) { return Grain::Minute }
+    if duration <= Duration::hours(1) { return Grain::Hour }
+    if duration <= Duration::days(1) { return Grain::Day }
+    if duration <= Duration::days(7) { return Grain::Week }
+    if duration <= Duration::days(31) { return Grain::Month }
+    if duration <= Duration::days(92) { return Grain::Quarter }
+    if duration <= Duration::days(183) { return Grain::Half }
+    if duration <= Duration::days(366) { return Grain::Year }
+    if duration <= Duration::days(5 * 366) { return Grain::Lustrum }
+    if duration <= Duration::days(10 * 366) { return Grain::Decade }
+    if duration <= Duration::days(100 * 366) { return Grain::Century }
+    Grain::Millenium
+}
+
 pub fn truncate(d: DateTime, granularity: Grain) -> DateTime {
     use chrono::Timelike;
     use types::Grain::*;

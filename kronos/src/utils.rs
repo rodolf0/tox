@@ -1,24 +1,12 @@
 #![deny(warnings)]
 
 extern crate chrono;
-use chrono::Datelike;
+use self::chrono::Timelike;
+use self::chrono::Datelike;
+use self::chrono::Weekday;
+
 use types::{Grain, Date, DateTime, Duration};
 
-
-// TODO: change name + include virtual grains in same enum
-pub fn next_grain(g: Grain) -> Grain {
-    match g {
-        Grain::Second => Grain::Minute,
-        Grain::Minute => Grain::Hour,
-        Grain::Hour => Grain::Day,
-        Grain::Day => Grain::Week,
-        Grain::Week => Grain::Month,
-        Grain::Month => Grain::Year,
-        Grain::Quarter => Grain::Year,
-        Grain::Year => Grain::Year,
-        _ => panic!("next_grain: TODO implement")
-    }
-}
 
 pub fn enclosing_grain_from_duration(duration: Duration) -> Grain {
     if duration <= Duration::seconds(1) { return Grain::Second }
@@ -37,7 +25,6 @@ pub fn enclosing_grain_from_duration(duration: Duration) -> Grain {
 }
 
 pub fn truncate(d: DateTime, granularity: Grain) -> DateTime {
-    use chrono::Timelike;
     use types::Grain::*;
     match granularity {
         Second => d.with_nanosecond(0).unwrap(),
@@ -88,7 +75,6 @@ pub fn find_month(mut date: Date, month: u32, future: bool) -> Date {
 }
 
 pub fn find_weekend(mut date: Date, future: bool) -> Date {
-    use chrono::Weekday;
     if date.weekday() == Weekday::Sun { date = date.pred(); }
     while date.weekday() != Weekday::Sat {
         date = if future {

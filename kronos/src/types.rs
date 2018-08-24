@@ -1,16 +1,10 @@
 #![deny(warnings)]
 
-
 // duckling links
 // - https://github.com/wit-ai/duckling_old/blob/6b7e2e1bdbd50299cee4075ff48d7323c05758bc/src/duckling/time/pred.clj#L57-L72
 // - https://duckling.wit.ai/#limitations
 // - https://github.com/wit-ai/duckling_old/blob/6b7e2e1bdbd50299cee4075ff48d7323c05758bc/src/duckling/time/pred.clj#L333
 
-//
-// - interval based (weekend, mon 2.30pm to tues 3am)
-//   - monday to friday
-//   - afternoon (13hs - 19hs)
-//
 // * composite durations: 3hs and 20 minutes -> grains
 // - interval
 //   - monday to friday (range of 5 days)
@@ -22,12 +16,10 @@
 //
 
 
-
 extern crate chrono;
-
-pub type DateTime = chrono::NaiveDateTime;
-pub type Date = chrono::NaiveDate;
-pub type Duration = chrono::Duration;
+pub type DateTime = self::chrono::NaiveDateTime;
+pub type Date = self::chrono::NaiveDate;
+pub type Duration = self::chrono::Duration;
 
 
 // TODO: Fortnight is not aligned to any known frame its just 14 nights

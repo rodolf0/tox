@@ -6,9 +6,7 @@
 // - https://github.com/wit-ai/duckling_old/blob/6b7e2e1bdbd50299cee4075ff48d7323c05758bc/src/duckling/time/pred.clj#L333
 
 // * composite durations: 3hs and 20 minutes -> grains
-// - interval
-//   - monday to friday (range of 5 days)
-// - multiple-base eg: 2 days -> mon+tue, wed+thu, fri+sat ...
+// - multiple-base eg: 2 days yields mon+tue, wed+thu, fri+sat ...
 //
 // filters:
 // - ever other month
@@ -23,7 +21,8 @@ pub type Duration = self::chrono::Duration;
 
 
 // TODO: Fortnight is not aligned to any known frame its just 14 nights
-// TOOD: distinguish between Grain and Resolution (that of Range)
+// TODO: distinguish between Grain and Resolution (that of Range)
+// TODO: resolution only goes through second - day range
 
 #[derive(Debug,PartialEq,Eq,PartialOrd,Ord,Clone,Copy)]
 pub enum Grain {
@@ -42,6 +41,13 @@ pub enum Grain {
     Millenium,
 }
 
+#[derive(Debug,PartialEq,Eq,Clone,Copy)]
+pub enum Season {
+    Spring,
+    Summer,
+    Autumn,
+    Winter,
+}
 
 // Ranges are right-open intervals of time, ie: [start, end)
 #[derive(Clone,Debug,PartialEq)]

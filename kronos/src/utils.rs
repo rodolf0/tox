@@ -5,7 +5,7 @@ use self::chrono::Timelike;
 use self::chrono::Datelike;
 use self::chrono::Weekday;
 
-use types::{Grain, Date, DateTime, Duration};
+use types::{Grain, Date, DateTime, Duration, Season};
 
 
 pub fn enclosing_grain_from_duration(duration: Duration) -> Grain {
@@ -72,6 +72,43 @@ pub fn find_month(mut date: Date, month: u32, future: bool) -> Date {
         }
     }
     date
+}
+
+pub fn find_season(dt: Date, season: Season, future: bool, north: bool)
+    -> (Date, Date)
+{
+    let season_lookup = |date: Date| {
+        if date.month() < 3 || date.month() == 3 && date.day() < 21 {
+            Season::Winter
+        } else if date.month() < 6 || date.month() == 6 && date.day() < 21 {
+            Season::Spring
+        } else if date.month() < 9 || date.month() == 9 && date.day() < 21 {
+            Season::Summer
+        } else if date.month() < 12 || date.month() == 12 && date.day() < 21 {
+            Season::Autumn
+        } else {
+            Season::Winter
+        }
+    };
+    let search = |end_mo, mut date: Date| {
+        let inc = if future { Duration::days(1) } else { Duration::days(-1) };
+        while season_lookup(date) != season {
+            date += inc;
+        }
+        let end_date = Date::from_ymd(date.year(), end_mo, 21);
+        let start_date = dtshift::sub(end_date, 0, 3, 0);
+        (start_date, end_date)
+    };
+    match (season, north) {
+        (Season::Spring, true) |
+        (Season::Autumn, false) => search(6, dt),
+        (Season::Summer, true) |
+        (Season::Winter, false) => search(9, dt),
+        (Season::Autumn, true) |
+        (Season::Spring, false) => search(12, dt),
+        (Season::Winter, true) |
+        (Season::Summer, false) => search(3, dt),
+    }
 }
 
 pub fn find_weekend(mut date: Date, future: bool) -> Date {

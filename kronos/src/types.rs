@@ -5,9 +5,6 @@
 // - https://duckling.wit.ai/#limitations
 // - https://github.com/wit-ai/duckling_old/blob/6b7e2e1bdbd50299cee4075ff48d7323c05758bc/src/duckling/time/pred.clj#L333
 
-// * composite durations: 3hs and 20 minutes -> grains
-// - multiple-base eg: 2 days yields mon+tue, wed+thu, fri+sat ...
-//
 // filters:
 // - ever other month
 // - shift-by-2 (eg 2 days after monday)
@@ -19,10 +16,8 @@ pub type DateTime = self::chrono::NaiveDateTime;
 pub type Date = self::chrono::NaiveDate;
 pub type Duration = self::chrono::Duration;
 
+use std::str::FromStr;
 
-// TODO: Fortnight is not aligned to any known frame its just 14 nights
-// TODO: distinguish between Grain and Resolution (that of Range)
-// TODO: resolution only goes through second - day range
 
 #[derive(Debug,PartialEq,Eq,PartialOrd,Ord,Clone,Copy)]
 pub enum Grain {
@@ -41,12 +36,47 @@ pub enum Grain {
     Millenium,
 }
 
+impl FromStr for Grain {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_ref() {
+            "second" | "seconds" => Ok(Grain::Second),
+            "minute" | "minutes" => Ok(Grain::Minute),
+            "hour" | "hours" => Ok(Grain::Hour),
+            "day" | "days" => Ok(Grain::Day),
+            "week" | "weeks" => Ok(Grain::Week),
+            "month" | "months" => Ok(Grain::Month),
+            "quarter" | "quarters" => Ok(Grain::Quarter),
+            "half" | "halfs" => Ok(Grain::Half),
+            "year" | "years" => Ok(Grain::Year),
+            "lustrum" | "lustrums" => Ok(Grain::Lustrum),
+            "decade" | "decades" => Ok(Grain::Decade),
+            "century" | "centuries" => Ok(Grain::Century),
+            "millenium" | "millenia" | "milleniums" => Ok(Grain::Millenium),
+            _ => Err(format!("Can't build Grain from {}", s))
+        }
+    }
+}
+
 #[derive(Debug,PartialEq,Eq,Clone,Copy)]
 pub enum Season {
     Spring,
     Summer,
     Autumn,
     Winter,
+}
+
+impl FromStr for Season {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_ref() {
+            "spring" | "springs" => Ok(Season::Spring),
+            "summer" | "summers" => Ok(Season::Summer),
+            "autumn" | "autumns" => Ok(Season::Autumn),
+            "winter" | "winters" => Ok(Season::Winter),
+            _ => Err(format!("Can't build Season from {}", s))
+        }
+    }
 }
 
 // Ranges are right-open intervals of time, ie: [start, end)

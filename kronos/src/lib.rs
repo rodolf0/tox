@@ -26,3 +26,9 @@ pub use seq_except::Except;
 
 mod seq_interval;
 pub use seq_interval::Interval;
+
+mod seq_seasons;
+pub use seq_seasons::Seasons;
+
+mod seq_mgrain;
+pub use seq_mgrain::MGrain;

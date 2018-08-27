@@ -24,6 +24,15 @@ pub fn enclosing_grain_from_duration(duration: Duration) -> Grain {
     Grain::Millenium
 }
 
+pub fn grain_from_duration(duration: Duration) -> Grain {
+    let seconds = duration.num_seconds();
+    if seconds % 60 != 0 { return Grain::Second }
+    if (seconds/60) % 60 != 0 { return Grain::Minute }
+    if (seconds/3600) % 24 != 0 { return Grain::Hour }
+    if (seconds/3600/24) % 7 != 0 { return Grain::Day }
+    Grain::Week
+}
+
 pub fn truncate(d: DateTime, granularity: Grain) -> DateTime {
     use types::Grain::*;
     match granularity {

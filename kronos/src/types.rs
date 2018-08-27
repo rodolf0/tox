@@ -1,15 +1,5 @@
 #![deny(warnings)]
 
-// duckling links
-// - https://github.com/wit-ai/duckling_old/blob/6b7e2e1bdbd50299cee4075ff48d7323c05758bc/src/duckling/time/pred.clj#L57-L72
-// - https://duckling.wit.ai/#limitations
-// - https://github.com/wit-ai/duckling_old/blob/6b7e2e1bdbd50299cee4075ff48d7323c05758bc/src/duckling/time/pred.clj#L333
-
-// filters:
-// - ever other month
-// - shift-by-2 (eg 2 days after monday)
-//
-
 
 extern crate chrono;
 pub type DateTime = self::chrono::NaiveDateTime;
@@ -117,7 +107,7 @@ pub trait TimeSequence<'a> {
 
     // Yield instances of this sequence into the past
     // Start-time of emited Ranges must be less-or-equal than reference t0.
-    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a>;
+    fn _past_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + 'a>;
 
     // NOTE: past_raw and future_raw are mainly used internaly.
     // Their first elements may overlap and are needed for composing NthOf.
@@ -131,7 +121,7 @@ pub trait TimeSequence<'a> {
 
     // End-time of emited Ranges must be less-or-equal than reference DateTime.
     // Complement of "future" where end-time must be greater than t0.
-    fn past(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a> {
+    fn past(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + 'a> {
         let t0 = t0.clone();
         Box::new(self._past_raw(&t0)
             .skip_while(move |range| range.end > t0))

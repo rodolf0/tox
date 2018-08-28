@@ -32,3 +32,9 @@ pub use seq_seasons::Seasons;
 
 mod seq_mgrain;
 pub use seq_mgrain::MGrain;
+
+mod seq_func;
+pub use seq_func::{Map, shift};
+
+#[cfg(test)]
+mod mixed_tests;

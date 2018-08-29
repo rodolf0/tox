@@ -1,29 +1,41 @@
 #![deny(warnings)]
 
 extern crate chrono;
-use chrono::{Datelike, Timelike};
-use semantics::Grain;
+use self::chrono::Timelike;
+use self::chrono::Datelike;
+use self::chrono::Weekday;
 
-pub type DateTime = chrono::NaiveDateTime;
-pub type Date = chrono::NaiveDate;
-pub type Duration = chrono::Duration;
+use types::{Grain, Date, DateTime, Duration, Season};
 
-pub fn next_grain(g: Grain) -> Grain {
-    match g {
-        Grain::Second => Grain::Minute,
-        Grain::Minute => Grain::Hour,
-        Grain::Hour => Grain::Day,
-        Grain::Day => Grain::Week,
-        Grain::Week => Grain::Month,
-        Grain::Month => Grain::Year,
-        Grain::Quarter => Grain::Year,
-        Grain::Year => Grain::Year,
-    }
+
+pub fn enclosing_grain_from_duration(duration: Duration) -> Grain {
+    if duration <= Duration::seconds(1) { return Grain::Second }
+    if duration <= Duration::minutes(1) { return Grain::Minute }
+    if duration <= Duration::hours(1) { return Grain::Hour }
+    if duration <= Duration::days(1) { return Grain::Day }
+    if duration <= Duration::days(7) { return Grain::Week }
+    if duration <= Duration::days(31) { return Grain::Month }
+    if duration <= Duration::days(92) { return Grain::Quarter }
+    if duration <= Duration::days(183) { return Grain::Half }
+    if duration <= Duration::days(366) { return Grain::Year }
+    if duration <= Duration::days(5 * 366) { return Grain::Lustrum }
+    if duration <= Duration::days(10 * 366) { return Grain::Decade }
+    if duration <= Duration::days(100 * 366) { return Grain::Century }
+    Grain::Millenium
 }
 
-pub fn truncate(d: DateTime, g: Grain) -> DateTime {
-    use Grain::*;
-    match g {
+pub fn grain_from_duration(duration: Duration) -> Grain {
+    let seconds = duration.num_seconds();
+    if seconds % 60 != 0 { return Grain::Second }
+    if (seconds/60) % 60 != 0 { return Grain::Minute }
+    if (seconds/3600) % 24 != 0 { return Grain::Hour }
+    if (seconds/3600/24) % 7 != 0 { return Grain::Day }
+    Grain::Week
+}
+
+pub fn truncate(d: DateTime, granularity: Grain) -> DateTime {
+    use types::Grain::*;
+    match granularity {
         Second => d.with_nanosecond(0).unwrap(),
         Minute => d.date().and_hms(d.hour(), d.minute(), 0),
         Hour => d.date().and_hms(d.hour(), 0, 0),
@@ -34,40 +46,110 @@ pub fn truncate(d: DateTime, g: Grain) -> DateTime {
         },
         Month => Date::from_ymd(d.year(), d.month(), 1).and_hms(0, 0, 0),
         Quarter => {
-            let qstart = 1 + 3 * (d.month()/4);
-            Date::from_ymd(d.year(), qstart, 1).and_hms(0, 0, 0)
+            let quarter_start = 1 + 3 * ((d.month()-1) / 3);
+            Date::from_ymd(d.year(), quarter_start, 1).and_hms(0, 0, 0)
+        },
+        Half => {
+            let half_start = 1 + 6 * ((d.month() - 1) / 6);
+            Date::from_ymd(d.year(), half_start, 1).and_hms(0, 0, 0)
         },
         Year => Date::from_ymd(d.year(), 1, 1).and_hms(0, 0, 0),
+        Lustrum =>
+            Date::from_ymd(d.year() - d.year() % 5, 1, 1).and_hms(0, 0, 0),
+        Decade =>
+            Date::from_ymd(d.year() - d.year() % 10, 1, 1).and_hms(0, 0, 0),
+        Century =>
+            Date::from_ymd(d.year() - d.year() % 100, 1, 1).and_hms(0, 0, 0),
+        Millenium =>
+            Date::from_ymd(d.year() - d.year() % 1000, 1, 1).and_hms(0, 0, 0),
     }
 }
 
-pub fn find_dow(mut date: Date, dow: u32) -> Date {
+pub fn find_dow(mut date: Date, dow: u32, future: bool) -> Date {
     while date.weekday().num_days_from_sunday() != dow {
-        date = date.succ();
+        date = if future { date.succ() } else { date.pred() }
     }
     date
 }
 
-pub fn find_month(mut date: Date, month: u32) -> Date {
+pub fn find_month(mut date: Date, month: u32, future: bool) -> Date {
     while date.month() != month {
-        date = dtshift::add(date, 0, 1, 0);
+        date = if future {
+            dtshift::add(date, 0, 1, 0)
+        } else {
+            dtshift::sub(date, 0, 1, 0)
+        }
     }
     date
 }
 
-pub fn shift_datetime(d: DateTime, grain: Grain, n: i32) -> DateTime {
-    use Grain::*;
+pub fn find_season(dt: Date, season: Season, future: bool, north: bool)
+    -> (Date, Date)
+{
+    let season_lookup = |date: Date| {
+        if date.month() < 3 || date.month() == 3 && date.day() < 21 {
+            Season::Winter
+        } else if date.month() < 6 || date.month() == 6 && date.day() < 21 {
+            Season::Spring
+        } else if date.month() < 9 || date.month() == 9 && date.day() < 21 {
+            Season::Summer
+        } else if date.month() < 12 || date.month() == 12 && date.day() < 21 {
+            Season::Autumn
+        } else {
+            Season::Winter
+        }
+    };
+    let search = |end_mo, mut date: Date| {
+        let inc = if future { Duration::days(1) } else { Duration::days(-1) };
+        while season_lookup(date) != season {
+            date += inc;
+        }
+        let end_date = Date::from_ymd(date.year(), end_mo, 21);
+        let start_date = dtshift::sub(end_date, 0, 3, 0);
+        (start_date, end_date)
+    };
+    match (season, north) {
+        (Season::Spring, true) |
+        (Season::Autumn, false) => search(6, dt),
+        (Season::Summer, true) |
+        (Season::Winter, false) => search(9, dt),
+        (Season::Autumn, true) |
+        (Season::Spring, false) => search(12, dt),
+        (Season::Winter, true) |
+        (Season::Summer, false) => search(3, dt),
+    }
+}
+
+pub fn find_weekend(mut date: Date, future: bool) -> Date {
+    if date.weekday() == Weekday::Sun { date = date.pred(); }
+    while date.weekday() != Weekday::Sat {
+        date = if future {
+            date.succ()
+        } else {
+            date.pred()
+        };
+    }
+    date
+}
+
+pub fn shift_datetime(d: DateTime, granularity: Grain, n: i32) -> DateTime {
+    use types::Grain::*;
     let m = if n >= 0 {n as u32} else {(-n) as u32};
     let shiftfn = if n >= 0 {dtshift::add} else {dtshift::sub};
-    match grain {
+    match granularity {
         Second => d + Duration::seconds(n as i64),
         Minute => d + Duration::minutes(n as i64),
         Hour => d + Duration::hours(n as i64),
         Day => d + Duration::days(n as i64),
         Week => d + Duration::weeks(n as i64),
-        Month => DateTime::new(shiftfn(d.date(), 0, m, 0), d.time()),
-        Quarter => DateTime::new(shiftfn(d.date(), 0, 3 * m, 0), d.time()),
-        Year => DateTime::new(shiftfn(d.date(), m, 0, 0), d.time()),
+        Month => shiftfn(d.date(), 0, m, 0).and_time(d.time()),
+        Quarter => shiftfn(d.date(), 0, 3 * m, 0).and_time(d.time()),
+        Half => shiftfn(d.date(), 0, 6 * m, 0).and_time(d.time()),
+        Year => shiftfn(d.date(), m, 0, 0).and_time(d.time()),
+        Lustrum => shiftfn(d.date(), 5 * m, 0, 0).and_time(d.time()),
+        Decade => shiftfn(d.date(), 10 * m, 0, 0).and_time(d.time()),
+        Century => shiftfn(d.date(), 100 * m, 0, 0).and_time(d.time()),
+        Millenium => shiftfn(d.date(), 1000 * m, 0, 0).and_time(d.time()),
     }
 }
 

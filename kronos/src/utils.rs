@@ -42,7 +42,7 @@ pub fn truncate(d: DateTime, granularity: Grain) -> DateTime {
         Day => d.date().and_hms(0, 0, 0),
         Week => {
             let days_from_sun = d.weekday().num_days_from_sunday();
-            (d.date() - Duration::days(days_from_sun as i64)).and_hms(0, 0, 0)
+            (d.date() - Duration::days(i64::from(days_from_sun))).and_hms(0, 0, 0)
         },
         Month => Date::from_ymd(d.year(), d.month(), 1).and_hms(0, 0, 0),
         Quarter => {
@@ -137,11 +137,11 @@ pub fn shift_datetime(d: DateTime, granularity: Grain, n: i32) -> DateTime {
     let m = if n >= 0 {n as u32} else {(-n) as u32};
     let shiftfn = if n >= 0 {dtshift::add} else {dtshift::sub};
     match granularity {
-        Second => d + Duration::seconds(n as i64),
-        Minute => d + Duration::minutes(n as i64),
-        Hour => d + Duration::hours(n as i64),
-        Day => d + Duration::days(n as i64),
-        Week => d + Duration::weeks(n as i64),
+        Second => d + Duration::seconds(i64::from(n)),
+        Minute => d + Duration::minutes(i64::from(n)),
+        Hour => d + Duration::hours(i64::from(n)),
+        Day => d + Duration::days(i64::from(n)),
+        Week => d + Duration::weeks(i64::from(n)),
         Month => shiftfn(d.date(), 0, m, 0).and_time(d.time()),
         Quarter => shiftfn(d.date(), 0, 3 * m, 0).and_time(d.time()),
         Half => shiftfn(d.date(), 0, 6 * m, 0).and_time(d.time()),
@@ -162,7 +162,7 @@ mod dtshift {
         assert!(m > 0 && m <= 12);
         // check when february has 29 days
         if m == 2 && y % 4 == 0 && (y % 100 != 0 || y % 400 == 0) {return 29;}
-        DIM[(m-1) as usize] as u32
+        u32::from(DIM[(m-1) as usize])
     }
 
     pub fn add(dt: Date, y: u32, mut m: u32, mut d: u32) -> Date {

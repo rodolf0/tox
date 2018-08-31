@@ -27,7 +27,7 @@ impl MGrain {
         Box::new((0..).map(move |x| Range{
             start: base + hop * x,
             end: base + hop * x + duration,
-            grain: grain
+            grain
         }))
     }
 }

@@ -114,7 +114,7 @@ pub trait TimeSequence<'a> {
     // End-user wants future + past which have no overlap in emitted Ranges
 
     fn future(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + 'a> {
-        let t0 = t0.clone();
+        let t0 = *t0;
         Box::new(self._future_raw(&t0)
             .skip_while(move |range| range.end <= t0))
     }
@@ -122,7 +122,7 @@ pub trait TimeSequence<'a> {
     // End-time of emited Ranges must be less-or-equal than reference DateTime.
     // Complement of "future" where end-time must be greater than t0.
     fn past(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + 'a> {
-        let t0 = t0.clone();
+        let t0 = *t0;
         Box::new(self._past_raw(&t0)
             .skip_while(move |range| range.end > t0))
     }

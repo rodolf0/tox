@@ -15,7 +15,7 @@ impl Grains {
         Box::new((0..).map(move |x| Range{
             start: utils::shift_datetime(base, grain, sign * x),
             end: utils::shift_datetime(base, grain, sign * x + 1),
-            grain: grain
+            grain
         }))
     }
 }

@@ -1,10 +1,12 @@
 #![deny(warnings)]
 
 mod types;
+pub use types::{Grain, TimeSequence, Range, Season};
+
 mod utils;
 
 mod seq_named;
-pub use seq_named::{Weekday, Month};
+pub use seq_named::{Weekday, Month, Weekend, Year};
 
 mod seq_grain;
 pub use seq_grain::Grains;

@@ -28,7 +28,7 @@ pub enum Grain {
 
 impl FromStr for Grain {
     type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Grain, String> {
         match s.to_lowercase().as_ref() {
             "second" | "seconds" => Ok(Grain::Second),
             "minute" | "minutes" => Ok(Grain::Minute),
@@ -58,7 +58,7 @@ pub enum Season {
 
 impl FromStr for Season {
     type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Season, String> {
         match s.to_lowercase().as_ref() {
             "spring" | "springs" => Ok(Season::Spring),
             "summer" | "summers" => Ok(Season::Summer),

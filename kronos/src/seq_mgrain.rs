@@ -11,11 +11,11 @@ pub struct MGrain {
 }
 
 impl MGrain {
-    pub fn new(duration: Duration) -> Self {
+    pub fn new(duration: Duration) -> MGrain {
         MGrain{duration, resolution: utils::grain_from_duration(duration)}
     }
 
-    pub fn new2(duration: Duration, resolution: Grain) -> Self {
+    pub fn new2(duration: Duration, resolution: Grain) -> MGrain {
         MGrain{duration, resolution}
     }
 

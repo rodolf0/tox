@@ -206,8 +206,7 @@ mod tests {
     }
 
     fn item(rule: Rc<Rule>, dot: usize, start: usize, end: usize) -> Item {
-        Item{rule: rule, dot: dot, start: start, end: end,
-             bp: RefCell::new(HashSet::new())}
+        Item{rule, dot, start, end, bp: RefCell::new(HashSet::new())}
     }
 
     #[test]

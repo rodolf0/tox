@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
 use utils;
-use types::{DateTime, Duration, Range, Grain, TimeSequence};
+use types::{Date, DateTime, Duration, Range, Grain, TimeSequence};
 
 
 #[derive(Clone)]
@@ -79,6 +79,25 @@ impl<'a> TimeSequence<'a> for Weekend {
 
     fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, false)
+    }
+}
+
+
+#[derive(Clone)]
+pub struct Year(pub i32);
+
+impl<'a> TimeSequence<'a> for Year {
+    fn _future_raw(&self, _: &DateTime) -> Box<Iterator<Item=Range>> {
+        use std::iter;
+        Box::new(iter::once(Range{
+            start: Date::from_ymd(self.0, 1, 1).and_hms(0, 0, 0),
+            end: Date::from_ymd(self.0 + 1, 1, 1).and_hms(0, 0, 0),
+            grain: Grain::Year
+        }))
+    }
+
+    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+        self._future_raw(t0)
     }
 }
 

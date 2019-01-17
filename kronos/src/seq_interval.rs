@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
-use utils;
-use types::{DateTime, Range, TimeSequence};
+use crate::utils;
+use crate::types::{DateTime, Range, TimeSequence};
 
 // example duckling intervals http://tinyurl.com/hk2vu34
 
@@ -65,10 +65,10 @@ impl<'a, SeqA, SeqB> TimeSequence<'a> for Interval<SeqA, SeqB>
 #[cfg(test)]
 mod test {
     use super::*;
-    use types::{Date, Grain};
-    use seq_named::{Weekday, Month};
-    use seq_nthof::NthOf;
-    use seq_grain::Grains;
+    use crate::types::{Date, Grain};
+    use crate::seq_named::{Weekday, Month};
+    use crate::seq_nthof::NthOf;
+    use crate::seq_grain::Grains;
 
     fn dt(year: i32, month: u32, day: u32) -> DateTime {
         Date::from_ymd(year, month, day).and_hms(0, 0, 0)

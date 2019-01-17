@@ -1,13 +1,11 @@
-extern crate lexers;
-
 mod eval;
 mod procedure;
 mod builtin;
 
-pub use parser::{Parser, LispExpr, ParseError};
-pub use eval::{LispContext, EvalErr};
-pub use procedure::Procedure;
-pub use builtin::builtins;
+pub use crate::parser::{Parser, LispExpr, ParseError};
+pub use crate::eval::{LispContext, EvalErr};
+pub use crate::procedure::Procedure;
+pub use crate::builtin::builtins;
 
 mod parser;
 #[cfg(test)]

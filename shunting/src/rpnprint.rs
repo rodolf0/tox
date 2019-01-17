@@ -1,5 +1,5 @@
 use lexers::MathToken;
-use parser::{RPNExpr, Assoc, precedence};
+use crate::parser::{RPNExpr, Assoc, precedence};
 use std::fmt;
 
 #[derive(Debug, Clone)]

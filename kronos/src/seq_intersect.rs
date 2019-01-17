@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use types::{DateTime, Range, TimeSequence};
+use crate::types::{DateTime, Range, TimeSequence};
 
 // Guard against impossible intersections
 const INFINITE_FUSE: usize = 1000;
@@ -70,11 +70,11 @@ impl<'a, SeqA, SeqB> TimeSequence<'a> for Intersect<SeqA, SeqB>
 #[cfg(test)]
 mod test {
     use super::*;
-    use types::{Date, Grain};
-    use seq_named::{Weekday, Month};
-    use seq_nthof::NthOf;
-    use seq_grain::Grains;
-    use seq_union::Union;
+    use crate::types::{Date, Grain};
+    use crate::seq_named::{Weekday, Month};
+    use crate::seq_nthof::NthOf;
+    use crate::seq_grain::Grains;
+    use crate::seq_union::Union;
 
     fn dt(year: i32, month: u32, day: u32) -> DateTime {
         Date::from_ymd(year, month, day).and_hms(0, 0, 0)

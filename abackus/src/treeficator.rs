@@ -1,9 +1,7 @@
 #![deny(warnings)]
 
-extern crate earlgrey;
-
-use ebnf::ParserBuilder;
-use self::earlgrey::{EarleyParser, EarleyForest, Error};
+use crate::ebnf::ParserBuilder;
+use earlgrey::{EarleyParser, EarleyForest, Error};
 
 
 #[derive(Clone,Debug)]

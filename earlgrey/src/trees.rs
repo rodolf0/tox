@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
-use items::{Item, Trigger};
-use parser::{ParseTrees, Error};
+use crate::items::{Item, Trigger};
+use crate::parser::{ParseTrees, Error};
 use std::collections::HashMap;
 use std::rc::Rc;
 

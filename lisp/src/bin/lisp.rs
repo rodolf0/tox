@@ -1,7 +1,3 @@
-extern crate rustyline;
-extern crate lexers;
-extern crate lisp;
-
 #[cfg(not(test))]
 fn main() {
     use std::rc::Rc;

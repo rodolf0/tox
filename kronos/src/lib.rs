@@ -1,42 +1,42 @@
 #![deny(warnings)]
 
 mod types;
-pub use types::{Grain, TimeSequence, Range, Season};
+pub use crate::types::{Grain, TimeSequence, Range, Season};
 
 mod utils;
 
 mod seq_named;
-pub use seq_named::{Weekday, Month, Weekend, Year};
+pub use crate::seq_named::{Weekday, Month, Weekend, Year};
 
 mod seq_grain;
-pub use seq_grain::Grains;
+pub use crate::seq_grain::Grains;
 
 mod seq_nthof;
-pub use seq_nthof::NthOf;
+pub use crate::seq_nthof::NthOf;
 
 mod seq_lastof;
-pub use seq_lastof::LastOf;
+pub use crate::seq_lastof::LastOf;
 
 mod seq_union;
-pub use seq_union::Union;
+pub use crate::seq_union::Union;
 
 mod seq_intersect;
-pub use seq_intersect::Intersect;
+pub use crate::seq_intersect::Intersect;
 
 mod seq_except;
-pub use seq_except::Except;
+pub use crate::seq_except::Except;
 
 mod seq_interval;
-pub use seq_interval::Interval;
+pub use crate::seq_interval::Interval;
 
 mod seq_seasons;
-pub use seq_seasons::Seasons;
+pub use crate::seq_seasons::Seasons;
 
 mod seq_mgrain;
-pub use seq_mgrain::MGrain;
+pub use crate::seq_mgrain::MGrain;
 
 mod seq_func;
-pub use seq_func::{Map, shift};
+pub use crate::seq_func::{Map, shift};
 
 #[cfg(test)]
 mod mixed_tests;

@@ -2,8 +2,8 @@
 
 mod ebnf;
 mod treeficator;
-pub use ebnf::ParserBuilder;
-pub use treeficator::{Tree, Sexpr};
+pub use crate::ebnf::ParserBuilder;
+pub use crate::treeficator::{Tree, Sexpr};
 
 #[cfg(test)]
 mod ebnf_test;

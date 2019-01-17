@@ -1,6 +1,6 @@
-use parser::{Parser, ParseError, LispExpr};
-use procedure::Procedure;
-use builtin::builtins;
+use crate::parser::{Parser, ParseError, LispExpr};
+use crate::procedure::Procedure;
+use crate::builtin::builtins;
 
 use std::collections::HashMap;
 use std::iter::FromIterator;

@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
 use std::collections::HashMap;
-use lox_interpreter::V;
+use crate::lox_interpreter::V;
 use std::cell::RefCell;
 use std::rc::Rc;
 

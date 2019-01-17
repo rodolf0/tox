@@ -1,8 +1,7 @@
 #![deny(warnings)]
 
-extern crate lexers;
-use self::lexers::Scanner;
-use lox_scanner::{Token, TT};
+use lexers::Scanner;
+use crate::lox_scanner::{Token, TT};
 use std::rc::Rc;
 
 
@@ -98,7 +97,7 @@ impl LoxParser {
             // alternatively if we've found a keyword we might be starting a
             // statement, try to continue there
             if let Some(peek) = self.scanner.peek() {
-                use self::TT::*;
+                use TT::*;
                 match peek.token {
                     CLASS | FUN | VAR | FOR | IF |
                     WHILE | PRINT | RETURN | BREAK

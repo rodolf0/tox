@@ -1,5 +1,5 @@
-use eval::{EvalErr, LispContext};
-use parser::LispExpr;
+use crate::eval::{EvalErr, LispContext};
+use crate::parser::LispExpr;
 use std::{fmt, cmp};
 use std::rc::Rc;
 

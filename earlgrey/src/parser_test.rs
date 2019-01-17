@@ -1,8 +1,8 @@
 #![deny(warnings)]
 
-use grammar::{GrammarBuilder, Grammar};
-use parser::EarleyParser;
-use trees::EarleyForest;
+use crate::grammar::{GrammarBuilder, Grammar};
+use crate::parser::EarleyParser;
+use crate::trees::EarleyForest;
 use std::fmt;
 
 
@@ -38,7 +38,7 @@ fn check_trees<T: fmt::Debug>(trees: &Vec<T>, expected: Vec<&str>) {
 }
 
 mod math {
-    use grammar::{Grammar, GrammarBuilder};
+    use crate::grammar::{Grammar, GrammarBuilder};
 
     fn grammar_math() -> Grammar {
         // Sum -> Sum + Mul | Mul
@@ -70,7 +70,7 @@ mod math {
 
     #[test]
     fn math_grammar_test() {
-        use parser::EarleyParser;
+        use crate::parser::EarleyParser;
         use super::{Tree, tree_evaler};
         fn node(rule: &str, subtree: Vec<Tree>) -> Tree {
             Tree::Node(rule.to_string(), subtree)
@@ -346,9 +346,9 @@ fn natural_lang() {
 }
 
 mod small_math {
-    use grammar::{Grammar, GrammarBuilder};
-    use parser::EarleyParser;
-    use trees::EarleyForest;
+    use crate::grammar::{Grammar, GrammarBuilder};
+    use crate::parser::EarleyParser;
+    use crate::trees::EarleyForest;
     use super::check_trees;
 
     fn small_math() -> Grammar {

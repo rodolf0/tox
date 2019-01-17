@@ -1,4 +1,4 @@
-use parser::{Parser, LispExpr};
+use crate::parser::{Parser, LispExpr};
 
 #[test]
 fn test_lisp1() {

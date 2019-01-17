@@ -1,8 +1,9 @@
 [package]
 name = "lox"
 version = "0.1.0"
+edition = "2018"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 
 [dependencies]
-lexers = { version = "0.0.6", path = "../lexers" }
+lexers = { version = "0.0.7", path = "../lexers" }
 time = "0.1"

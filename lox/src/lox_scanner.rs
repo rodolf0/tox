@@ -1,6 +1,4 @@
-extern crate lexers;
-use self::lexers::{Scanner, scan_number, scan_identifier};
-
+use lexers::{Scanner, scan_number, scan_identifier};
 
 #[derive(Clone,Debug,PartialEq)]
 pub enum TT {

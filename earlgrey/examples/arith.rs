@@ -1,6 +1,3 @@
-extern crate earlgrey;
-extern crate lexers;
-extern crate rustyline;
 use std::cell::RefCell;
 
 fn build_grammar() -> earlgrey::Grammar {

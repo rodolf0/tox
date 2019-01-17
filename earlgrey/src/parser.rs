@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
-use grammar::{Symbol, Grammar};
-use items::{Item, StateSet};
+use crate::grammar::{Symbol, Grammar};
+use crate::items::{Item, StateSet};
 use std::rc::Rc;
 
 
@@ -113,7 +113,7 @@ impl EarleyParser {
 
 #[cfg(test)]
 mod tests {
-    use grammar::GrammarBuilder;
+    use crate::grammar::GrammarBuilder;
     use super::{EarleyParser, Error};
 
     fn good(parser: &EarleyParser, input: &str) {

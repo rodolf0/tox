@@ -11,10 +11,10 @@ mod lox_environment;
 mod lox_native;
 mod lox_resolver;
 
-use lox_scanner::LoxScanner;
-use lox_parser::LoxParser;
-use lox_interpreter::LoxInterpreter;
-use lox_resolver::Resolver;
+use crate::lox_scanner::LoxScanner;
+use crate::lox_parser::LoxParser;
+use crate::lox_interpreter::LoxInterpreter;
+use crate::lox_resolver::Resolver;
 
 
 fn main() {

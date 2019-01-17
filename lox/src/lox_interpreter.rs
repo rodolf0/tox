@@ -1,9 +1,9 @@
 #![deny(warnings)]
 
-use lox_scanner::{TT, Token};
-use lox_parser::{Expr, Stmt};
-use lox_environment::Environment;
-use lox_native::native_fn_env;
+use crate::lox_scanner::{TT, Token};
+use crate::lox_parser::{Expr, Stmt};
+use crate::lox_environment::Environment;
+use crate::lox_native::native_fn_env;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -11,7 +11,7 @@ use std::rc::Rc;
 
 
 pub trait Callable {
-    fn call(&self, &mut LoxInterpreter, &Vec<V>) -> ExecResult;
+    fn call(&self, _: &mut LoxInterpreter, _: &Vec<V>) -> ExecResult;
     fn arity(&self) -> usize;
     fn id(&self) -> String;
 }

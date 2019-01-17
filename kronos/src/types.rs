@@ -1,10 +1,8 @@
 #![deny(warnings)]
 
-
-extern crate chrono;
-pub type DateTime = self::chrono::NaiveDateTime;
-pub type Date = self::chrono::NaiveDate;
-pub type Duration = self::chrono::Duration;
+pub type DateTime = chrono::NaiveDateTime;
+pub type Date = chrono::NaiveDate;
+pub type Duration = chrono::Duration;
 
 use std::str::FromStr;
 

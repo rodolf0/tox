@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
-use lox_parser::{Expr, Stmt};
-use lox_interpreter::LoxInterpreter;
+use crate::lox_parser::{Expr, Stmt};
+use crate::lox_interpreter::LoxInterpreter;
 use std::collections::HashMap;
 
 type ResolveResult = Result<(), String>;

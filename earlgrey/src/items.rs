@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use grammar::{Symbol, Rule};
+use crate::grammar::{Symbol, Rule};
 use std::{cell, fmt, hash, iter};
 use std::collections::HashSet;
 use std::rc::Rc;

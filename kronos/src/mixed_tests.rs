@@ -1,12 +1,12 @@
 #![deny(warnings)]
 
-use types::{DateTime, Date, Grain, Range, TimeSequence};
+use crate::types::{DateTime, Date, Grain, Range, TimeSequence};
 
-use seq_nthof::*;
-use seq_intersect::*;
-use seq_grain::*;
-use seq_named::*;
-use seq_func::*;
+use crate::seq_nthof::*;
+use crate::seq_intersect::*;
+use crate::seq_grain::*;
+use crate::seq_named::*;
+use crate::seq_func::*;
 
 
 fn dt(year: i32, month: u32, day: u32) -> DateTime {

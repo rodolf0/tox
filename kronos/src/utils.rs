@@ -1,11 +1,10 @@
 #![deny(warnings)]
 
-extern crate chrono;
-use self::chrono::Timelike;
-use self::chrono::Datelike;
-use self::chrono::Weekday;
+use chrono::Timelike;
+use chrono::Datelike;
+use chrono::Weekday;
 
-use types::{Grain, Date, DateTime, Duration, Season};
+use crate::types::{Grain, Date, DateTime, Duration, Season};
 
 
 pub fn enclosing_grain_from_duration(duration: Duration) -> Grain {
@@ -34,7 +33,7 @@ pub fn grain_from_duration(duration: Duration) -> Grain {
 }
 
 pub fn truncate(d: DateTime, granularity: Grain) -> DateTime {
-    use types::Grain::*;
+    use crate::types::Grain::*;
     match granularity {
         Second => d.with_nanosecond(0).unwrap(),
         Minute => d.date().and_hms(d.hour(), d.minute(), 0),
@@ -133,7 +132,7 @@ pub fn find_weekend(mut date: Date, future: bool) -> Date {
 }
 
 pub fn shift_datetime(d: DateTime, granularity: Grain, n: i32) -> DateTime {
-    use types::Grain::*;
+    use crate::types::Grain::*;
     let m = if n >= 0 {n as u32} else {(-n) as u32};
     let shiftfn = if n >= 0 {dtshift::add} else {dtshift::sub};
     match granularity {

@@ -1,4 +1,4 @@
-use scanner::Scanner;
+use crate::scanner::Scanner;
 
 #[test]
 fn test_extremes() {

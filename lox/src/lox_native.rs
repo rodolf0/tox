@@ -1,10 +1,8 @@
 #![deny(warnings)]
 
-extern crate time;
-use lox_interpreter::{V, Callable, LoxInterpreter};
-use lox_environment::Environment;
+use crate::lox_interpreter::{V, Callable, LoxInterpreter};
+use crate::lox_environment::Environment;
 use std::rc::Rc;
-
 
 pub struct Clock;
 

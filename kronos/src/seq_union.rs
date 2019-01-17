@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use types::{DateTime, Range, TimeSequence};
+use crate::types::{DateTime, Range, TimeSequence};
 
 // Alternates SeqA and SeqB depending on what happens first
 // Union skips over Ranges totally contained by other sequence
@@ -75,16 +75,16 @@ impl<'a, SeqA, SeqB> TimeSequence<'a> for Union<SeqA, SeqB>
 #[cfg(test)]
 mod test {
     use super::*;
-    use types::Grain;
+    use crate::types::Grain;
 
     fn dt(year: i32, month: u32, day: u32) -> DateTime {
-        use types::Date;
+        use crate::types::Date;
         Date::from_ymd(year, month, day).and_hms(0, 0, 0)
     }
 
     #[test]
     fn test_union() {
-        use seq_named::Weekday;
+        use crate::seq_named::Weekday;
 
         let mut monwed = Union(Weekday(1), Weekday(3)).future(&dt(2015, 2, 27));
         assert_eq!(monwed.next().unwrap(),
@@ -106,7 +106,7 @@ mod test {
 
     #[test]
     fn test_union_past() {
-        use seq_named::Weekday;
+        use crate::seq_named::Weekday;
 
         let mut monwed = Union(Weekday(1), Weekday(3)).past(&dt(2015, 2, 27));
         assert_eq!(monwed.next().unwrap(),
@@ -132,7 +132,7 @@ mod test {
 
     #[test]
     fn test_diff_resolution() {
-        use seq_named::{Month, Weekday};
+        use crate::seq_named::{Month, Weekday};
 
         let mut mon_or_march = Union(Weekday(1), Month(3)).future(&dt(2015, 2, 27));
         assert_eq!(mon_or_march.next().unwrap(),

@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
-use utils;
-use types::{DateTime, Range, Grain, TimeSequence};
+use crate::utils;
+use crate::types::{DateTime, Range, Grain, TimeSequence};
 
 
 #[derive(Clone)]
@@ -34,7 +34,7 @@ impl<'a> TimeSequence<'a> for Grains {
 #[cfg(test)]
 mod test {
     use super::*;
-    use types::{Date, Grain};
+    use crate::types::{Date, Grain};
 
     fn dt(year: i32, month: u32, day: u32) -> DateTime {
         Date::from_ymd(year, month, day).and_hms(0, 0, 0)

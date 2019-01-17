@@ -1,8 +1,6 @@
-extern crate rand;
 use std::collections::HashMap;
-
 use lexers::MathToken;
-use parser::RPNExpr;
+use crate::parser::RPNExpr;
 
 #[derive(Debug, PartialEq)]
 pub enum EvalErr {
@@ -46,8 +44,8 @@ impl MathContext {
                     None => return Err(EvalErr::UnknownVar(var.to_string()))
                 },
                 MathToken::BOp(ref op) => {
-                    let r = try!(operands.pop().ok_or(EvalErr::WrongNumberOfArgs));
-                    let l = try!(operands.pop().ok_or(EvalErr::WrongNumberOfArgs));
+                    let r = operands.pop().ok_or(EvalErr::WrongNumberOfArgs)?;
+                    let l = operands.pop().ok_or(EvalErr::WrongNumberOfArgs)?;
                     match &op[..] {
                         "+" => operands.push(l + r),
                         "-" => operands.push(l - r),
@@ -59,7 +57,7 @@ impl MathContext {
                     }
                 },
                 MathToken::UOp(ref op) => {
-                    let o = try!(operands.pop().ok_or(EvalErr::WrongNumberOfArgs));
+                    let o = operands.pop().ok_or(EvalErr::WrongNumberOfArgs)?;
                     match &op[..] {
                         "-" => operands.push(-o),
                         "!" => match Self::eval_fn("tgamma", vec![o + 1.0]) {
@@ -107,7 +105,6 @@ impl MathContext {
 
 #[cfg(feature="dynlink-eval")]
 mod mathlink {
-    extern crate dylib;
     use std::mem;
     pub fn link_fn(fname: &str) -> Result<fn(f64) -> f64, String> {
         match dylib::DynamicLibrary::open(None) {

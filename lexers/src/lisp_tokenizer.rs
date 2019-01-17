@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
-use helpers;
-use scanner::Scanner;
+use crate::helpers;
+use crate::scanner::Scanner;
 use std::str::FromStr;
 
 

@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
 use std::rc::Rc;
-use types::{DateTime, Range, Grain, TimeSequence};
+use crate::types::{DateTime, Range, Grain, TimeSequence};
 
 #[derive(Clone)]
 pub struct Map<Seq>(pub Seq, pub Rc<Fn(Range)->Option<Range>>)
@@ -25,7 +25,7 @@ impl<'a, Seq> TimeSequence<'a> for Map<Seq>
 pub fn shift<'a, Seq>(seq: Seq, grain: Grain, n: i32) -> impl TimeSequence<'a>
     where for<'b> Seq: TimeSequence<'b> + Clone + 'a
 {
-    use utils;
+    use crate::utils;
     Map(seq, Rc::new(move |x| Some(Range{
         start: utils::shift_datetime(x.start, grain, n),
         end: utils::shift_datetime(x.end, grain, n),

@@ -1,5 +1,5 @@
-use parser::ShuntingParser;
-use rpneval::MathContext;
+use crate::parser::ShuntingParser;
+use crate::rpneval::MathContext;
 
 macro_rules! fuzzy_eq {
     ($lhs:expr, $rhs:expr) => { assert!(($lhs - $rhs).abs() < 1.0e-10) }

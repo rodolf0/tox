@@ -1,6 +1,6 @@
 [[package]]
 name = "lexers"
-version = "0.0.6"
+version = "0.0.7"
 
 [[package]]
 name = "libc"
@@ -11,7 +11,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "lox"
 version = "0.1.0"
 dependencies = [
- "lexers 0.0.6",
+ "lexers 0.0.7",
  "time 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

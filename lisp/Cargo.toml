@@ -1,9 +1,10 @@
 [package]
 name = "lisp"
 version = "0.0.3"
+edition = "2018"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "A lisp like thingy"
 
 [dependencies]
-lexers = { version = "0.0.6", path = "../lexers" }
+lexers = { version = "0.0.7", path = "../lexers" }
 rustyline = "1.0.0"

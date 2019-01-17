@@ -1,6 +1,7 @@
 [package]
 name = "shunting"
 version = "0.0.3"
+edition = "2018"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "A shunting-yard math parser"
 license = "MIT"
@@ -11,10 +12,10 @@ default = ["dynlink-eval"]
 dynlink-eval = ["dylib"]
 
 [dependencies]
-lexers = { version = "0.0.6", path = "../lexers" }
-rustyline = "1.0.0"
-rand = "0.3"
+lexers = { version = "0.0.7", path = "../lexers" }
+rustyline = "3.0.0"
+rand = "0.6"
 
 [dependencies.dylib]
-version = "0.0.2"
+version = "0.0.3"
 optional = true

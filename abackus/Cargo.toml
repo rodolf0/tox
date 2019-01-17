@@ -1,14 +1,15 @@
 [package]
 name = "abackus"
-version = "0.1.5"
+version = "0.1.6"
+edition = "2018"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "Parser builder using EBNF"
 license = "MIT"
 repository = "https://github.com/rodolf0/tox"
 
 [dependencies]
-lexers = { version = "0.0.6", path = "../lexers" }
-earlgrey = { version = "0.2.0", path = "../earlgrey" }
+lexers = { version = "0.0.7", path = "../lexers" }
+earlgrey = { version = "0.2.1", path = "../earlgrey" }
 
 [[example]]
 name = "ebnftree"

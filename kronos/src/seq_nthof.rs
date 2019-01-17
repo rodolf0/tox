@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use types::{DateTime, Range, TimeSequence};
+use crate::types::{DateTime, Range, TimeSequence};
 
 // Guard against impossible sequences, eg: 32nd day of the month
 const INFINITE_FUSE: usize = 1000;
@@ -54,9 +54,9 @@ impl<'a, Frame, Win> TimeSequence<'a> for NthOf<Frame, Win>
 #[cfg(test)]
 mod test {
     use super::*;
-    use types::{Date, Grain};
-    use seq_grain::Grains;
-    use seq_named::{Weekday, Weekend, Month};
+    use crate::types::{Date, Grain};
+    use crate::seq_grain::Grains;
+    use crate::seq_named::{Weekday, Weekend, Month};
 
     fn dt(year: i32, month: u32, day: u32) -> DateTime {
         Date::from_ymd(year, month, day).and_hms(0, 0, 0)
@@ -69,7 +69,7 @@ mod test {
     #[test]
     #[should_panic]
     fn nthof_fuse() {
-        use seq_grain::Grains;
+        use crate::seq_grain::Grains;
         let thirtysecond = NthOf(32, Grains(Grain::Day), Grains(Grain::Month));
         thirtysecond.future(&dt(2016, 8, 31)).next();
     }

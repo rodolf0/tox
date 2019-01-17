@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
 use std::collections::VecDeque;
-use types::{DateTime, Range, TimeSequence};
+use crate::types::{DateTime, Range, TimeSequence};
 
 // Guard against impossible sequences, eg: 32nd day of the month
 const INFINITE_FUSE: usize = 1000;
@@ -61,9 +61,9 @@ impl<'a, Frame, Win> TimeSequence<'a> for LastOf<Frame, Win>
 #[cfg(test)]
 mod test {
     use super::*;
-    use types::{Date, Grain};
-    use seq_grain::Grains;
-    use seq_named::{Weekend, Month};
+    use crate::types::{Date, Grain};
+    use crate::seq_grain::Grains;
+    use crate::seq_named::{Weekend, Month};
 
 
     fn dt(year: i32, month: u32, day: u32) -> DateTime {

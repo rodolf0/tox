@@ -1,14 +1,14 @@
 #![deny(warnings)]
 
 mod grammar;
-pub use grammar::{GrammarBuilder, Grammar};
+pub use crate::grammar::{GrammarBuilder, Grammar};
 
 mod items;
 mod parser;
-pub use parser::{EarleyParser, Error};
+pub use crate::parser::{EarleyParser, Error};
 
 mod trees;
-pub use trees::EarleyForest;
+pub use crate::trees::EarleyForest;
 
 #[cfg(test)]
 mod parser_test;

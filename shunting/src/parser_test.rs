@@ -1,5 +1,5 @@
 use lexers::MathToken;
-use parser::{ShuntingParser, RPNExpr, ParseError};
+use crate::parser::{ShuntingParser, RPNExpr, ParseError};
 
 #[test]
 fn test_parse1() {

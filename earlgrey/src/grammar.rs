@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::{fmt, hash};
 use std::rc::Rc;
-use parser::Error;
+use crate::parser::Error;
 
 
 pub enum Symbol {

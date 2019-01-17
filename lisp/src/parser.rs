@@ -1,5 +1,5 @@
 use lexers::{Scanner, LispToken, LispTokenizer};
-use procedure::Procedure;
+use crate::procedure::Procedure;
 use std::string;
 use std::rc::Rc;
 
@@ -79,19 +79,19 @@ impl Parser {
                 Ok(LispExpr::List(list))
             },
             Some(LispToken::Quote) => {
-                let expr = try!(Parser::parse(lex));
+                let expr = Parser::parse(lex)?;
                 Ok(LispExpr::Quote(Box::new(expr)))
             },
             Some(LispToken::QuasiQuote) => {
-                let expr = try!(Parser::parse(lex));
+                let expr = Parser::parse(lex)?;
                 Ok(LispExpr::QuasiQuote(Box::new(expr)))
             },
             Some(LispToken::UnQuote) => {
-                let expr = try!(Parser::parse(lex));
+                let expr = Parser::parse(lex)?;
                 Ok(LispExpr::UnQuote(Box::new(expr)))
             },
             Some(LispToken::UnQSplice) => {
-                let expr = try!(Parser::parse(lex));
+                let expr = Parser::parse(lex)?;
                 Ok(LispExpr::UnQSplice(Box::new(expr)))
             }
         }

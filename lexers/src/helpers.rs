@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use scanner::Scanner;
+use crate::scanner::Scanner;
 
 
 /*

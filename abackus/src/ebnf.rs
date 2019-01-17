@@ -1,10 +1,7 @@
 #![deny(warnings)]
 
-extern crate lexers;
-extern crate earlgrey;
-
-use self::lexers::EbnfTokenizer;
-use self::earlgrey::{
+use lexers::EbnfTokenizer;
+use earlgrey::{
     Grammar, GrammarBuilder,
     EarleyParser, Error, EarleyForest,
 };

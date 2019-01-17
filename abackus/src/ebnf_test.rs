@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use ebnf::{ebnf_grammar, ParserBuilder};
+use crate::ebnf::{ebnf_grammar, ParserBuilder};
 use std::fmt;
 
 #[test]

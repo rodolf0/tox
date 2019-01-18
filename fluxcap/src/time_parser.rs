@@ -1,0 +1,93 @@
+#![deny(warnings)]
+
+use crate::constants as k;
+
+extern crate abackus;
+use self::abackus::ParserBuilder;
+
+extern crate kronos;
+use self::kronos::Grain;
+
+extern crate earlgrey;
+use self::earlgrey::EarleyParser;
+
+
+// https://github.com/wit-ai/duckling_old/blob/master/resources/languages/en/corpus/time.clj
+// https://github.com/wit-ai/duckling_old/blob/master/resources/languages/en/rules/time.clj
+
+pub fn time_parser() -> EarleyParser {
+    let grammar = r#"
+
+    named_seq := day_ordinal
+              | weekday
+              | month
+              | day_ordinal 'of' month
+              | month day_ordinal
+              | weekday day_ordinal
+              | weekday day_ordinal 'of' month
+              | weekday month day_ordinal
+              | 'weekend' | 'weekends'
+              ;
+
+    sequence := named_seq | grain;
+
+
+    comp_seq := ordinal sequence 'of' ['the'] comp_seq
+              | 'last' sequence 'of' ['the'] comp_seq
+              | sequence
+              ;
+
+    comp_grain := small_int grain
+               | 'a' grain
+               | comp_grain 'and' small_int grain
+               | comp_grain 'and' 'a' grain
+               ;
+
+    time := 'today'
+          | 'tomorrow'
+          | 'yesterday'
+          | 'on' weekday
+          | named_seq
+
+          | 'the' comp_seq
+          | 'this' comp_seq
+          | 'next' comp_seq
+          | 'last' comp_seq
+
+          | comp_seq 'after' 'next'
+          | comp_seq 'before' 'last'
+
+          | 'a' named_seq 'ago'
+          |  small_int named_seq 'ago'
+          | 'in' small_int named_seq
+
+          | comp_grain 'ago'
+          | 'in' comp_grain
+
+          | year
+          | month year
+          | month day_ordinal year
+
+          | comp_grain 'after' time
+          | comp_grain 'before' time
+
+          | sequence 'until' time
+          | sequence 'since' time
+          | sequence 'between' time 'and' time
+          ;
+    "#;
+
+    use std::str::FromStr;
+    ParserBuilder::default()
+        .plug_terminal("ordinal", |d| k::ordinal(d).or(k::short_ordinal(d)).is_some())
+        .plug_terminal("day_ordinal", |d| k::ordinal(d).or(k::short_ordinal(d)).is_some())
+        .plug_terminal("weekday", |d| k::weekday(d).is_some())
+        .plug_terminal("month", |d| k::month(d).is_some())
+        .plug_terminal("grain", |g| Grain::from_str(g).is_ok())
+        .plug_terminal("year", |y| if let Ok(year) = i32::from_str(y)
+                       { year > 999 && year < 2200 } else { false })
+        .plug_terminal("small_int", |u| if let Ok(u) = usize::from_str(u)
+                       { u < 100 } else { false })
+        .into_parser("time", &grammar)
+        .unwrap_or_else(|e| panic!("TimeMachine grammar BUG: {:?}", e))
+}

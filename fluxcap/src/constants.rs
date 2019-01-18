@@ -43,8 +43,7 @@ pub fn ordinal(n: &str) -> Option<u32> {
     ];
     ORD.iter()
        .enumerate()
-       .filter_map(|(i, name)| match *name == n {
-           true => Some((i+1) as u32), _=> None })
+       .filter_map(|(i, txt)| if *txt == n { Some((i+1) as u32) } else { None })
        .next()
 }
 

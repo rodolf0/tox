@@ -27,11 +27,9 @@ fn main() {
             Second => "%A, %e %B %Y %H:%M:%S",
             Minute => "%A, %e %B %Y %H:%M",
             Hour => "%A, %e %B %Y %Hhs",
-            Day => "%A, %e %B %Y",
-            Week => "%A, %e %B %Y",
-            Month => "%B %Y",
-            Quarter => "%B %Y",
-            Year => "%Y",
+            Day | Week => "%A, %e %B %Y",
+            Month | Quarter | Half => "%B %Y",
+            Year | Lustrum | Decade | Century | Millenium => "%Y",
         }
     }
 

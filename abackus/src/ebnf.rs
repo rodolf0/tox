@@ -202,9 +202,10 @@ impl ParserBuilder {
             // Build parser for EBNF grammar
             let ebnf = EarleyParser::new(ebnf_grammar());
             // Use EBNF parser to parse the user provided grammar
-            let state = ebnf.parse(EbnfTokenizer::scanner(user_grammar_spec))
-                .expect(&format!("Failed to parse user grammar. {}",
-                                 user_grammar_spec));
+            let state = ebnf
+                .parse(EbnfTokenizer::scanner(user_grammar_spec))
+                .unwrap_or_else(|_| panic!("Failed to parse user grammar. {}",
+                                           user_grammar_spec));
             // Forge user's grammar builder by executing semantic actions
             if ev.eval_all(&state)?.len() != 1 {
                 panic!("BUG: EBNF grammar shouldn't be ambiguous!");

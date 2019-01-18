@@ -144,7 +144,7 @@ impl GrammarBuilder {
         }
         let rule = Rule{
             head,
-            spec: spec.into_iter()
+            spec: spec.iter()
                     .map(|s| self.symbols[s.as_ref()].clone()).collect()
         };
         // check for duplicate rules

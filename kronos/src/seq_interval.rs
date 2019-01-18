@@ -6,7 +6,10 @@ use crate::types::{DateTime, Range, TimeSequence};
 // example duckling intervals http://tinyurl.com/hk2vu34
 
 #[derive(Clone)]
-pub struct Interval<SeqA, SeqB> {
+pub struct Interval<SeqA, SeqB>
+    where for<'b> SeqA: TimeSequence<'b>,
+          for<'b> SeqB: TimeSequence<'b> + Clone
+{
     start: SeqA,
     end: SeqB,
     inclusive: bool,

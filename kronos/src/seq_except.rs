@@ -17,7 +17,9 @@ use crate::types::{DateTime, Range, TimeSequence};
 // - March except mondays (never happens: a march without mondays)
 
 #[derive(Clone)]
-pub struct Except<SeqA, SeqB>(pub SeqA, pub SeqB);
+pub struct Except<SeqA, SeqB>(pub SeqA, pub SeqB)
+    where for<'b> SeqA: TimeSequence<'b>,
+          for<'b> SeqB: TimeSequence<'b>;
 
 impl<SeqA, SeqB> Except<SeqA, SeqB>
     where for<'b> SeqA: TimeSequence<'b>,

@@ -21,7 +21,9 @@ const INFINITE_FUSE: usize = 1000;
 // - Monday 28th
 
 #[derive(Clone)]
-pub struct Intersect<SeqA, SeqB>(pub SeqA, pub SeqB);
+pub struct Intersect<SeqA, SeqB>(pub SeqA, pub SeqB)
+    where for<'b> SeqA: TimeSequence<'b>,
+          for<'b> SeqB: TimeSequence<'b>;
 
 impl<SeqA, SeqB> Intersect<SeqA, SeqB>
     where for<'b> SeqA: TimeSequence<'b>,

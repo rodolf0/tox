@@ -19,7 +19,9 @@ use crate::types::{DateTime, Range, TimeSequence};
 // - overlapping (2pm to 3pm) and (1pm to 5pm)
 
 #[derive(Clone)]
-pub struct Union<SeqA, SeqB>(pub SeqA, pub SeqB);
+pub struct Union<SeqA, SeqB>(pub SeqA, pub SeqB)
+    where for<'b> SeqA: TimeSequence<'b>,
+          for<'b> SeqB: TimeSequence<'b>;
 
 impl<SeqA, SeqB> Union<SeqA, SeqB>
     where for<'b> SeqA: TimeSequence<'b>,

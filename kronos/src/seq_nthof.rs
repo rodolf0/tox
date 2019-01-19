@@ -69,7 +69,6 @@ mod test {
     #[test]
     #[should_panic]
     fn nthof_fuse() {
-        use crate::seq_grain::Grains;
         let thirtysecond = NthOf(32, Grains(Grain::Day), Grains(Grain::Month));
         thirtysecond.future(&dt(2016, 8, 31)).next();
     }

@@ -38,5 +38,8 @@ pub use crate::seq_mgrain::MGrain;
 mod seq_func;
 pub use crate::seq_func::{Map, shift};
 
+mod seq_shim;
+pub use crate::seq_shim::Shim;
+
 #[cfg(test)]
 mod mixed_tests;

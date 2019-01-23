@@ -7,22 +7,22 @@ use crate::types::{DateTime, Range, TimeSequence};
 // is a helper to allow different sequence types to be used as if they were one
 
 #[derive(Clone)]
-pub struct Shim(pub Rc<for<'b> TimeSequence<'b>>);
+pub struct Shim(pub Rc<TimeSequence>);
 
-impl<'a> TimeSequence<'a> for Shim {
-    fn _future_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
+impl TimeSequence for Shim {
+    fn _future_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + '_> {
         self.0._future_raw(t0)
     }
 
-    fn _past_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + '_> {
         self.0._past_raw(t0)
     }
 
-    fn future(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
+    fn future(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + '_> {
         self.0.future(t0)
     }
 
-    fn past(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
+    fn past(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + '_> {
         self.0.past(t0)
     }
 }

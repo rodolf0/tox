@@ -20,14 +20,14 @@ use crate::types::{DateTime, Range, TimeSequence};
 
 #[derive(Clone)]
 pub struct Union<SeqA, SeqB>(pub SeqA, pub SeqB)
-    where for<'b> SeqA: TimeSequence<'b>,
-          for<'b> SeqB: TimeSequence<'b>;
+    where SeqA: TimeSequence,
+          SeqB: TimeSequence;
 
 impl<SeqA, SeqB> Union<SeqA, SeqB>
-    where for<'b> SeqA: TimeSequence<'b>,
-          for<'b> SeqB: TimeSequence<'b>
+    where SeqA: TimeSequence,
+          SeqB: TimeSequence
 {
-    fn _base(&self, t0: &DateTime, future: bool) -> Box<Iterator<Item=Range>> {
+    fn _base(&self, t0: &DateTime, future: bool) -> Box<Iterator<Item=Range> + '_> {
         let (mut astream, mut bstream) = if future {
             (self.0._future_raw(t0), self.1._future_raw(t0))
         } else {
@@ -60,15 +60,15 @@ impl<SeqA, SeqB> Union<SeqA, SeqB>
     }
 }
 
-impl<'a, SeqA, SeqB> TimeSequence<'a> for Union<SeqA, SeqB>
-    where for<'b> SeqA: TimeSequence<'b>,
-          for<'b> SeqB: TimeSequence<'b>
+impl<SeqA, SeqB> TimeSequence for Union<SeqA, SeqB>
+    where SeqA: TimeSequence,
+          SeqB: TimeSequence
 {
-    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + '_> {
         self._base(t0, true)
     }
 
-    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + '_> {
         self._base(t0, false)
     }
 }
@@ -97,7 +97,8 @@ mod test {
             Range{start: dt(2015, 3, 9), end: dt(2015, 3, 10), grain: Grain::Day});
 
         let monwed = Union(Weekday(1), Weekday(3));
-        let mut monwedfri = Union(monwed, Weekday(5)).future(&dt(2015, 2, 27));
+        let monwedfri = Union(monwed, Weekday(5));
+        let mut monwedfri = monwedfri.future(&dt(2015, 2, 27));
         assert_eq!(monwedfri.next().unwrap(),
             Range{start: dt(2015, 2, 27), end: dt(2015, 2, 28), grain: Grain::Day});
         assert_eq!(monwedfri.next().unwrap(),
@@ -117,7 +118,8 @@ mod test {
             Range{start: dt(2015, 2, 23), end: dt(2015, 2, 24), grain: Grain::Day});
 
         let monwed = Union(Weekday(1), Weekday(3));
-        let mut monwedfri = Union(monwed, Weekday(5)).past(&dt(2015, 2, 27));
+        let monwedfri = Union(monwed, Weekday(5));
+        let mut monwedfri = monwedfri.past(&dt(2015, 2, 27));
         assert_eq!(monwedfri.next().unwrap(),
             Range{start: dt(2015, 2, 25), end: dt(2015, 2, 26), grain: Grain::Day});
         assert_eq!(monwedfri.next().unwrap(),
@@ -127,7 +129,8 @@ mod test {
 
         // past-inclusive/raw
         let monwed = Union(Weekday(1), Weekday(3));
-        let mut monwedfri = Union(monwed, Weekday(5))._past_raw(&dt(2015, 2, 27));
+        let monwedfri = Union(monwed, Weekday(5));
+        let mut monwedfri = monwedfri._past_raw(&dt(2015, 2, 27));
         assert_eq!(monwedfri.next().unwrap(),
             Range{start: dt(2015, 2, 27), end: dt(2015, 2, 28), grain: Grain::Day});
     }

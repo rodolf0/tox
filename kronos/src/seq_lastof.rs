@@ -8,16 +8,16 @@ const INFINITE_FUSE: usize = 1000;
 
 #[derive(Clone)]
 pub struct LastOf<Frame, Win>(pub usize, pub Win, pub Frame)
-    where for<'a> Frame: TimeSequence<'a>,
-          for<'a> Win: TimeSequence<'a> + Clone;
+    where Frame: TimeSequence,
+          Win: TimeSequence + Clone;
 
 
-impl<'a, Frame, Win> LastOf<Frame, Win>
-    where for<'b> Frame: TimeSequence<'b>,
-          for<'b> Win: TimeSequence<'b> + Clone + 'a
+impl<Frame, Win> LastOf<Frame, Win>
+    where Frame: TimeSequence,
+          Win: TimeSequence + Clone
 {
     fn _base(&self, t0: &DateTime, future: bool)
-        -> Box<Iterator<Item=Range> + 'a>
+        -> Box<Iterator<Item=Range> + '_>
     {
         let win = self.1.clone();
         let nth = self.0;
@@ -44,15 +44,15 @@ impl<'a, Frame, Win> LastOf<Frame, Win>
     }
 }
 
-impl<'a, Frame, Win> TimeSequence<'a> for LastOf<Frame, Win>
-    where for<'b> Frame: TimeSequence<'b>,
-          for<'b> Win: TimeSequence<'b> + Clone + 'a
+impl<Frame, Win> TimeSequence for LastOf<Frame, Win>
+    where Frame: TimeSequence,
+          Win: TimeSequence + Clone
 {
-    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + '_> {
         self._base(t0, true)
     }
 
-    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + '_> {
         self._base(t0, false)
     }
 }

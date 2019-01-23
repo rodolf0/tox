@@ -19,7 +19,7 @@ impl Weekday {
     }
 }
 
-impl<'a> TimeSequence<'a> for Weekday {
+impl TimeSequence for Weekday {
     fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, true)
     }
@@ -46,7 +46,7 @@ impl Month {
     }
 }
 
-impl<'a> TimeSequence<'a> for Month {
+impl TimeSequence for Month {
     fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, true)
     }
@@ -72,7 +72,7 @@ impl Weekend {
     }
 }
 
-impl<'a> TimeSequence<'a> for Weekend {
+impl TimeSequence for Weekend {
     fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, true)
     }
@@ -86,7 +86,7 @@ impl<'a> TimeSequence<'a> for Weekend {
 #[derive(Clone)]
 pub struct Year(pub i32);
 
-impl<'a> TimeSequence<'a> for Year {
+impl TimeSequence for Year {
     fn _future_raw(&self, _: &DateTime) -> Box<Iterator<Item=Range>> {
         use std::iter;
         Box::new(iter::once(Range{
@@ -96,7 +96,7 @@ impl<'a> TimeSequence<'a> for Year {
         }))
     }
 
-    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + '_> {
         self._future_raw(t0)
     }
 }

@@ -22,14 +22,14 @@ const INFINITE_FUSE: usize = 1000;
 
 #[derive(Clone)]
 pub struct Intersect<SeqA, SeqB>(pub SeqA, pub SeqB)
-    where for<'b> SeqA: TimeSequence<'b>,
-          for<'b> SeqB: TimeSequence<'b>;
+    where SeqA: TimeSequence,
+          SeqB: TimeSequence;
 
 impl<SeqA, SeqB> Intersect<SeqA, SeqB>
-    where for<'b> SeqA: TimeSequence<'b>,
-          for<'b> SeqB: TimeSequence<'b>
+    where SeqA: TimeSequence,
+          SeqB: TimeSequence
 {
-    fn _base(&self, t0: &DateTime, future: bool) -> Box<Iterator<Item=Range>> {
+    fn _base(&self, t0: &DateTime, future: bool) -> Box<Iterator<Item=Range> + '_> {
         let (mut astream, mut bstream) = if future {
             (self.0._future_raw(t0), self.1._future_raw(t0))
         } else {
@@ -55,15 +55,15 @@ impl<SeqA, SeqB> Intersect<SeqA, SeqB>
     }
 }
 
-impl<'a, SeqA, SeqB> TimeSequence<'a> for Intersect<SeqA, SeqB>
-    where for<'b> SeqA: TimeSequence<'b>,
-          for<'b> SeqB: TimeSequence<'b>
+impl<SeqA, SeqB> TimeSequence for Intersect<SeqA, SeqB>
+    where SeqA: TimeSequence,
+          SeqB: TimeSequence
 {
-    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + '_> {
         self._base(t0, true)
     }
 
-    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + '_> {
         self._base(t0, false)
     }
 }

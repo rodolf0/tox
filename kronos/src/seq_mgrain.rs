@@ -32,7 +32,7 @@ impl MGrain {
     }
 }
 
-impl<'a> TimeSequence<'a> for MGrain {
+impl TimeSequence for MGrain {
     fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, true)
     }

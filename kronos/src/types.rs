@@ -97,21 +97,21 @@ impl Range {
 // TimeSequence is a floating description of a set of time Ranges.
 // They can be evaluated in the context of an instant to produce time Ranges.
 
-pub trait TimeSequence<'a> {
+pub trait TimeSequence {
     // Yield instances of this sequence into the future.
     // End-time of Ranges must be greater than reference t0 DateTime.
     // NOTE: First Range may start after t0 if for example discontinuous.
-    fn _future_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + 'a>;
+    fn _future_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + '_>;
 
     // Yield instances of this sequence into the past
     // Start-time of emited Ranges must be less-or-equal than reference t0.
-    fn _past_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + 'a>;
+    fn _past_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + '_>;
 
     // NOTE: past_raw and future_raw are mainly used internaly.
     // Their first elements may overlap and are needed for composing NthOf.
     // End-user wants future + past which have no overlap in emitted Ranges
 
-    fn future(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + 'a> {
+    fn future(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + '_> {
         let t0 = *t0;
         Box::new(self._future_raw(&t0)
             .skip_while(move |range| range.end <= t0))
@@ -119,7 +119,7 @@ pub trait TimeSequence<'a> {
 
     // End-time of emited Ranges must be less-or-equal than reference DateTime.
     // Complement of "future" where end-time must be greater than t0.
-    fn past(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + 'a> {
+    fn past(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + '_> {
         let t0 = *t0;
         Box::new(self._past_raw(&t0)
             .skip_while(move |range| range.end > t0))

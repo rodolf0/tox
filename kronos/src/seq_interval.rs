@@ -7,19 +7,19 @@ use crate::types::{DateTime, Range, TimeSequence};
 
 #[derive(Clone)]
 pub struct Interval<SeqA, SeqB>
-    where for<'b> SeqA: TimeSequence<'b>,
-          for<'b> SeqB: TimeSequence<'b> + Clone
+    where SeqA: TimeSequence,
+          SeqB: TimeSequence + Clone
 {
     start: SeqA,
     end: SeqB,
     inclusive: bool,
 }
 
-impl<'a, SeqA, SeqB> Interval<SeqA, SeqB>
-    where for<'b> SeqA: TimeSequence<'b>,
-          for<'b> SeqB: TimeSequence<'b> + Clone + 'a
+impl<SeqA, SeqB> Interval<SeqA, SeqB>
+    where SeqA: TimeSequence,
+          SeqB: TimeSequence + Clone
 {
-    fn _base(&self, t0: &DateTime, future: bool) -> Box<Iterator<Item=Range> + 'a> {
+    fn _base(&self, t0: &DateTime, future: bool) -> Box<Iterator<Item=Range> + '_> {
         let endseq = self.end.clone();
         let inclusive = self.inclusive;
 
@@ -51,15 +51,15 @@ impl<'a, SeqA, SeqB> Interval<SeqA, SeqB>
     }
 }
 
-impl<'a, SeqA, SeqB> TimeSequence<'a> for Interval<SeqA, SeqB>
-    where for<'b> SeqA: TimeSequence<'b>,
-          for<'b> SeqB: TimeSequence<'b> + Clone + 'a
+impl<SeqA, SeqB> TimeSequence for Interval<SeqA, SeqB>
+    where SeqA: TimeSequence,
+          SeqB: TimeSequence + Clone
 {
-    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + '_> {
         self._base(t0, true)
     }
 
-    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + 'a> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + '_> {
         self._base(t0, false)
     }
 }

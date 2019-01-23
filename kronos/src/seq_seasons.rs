@@ -21,7 +21,7 @@ impl Seasons {
     }
 }
 
-impl<'a> TimeSequence<'a> for Seasons {
+impl TimeSequence for Seasons {
     fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, true)
     }

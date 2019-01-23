@@ -18,14 +18,14 @@ use crate::types::{DateTime, Range, TimeSequence};
 
 #[derive(Clone)]
 pub struct Except<SeqA, SeqB>(pub SeqA, pub SeqB)
-    where for<'b> SeqA: TimeSequence<'b>,
-          for<'b> SeqB: TimeSequence<'b>;
+    where SeqA: TimeSequence,
+          SeqB: TimeSequence;
 
 impl<SeqA, SeqB> Except<SeqA, SeqB>
-    where for<'b> SeqA: TimeSequence<'b>,
-          for<'b> SeqB: TimeSequence<'b>
+    where SeqA: TimeSequence,
+          SeqB: TimeSequence
 {
-    fn _base(&self, t0: &DateTime, future: bool) -> Box<Iterator<Item=Range>> {
+    fn _base(&self, t0: &DateTime, future: bool) -> Box<Iterator<Item=Range> + '_> {
         let (stream, mut except) = if future {
             (self.0._future_raw(t0), self.1._future_raw(t0))
         } else {
@@ -43,15 +43,15 @@ impl<SeqA, SeqB> Except<SeqA, SeqB>
     }
 }
 
-impl<'a, SeqA, SeqB> TimeSequence<'a> for Except<SeqA, SeqB>
-    where for<'b> SeqA: TimeSequence<'b>,
-          for<'b> SeqB: TimeSequence<'b>
+impl<SeqA, SeqB> TimeSequence for Except<SeqA, SeqB>
+    where SeqA: TimeSequence,
+          SeqB: TimeSequence
 {
-    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + '_> {
         self._base(t0, true)
     }
 
-    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + '_> {
         self._base(t0, false)
     }
 }

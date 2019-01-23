@@ -20,7 +20,7 @@ impl Grains {
     }
 }
 
-impl<'a> TimeSequence<'a> for Grains {
+impl TimeSequence for Grains {
     fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
         self._base(t0, true)
     }

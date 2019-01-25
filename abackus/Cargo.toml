@@ -1,6 +1,6 @@
 [package]
 name = "abackus"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2018"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "Parser builder using EBNF"

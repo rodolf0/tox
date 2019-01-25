@@ -20,18 +20,23 @@ pub enum Tree {
 }
 
 impl Sexpr {
-    pub fn print(&self) { self.print_helper("") }
+    pub fn print(&self) -> String {
+        let mut out = String::new();
+        self.print_helper("", &mut out);
+        out
+    }
 
-    fn print_helper(&self, level: &str) {
+    fn print_helper(&self, level: &str, out: &mut String) {
         match *self {
-            Sexpr::Atom(ref lexeme) => println!("{}`-- {:?}", level, lexeme),
+            Sexpr::Atom(ref lexeme) =>
+                *out += &format!("{}`-- {:?}\n", level, lexeme),
             Sexpr::List(ref subn) => {
-                println!("{}`--", level);
+                *out += &format!("{}`--\n", level);
                 if let Some((last, rest)) = subn.split_last() {
                     let l = format!("{}  |", level);
-                    for n in rest { n.print_helper(&l); }
+                    for n in rest { n.print_helper(&l, out); }
                     let l = format!("{}   ", level);
-                    last.print_helper(&l);
+                    last.print_helper(&l, out);
                 }
             }
         }

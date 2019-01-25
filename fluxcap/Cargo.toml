@@ -1,6 +1,6 @@
 [package]
 name = "fluxcap"
-version = "0.0.7"
+version = "0.0.8"
 edition = "2018"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "time expression parsing inspired on duckling"
@@ -9,7 +9,7 @@ repository = "https://github.com/rodolf0/tox"
 
 [dependencies]
 chrono = "0.4"
-abackus = { version = "0.1.6", path = "../abackus" }
+abackus = { version = "0.1.7", path = "../abackus" }
 earlgrey = { version = "0.2.1", path = "../earlgrey" }
 lexers = { version = "0.0.7", path = "../lexers" }
 kronos = { version = "0.1.1", path = "../kronos" }

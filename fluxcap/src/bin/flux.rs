@@ -46,6 +46,6 @@ fn main() {
     }
 
     for t in tm.debug(&input) {
-        t.print();
+        println!("{}", t.print());
     }
 }

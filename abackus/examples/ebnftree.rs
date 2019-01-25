@@ -38,7 +38,7 @@ fn main() {
         .sexprificator(&grammar, "expr");
 
     match trificator(&mut Tokenizer::scanner(&input)) {
-        Ok(trees) => for t in trees { t.print(); },
+        Ok(trees) => for t in trees { println!("{}", t.print()); },
         Err(e) => println!("{:?}", e)
     }
 }

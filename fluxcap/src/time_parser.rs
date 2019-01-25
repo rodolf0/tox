@@ -1,23 +1,17 @@
 #![deny(warnings)]
 
 use crate::constants as k;
-
-extern crate abackus;
-use self::abackus::ParserBuilder;
-
-extern crate kronos;
-use self::kronos::Grain;
-
-extern crate earlgrey;
-use self::earlgrey::EarleyParser;
+use abackus::{ParserBuilder, Sexpr};
+use kronos::Grain;
+use earlgrey::{EarleyParser, Error};
+use lexers::Scanner;
 
 
 // https://github.com/wit-ai/duckling_old/blob/master/resources/languages/en/corpus/time.clj
 // https://github.com/wit-ai/duckling_old/blob/master/resources/languages/en/rules/time.clj
 
-pub fn time_parser() -> EarleyParser {
-    let grammar = r#"
-
+pub fn time_grammar() -> &'static str {
+    r#"
     named_seq := day_ordinal
               | weekday
               | month
@@ -75,8 +69,10 @@ pub fn time_parser() -> EarleyParser {
           | sequence 'since' time
           | sequence 'between' time 'and' time
           ;
-    "#;
+    "#
+}
 
+fn _parser_builder() -> ParserBuilder {
     use std::str::FromStr;
     ParserBuilder::default()
         .plug_terminal("ordinal", |d| k::ordinal(d).or(k::short_ordinal(d)).is_some())
@@ -88,6 +84,14 @@ pub fn time_parser() -> EarleyParser {
                        { year > 999 && year < 2200 } else { false })
         .plug_terminal("small_int", |u| if let Ok(u) = usize::from_str(u)
                        { u < 100 } else { false })
-        .into_parser("time", &grammar)
+}
+
+pub fn time_parser() -> EarleyParser {
+    _parser_builder()
+        .into_parser("time", time_grammar())
         .unwrap_or_else(|e| panic!("TimeMachine grammar BUG: {:?}", e))
+}
+
+pub fn time_debug() -> Box<Fn(Scanner<String>) -> Result<Vec<Sexpr>, Error>> {
+    Box::new(_parser_builder().sexprificator(time_grammar(), "time"))
 }

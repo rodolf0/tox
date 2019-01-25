@@ -3,8 +3,9 @@
 type DateTime = chrono::NaiveDateTime;
 type Date = chrono::NaiveDate;
 
-use lexers::DelimTokenizer;
-use earlgrey::{EarleyParser, EarleyForest};
+use lexers::{DelimTokenizer, Scanner};
+use earlgrey::{EarleyParser, EarleyForest, Error};
+use abackus::{Sexpr};
 use kronos as k;
 use std::rc::Rc;
 
@@ -278,7 +279,8 @@ fn evaler_time<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
 }
 
 
-pub struct TimeMachine<'a>(EarleyParser, EarleyForest<'a, TimeNode>);
+pub struct TimeMachine<'a>(EarleyParser, EarleyForest<'a, TimeNode>,
+                           Box<Fn(Scanner<String>) -> Result<Vec<Sexpr>, Error>>);
 
 impl<'a> TimeMachine<'a> {
     pub fn new() -> TimeMachine<'a> {
@@ -288,7 +290,18 @@ impl<'a> TimeMachine<'a> {
         evaler_comp_seq(&mut ev);
         evaler_comp_grain(&mut ev);
         evaler_time(&mut ev);
-        TimeMachine(time_parser::time_parser(), ev)
+        TimeMachine(time_parser::time_parser(), ev, time_parser::time_debug())
+    }
+
+    pub fn debug(&self, time: &str) -> Vec<Sexpr> {
+        let tokenizer = DelimTokenizer::scanner(time, ", ", true);
+        match self.2(tokenizer) {
+            Ok(trees) => trees,
+            Err(e) => {
+                eprintln!("TimeMachine {:?} for '{}'", e, time);
+                return Vec::new();
+            }
+        }
     }
 
     pub fn eval(&self, reftime: DateTime, time: &str) -> Vec<TimeEl> {

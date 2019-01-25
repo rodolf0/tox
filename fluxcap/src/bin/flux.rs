@@ -44,4 +44,8 @@ fn main() {
             _ => println!("{:?}", r),
         }
     }
+
+    for t in tm.debug(&input) {
+        t.print();
+    }
 }

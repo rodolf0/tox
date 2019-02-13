@@ -23,6 +23,16 @@ impl Iterator for EbnfTokenizer {
         }
         let mut s = &mut self.0;
         s.ignore_ws();
+        // discard comments starting with '#' until new-line
+        if s.accept_char('#') {
+            while let Some(nl) = s.next() {
+                if nl == '\n' {
+                    s.ignore();
+                    // discard comment and allow more by restarting
+                    return self.next();
+                }
+            }
+        }
         if s.accept_any_char("[]{}()|;").is_some() {
             return Some(s.extract_string());
         }

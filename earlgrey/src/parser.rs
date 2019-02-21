@@ -3,7 +3,7 @@
 use crate::grammar::{Symbol, Grammar};
 use crate::items::{Item, StateSet};
 use std::rc::Rc;
-
+use std::fmt::Debug;
 
 #[derive(Debug,PartialEq)]
 pub enum Error {
@@ -16,7 +16,6 @@ pub enum Error {
 
 pub struct EarleyParser {
     pub g: Grammar,
-    debug: bool,
 }
 
 #[derive(Debug)]
@@ -26,11 +25,11 @@ pub struct ParseTrees(pub Vec<Rc<Item>>);
 
 impl EarleyParser {
     pub fn new(grammar: Grammar) -> EarleyParser {
-        EarleyParser{g: grammar, debug: false}
+        EarleyParser{g: grammar}
     }
 
     pub fn parse<S, SI>(&self, mut tok: SI) -> Result<ParseTrees, Error>
-            where S: AsRef<str>, SI: Iterator<Item=S> {
+            where S: Debug + AsRef<str>, SI: Iterator<Item=S> {
 
         // 0. Populate S0, add items for each rule matching the start symbol
         let s0: StateSet = self.g.rules_for(&self.g.start).into_iter()
@@ -74,23 +73,29 @@ impl EarleyParser {
                 if state.len() == prev_item_count { break; }
             }
 
+            if cfg!(feature="debug") {
+                eprintln!("=== {} ===", idx);
+                for s in states[idx].iter() {
+                    eprintln!("{:?}", s);
+                }
+            }
+
             // Bootstrap Si+1 next state with rules that accept the next token
             if let Some(lexeme) = tok.next() {
-                let scans = states[idx]
+                let scans: StateSet = states[idx]
                     .advanced_by_scan(lexeme.as_ref(), idx+1)
                     .into_iter()
                     .collect();
+
+                if cfg!(feature="debug") {
+                    eprintln!("=== Scanned ===");
+                    for s in scans.iter() {
+                        eprintln!("{:?} ~~> {:?}", lexeme, s);
+                    }
+                }
+
                 states.push(scans);
             }
-        }
-
-        // Verbose, debug state-sets
-        if self.debug {
-            for (idx, stateset) in states.iter().enumerate() {
-                eprintln!("=== {} ===", idx);
-                for item in stateset.iter() { eprintln!("{:?}", item); }
-            }
-            eprintln!("=========");
         }
 
         // Check that at least one item is a. complete, b. starts at the idx 0,

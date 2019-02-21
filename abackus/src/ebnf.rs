@@ -49,9 +49,8 @@ pub fn ebnf_grammar() -> Grammar {
       .expect("Bad EBNF Grammar")
 }
 
-// enable / disable debug information
 macro_rules! debug {
-    ($fmt:expr, $($args:expr),*) => (if false { eprintln!($fmt, $($args),*); })
+    ($($args:tt)*) => (if cfg!(feature="debug") { eprintln!($($args)*); })
 }
 
 

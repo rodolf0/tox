@@ -2,7 +2,7 @@
 
 use crate::ebnf::ParserBuilder;
 use earlgrey::{EarleyParser, EarleyForest, Error};
-
+use std::fmt::Debug;
 
 #[derive(Clone,Debug)]
 pub enum Sexpr {
@@ -46,7 +46,7 @@ impl Sexpr {
 impl ParserBuilder {
     pub fn treeficator<S, SI>(self, grammar: &str, start: &str)
         -> impl Fn(SI) -> Result<Vec<Tree>, Error>
-        where S: AsRef<str>, SI: Iterator<Item=S>
+        where S: AsRef<str> + Debug, SI: Iterator<Item=S>
     {
         // User may pre-plug grammar (self.0) with terminals
         // 1. build a parser for user's grammar
@@ -68,7 +68,7 @@ impl ParserBuilder {
 
     pub fn sexprificator<S, SI>(self, grammar: &str, start: &str)
         -> impl Fn(SI) -> Result<Vec<Sexpr>, Error>
-        where S: AsRef<str>, SI: Iterator<Item=S>
+        where S: AsRef<str> + Debug, SI: Iterator<Item=S>
     {
         // User may pre-plug grammar (self.0) with terminals
         // 1. build a parser for user's grammar

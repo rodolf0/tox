@@ -37,8 +37,8 @@ impl Iterator for EbnfTokenizer {
             return Some(s.extract_string());
         }
         let backtrack = s.pos();
-        if s.accept_any_char(":").is_some() {
-            if s.accept_any_char("=").is_some() {
+        if s.accept_char(':') {
+            if s.accept_char('=') {
                 return Some(s.extract_string());
             }
             s.set_pos(backtrack);
@@ -58,10 +58,14 @@ impl Iterator for EbnfTokenizer {
             }
             s.set_pos(backtrack);
         }
+        let backtrack = s.pos();
+        s.accept_char('@');
         // NOTE: scan_identifier limits the valid options
         if let Some(id) = helpers::scan_identifier(&mut s) {
             return Some(id);
         }
+        // backtrack possible '@'
+        s.set_pos(backtrack);
         None
     }
 }

@@ -1,9 +1,9 @@
 [[package]]
 name = "abackus"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
- "earlgrey 0.2.2",
- "lexers 0.0.7",
+ "earlgrey 0.2.3",
+ "lexers 0.0.8",
  "rustyline 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -14,7 +14,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "earlgrey"
-version = "0.2.2"
+version = "0.2.3"
 
 [[package]]
 name = "encode_unicode"
@@ -32,7 +32,7 @@ dependencies = [
 
 [[package]]
 name = "lexers"
-version = "0.0.7"
+version = "0.0.8"
 
 [[package]]
 name = "libc"

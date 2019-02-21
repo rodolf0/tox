@@ -1,6 +1,6 @@
 [package]
 name = "lexers"
-version = "0.0.7"
+version = "0.0.8"
 edition = "2018"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "Various string tokenizers"

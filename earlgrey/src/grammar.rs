@@ -99,18 +99,18 @@ impl Grammar {
 ///////////////////////////////////////////////////////////////////////////////
 
 impl GrammarBuilder {
-    fn add_symbol(&mut self, symbol: Symbol, ignoredup: bool) {
-        // NOTE: we check existence to avoid new symbols stomping on pluged ones
+    fn add_symbol(&mut self, symbol: Symbol, allowdups: bool) {
+        // NOTE: we check existence to avoid new syms stomping on plugged syms
         if !self.symbols.contains_key(symbol.name()) {
             self.symbols.insert(symbol.name().to_string(), Rc::new(symbol));
-        } else if !ignoredup {
+        } else if !allowdups {
             self.error =
                 Some(Error::DuplicateSym(symbol.name().to_string()));
         }
     }
 
-    pub fn add_nonterm<S: Into<String>>(&mut self, nt: S, ignoredup: bool) {
-        self.add_symbol(Symbol::NonTerm(nt.into()), ignoredup);
+    pub fn add_nonterm<S: Into<String>>(&mut self, nt: S, allowdups: bool) {
+        self.add_symbol(Symbol::NonTerm(nt.into()), allowdups);
     }
 
     pub fn nonterm<S: Into<String>>(mut self, nt: S) -> Self {
@@ -118,9 +118,9 @@ impl GrammarBuilder {
         self
     }
 
-    pub fn add_terminal<S, TM>(&mut self, nt: S, tm: TM, ignoredup: bool)
+    pub fn add_terminal<S, TM>(&mut self, nt: S, tm: TM, allowdups: bool)
             where S: Into<String>, TM: 'static + Fn(&str)->bool {
-        self.add_symbol(Symbol::Terminal(nt.into(), Box::new(tm)), ignoredup);
+        self.add_symbol(Symbol::Terminal(nt.into(), Box::new(tm)), allowdups);
     }
 
     pub fn terminal<S, TM>(mut self, nt: S, tm: TM) -> Self
@@ -129,7 +129,7 @@ impl GrammarBuilder {
         self
     }
 
-    pub fn add_rule<H, S>(&mut self, head: H, spec: &[S])
+    pub fn add_rule<H, S>(&mut self, head: H, spec: &[S], allowdups: bool)
             where H: Into<String>, S: AsRef<str> {
         // check for missing symbols first
         if let Some(s) = spec.iter()
@@ -149,16 +149,16 @@ impl GrammarBuilder {
         };
         // check for duplicate rules
         let rulestr = rule.to_string();
-        if self.rules.iter().any(|r| r.to_string() == rulestr) {
+        if self.rules.iter().all(|r| r.to_string() != rulestr) {
+            self.rules.push(Rc::new(rule));
+        } else if !allowdups {
             self.error = Some(Error::DuplicateRule(rulestr));
-            return;
         }
-        self.rules.push(Rc::new(rule));
     }
 
     pub fn rule<H, S>(mut self, head: H, spec: &[S]) -> Self
             where H: Into<String>, S: AsRef<str> {
-        self.add_rule(head, spec);
+        self.add_rule(head, spec, false);
         self
     }
 

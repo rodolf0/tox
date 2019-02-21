@@ -16,6 +16,11 @@ pub fn ebnf_grammar() -> Grammar {
                     i == 0 && c.is_alphabetic() ||
                     i > 0 && (c.is_alphanumeric() || c == '_')))
       .terminal("<Chars>", move |s| s.chars().all(|c| !c.is_control()))
+      .terminal("@<Tag>", move |s|
+                s.chars().enumerate().all(|(i, c)|
+                    i == 0 && c == '@' ||
+                    i == 1 && c.is_alphabetic() ||
+                    i > 1 && (c.is_alphanumeric() || c == '_')))
       .terminal(":=", |s| s == ":=")
       .terminal(";", |s| s == ";")
       .terminal("[", |s| s == "[")
@@ -45,6 +50,9 @@ pub fn ebnf_grammar() -> Grammar {
       .rule("<Atom>", &["[", "<Body>", "]"])
       .rule("<Atom>", &["{", "<Body>", "}"])
       .rule("<Atom>", &["(", "<Body>", ")"])
+      .rule("<Atom>", &["[", "<Body>", "]", "@<Tag>"])
+      .rule("<Atom>", &["{", "<Body>", "}", "@<Tag>"])
+      .rule("<Atom>", &["(", "<Body>", ")", "@<Tag>"])
       .into_grammar("<RuleList>")
       .expect("Bad EBNF Grammar")
 }
@@ -77,6 +85,10 @@ impl ParserBuilder {
                     debug!("Adding non-term {:?}", token);
                     gb.borrow_mut().add_nonterm(token, true);
                 },
+                "@<Tag>" => {
+                    debug!("Adding non-term {:?}", token);
+                    gb.borrow_mut().add_nonterm(token, true);
+                },
                 "<Chars>" => {
                     debug!("Adding terminal {:?}", token);
                     let tok = token.to_string();
@@ -97,7 +109,7 @@ impl ParserBuilder {
             let mut t_gb = gb.borrow_mut();
             for rule in body {
                 debug!("Adding rule {:?} -> {:?}", id, rule);
-                t_gb.add_rule(id.as_ref(), rule.as_slice());
+                t_gb.add_rule(id.as_ref(), rule.as_slice(), false);
             }
             G::Nop
         });
@@ -136,7 +148,19 @@ impl ParserBuilder {
             let body = pull!(G::Body, n.remove(1));
             for rule in body {
                 debug!("Adding rule {:?} -> {:?}", aux, rule);
-                t_gb.add_rule(aux.as_ref(), rule.as_slice());
+                t_gb.add_rule(aux.as_ref(), rule.as_slice(), false);
+            }
+            G::Atom(aux)
+        });
+        ev.action("<Atom> -> ( <Body> ) @<Tag>", move |mut n| {
+            let aux = pull!(G::Atom, n.remove(3));
+            debug!("Adding non-term {:?}", aux);
+            let mut t_gb = gb.borrow_mut();
+            t_gb.add_nonterm(aux.as_ref(), true);
+            let body = pull!(G::Body, n.remove(1));
+            for rule in body {
+                debug!("Adding rule {:?} -> {:?}", aux, rule);
+                t_gb.add_rule(aux.as_ref(), rule.as_slice(), true);
             }
             G::Atom(aux)
         });
@@ -153,9 +177,23 @@ impl ParserBuilder {
             let body = pull!(G::Body, n.remove(1));
             for rule in body {
                 debug!("Adding rule {:?} -> {:?}", aux, rule);
-                t_gb.add_rule(aux.as_ref(), rule.as_slice());
+                t_gb.add_rule(aux.as_ref(), rule.as_slice(), false);
                 debug!("Adding rule {:?} -> []", aux);
-                t_gb.add_rule::<_, String>(aux.as_ref(), &[]);
+                t_gb.add_rule::<_, String>(aux.as_ref(), &[], false);
+            }
+            G::Atom(aux)
+        });
+        ev.action("<Atom> -> [ <Body> ] @<Tag>", move |mut n| {
+            let aux = pull!(G::Atom, n.remove(3));
+            debug!("Adding non-term {:?}", aux);
+            let mut t_gb = gb.borrow_mut();
+            t_gb.add_nonterm(aux.as_ref(), true);
+            let body = pull!(G::Body, n.remove(1));
+            for rule in body {
+                debug!("Adding rule {:?} -> {:?}", aux, rule);
+                t_gb.add_rule(aux.as_ref(), rule.as_slice(), true);
+                debug!("Adding rule {:?} -> []", aux);
+                t_gb.add_rule::<_, String>(aux.as_ref(), &[], true);
             }
             G::Atom(aux)
         });
@@ -173,9 +211,25 @@ impl ParserBuilder {
             for mut rule in body {
                 rule.push(aux.clone());
                 debug!("Adding rule {:?} -> {:?}", aux, rule);
-                t_gb.add_rule(aux.as_ref(), rule.as_slice());
+                t_gb.add_rule(aux.as_ref(), rule.as_slice(), false);
                 debug!("Adding rule {:?} -> []", aux);
-                t_gb.add_rule::<_, String>(aux.as_ref(), &[]);
+                t_gb.add_rule::<_, String>(aux.as_ref(), &[], false);
+            }
+            G::Atom(aux)
+        });
+        ev.action("<Atom> -> { <Body> } @<Tag>", move |mut n| {
+            // <Atom> -> aux ; aux -> <e> | <Body> aux ;
+            let aux = pull!(G::Atom, n.remove(3));
+            debug!("Adding non-term {:?}", aux);
+            let mut t_gb = gb.borrow_mut();
+            t_gb.add_nonterm(aux.as_ref(), true);
+            let body = pull!(G::Body, n.remove(1));
+            for mut rule in body {
+                rule.push(aux.clone());
+                debug!("Adding rule {:?} -> {:?}", aux, rule);
+                t_gb.add_rule(aux.as_ref(), rule.as_slice(), true);
+                debug!("Adding rule {:?} -> []", aux);
+                t_gb.add_rule::<_, String>(aux.as_ref(), &[], true);
             }
             G::Atom(aux)
         });

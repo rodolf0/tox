@@ -76,6 +76,28 @@ fn repetition() {
 }
 
 #[test]
+fn repetition_tagged() {
+    let g = r#"
+        arg := b { "," b } @x;
+        b := "0" | "1" ;
+    "#;
+    let parser = ParserBuilder::default().treeficator(&g, "arg");
+    let trees = parser("1 , 0 , 1".split_whitespace()).unwrap();
+    check_trees(&trees, vec![
+        concat!(
+            r#"Node("arg -> b @x", ["#,
+                r#"Node("b -> 1", [Leaf("1", "1")]), "#,
+                r#"Node("@x -> , b @x", ["#,
+                    r#"Leaf(",", ","), "#,
+                    r#"Node("b -> 0", [Leaf("0", "0")]), "#,
+                    r#"Node("@x -> , b @x", ["#,
+                        r#"Leaf(",", ","), "#,
+                        r#"Node("b -> 1", [Leaf("1", "1")]), "#,
+                        r#"Node("@x -> ", [])])])])"#)
+    ]);
+}
+
+#[test]
 fn option() {
     let g = r#"
         complex := d [ "i" ];
@@ -102,6 +124,32 @@ fn option() {
 }
 
 #[test]
+fn option_tagged() {
+    let g = r#"
+        complex := d [ "i" ] @x;
+        d := "0" | "1" | "2";
+    "#;
+    let parser = ParserBuilder::default().treeficator(&g, "complex");
+    let trees = parser(["1"].iter()).unwrap();
+    check_trees(&trees, vec![
+        concat!(
+            r#"Node("complex -> d @x", ["#,
+                r#"Node("d -> 1", [Leaf("1", "1")]), "#,
+                r#"Node("@x -> ", [])])"#)
+    ]);
+
+    let trees = parser(["2", "i"].iter()).unwrap();
+    check_trees(&trees, vec![
+        concat!(
+            r#"Node("complex -> d @x", ["#,
+                r#"Node("d -> 2", [Leaf("2", "2")]), "#,
+                r#"Node("@x -> i", [Leaf("i", "i")])])"#)
+    ]);
+
+    assert!(parser(["2", "i", "i"].iter()).is_err());
+}
+
+#[test]
 fn grouping() {
     let g = r#"
         row := ("a" | "b") ("0" | "1") ;
@@ -121,6 +169,32 @@ fn grouping() {
             r#"Node("row -> <Uniq-3> <Uniq-6>", ["#,
                 r#"Node("<Uniq-3> -> a", [Leaf("a", "a")]), "#,
                 r#"Node("<Uniq-6> -> 0", [Leaf("0", "0")])])"#)
+    ]);
+
+    assert!(parser(["a", "b"].iter()).is_err());
+    assert!(parser(["0", "1"].iter()).is_err());
+}
+
+#[test]
+fn grouping_tagged() {
+    let g = r#"
+        row := ("a" | "b") @x ("0" | "1") @y;
+    "#;
+    let parser = ParserBuilder::default().treeficator(&g, "row");
+    let trees = parser(["b", "1"].iter()).unwrap();
+    check_trees(&trees, vec![
+        concat!(
+            r#"Node("row -> @x @y", ["#,
+                r#"Node("@x -> b", [Leaf("b", "b")]), "#,
+                r#"Node("@y -> 1", [Leaf("1", "1")])])"#)
+    ]);
+
+    let trees = parser(["a", "0"].iter()).unwrap();
+    check_trees(&trees, vec![
+        concat!(
+            r#"Node("row -> @x @y", ["#,
+                r#"Node("@x -> a", [Leaf("a", "a")]), "#,
+                r#"Node("@y -> 0", [Leaf("0", "0")])])"#)
     ]);
 
     assert!(parser(["a", "b"].iter()).is_err());
@@ -161,6 +235,48 @@ fn mixed() {
                 r#"Node("<Uniq-3> -> ", []), "#,
                 r#"Node("<Uniq-6> -> 1", [Leaf("1", "1")]), "#,
                 r#"Node("<Uniq-8> -> c", [Leaf("c", "c")])])"#)
+    ]);
+
+    assert!(parser(["a", "b"].iter()).is_err());
+    assert!(parser(["0", "1"].iter()).is_err());
+    assert!(parser(["a", "b", "0", "d"].iter()).is_err());
+    assert!(parser(["a", "b", "0"].iter()).is_ok());
+}
+
+#[test]
+fn mixed_tagged() {
+    let g = r#"
+        row := "a" [ "b" ]@x ("0" | "1")@y [ "c" ]@z;
+    "#;
+    let parser = ParserBuilder::default().treeficator(&g, "row");
+    let trees = parser(["a", "0"].iter()).unwrap();
+    check_trees(&trees, vec![
+        concat!(
+            r#"Node("row -> a @x @y @z", ["#,
+                r#"Leaf("a", "a"), "#,
+                r#"Node("@x -> ", []), "#,
+                r#"Node("@y -> 0", [Leaf("0", "0")]), "#,
+                r#"Node("@z -> ", [])])"#)
+    ]);
+
+    let trees = parser(["a", "b", "1"].iter()).unwrap();
+    check_trees(&trees, vec![
+        concat!(
+            r#"Node("row -> a @x @y @z", ["#,
+                r#"Leaf("a", "a"), "#,
+                r#"Node("@x -> b", [Leaf("b", "b")]), "#,
+                r#"Node("@y -> 1", [Leaf("1", "1")]), "#,
+                r#"Node("@z -> ", [])])"#)
+    ]);
+
+    let trees = parser(["a", "1", "c"].iter()).unwrap();
+    check_trees(&trees, vec![
+        concat!(
+            r#"Node("row -> a @x @y @z", ["#,
+                r#"Leaf("a", "a"), "#,
+                r#"Node("@x -> ", []), "#,
+                r#"Node("@y -> 1", [Leaf("1", "1")]), "#,
+                r#"Node("@z -> c", [Leaf("c", "c")])])"#)
     ]);
 
     assert!(parser(["a", "b"].iter()).is_err());

@@ -25,9 +25,8 @@ pub fn time_grammar() -> &'static str {
 
     sequence := named_seq | grain;
 
-
-    comp_seq := ordinal sequence 'of' ['the'] comp_seq
-              | 'last' sequence 'of' ['the'] comp_seq
+    comp_seq := ordinal sequence 'of' ['the'] @opt_the comp_seq
+              | 'last' sequence 'of' ['the'] @opt_the comp_seq
               | sequence
               ;
 

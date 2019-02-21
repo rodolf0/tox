@@ -170,14 +170,13 @@ fn evaler_sequence<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
 
 fn evaler_comp_seq<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
     use kronos::*;
-    // register 'the' optional branches (compile, try, see missing symbol)
-    for s in [14, 16].into_iter() {
-        ev.action(&format!("<Uniq-{}> -> ", s), |_| TimeNode::Nop);
-        ev.action(&format!("<Uniq-{}> -> the", s), |_| TimeNode::Nop);
-    }
-    ev.action("comp_seq -> ordinal sequence of <Uniq-14> comp_seq",
+
+    ev.action("@opt_the -> the", |_| TimeNode::Nop);
+    ev.action("@opt_the -> ", |_| TimeNode::Nop);
+
+    ev.action("comp_seq -> ordinal sequence of @opt_the comp_seq",
               |t| s!(NthOf(t[0].usize(), t[1].seq(), t[4].seq())));
-    ev.action("comp_seq -> last sequence of <Uniq-16> comp_seq",
+    ev.action("comp_seq -> last sequence of @opt_the comp_seq",
               |t| s!(LastOf(1, t[1].seq(), t[4].seq())));
     ev.action("comp_seq -> sequence", |mut t| t.remove(0));
 }

@@ -14,7 +14,6 @@ type LeafBuilder<'a, ASTNode> = Box<Fn(&str, &str) -> ASTNode + 'a>;
 pub struct EarleyForest<'a, ASTNode: Clone> {
     actions: HashMap<String, SemAction<'a, ASTNode>>,
     leaf_builder: LeafBuilder<'a, ASTNode>,
-    debug: bool,
 }
 
 impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
@@ -22,8 +21,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
             where Builder: Fn(&str, &str) -> ASTNode + 'a {
         EarleyForest{
             actions: HashMap::new(),
-            leaf_builder: Box::new(leaf_builder),
-            debug: false}
+            leaf_builder: Box::new(leaf_builder)}
     }
 
     // Register semantic actions to act when rules are matched
@@ -42,7 +40,9 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
         match self.actions.get(&rulename) {
             None => Err(Error::MissingAction(rulename)),
             Some(action) => {
-                if self.debug { eprintln!("Reduction: {}", rulename); }
+                if cfg!(feature="debug") {
+                    eprintln!("Reduction: {}", rulename);
+                }
                 Ok(vec![action(args)])
             }
         }

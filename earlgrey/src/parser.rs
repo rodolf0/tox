@@ -28,8 +28,8 @@ impl EarleyParser {
         EarleyParser{g: grammar}
     }
 
-    pub fn parse<S, SI>(&self, mut tok: SI) -> Result<ParseTrees, Error>
-            where S: Debug + AsRef<str>, SI: Iterator<Item=S> {
+    pub fn parse<T, Ti>(&self, mut tokenizer: T) -> Result<ParseTrees, Error>
+            where T: Iterator<Item=Ti>, Ti: Debug + AsRef<str> {
 
         // 0. Populate S0, add items for each rule matching the start symbol
         let s0: StateSet = self.g.rules_for(&self.g.start).into_iter()
@@ -81,7 +81,7 @@ impl EarleyParser {
             }
 
             // Bootstrap Si+1 next state with rules that accept the next token
-            if let Some(lexeme) = tok.next() {
+            if let Some(lexeme) = tokenizer.next() {
                 let scans: StateSet = states[idx]
                     .advanced_by_scan(lexeme.as_ref(), idx+1)
                     .into_iter()

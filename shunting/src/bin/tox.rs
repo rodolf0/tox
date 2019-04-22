@@ -48,7 +48,7 @@ fn main() {
         use shunting::MathContext;
         let mut cx = MathContext::new();
         let histpath =
-            std::env::home_dir().map(|h| h.join(".tox_history")).unwrap();
+            dirs::home_dir().map(|h| h.join(".tox_history")).unwrap();
         let mut rl = rustyline::Editor::<()>::new();
         if let Err(_) = rl.load_history(&histpath) {
             println!("No history yet");

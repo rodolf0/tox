@@ -2,7 +2,6 @@
 
 use crate::helpers;
 use crate::scanner::Scanner;
-use std::str::FromStr;
 
 
 #[derive(Clone, PartialEq, Debug)]
@@ -15,15 +14,19 @@ pub enum LispToken {
     String(String),
 }
 
-pub struct LispTokenizer(Scanner<char>);
+pub struct LispTokenizer<I: Iterator<Item=char>>(Scanner<I>);
 
-impl LispTokenizer {
-    pub fn scanner(source: &str) -> Scanner<LispToken> {
-        Scanner::new(Box::new(LispTokenizer(Scanner::from_buf(source.chars()))))
+impl<I: Iterator<Item=char>> LispTokenizer<I> {
+    pub fn new(source: I) -> Self {
+        LispTokenizer(Scanner::new(source))
+    }
+
+    pub fn scanner(source: I) -> Scanner<Self> {
+        Scanner::new(Self::new(source))
     }
 }
 
-impl Iterator for LispTokenizer {
+impl<I: Iterator<Item=char>> Iterator for LispTokenizer<I> {
     type Item = LispToken;
     fn next(&mut self) -> Option<Self::Item> {
         self.0.ignore_ws();
@@ -45,6 +48,7 @@ impl Iterator for LispTokenizer {
             self.0.ignore();
             Some(token)
         } else if self.0.until_any_char(") \n\r\t") { // or til EOF
+            use std::str::FromStr;
             let token = self.0.extract_string();
             match &token[..] {
                 "#t" => Some(LispToken::True),
@@ -67,7 +71,7 @@ mod tests {
     use super::{LispToken, LispTokenizer};
 
     #[test]
-    fn test_lisp_tokenizer() {
+    fn lisp_tokenizer() {
         let inputs = vec![
             "(+ 3 4 5)",
             "(max 'a \"hello\")",
@@ -81,7 +85,7 @@ mod tests {
                  LispToken::String(format!("\"hello\"")), LispToken::CParen],
         ];
         for (input, expected) in inputs.iter().zip(expect.iter()) {
-            let mut lx = LispTokenizer::scanner(input);
+            let mut lx = LispTokenizer::new(input.chars());
             for exp in expected.iter() { assert_eq!(*exp, lx.next().unwrap()); }
             assert_eq!(lx.next(), None);
         }

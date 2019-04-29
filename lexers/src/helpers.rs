@@ -2,14 +2,13 @@
 
 use crate::scanner::Scanner;
 
-
 /*
  * The caller of these function is expected to setup the scanner for a
  * clear start, ie: call scanner.ignore() to start fresh
  */
 
 // scan numbers like -?[0-9]+(\.[0-9]+)?([eE][+-][0-9]+)?
-pub fn scan_number(scanner: &mut Scanner<char>) -> Option<String> {
+pub fn scan_number<I: Iterator<Item=char>>(scanner: &mut Scanner<I>) -> Option<String> {
     let backtrack = scanner.pos();
     let digits = "0123456789";
     // optional sign
@@ -38,7 +37,7 @@ pub fn scan_number(scanner: &mut Scanner<char>) -> Option<String> {
     Some(scanner.extract_string())
 }
 
-pub fn scan_math_op(scanner: &mut Scanner<char>) -> Option<String> {
+pub fn scan_math_op<I: Iterator<Item=char>>(scanner: &mut Scanner<I>) -> Option<String> {
     if scanner.accept_any_char(">=<").is_some() {
         // accept '<', '>', '=', '<=', '>=', '=='
         scanner.accept_any_char("=");
@@ -55,7 +54,7 @@ pub fn scan_math_op(scanner: &mut Scanner<char>) -> Option<String> {
 }
 
 // scan integers like 0x34 0b10101 0o657
-pub fn scan_xob_integers(scanner: &mut Scanner<char>) -> Option<String> {
+pub fn scan_xob_integers<I: Iterator<Item=char>>(scanner: &mut Scanner<I>) -> Option<String> {
     let backtrack = scanner.pos();
     if scanner.accept_any_char("0").is_some() &&
         match scanner.accept_any_char("xob") {
@@ -71,7 +70,7 @@ pub fn scan_xob_integers(scanner: &mut Scanner<char>) -> Option<String> {
 }
 
 // scan a quoted string like "this is \"an\" example"
-pub fn scan_quoted_string(scanner: &mut Scanner<char>, q: char) -> Option<String> {
+pub fn scan_quoted_string<I: Iterator<Item=char>>(scanner: &mut Scanner<I>, q: char) -> Option<String> {
     let backtrack = scanner.pos();
     if ! scanner.accept_char(q) { return None; }
     while let Some(n) = scanner.next() {
@@ -83,7 +82,7 @@ pub fn scan_quoted_string(scanner: &mut Scanner<char>, q: char) -> Option<String
 }
 
 // scan [a-zA-Z_][a-zA-Z0-9_]+
-pub fn scan_identifier(scanner: &mut Scanner<char>) -> Option<String> {
+pub fn scan_identifier<I: Iterator<Item=char>>(scanner: &mut Scanner<I>) -> Option<String> {
     let alfa = concat!("abcdefghijklmnopqrstuvwxyz",
                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ_");
     let alnum = concat!("0123456789",
@@ -111,7 +110,7 @@ mod tests {
             "-38.657e3", "53.845e+5", "65.987E-4", "-4.4e+2i", "-6.14e-5i",
         ];
         for t in tests.iter() {
-            let mut s = Scanner::from_buf(t.chars());
+            let mut s = Scanner::new(t.chars());
             assert_eq!(Some(t.to_string()), scan_number(&mut s));
         }
     }
@@ -123,7 +122,7 @@ mod tests {
             "*", "**", "^", "!", "+", "-", "/", "%",
         ];
         for t in tests.iter() {
-            let mut s = Scanner::from_buf(t.chars());
+            let mut s = Scanner::new(t.chars());
             assert_eq!(Some(t.to_string()), scan_math_op(&mut s));
         }
     }
@@ -132,7 +131,7 @@ mod tests {
     fn test_scan_identifiers() {
         let tests = vec!["id1", "func", "anyword", "_00", "bla23"];
         for t in tests.iter() {
-            let mut s = Scanner::from_buf(t.chars());
+            let mut s = Scanner::new(t.chars());
             assert_eq!(Some(t.to_string()), scan_identifier(&mut s));
         }
     }
@@ -144,7 +143,7 @@ mod tests {
             r"'another test \' with an escaped quote'",
         ];
         for t in tests.iter() {
-            let mut s = Scanner::from_buf(t.chars());
+            let mut s = Scanner::new(t.chars());
             assert_eq!(Some(t.to_string()), scan_quoted_string(&mut s, '\''));
         }
     }

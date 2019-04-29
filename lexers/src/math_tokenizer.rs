@@ -2,7 +2,6 @@
 
 use crate::helpers;
 use crate::scanner::Scanner;
-use std::str::FromStr;
 
 
 #[derive(Clone, PartialEq, Debug)]
@@ -15,15 +14,18 @@ pub enum MathToken {
     OParen, CParen, Comma,
 }
 
-pub struct MathTokenizer {
-    src: Scanner<char>,
+pub struct MathTokenizer<I: Iterator<Item=char>> {
+    src: Scanner<I>,
     prev: Option<MathToken>
 }
 
-impl MathTokenizer {
-    pub fn scanner(source: &str) -> Scanner<MathToken> {
-        Scanner::new(Box::new(
-            MathTokenizer{src: Scanner::from_buf(source.chars()), prev: None}))
+impl<I: Iterator<Item=char>> MathTokenizer<I> {
+    pub fn new(source: I) -> Self {
+        MathTokenizer{src: Scanner::new(source), prev: None}
+    }
+
+    pub fn scanner(source: I) -> Scanner<Self> {
+        Scanner::new(Self::new(source))
     }
 
     // when would a minus be unary? we need to know the prev token
@@ -53,6 +55,7 @@ impl MathTokenizer {
                 _ => Some(MathToken::Variable(id))
             }
         } else if let Some(num) = helpers::scan_number(&mut self.src) {
+            use std::str::FromStr;
             Some(MathToken::Number(f64::from_str(&num).unwrap()))
         } else if self.src.next().is_some() {
             Some(MathToken::Unknown(self.src.extract_string()))
@@ -62,7 +65,7 @@ impl MathTokenizer {
     }
 }
 
-impl Iterator for MathTokenizer {
+impl<I: Iterator<Item=char>> Iterator for MathTokenizer<I> {
     type Item = MathToken;
     fn next(&mut self) -> Option<Self::Item> {
         let token = self.get_token();
@@ -78,8 +81,8 @@ mod tests {
     use super::{MathToken, MathTokenizer};
 
     #[test]
-    fn test1() {
-        let mut lx = MathTokenizer::scanner("3+4*2/-(1-5)^2^3");
+    fn basic_ops() {
+        let mut lx = MathTokenizer::new("3+4*2/-(1-5)^2^3".chars());
         let expect = [
             MathToken::Number(3.0),
             MathToken::BOp(format!("+")),
@@ -106,8 +109,8 @@ mod tests {
     }
 
     #[test]
-    fn test2() {
-        let mut lx = MathTokenizer::scanner("3.4e-2 * sin(x)/(7! % -4) * max(2, x)");
+    fn mixed_ops() {
+        let mut lx = MathTokenizer::new("3.4e-2 * sin(x)/(7! % -4) * max(2, x)".chars());
         let expect = [
             MathToken::Number(3.4e-2),
             MathToken::BOp(format!("*")),
@@ -139,65 +142,14 @@ mod tests {
     }
 
     #[test]
-    fn test3() {
-        let mut lx = MathTokenizer::scanner("sqrt(-(1-x^2) / (1 + x^2))");
-        let expect = [
-            MathToken::Function(format!("sqrt"), 0),
-            MathToken::OParen,
-            MathToken::UOp(format!("-")),
-            MathToken::OParen,
-            MathToken::Number(1.0),
-            MathToken::BOp(format!("-")),
-            MathToken::Variable(format!("x")),
-            MathToken::BOp(format!("^")),
-            MathToken::Number(2.0),
-            MathToken::CParen,
-            MathToken::BOp(format!("/")),
-            MathToken::OParen,
-            MathToken::Number(1.0),
-            MathToken::BOp(format!("+")),
-            MathToken::Variable(format!("x")),
-            MathToken::BOp(format!("^")),
-            MathToken::Number(2.0),
-            MathToken::CParen,
-            MathToken::CParen,
-        ];
-        for exp_token in expect.iter() {
-            let token = lx.next().unwrap();
-            assert_eq!(*exp_token, token);
-        }
-        assert_eq!(lx.next(), None);
-    }
-
-    #[test]
-    fn test4() {
-        let mut lx = MathTokenizer::scanner("x---y");
+    fn unary_ops() {
+        let mut lx = MathTokenizer::new("x---y".chars());
         let expect = [
             MathToken::Variable(format!("x")),
             MathToken::BOp(format!("-")),
             MathToken::UOp(format!("-")),
             MathToken::UOp(format!("-")),
             MathToken::Variable(format!("y")),
-        ];
-        for exp_token in expect.iter() {
-            let token = lx.next().unwrap();
-            assert_eq!(*exp_token, token);
-        }
-        assert_eq!(lx.next(), None);
-    }
-
-    #[test]
-    fn test5() {
-        let mut lx = MathTokenizer::scanner("max(0, 1, 3)");
-        let expect = [
-            MathToken::Function(format!("max"), 0),
-            MathToken::OParen,
-            MathToken::Number(0.0),
-            MathToken::Comma,
-            MathToken::Number(1.0),
-            MathToken::Comma,
-            MathToken::Number(3.0),
-            MathToken::CParen,
         ];
         for exp_token in expect.iter() {
             let token = lx.next().unwrap();

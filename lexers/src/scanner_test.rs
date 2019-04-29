@@ -2,7 +2,7 @@ use crate::scanner::Scanner;
 
 #[test]
 fn test_extremes() {
-    let mut s = Scanner::from_buf("just a test buffer@".chars());
+    let mut s = Scanner::new("just a test buffer@".chars());
     assert_eq!(s.prev(), None);
     assert_eq!(s.peek_prev(), None);
     assert_eq!(s.next(), Some('j'));
@@ -19,7 +19,7 @@ fn test_extremes() {
 
 #[test]
 fn test_extract() {
-    let mut s = Scanner::from_buf("just a test buffer@".chars());
+    let mut s = Scanner::new("just a test buffer@".chars());
     for _ in 0..4 { assert!(s.next().is_some()); }
     assert_eq!(s.extract().iter().cloned().collect::<String>(), "just");
     assert_eq!(s.peek(), Some(' '));
@@ -33,7 +33,7 @@ fn test_extract() {
 
 #[test]
 fn test_accept() {
-    let mut s = Scanner::from_buf("heey  you!".chars());
+    let mut s = Scanner::new("heey  you!".chars());
     assert!(!s.skip_ws());
     assert_eq!(s.prev(), None);
     assert_eq!(s.accept_any_char("he"), Some('h'));
@@ -53,7 +53,7 @@ fn test_accept() {
 
 #[test]
 fn test_skips() {
-    let mut s = Scanner::from_buf("heey  you!".chars());
+    let mut s = Scanner::new("heey  you!".chars());
     assert_eq!(s.accept_any_char("h"), Some('h'));
     assert!(s.skip_all_chars("hey"));
     assert!(!s.skip_all_chars("hey"));

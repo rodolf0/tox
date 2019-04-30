@@ -1,8 +1,11 @@
 [package]
 name = "lexers"
-version = "0.0.8"
+version = "0.1.1"
 edition = "2018"
-authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
-description = "Various string tokenizers"
 license = "MIT"
-repository = "https://github.com/rodolf0/tox"
+authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
+description = "Tools for tokenizing and scanning"
+repository = "https://github.com/rodolf0/tox/tree/master/lexers"
+readme = "README.md"
+keywords = ["lexer", "tokenizer"]
+categories = ["parsing"]

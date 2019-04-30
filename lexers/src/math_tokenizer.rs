@@ -2,25 +2,30 @@
 
 use crate::scanner::Scanner;
 
-
 #[derive(Clone, PartialEq, Debug)]
 pub enum MathToken {
     Unknown(String),
     Number(f64),
     Variable(String),
     Function(String, usize), // arity
-    UOp(String), BOp(String),
-    OParen, CParen, Comma,
+    UOp(String),
+    BOp(String),
+    OParen,
+    CParen,
+    Comma,
 }
 
-pub struct MathTokenizer<I: Iterator<Item=char>> {
+pub struct MathTokenizer<I: Iterator<Item = char>> {
     src: Scanner<I>,
-    prev: Option<MathToken>
+    prev: Option<MathToken>,
 }
 
-impl<I: Iterator<Item=char>> MathTokenizer<I> {
+impl<I: Iterator<Item = char>> MathTokenizer<I> {
     pub fn new(source: I) -> Self {
-        MathTokenizer{src: Scanner::new(source), prev: None}
+        MathTokenizer {
+            src: Scanner::new(source),
+            prev: None,
+        }
     }
 
     pub fn scanner(source: I) -> Scanner<Self> {
@@ -33,7 +38,7 @@ impl<I: Iterator<Item=char>> MathTokenizer<I> {
             Some(MathToken::Number(_)) => false,
             Some(MathToken::Variable(_)) => false,
             Some(MathToken::CParen) => false,
-            _ => true
+            _ => true,
         }
     }
 
@@ -52,7 +57,7 @@ impl<I: Iterator<Item=char>> MathTokenizer<I> {
         if let Some(id) = self.src.scan_identifier() {
             return match self.src.peek() {
                 Some('(') => Some(MathToken::Function(id, 0)),
-                _ => Some(MathToken::Variable(id))
+                _ => Some(MathToken::Variable(id)),
             };
         }
         if let Some(num) = self.src.scan_number() {
@@ -66,7 +71,7 @@ impl<I: Iterator<Item=char>> MathTokenizer<I> {
     }
 }
 
-impl<I: Iterator<Item=char>> Iterator for MathTokenizer<I> {
+impl<I: Iterator<Item = char>> Iterator for MathTokenizer<I> {
     type Item = MathToken;
     fn next(&mut self) -> Option<Self::Item> {
         let token = self.get_token();

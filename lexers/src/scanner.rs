@@ -1,13 +1,20 @@
 #![deny(warnings)]
 
-pub struct Scanner<I: Iterator> where I::Item: Clone {
+pub struct Scanner<I: Iterator>
+where
+    I::Item: Clone,
+{
     src: I,
     buf: Vec<I::Item>,
     pos: isize,
 }
 
 // Scanners are Iterators
-impl<I> Iterator for Scanner<I> where I: Iterator, I::Item: Clone {
+impl<I> Iterator for Scanner<I>
+where
+    I: Iterator,
+    I::Item: Clone,
+{
     type Item = I::Item;
     fn next(&mut self) -> Option<Self::Item> {
         self.pos += 1;
@@ -20,13 +27,23 @@ impl<I> Iterator for Scanner<I> where I: Iterator, I::Item: Clone {
     }
 }
 
-impl<I> Scanner<I> where I: Iterator, I::Item: Clone {
+impl<I> Scanner<I>
+where
+    I: Iterator,
+    I::Item: Clone,
+{
     pub fn new(source: I) -> Scanner<I> {
-        Scanner{src: source, buf: Vec::new(), pos: -1}
+        Scanner {
+            src: source,
+            buf: Vec::new(),
+            pos: -1,
+        }
     }
 
     // Allows getting current buffer position to backtrack
-    pub fn buffer_pos(&self) -> isize { self.pos }
+    pub fn buffer_pos(&self) -> isize {
+        self.pos
+    }
 
     // Reset buffer position, normally used for backtracking
     // If position is out of bounds set_buffer_pos returns false
@@ -49,7 +66,9 @@ impl<I> Scanner<I> where I: Iterator, I::Item: Clone {
 
     // Steps the scanner back and returns the token at that position
     pub fn prev(&mut self) -> Option<I::Item> {
-        if self.pos >= 0 { self.pos -= 1; }
+        if self.pos >= 0 {
+            self.pos -= 1;
+        }
         self.current()
     }
 
@@ -88,14 +107,19 @@ impl<I> Scanner<I> where I: Iterator, I::Item: Clone {
     }
 }
 
-
-impl<I> Scanner<I> where I: Iterator, I::Item: Clone + PartialEq {
+impl<I> Scanner<I>
+where
+    I: Iterator,
+    I::Item: Clone + PartialEq,
+{
     // Advance the scanner only if the next char is the expected one
     // self.current() will return the matched char if accept matched
     pub fn accept(&mut self, what: &I::Item) -> Option<I::Item> {
         let backtrack = self.buffer_pos();
         if let Some(next) = self.next() {
-            if &next == what { return Some(next); }
+            if &next == what {
+                return Some(next);
+            }
         }
         self.set_buffer_pos(backtrack);
         None
@@ -106,7 +130,9 @@ impl<I> Scanner<I> where I: Iterator, I::Item: Clone + PartialEq {
     pub fn accept_any(&mut self, any: &[I::Item]) -> Option<I::Item> {
         let backtrack = self.buffer_pos();
         if let Some(next) = self.next() {
-            if any.contains(&next) { return Some(next); }
+            if any.contains(&next) {
+                return Some(next);
+            }
         }
         self.set_buffer_pos(backtrack);
         None
@@ -116,7 +142,9 @@ impl<I> Scanner<I> where I: Iterator, I::Item: Clone + PartialEq {
     // self.current() will return the last matching char
     pub fn skip_all(&mut self, over: &[I::Item]) -> bool {
         let mut advanced = false;
-        while self.accept_any(over).is_some() { advanced = true; }
+        while self.accept_any(over).is_some() {
+            advanced = true;
+        }
         advanced
     }
 
@@ -125,7 +153,9 @@ impl<I> Scanner<I> where I: Iterator, I::Item: Clone + PartialEq {
     pub fn until_any(&mut self, any: &[I::Item]) -> bool {
         let mut advanced = false;
         while let Some(next) = self.peek() {
-            if any.contains(&next) { break; }
+            if any.contains(&next) {
+                break;
+            }
             self.next();
             advanced = true;
         }

@@ -20,12 +20,16 @@ fn extremes() {
 #[test]
 fn extract() {
     let mut s = Scanner::new("just a test buffer@".chars());
-    for _ in 0..4 { assert!(s.next().is_some()); }
+    for _ in 0..4 {
+        assert!(s.next().is_some());
+    }
     assert_eq!(s.extract().iter().cloned().collect::<String>(), "just");
     assert_eq!(s.peek(), Some(' '));
     assert_eq!(s.prev(), None);
     assert_eq!(s.next(), Some(' '));
-    for _ in 0..6 { assert!(s.next().is_some()); }
+    for _ in 0..6 {
+        assert!(s.next().is_some());
+    }
     assert_eq!(s.extract_string(), " a test");
     assert_eq!(s.next(), Some(' '));
     assert_eq!(s.peek_prev(), None);

@@ -2,14 +2,17 @@
 
 use crate::scanner::Scanner;
 
-pub struct EbnfTokenizer<I: Iterator<Item=char>> {
+pub struct EbnfTokenizer<I: Iterator<Item = char>> {
     input: Scanner<I>,
     lookahead: Vec<String>,
 }
 
-impl<I: Iterator<Item=char>> EbnfTokenizer<I> {
+impl<I: Iterator<Item = char>> EbnfTokenizer<I> {
     pub fn new(source: I) -> Self {
-        EbnfTokenizer{input: Scanner::new(source), lookahead: Vec::new()}
+        EbnfTokenizer {
+            input: Scanner::new(source),
+            lookahead: Vec::new(),
+        }
     }
 
     pub fn scanner(source: I) -> Scanner<Self> {
@@ -17,7 +20,7 @@ impl<I: Iterator<Item=char>> EbnfTokenizer<I> {
     }
 }
 
-impl<I: Iterator<Item=char>> Iterator for EbnfTokenizer<I> {
+impl<I: Iterator<Item = char>> Iterator for EbnfTokenizer<I> {
     type Item = String;
     fn next(&mut self) -> Option<Self::Item> {
         // used for accumulating string parts
@@ -31,12 +34,14 @@ impl<I: Iterator<Item=char>> Iterator for EbnfTokenizer<I> {
             while let Some(nl) = s.next() {
                 if nl == '\n' {
                     s.extract(); // ignore comment
-                    // discard comment and allow more by restarting
+                                 // discard comment and allow more by restarting
                     return self.next();
                 }
             }
         }
-        if s.accept_any(&['[', ']', '{', '}', '(', ')', '|', ';']).is_some() {
+        if s.accept_any(&['[', ']', '{', '}', '(', ')', '|', ';'])
+            .is_some()
+        {
             return Some(s.extract_string());
         }
         let backtrack = s.buffer_pos();
@@ -54,7 +59,7 @@ impl<I: Iterator<Item=char>> Iterator for EbnfTokenizer<I> {
                     self.lookahead.push(n.to_string());
                     // store string content
                     let v = s.extract_string();
-                    self.lookahead.push(v[1..v.len()-1].to_string());
+                    self.lookahead.push(v[1..v.len() - 1].to_string());
                     // return opening quote
                     return Some(q.to_string());
                 }

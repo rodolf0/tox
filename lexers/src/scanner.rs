@@ -18,9 +18,10 @@ where
     type Item = I::Item;
     fn next(&mut self) -> Option<Self::Item> {
         self.pos += 1;
-        // Check if we need to fill buffer
-        if self.pos >= (self.buf.len() as isize) {
-            self.buf.extend(self.src.by_ref().take(1));
+        // Check if we need to fill the buffer
+        let lacking = self.pos - (self.buf.len() as isize) + 1;
+        if lacking > 0 {
+            self.buf.extend(self.src.by_ref().take(lacking as usize));
             self.pos = std::cmp::min(self.pos, self.buf.len() as isize);
         }
         self.current()

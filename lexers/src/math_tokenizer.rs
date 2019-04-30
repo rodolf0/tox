@@ -79,28 +79,28 @@ impl<I: Iterator<Item=char>> Iterator for MathTokenizer<I> {
 
 #[cfg(test)]
 mod tests {
-    use super::{MathToken, MathTokenizer};
+    use super::{MathToken::*, MathTokenizer};
 
     #[test]
     fn basic_ops() {
         let mut lx = MathTokenizer::new("3+4*2/-(1-5)^2^3".chars());
         let expect = [
-            MathToken::Number(3.0),
-            MathToken::BOp(format!("+")),
-            MathToken::Number(4.0),
-            MathToken::BOp(format!("*")),
-            MathToken::Number(2.0),
-            MathToken::BOp(format!("/")),
-            MathToken::UOp(format!("-")),
-            MathToken::OParen,
-            MathToken::Number(1.0),
-            MathToken::BOp(format!("-")),
-            MathToken::Number(5.0),
-            MathToken::CParen,
-            MathToken::BOp(format!("^")),
-            MathToken::Number(2.0),
-            MathToken::BOp(format!("^")),
-            MathToken::Number(3.0),
+            Number(3.0),
+            BOp(format!("+")),
+            Number(4.0),
+            BOp(format!("*")),
+            Number(2.0),
+            BOp(format!("/")),
+            UOp(format!("-")),
+            OParen,
+            Number(1.0),
+            BOp(format!("-")),
+            Number(5.0),
+            CParen,
+            BOp(format!("^")),
+            Number(2.0),
+            BOp(format!("^")),
+            Number(3.0),
         ];
         for exp_token in expect.iter() {
             let token = lx.next().unwrap();
@@ -113,27 +113,27 @@ mod tests {
     fn mixed_ops() {
         let mut lx = MathTokenizer::new("3.4e-2 * sin(x)/(7! % -4) * max(2, x)".chars());
         let expect = [
-            MathToken::Number(3.4e-2),
-            MathToken::BOp(format!("*")),
-            MathToken::Function(format!("sin"), 0),
-            MathToken::OParen,
-            MathToken::Variable(format!("x")),
-            MathToken::CParen,
-            MathToken::BOp(format!("/")),
-            MathToken::OParen,
-            MathToken::Number(7.0),
-            MathToken::UOp(format!("!")),
-            MathToken::BOp(format!("%")),
-            MathToken::UOp(format!("-")),
-            MathToken::Number(4.0),
-            MathToken::CParen,
-            MathToken::BOp(format!("*")),
-            MathToken::Function(format!("max"), 0),
-            MathToken::OParen,
-            MathToken::Number(2.0),
-            MathToken::Comma,
-            MathToken::Variable(format!("x")),
-            MathToken::CParen,
+            Number(3.4e-2),
+            BOp(format!("*")),
+            Function(format!("sin"), 0),
+            OParen,
+            Variable(format!("x")),
+            CParen,
+            BOp(format!("/")),
+            OParen,
+            Number(7.0),
+            UOp(format!("!")),
+            BOp(format!("%")),
+            UOp(format!("-")),
+            Number(4.0),
+            CParen,
+            BOp(format!("*")),
+            Function(format!("max"), 0),
+            OParen,
+            Number(2.0),
+            Comma,
+            Variable(format!("x")),
+            CParen,
         ];
         for exp_token in expect.iter() {
             let token = lx.next().unwrap();
@@ -146,11 +146,11 @@ mod tests {
     fn unary_ops() {
         let mut lx = MathTokenizer::new("x---y".chars());
         let expect = [
-            MathToken::Variable(format!("x")),
-            MathToken::BOp(format!("-")),
-            MathToken::UOp(format!("-")),
-            MathToken::UOp(format!("-")),
-            MathToken::Variable(format!("y")),
+            Variable(format!("x")),
+            BOp(format!("-")),
+            UOp(format!("-")),
+            UOp(format!("-")),
+            Variable(format!("y")),
         ];
         for exp_token in expect.iter() {
             let token = lx.next().unwrap();

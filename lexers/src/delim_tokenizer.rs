@@ -25,7 +25,7 @@ impl<I: Iterator<Item=char>> Iterator for DelimTokenizer<I> {
         if self.src.until_any(&self.delims) {
             Some(self.src.extract_string())
         } else if let Some(c) = self.src.accept_any(&self.delims) {
-            self.src.ignore();
+            self.src.extract(); // ignore
             if self.remove { self.next() } else { Some(c.to_string()) }
         } else {
             None

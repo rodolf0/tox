@@ -30,7 +30,7 @@ impl<I: Iterator<Item=char>> Iterator for EbnfTokenizer<I> {
         if s.accept(&'#').is_some() {
             while let Some(nl) = s.next() {
                 if nl == '\n' {
-                    s.ignore();
+                    s.extract(); // ignore comment
                     // discard comment and allow more by restarting
                     return self.next();
                 }
@@ -39,14 +39,14 @@ impl<I: Iterator<Item=char>> Iterator for EbnfTokenizer<I> {
         if s.accept_any(&['[', ']', '{', '}', '(', ')', '|', ';']).is_some() {
             return Some(s.extract_string());
         }
-        let backtrack = s.pos();
+        let backtrack = s.buffer_pos();
         if s.accept(&':').is_some() {
             if s.accept(&'=').is_some() {
                 return Some(s.extract_string());
             }
-            s.set_pos(backtrack);
+            s.set_buffer_pos(backtrack);
         }
-        let backtrack = s.pos();
+        let backtrack = s.buffer_pos();
         if let Some(q) = s.accept_any(&['"', '\'']) {
             while let Some(n) = s.next() {
                 if n == q {
@@ -59,16 +59,16 @@ impl<I: Iterator<Item=char>> Iterator for EbnfTokenizer<I> {
                     return Some(q.to_string());
                 }
             }
-            s.set_pos(backtrack);
+            s.set_buffer_pos(backtrack);
         }
-        let backtrack = s.pos();
+        let backtrack = s.buffer_pos();
         s.accept(&'@');
         // NOTE: scan_identifier limits the valid options
         if let Some(id) = s.scan_identifier() {
             return Some(id);
         }
         // backtrack possible '@'
-        s.set_pos(backtrack);
+        s.set_buffer_pos(backtrack);
         None
     }
 }

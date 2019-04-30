@@ -45,7 +45,7 @@ impl<I: Iterator<Item=char>> Iterator for LispTokenizer<I> {
                 },
                 _ => unreachable!()
             };
-            self.0.ignore();
+            self.0.extract(); // ignore
             return Some(token)
         }
         if self.0.until_any(&[')', ' ', '\n', '\r', '\t']) { // or until EOF

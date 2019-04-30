@@ -22,10 +22,7 @@ static ALNUM: &[char] = &['_',
 
 impl<I: Iterator<Item=char>> Scanner<I> {
     pub fn extract_string(&mut self) -> String {
-        use std::iter::FromIterator;
-        let token = String::from_iter(self.view());
-        self.ignore();
-        token
+        self.extract().into_iter().collect()
     }
 
     pub fn scan_whitespace(&mut self) -> Option<String> {
@@ -35,26 +32,26 @@ impl<I: Iterator<Item=char>> Scanner<I> {
 
     // scan numbers like -?[0-9]+(\.[0-9]+)?([eE][+-][0-9]+)?
     pub fn scan_number(&mut self) -> Option<String> {
-        let backtrack = self.pos();
+        let backtrack = self.buffer_pos();
         // optional sign
         self.accept_any(&['+', '-']);
         // require integer part
         if !self.skip_all(DIGITS) {
-            self.set_pos(backtrack);
+            self.set_buffer_pos(backtrack);
             return None;
         }
         // check for fractional part, else it's just an integer
-        let backtrack = self.pos();
+        let backtrack = self.buffer_pos();
         if self.accept(&'.').is_some() && !self.skip_all(DIGITS) {
-            self.set_pos(backtrack);
+            self.set_buffer_pos(backtrack);
             return Some(self.extract_string()); // integer
         }
         // check for exponent part
-        let backtrack = self.pos();
+        let backtrack = self.buffer_pos();
         if self.accept_any(&['e', 'E']).is_some() {
             self.accept_any(&['+', '-']); // exponent sign is optional
             if !self.skip_all(DIGITS) {
-                self.set_pos(backtrack);
+                self.set_buffer_pos(backtrack);
                 return Some(self.extract_string()); //float
             }
         }
@@ -81,7 +78,7 @@ impl<I: Iterator<Item=char>> Scanner<I> {
 
     // scan integers like 0x34 0b10101 0o657
     pub fn scan_integer(&mut self) -> Option<String> {
-        let backtrack = self.pos();
+        let backtrack = self.buffer_pos();
         if self.accept(&'0').is_some() &&
             match self.accept_any(&['x', 'o', 'b']) {
                 Some('x') => self.skip_all(HEXDIGITS),
@@ -91,19 +88,19 @@ impl<I: Iterator<Item=char>> Scanner<I> {
             } {
             return Some(self.extract_string());
         }
-        self.set_pos(backtrack);
+        self.set_buffer_pos(backtrack);
         None
     }
 
     // scan a quoted string like "this is \"an\" example"
     pub fn scan_quoted_string(&mut self, q: char) -> Option<String> {
-        let backtrack = self.pos();
+        let backtrack = self.buffer_pos();
         self.accept(&q)?;
         while let Some(n) = self.next() {
             if n == '\\' { self.next(); continue; }
             if n == q { return Some(self.extract_string()); }
         }
-        self.set_pos(backtrack);
+        self.set_buffer_pos(backtrack);
         None
     }
 

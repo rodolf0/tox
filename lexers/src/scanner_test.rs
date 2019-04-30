@@ -8,7 +8,7 @@ fn extremes() {
     assert_eq!(s.next(), Some('j'));
     assert_eq!(s.prev(), None);
     while s.next() != Some('@') {}
-    assert_eq!(s.curr(), Some('@'));
+    assert_eq!(s.current(), Some('@'));
     assert_eq!(s.peek_prev(), Some('r'));
     assert_eq!(s.prev(), Some('r'));
     assert_eq!(s.prev(), Some('e'));
@@ -38,15 +38,15 @@ fn accept() {
     assert!(!s.skip_all(WHITE));
     assert_eq!(s.prev(), None);
     assert_eq!(s.accept_any(&['h', 'e']), Some('h'));
-    assert_eq!(s.curr(), Some('h'));
+    assert_eq!(s.current(), Some('h'));
     assert_eq!(s.accept_any(&['h', 'e']), Some('e'));
-    assert_eq!(s.curr(), Some('e'));
+    assert_eq!(s.current(), Some('e'));
     assert_eq!(s.accept_any(&['h', 'y', 'e']), Some('e'));
     assert_eq!(s.accept_any(&['e']), None);
     assert_eq!(s.accept_any(&['h', 'e', 'y']), Some('y'));
     assert!(s.skip_all(WHITE));
     assert!(!s.skip_all(WHITE));
-    assert_eq!(s.curr(), Some(' '));
+    assert_eq!(s.current(), Some(' '));
     assert_eq!(s.peek(), Some('y'));
     assert_eq!(s.next(), Some('y'));
     assert_eq!(s.next(), Some('o'));
@@ -58,10 +58,10 @@ fn skips() {
     assert_eq!(s.accept_any(&['h']), Some('h'));
     assert!(s.skip_all(&['h', 'e', 'y']));
     assert!(!s.skip_all(&['h', 'e', 'y']));
-    assert_eq!(s.curr(), Some('y'));
+    assert_eq!(s.current(), Some('y'));
     assert!(s.until_any(&['!']));
     assert!(!s.until_any(&['!']));
     assert_eq!(s.accept_any(&['!']), Some('!'));
     assert_eq!(s.next(), None);
-    assert_eq!(s.curr(), None);
+    assert_eq!(s.current(), None);
 }

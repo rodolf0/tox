@@ -1,9 +1,5 @@
 #![deny(warnings)]
 
-use std::collections::HashSet;
-use std::hash::Hash;
-
-
 pub struct Scanner<I: Iterator> where I::Item: Clone {
     src: I,
     buf: Vec<I::Item>,
@@ -77,13 +73,13 @@ impl<I> Scanner<I> where I: Iterator, I::Item: Clone {
     }
 
     pub fn view(&self) -> &[I::Item] {
-        let n = self.pos as usize + 1;
+        let n = (self.pos + 1) as usize;
         &self.buf[..n]
     }
 
     pub fn ignore(&mut self) {
         if self.pos >= 0 {
-            let n = self.pos as usize + 1;
+            let n = (self.pos + 1) as usize;
             self.buf = if self.buf.len() > n {
                 self.buf[n..].to_vec()
             } else {
@@ -101,10 +97,19 @@ impl<I> Scanner<I> where I: Iterator, I::Item: Clone {
 }
 
 
-impl<I> Scanner<I> where I: Iterator, I::Item: Clone + Hash + Eq {
+impl<I> Scanner<I> where I: Iterator, I::Item: Clone + PartialEq {
+    pub fn accept(&mut self, what: &I::Item) -> Option<I::Item> {
+        let backtrack = self.pos();
+        if let Some(next) = self.next() {
+            if &next == what { return Some(next); }
+        }
+        self.set_pos(backtrack);
+        None
+    }
+
     // Advance the scanner only if the next char is in the 'any' set,
     // self.curr() will return the matched char if accept matched any
-    pub fn accept_any(&mut self, any: &HashSet<I::Item>) -> Option<I::Item> {
+    pub fn accept_any(&mut self, any: &[I::Item]) -> Option<I::Item> {
         let backtrack = self.pos();
         if let Some(next) = self.next() {
             if any.contains(&next) { return Some(next); }
@@ -115,7 +120,7 @@ impl<I> Scanner<I> where I: Iterator, I::Item: Clone + Hash + Eq {
 
     // Skip over the 'over' set, result is if the scanner was advanced,
     // after skip a call to self.curr() will return the last matching char
-    pub fn skip_all(&mut self, over: &HashSet<I::Item>) -> bool {
+    pub fn skip_all(&mut self, over: &[I::Item]) -> bool {
         let mut advanced = false;
         while self.accept_any(over).is_some() { advanced = true; }
         advanced
@@ -123,62 +128,10 @@ impl<I> Scanner<I> where I: Iterator, I::Item: Clone + Hash + Eq {
 
     // Find an element in the 'any' set or EOF, return if the scanner advanced,
     // After until a call to self.curr() returns the last non-matching char
-    pub fn until_any(&mut self, any: &HashSet<I::Item>) -> bool {
+    pub fn until_any(&mut self, any: &[I::Item]) -> bool {
         let mut advanced = false;
         while let Some(next) = self.peek() {
             if any.contains(&next) { break; }
-            self.next();
-            advanced = true;
-        }
-        advanced
-    }
-}
-
-static WHITE: &str = " \n\r\t";
-
-impl<I: Iterator<Item=char>> Scanner<I> {
-    pub fn extract_string(&mut self) -> String {
-        use std::iter::FromIterator;
-        let tokens = String::from_iter(self.view().iter().cloned());
-        self.ignore();
-        tokens
-    }
-
-    pub fn accept_any_char(&mut self, any: &str) -> Option<char> {
-        let backtrack = self.pos();
-        if let Some(next) = self.next() {
-            if any.contains(next) { return Some(next); }
-        }
-        self.set_pos(backtrack);
-        None
-    }
-
-    pub fn accept_char(&mut self, c: char) -> bool {
-        let backtrack = self.pos();
-        if let Some(next) = self.next() {
-            if next == c { return true; }
-        }
-        self.set_pos(backtrack);
-        false
-    }
-
-    pub fn skip_all_chars(&mut self, over: &str) -> bool {
-        let mut advanced = false;
-        while self.accept_any_char(over).is_some() { advanced = true; }
-        advanced
-    }
-
-    pub fn skip_ws(&mut self) -> bool { self.skip_all_chars(WHITE) }
-
-    pub fn ignore_ws(&mut self) {
-        self.skip_all_chars(WHITE);
-        self.ignore();
-    }
-
-    pub fn until_any_char(&mut self, any: &str) -> bool {
-        let mut advanced = false;
-        while let Some(next) = self.peek() {
-            if any.contains(next) { break; }
             self.next();
             advanced = true;
         }

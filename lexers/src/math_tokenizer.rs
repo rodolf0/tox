@@ -1,6 +1,5 @@
 #![deny(warnings)]
 
-use crate::helpers;
 use crate::scanner::Scanner;
 
 
@@ -39,29 +38,31 @@ impl<I: Iterator<Item=char>> MathTokenizer<I> {
     }
 
     fn get_token(&mut self) -> Option<MathToken> {
-        self.src.ignore_ws(); // discard whatever came before + and spaces
-        if let Some(op) = helpers::scan_math_op(&mut self.src) {
-            match op.as_ref() {
+        self.src.scan_whitespace(); // discard whatever came before + and spaces
+        if let Some(op) = self.src.scan_math_op() {
+            return match op.as_ref() {
                 "(" => Some(MathToken::OParen),
                 ")" => Some(MathToken::CParen),
                 "," => Some(MathToken::Comma),
                 "!" => Some(MathToken::UOp(op)),
                 "-" if Self::makes_unary(&self.prev) => Some(MathToken::UOp(op)),
                 _ => Some(MathToken::BOp(op)),
-            }
-        } else if let Some(id) = helpers::scan_identifier(&mut self.src) {
-            match self.src.peek() {
+            };
+        }
+        if let Some(id) = self.src.scan_identifier() {
+            return match self.src.peek() {
                 Some('(') => Some(MathToken::Function(id, 0)),
                 _ => Some(MathToken::Variable(id))
-            }
-        } else if let Some(num) = helpers::scan_number(&mut self.src) {
-            use std::str::FromStr;
-            Some(MathToken::Number(f64::from_str(&num).unwrap()))
-        } else if self.src.next().is_some() {
-            Some(MathToken::Unknown(self.src.extract_string()))
-        } else {
-            None
+            };
         }
+        if let Some(num) = self.src.scan_number() {
+            use std::str::FromStr;
+            return Some(MathToken::Number(f64::from_str(&num).unwrap()));
+        }
+        if self.src.next().is_some() {
+            return Some(MathToken::Unknown(self.src.extract_string()));
+        }
+        None
     }
 }
 

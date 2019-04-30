@@ -1,6 +1,5 @@
 #![deny(warnings)]
 
-use crate::helpers;
 use crate::scanner::Scanner;
 
 pub struct EbnfTokenizer<I: Iterator<Item=char>> {
@@ -25,10 +24,10 @@ impl<I: Iterator<Item=char>> Iterator for EbnfTokenizer<I> {
         if !self.lookahead.is_empty() {
             return self.lookahead.pop();
         }
-        let mut s = &mut self.input;
-        s.ignore_ws();
+        let s = &mut self.input;
+        s.scan_whitespace();
         // discard comments starting with '#' until new-line
-        if s.accept_char('#') {
+        if s.accept(&'#').is_some() {
             while let Some(nl) = s.next() {
                 if nl == '\n' {
                     s.ignore();
@@ -37,18 +36,18 @@ impl<I: Iterator<Item=char>> Iterator for EbnfTokenizer<I> {
                 }
             }
         }
-        if s.accept_any_char("[]{}()|;").is_some() {
+        if s.accept_any(&['[', ']', '{', '}', '(', ')', '|', ';']).is_some() {
             return Some(s.extract_string());
         }
         let backtrack = s.pos();
-        if s.accept_char(':') {
-            if s.accept_char('=') {
+        if s.accept(&':').is_some() {
+            if s.accept(&'=').is_some() {
                 return Some(s.extract_string());
             }
             s.set_pos(backtrack);
         }
         let backtrack = s.pos();
-        if let Some(q) = s.accept_any_char("\"'") {
+        if let Some(q) = s.accept_any(&['"', '\'']) {
             while let Some(n) = s.next() {
                 if n == q {
                     // store closing quote
@@ -63,9 +62,9 @@ impl<I: Iterator<Item=char>> Iterator for EbnfTokenizer<I> {
             s.set_pos(backtrack);
         }
         let backtrack = s.pos();
-        s.accept_char('@');
+        s.accept(&'@');
         // NOTE: scan_identifier limits the valid options
-        if let Some(id) = helpers::scan_identifier(&mut s) {
+        if let Some(id) = s.scan_identifier() {
             return Some(id);
         }
         // backtrack possible '@'

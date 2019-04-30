@@ -1,7 +1,7 @@
 use crate::scanner::Scanner;
 
 #[test]
-fn test_extremes() {
+fn extremes() {
     let mut s = Scanner::new("just a test buffer@".chars());
     assert_eq!(s.prev(), None);
     assert_eq!(s.peek_prev(), None);
@@ -18,7 +18,7 @@ fn test_extremes() {
 }
 
 #[test]
-fn test_extract() {
+fn extract() {
     let mut s = Scanner::new("just a test buffer@".chars());
     for _ in 0..4 { assert!(s.next().is_some()); }
     assert_eq!(s.extract().iter().cloned().collect::<String>(), "just");
@@ -32,19 +32,20 @@ fn test_extract() {
 }
 
 #[test]
-fn test_accept() {
+fn accept() {
+    static WHITE: &[char] = &[' ', '\n', '\r', '\t'];
     let mut s = Scanner::new("heey  you!".chars());
-    assert!(!s.skip_ws());
+    assert!(!s.skip_all(WHITE));
     assert_eq!(s.prev(), None);
-    assert_eq!(s.accept_any_char("he"), Some('h'));
+    assert_eq!(s.accept_any(&['h', 'e']), Some('h'));
     assert_eq!(s.curr(), Some('h'));
-    assert_eq!(s.accept_any_char("he"), Some('e'));
+    assert_eq!(s.accept_any(&['h', 'e']), Some('e'));
     assert_eq!(s.curr(), Some('e'));
-    assert_eq!(s.accept_any_char("hye"), Some('e'));
-    assert_eq!(s.accept_any_char("e"), None);
-    assert_eq!(s.accept_any_char("hey"), Some('y'));
-    assert!(s.skip_ws());
-    assert!(!s.skip_ws());
+    assert_eq!(s.accept_any(&['h', 'y', 'e']), Some('e'));
+    assert_eq!(s.accept_any(&['e']), None);
+    assert_eq!(s.accept_any(&['h', 'e', 'y']), Some('y'));
+    assert!(s.skip_all(WHITE));
+    assert!(!s.skip_all(WHITE));
     assert_eq!(s.curr(), Some(' '));
     assert_eq!(s.peek(), Some('y'));
     assert_eq!(s.next(), Some('y'));
@@ -52,15 +53,15 @@ fn test_accept() {
 }
 
 #[test]
-fn test_skips() {
+fn skips() {
     let mut s = Scanner::new("heey  you!".chars());
-    assert_eq!(s.accept_any_char("h"), Some('h'));
-    assert!(s.skip_all_chars("hey"));
-    assert!(!s.skip_all_chars("hey"));
+    assert_eq!(s.accept_any(&['h']), Some('h'));
+    assert!(s.skip_all(&['h', 'e', 'y']));
+    assert!(!s.skip_all(&['h', 'e', 'y']));
     assert_eq!(s.curr(), Some('y'));
-    assert!(s.until_any_char("!"));
-    assert!(!s.until_any_char("!"));
-    assert_eq!(s.accept_any_char("!"), Some('!'));
+    assert!(s.until_any(&['!']));
+    assert!(!s.until_any(&['!']));
+    assert_eq!(s.accept_any(&['!']), Some('!'));
     assert_eq!(s.next(), None);
     assert_eq!(s.curr(), None);
 }

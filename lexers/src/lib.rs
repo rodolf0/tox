@@ -1,14 +1,8 @@
 #![deny(warnings)]
 
 mod scanner;
+mod char_scanner;
 pub use crate::scanner::Scanner;
-
-mod helpers;
-pub use crate::helpers::scan_identifier;
-pub use crate::helpers::scan_math_op;
-pub use crate::helpers::scan_number;
-pub use crate::helpers::scan_quoted_string;
-pub use crate::helpers::scan_xob_integers;
 
 mod ebnf_tokenizer;
 pub use crate::ebnf_tokenizer::EbnfTokenizer;

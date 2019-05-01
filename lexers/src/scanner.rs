@@ -22,8 +22,9 @@ where
         let lacking = self.pos - (self.buf.len() as isize) + 1;
         if lacking > 0 {
             self.buf.extend(self.src.by_ref().take(lacking as usize));
-            self.pos = std::cmp::min(self.pos, self.buf.len() as isize);
         }
+        // limit the buffer position to the buffer length at most
+        self.pos = std::cmp::min(self.pos, self.buf.len() as isize);
         self.current()
     }
 }
@@ -97,14 +98,15 @@ where
 
     // Consumes the buffer into a new token (which can be ignored)
     pub fn extract(&mut self) -> Vec<I::Item> {
-        if self.pos < 0 {
-            return Vec::new();
-        }
-        let split_point = (self.pos + 1) as usize;
+        // Check where to shift buffer
+        let split_point = std::cmp::min(self.pos + 1, self.buf.len() as isize);
+        assert!(split_point >= 0);
+        // Reset buffer cursor
         self.pos = -1;
-        let mut rest = self.buf.split_off(split_point);
-        std::mem::swap(&mut self.buf, &mut rest);
-        rest
+        // Split buffer and keep the remainder
+        let mut remaining = self.buf.split_off(split_point as usize);
+        std::mem::swap(&mut self.buf, &mut remaining);
+        remaining
     }
 }
 

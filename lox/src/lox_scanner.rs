@@ -1,4 +1,4 @@
-use lexers::{Scanner, scan_number, scan_identifier};
+use lexers::Scanner;
 
 #[derive(Clone,Debug,PartialEq)]
 pub enum TT {
@@ -20,20 +20,20 @@ pub struct Token {
     pub lexeme: String,
 }
 
-pub struct LoxScanner {
-    src: Scanner<char>,
+pub struct LoxScanner<I: Iterator<Item=char>> {
+    src: Scanner<I>,
     line: usize,
     errors: bool,
 }
 
 
-impl LoxScanner {
-    pub fn scanner(src: String) -> Scanner<Token> {
-        Scanner::new(Box::new(
+impl<I: Iterator<Item=char>> LoxScanner<I> {
+    pub fn scanner(source: I) -> Scanner<Self> {
+        Scanner::new(
             LoxScanner{
-                src: Scanner::from_buf(src.chars()),
+                src: Scanner::new(source),
                 line: 1,
-                errors: false}))
+                errors: false})
     }
 
     fn tokenize(&mut self, literal: TT) -> Option<Token> {
@@ -54,14 +54,14 @@ impl LoxScanner {
     }
 
     fn scan_restof_string(&mut self, q: char) -> bool {
-        let backtrack = self.src.pos();
+        let backtrack = self.src.buffer_pos();
         let orig_line = self.line;
         while let Some(n) = self.src.next() {
             if n == '\n' { self.line += 1; }
             if n == '\\' { self.src.next(); continue; }
             if n == q { return true; }
         }
-        self.src.set_pos(backtrack);
+        self.src.set_buffer_pos(backtrack);
         self.line = orig_line;
         false
     }
@@ -107,25 +107,32 @@ impl LoxScanner {
             Some(';') => self.tokenize(TT::SEMICOLON),
             Some('*') => self.tokenize(TT::STAR),
             Some('$') => self.tokenize(TT::DOLLAR),
-            Some('!') => match self.src.accept_char('=') {
-                true => self.tokenize(TT::NE),
-                false => self.tokenize(TT::BANG)
+            Some('!') => if self.src.accept(&'=').is_some() {
+                self.tokenize(TT::NE)
+            } else {
+                self.tokenize(TT::BANG)
             },
-            Some('=') => match self.src.accept_char('=') {
-                true => self.tokenize(TT::EQ),
-                false => self.tokenize(TT::ASSIGN)
+            Some('=') => if self.src.accept(&'=').is_some() {
+                self.tokenize(TT::EQ)
+            } else {
+                self.tokenize(TT::ASSIGN)
             },
-            Some('<') => match self.src.accept_char('=') {
-                true => self.tokenize(TT::LE),
-                false => self.tokenize(TT::LT)
+            Some('<') => if self.src.accept(&'=').is_some() {
+                self.tokenize(TT::LE)
+            } else {
+                self.tokenize(TT::LT)
             },
-            Some('>') => match self.src.accept_char('=') {
-                true => self.tokenize(TT::GE),
-                false => self.tokenize(TT::GT)
+            Some('>') => if self.src.accept(&'=').is_some() {
+                self.tokenize(TT::GE)
+            } else {
+                self.tokenize(TT::GT)
             },
-            Some('/') => match self.src.accept_char('/') {
-                true => { self.src.until_any_char("\n"); None }, // skip comment
-                false => self.tokenize(TT::SLASH),
+            Some('/') => if self.src.accept(&'/').is_some() {
+                // skip comment
+                self.src.until_any(&['\n']);
+                None
+            } else {
+                self.tokenize(TT::SLASH)
             },
             Some(' ') | Some('\t') | Some('\r') => None,
             Some('\n') => { self.line += 1; None }, // track current line
@@ -135,14 +142,14 @@ impl LoxScanner {
             },
             Some(d) if d.is_digit(10) => {
                 self.src.prev(); // hacky but works
-                let num = scan_number(&mut self.src).unwrap();
+                let num = self.src.scan_number().unwrap();
                 use std::str::FromStr;
                 Some(Token{line: self.line,
                      token: TT::Num(f64::from_str(&num).unwrap()), lexeme: num})
             },
             Some(a) if a.is_alphabetic() => {
                 self.src.prev(); // hacky but works
-                let id = scan_identifier(&mut self.src).unwrap();
+                let id = self.src.scan_identifier().unwrap();
                 self.id_or_keyword(id)
             },
             Some(c) => {
@@ -152,12 +159,12 @@ impl LoxScanner {
             },
             None => self.tokenize(TT::EOF)
         };
-        self.src.ignore(); // ignore what we didn't harvest
+        self.src.extract(); // ignore what we didn't harvest
         token
     }
 }
 
-impl Iterator for LoxScanner {
+impl<I: Iterator<Item=char>> Iterator for LoxScanner<I> {
     type Item = Token;
     fn next(&mut self) -> Option<Self::Item> {
         loop { // consume all white space and errors

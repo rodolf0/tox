@@ -11,7 +11,7 @@ repository = "https://github.com/rodolf0/tox"
 debug = []
 
 [dependencies]
-lexers = { version = "0.0.8", path = "../lexers" }
+lexers = { version = "0.1.2", path = "../lexers" }
 earlgrey = { version = "0.2.3", path = "../earlgrey" }
 
 [[example]]

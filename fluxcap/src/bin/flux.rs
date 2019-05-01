@@ -45,7 +45,13 @@ fn main() {
         }
     }
 
-    for t in tm.debug(&input) {
-        println!("{}", t.print());
+    let verbose = std::env::args().any(|arg| arg == "-v");
+    if verbose {
+        match fluxcap::debug_time_expression(&input) {
+            Err(e) => eprintln!("TimeMachine {:?} for '{}'", e, input),
+            Ok(trees) => for t in trees {
+                println!("{}", t.print());
+            }
+        }
     }
 }

@@ -1,12 +1,5 @@
 #![deny(warnings)]
 
-use crate::constants as k;
-use abackus::{ParserBuilder, Sexpr};
-use kronos::Grain;
-use earlgrey::{EarleyParser, Error};
-use lexers::Scanner;
-
-
 // https://github.com/wit-ai/duckling_old/blob/master/resources/languages/en/corpus/time.clj
 // https://github.com/wit-ai/duckling_old/blob/master/resources/languages/en/rules/time.clj
 
@@ -71,26 +64,29 @@ pub fn time_grammar() -> &'static str {
     "#
 }
 
-fn _parser_builder() -> ParserBuilder {
+fn _parser_builder() -> abackus::ParserBuilder {
     use std::str::FromStr;
-    ParserBuilder::default()
-        .plug_terminal("ordinal", |d| k::ordinal(d).or(k::short_ordinal(d)).is_some())
-        .plug_terminal("day_ordinal", |d| k::ordinal(d).or(k::short_ordinal(d)).is_some())
-        .plug_terminal("weekday", |d| k::weekday(d).is_some())
-        .plug_terminal("month", |d| k::month(d).is_some())
-        .plug_terminal("grain", |g| Grain::from_str(g).is_ok())
+    use crate::constants::*;
+    abackus::ParserBuilder::default()
+        .plug_terminal("ordinal", |d| ordinal(d).or(short_ordinal(d)).is_some())
+        .plug_terminal("day_ordinal", |d| ordinal(d).or(short_ordinal(d)).is_some())
+        .plug_terminal("weekday", |d| weekday(d).is_some())
+        .plug_terminal("month", |d| month(d).is_some())
+        .plug_terminal("grain", |g| kronos::Grain::from_str(g).is_ok())
         .plug_terminal("year", |y| if let Ok(year) = i32::from_str(y)
                        { year > 999 && year < 2200 } else { false })
         .plug_terminal("small_int", |u| if let Ok(u) = usize::from_str(u)
                        { u < 100 } else { false })
 }
 
-pub fn time_parser() -> EarleyParser {
+pub fn time_parser() -> earlgrey::EarleyParser {
     _parser_builder()
         .into_parser("time", time_grammar())
         .unwrap_or_else(|e| panic!("TimeMachine grammar BUG: {:?}", e))
 }
 
-pub fn time_debug() -> Box<Fn(Scanner<String>) -> Result<Vec<Sexpr>, Error>> {
-    Box::new(_parser_builder().sexprificator(time_grammar(), "time"))
+pub fn debug_time_expression(time: &str) -> Result<Vec<abackus::Sexpr>, earlgrey::Error> {
+    let tokenizer = lexers::DelimTokenizer::new(time.chars(), ", ", true);
+    let sexpr_writer = _parser_builder().sexprificator(time_grammar(), "time");
+    sexpr_writer(tokenizer)
 }

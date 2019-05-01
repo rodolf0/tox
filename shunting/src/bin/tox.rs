@@ -13,8 +13,8 @@ mod repl {
     }
 
     pub fn parse_statement(cx: &mut MathContext, input: &str) {
-        let mut ml = MathTokenizer::scanner(input);
-        let backtrack = ml.pos();
+        let mut ml = MathTokenizer::scanner(input.chars());
+        let backtrack = ml.buffer_pos();
         if let (Some(MathToken::Variable(var)), Some(assig)) = (ml.next(), ml.next()) {
             if assig == MathToken::BOp(format!("=")) {
                 match ShuntingParser::parse(&mut ml) {
@@ -28,7 +28,7 @@ mod repl {
             }
         }
         // wasn't assignment... try evaluating expression
-        ml.set_pos(backtrack);
+        ml.set_buffer_pos(backtrack);
         match ShuntingParser::parse(&mut ml) {
             Err(e) => println!("Parse error: {:?}", e),
             Ok(rpn) => match cx.eval(&rpn) {

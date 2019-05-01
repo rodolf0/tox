@@ -9,7 +9,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "earlgrey"
 version = "0.2.3"
 dependencies = [
- "lexers 0.0.8",
+ "lexers 0.1.1",
  "rustyline 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -29,7 +29,7 @@ dependencies = [
 
 [[package]]
 name = "lexers"
-version = "0.0.8"
+version = "0.1.1"
 
 [[package]]
 name = "libc"

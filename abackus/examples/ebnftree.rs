@@ -1,22 +1,19 @@
 #![deny(warnings)]
 
-struct Tokenizer(lexers::Scanner<char>);
+struct Tokenizer<I: Iterator<Item=char>>(lexers::Scanner<I>);
 
-impl Iterator for Tokenizer {
+impl<I: Iterator<Item=char>> Iterator for Tokenizer<I> {
     type Item = String;
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.ignore_ws();
-        lexers::scan_math_op(&mut self.0)
-            .or_else(|| lexers::scan_number(&mut self.0))
-            .or_else(|| lexers::scan_identifier(&mut self.0))
+        self.0.scan_whitespace();
+        self.0.scan_math_op()
+            .or_else(|| self.0.scan_number())
+            .or_else(|| self.0.scan_identifier())
     }
 }
 
-impl Tokenizer {
-    fn scanner(input: &str) -> lexers::Scanner<String> {
-        lexers::Scanner::new(
-            Box::new(Tokenizer(lexers::Scanner::from_buf(input.chars()))))
-    }
+fn tokenizer<I: Iterator<Item=char>>(input: I) -> Tokenizer<I> {
+    Tokenizer(lexers::Scanner::new(input))
 }
 
 fn main() {
@@ -37,7 +34,7 @@ fn main() {
         .plug_terminal("num", |n| f64::from_str(n).is_ok())
         .sexprificator(&grammar, "expr");
 
-    match trificator(&mut Tokenizer::scanner(&input)) {
+    match trificator(&mut tokenizer(input.chars())) {
         Ok(trees) => for t in trees { println!("{}", t.print()); },
         Err(e) => println!("{:?}", e)
     }

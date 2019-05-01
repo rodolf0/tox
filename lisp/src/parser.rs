@@ -55,10 +55,13 @@ pub struct Parser;
 
 impl Parser {
     pub fn parse_str(expr: &str) -> Result<LispExpr, ParseError> {
-        Self::parse(&mut LispTokenizer::scanner(expr))
+        Self::parse(&mut LispTokenizer::scanner(expr.chars()))
     }
 
-    fn parse(lex: &mut Scanner<LispToken>) -> Result<LispExpr, ParseError> {
+    fn parse<I>(lex: &mut Scanner<LispTokenizer<I>>)
+            -> Result<LispExpr, ParseError>
+        where I: Iterator<Item=char>
+    {
         match lex.next() {
             None                        => Err(ParseError::UnexpectedEOF),
             Some(LispToken::CParen)     => Err(ParseError::UnexpectedCParen),

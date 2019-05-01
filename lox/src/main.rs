@@ -24,7 +24,7 @@ fn main() {
     }
 
     let run = |source: String, interpreter: &mut LoxInterpreter| {
-        let scanner = LoxScanner::scanner(source);
+        let scanner = LoxScanner::scanner(source.chars());
         let mut parser = LoxParser::new(scanner);
         match parser.parse() {
             Ok(stmts) => {

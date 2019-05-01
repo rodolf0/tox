@@ -126,7 +126,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "lexers"
-version = "0.0.8"
+version = "0.1.2"
 
 [[package]]
 name = "libc"
@@ -331,7 +331,7 @@ version = "0.0.4"
 dependencies = [
  "dirs 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "dylib 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "lexers 0.0.8",
+ "lexers 0.1.2",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustyline 3.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

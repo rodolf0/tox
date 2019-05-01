@@ -40,23 +40,20 @@ fn build_grammar() -> earlgrey::Grammar {
       .expect("Bad Gramar")
 }
 
-struct Tokenizer(lexers::Scanner<char>);
+struct Tokenizer<I: Iterator<Item=char>>(lexers::Scanner<I>);
 
-impl Iterator for Tokenizer {
+impl<I: Iterator<Item=char>> Iterator for Tokenizer<I> {
     type Item = String;
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.ignore_ws();
-        lexers::scan_math_op(&mut self.0)
-            .or_else(|| lexers::scan_number(&mut self.0))
-            .or_else(|| lexers::scan_identifier(&mut self.0))
+        self.0.scan_whitespace();
+        self.0.scan_math_op()
+            .or_else(|| self.0.scan_number())
+            .or_else(|| self.0.scan_identifier())
     }
 }
 
-impl Tokenizer {
-    fn scanner(input: &str) -> lexers::Scanner<String> {
-        lexers::Scanner::new(
-            Box::new(Tokenizer(lexers::Scanner::from_buf(input.chars()))))
-    }
+fn tokenizer<I: Iterator<Item=char>>(input: I) -> Tokenizer<I> {
+    Tokenizer(lexers::Scanner::new(input))
 }
 
 fn gamma(x: f64) -> f64 {
@@ -100,7 +97,7 @@ fn main() {
     let parser = earlgrey::EarleyParser::new(build_grammar());
     let evaler = semanter();
     for expr in input {
-        match parser.parse(&mut Tokenizer::scanner(&expr)) {
+        match parser.parse(&mut tokenizer(expr.chars())) {
             Err(e) => println!("Parse err: {:?}", e),
             Ok(state) => {
                 rl.borrow_mut().add_history_entry(&expr);

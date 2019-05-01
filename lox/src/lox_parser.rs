@@ -42,18 +42,18 @@ pub enum Stmt {
 pub type ExprResult = Result<Expr, String>;
 pub type StmtResult = Result<Stmt, String>;
 
-pub struct LoxParser {
-    scanner: Scanner<Token>,
+pub struct LoxParser<I: Iterator<Item=Token>> {
+    scanner: Scanner<I>,
     errors: bool,
 }
 
-impl LoxParser {
-    pub fn new(scanner: Scanner<Token>) -> Self {
-        LoxParser{scanner: scanner, errors: false}
+impl<I: Iterator<Item=Token>> LoxParser<I> {
+    pub fn new(source: I) -> Self {
+        LoxParser{scanner: Scanner::new(source), errors: false}
     }
 
     fn accept(&mut self, token_types: Vec<TT>) -> bool {
-        let backtrack = self.scanner.pos();
+        let backtrack = self.scanner.buffer_pos();
         if let Some(token) = self.scanner.next() {
             let found = token_types.iter().any(|ttype| match &token.token {
                 &TT::Str(_) => match ttype { &TT::Str(_) => true, _ => false },
@@ -63,7 +63,7 @@ impl LoxParser {
             });
             if found { return true; }
         }
-        self.scanner.set_pos(backtrack);
+        self.scanner.set_buffer_pos(backtrack);
         false
     }
 
@@ -92,7 +92,8 @@ impl LoxParser {
             // if we hit a semicolon we're probably about to start a statement
             // we maybe inside a `for` clause, too bad, we're already panic'ing
             if token.token == TT::SEMICOLON {
-                return self.scanner.ignore();
+                self.scanner.extract();
+                return;
             }
             // alternatively if we've found a keyword we might be starting a
             // statement, try to continue there
@@ -161,7 +162,7 @@ impl LoxParser {
  *                  | IDENTIFIER ;
  */
 
-impl LoxParser {
+impl<I: Iterator<Item=Token>> LoxParser<I> {
     fn assignment(&mut self) -> ExprResult {
         let expr = self.logic_or()?;
         if self.accept(vec![TT::ASSIGN]) {
@@ -245,17 +246,17 @@ impl LoxParser {
         let mut primary = self.primary()?;
         // if there's an OPAREN crawl thread the function Call chain
         while self.accept(vec![TT::OPAREN]) {
-            self.scanner.ignore(); // skip oparen
+            self.scanner.extract(); // skip oparen
             let mut arguments = Vec::new();
             if !self.accept(vec![TT::CPAREN]) { // 0-arg case
                 loop {
                     arguments.push(self.expression()?);
                     if !self.accept(vec![TT::COMMA]) { break; }
-                    self.scanner.ignore(); // skip comma
+                    self.scanner.extract(); // skip comma
                 }
                 self.consume(vec![TT::CPAREN], "expect ')' after call args")?;
             }
-            self.scanner.ignore(); // skip cparen if accepted
+            self.scanner.extract(); // skip cparen if accepted
             primary = Expr::Call(Box::new(primary), arguments);
         }
         Ok(primary)
@@ -278,7 +279,7 @@ impl LoxParser {
             });
         }
         if self.accept(vec![TT::NIL]) {
-            self.scanner.ignore();
+            self.scanner.extract();
             return Ok(Expr::Nil);
         }
         if self.accept(vec![TT::Num(0.0)]) {
@@ -297,7 +298,7 @@ impl LoxParser {
             return Ok(Expr::Var(self.scanner.extract().swap_remove(0)));
         }
         if self.accept(vec![TT::OPAREN]) {
-            self.scanner.ignore(); // skip OPAREN
+            self.scanner.extract(); // skip OPAREN
             let expr = self.expression()?;
             self.consume(vec![TT::CPAREN], "expect ')' after group grouping")?;
             return Ok(Expr::Grouping(Box::new(expr)));
@@ -334,7 +335,7 @@ impl LoxParser {
         self.consume(vec![TT::CPAREN], "expect ')' after 'if' condition")?;
         let then_branch = self.statement()?;
         if self.accept(vec![TT::ELSE]) {
-            self.scanner.ignore(); // skip else
+            self.scanner.extract(); // skip else
             let else_branch = Some(Box::new(self.statement()?));
             return Ok(Stmt::If(condition, Box::new(then_branch), else_branch));
         }
@@ -352,10 +353,10 @@ impl LoxParser {
     fn for_stmt(&mut self) -> StmtResult {
         self.consume(vec![TT::OPAREN], "expect '(' after 'for'")?;
         let init = if self.accept(vec![TT::SEMICOLON]) {
-            self.scanner.ignore(); // skip ';'
+            self.scanner.extract(); // skip ';'
             None
         } else if self.accept(vec![TT::VAR]) {
-            self.scanner.ignore(); // skip var
+            self.scanner.extract(); // skip var
             Some(self.var_declaration()?)
         } else {
             Some(self.expr_stmt()?)
@@ -403,31 +404,31 @@ impl LoxParser {
 
     fn statement(&mut self) -> StmtResult {
         if self.accept(vec![TT::PRINT]) {
-            self.scanner.ignore(); // skip print
+            self.scanner.extract(); // skip print
             return self.print_stmt();
         }
         if self.accept(vec![TT::OBRACE]) {
-            self.scanner.ignore(); // skip obrace
+            self.scanner.extract(); // skip obrace
             return Ok(Stmt::Block(self.block_stmt()?));
         }
         if self.accept(vec![TT::IF]) {
-            self.scanner.ignore(); // skip if
+            self.scanner.extract(); // skip if
             return self.if_stmt();
         }
         if self.accept(vec![TT::WHILE]) {
-            self.scanner.ignore(); // skip while
+            self.scanner.extract(); // skip while
             return self.while_stmt();
         }
         if self.accept(vec![TT::FOR]) {
-            self.scanner.ignore(); // skip for
+            self.scanner.extract(); // skip for
             return self.for_stmt();
         }
         if self.accept(vec![TT::BREAK]) {
-            self.scanner.ignore(); // skip break
+            self.scanner.extract(); // skip break
             return self.break_stmt();
         }
         if self.accept(vec![TT::RETURN]) {
-            self.scanner.ignore(); // skip return
+            self.scanner.extract(); // skip return
             return self.return_stmt();
         }
         self.expr_stmt()
@@ -438,7 +439,7 @@ impl LoxParser {
             vec![TT::Id("".to_string())], "expect variable name")?;
         let mut init = Expr::Nil;
         if self.accept(vec![TT::ASSIGN]) {
-            self.scanner.ignore(); // skip assign
+            self.scanner.extract(); // skip assign
             init = self.expression()?;
         }
         self.consume(vec![TT::SEMICOLON], "expect ';' after variable decl")?;
@@ -456,7 +457,7 @@ impl LoxParser {
                     vec![TT::Id("".to_string())], "expect parameter name")?;
                 params.push(parameter.lexeme);
                 if !self.accept(vec![TT::COMMA]) { break; }
-                self.scanner.ignore(); // skip comma
+                self.scanner.extract(); // skip comma
             }
             self.consume(vec![TT::CPAREN], "expect ')' after parameters")?;
         }
@@ -467,11 +468,11 @@ impl LoxParser {
 
     fn declaration(&mut self) -> StmtResult {
         if self.accept(vec![TT::VAR]) {
-            self.scanner.ignore(); // skip var
+            self.scanner.extract(); // skip var
             return self.var_declaration();
         }
         if self.accept(vec![TT::FUN]) {
-            self.scanner.ignore(); // skip fun
+            self.scanner.extract(); // skip fun
             return self.fun_declaration("function");
         }
         self.statement()

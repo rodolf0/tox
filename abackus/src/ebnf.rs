@@ -256,7 +256,7 @@ impl ParserBuilder {
             let ebnf = EarleyParser::new(ebnf_grammar());
             // Use EBNF parser to parse the user provided grammar
             let state = ebnf
-                .parse(EbnfTokenizer::scanner(user_grammar_spec))
+                .parse(EbnfTokenizer::new(user_grammar_spec.chars()))
                 .unwrap_or_else(|_| panic!("Failed to parse user grammar. {}",
                                            user_grammar_spec));
             // Forge user's grammar builder by executing semantic actions

@@ -5,7 +5,7 @@ name = "abackus"
 version = "0.1.9"
 dependencies = [
  "earlgrey 0.2.3",
- "lexers 0.0.8",
+ "lexers 0.1.1",
  "rustyline 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -34,7 +34,7 @@ dependencies = [
 
 [[package]]
 name = "lexers"
-version = "0.0.8"
+version = "0.1.1"
 
 [[package]]
 name = "libc"

@@ -1,4 +1,4 @@
-use lexers::{Scanner, MathTokenizer, MathToken};
+use lexers::{MathTokenizer, MathToken};
 
 #[derive(PartialEq, Debug)]
 pub enum Assoc { Left, Right, None }
@@ -42,10 +42,10 @@ pub struct ShuntingParser;
 
 impl ShuntingParser {
     pub fn parse_str(expr: &str) -> Result<RPNExpr, ParseError> {
-        Self::parse(&mut MathTokenizer::scanner(expr))
+        Self::parse(&mut MathTokenizer::new(expr.chars()))
     }
 
-    pub fn parse(lex: &mut Scanner<MathToken>) -> Result<RPNExpr, ParseError> {
+    pub fn parse(lex: &mut impl Iterator<Item=MathToken>) -> Result<RPNExpr, ParseError> {
         let mut out = Vec::new();
         let mut stack = Vec::new();
         let mut arity = Vec::<usize>::new();

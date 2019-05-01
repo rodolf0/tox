@@ -6,5 +6,5 @@ authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "A lisp like thingy"
 
 [dependencies]
-lexers = { version = "0.0.7", path = "../lexers" }
+lexers = { version = "0.1.2", path = "../lexers" }
 rustyline = "1.0.0"

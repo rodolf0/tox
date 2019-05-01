@@ -8,4 +8,4 @@ description = "Tools for tokenizing and scanning"
 repository = "https://github.com/rodolf0/tox/tree/master/lexers"
 readme = "README.md"
 keywords = ["lexer", "tokenizer", "scanner", "ebnf"]
-categories = ["parsing"]
+categories = ["parsing", "text-processing"]

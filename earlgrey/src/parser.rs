@@ -28,8 +28,8 @@ impl EarleyParser {
         EarleyParser{g: grammar}
     }
 
-    pub fn parse<T, Ti>(&self, mut tokenizer: T) -> Result<ParseTrees, Error>
-            where T: Iterator<Item=Ti>, Ti: Debug + AsRef<str> {
+    pub fn parse<T>(&self, mut tokenizer: T) -> Result<ParseTrees, Error>
+            where T: Iterator, T::Item: Debug + AsRef<str> {
 
         // 0. Populate S0, add items for each rule matching the start symbol
         let s0: StateSet = self.g.rules_for(&self.g.start).into_iter()
@@ -46,7 +46,7 @@ impl EarleyParser {
             loop {
                 let (new_items, prev_item_count) = {
                     let state = &states[idx];
-                    let new_items: Vec<Item> = state.iter()
+                    let new_items: Vec<_> = state.iter()
                         .flat_map(|item| match item.next_symbol() {
 
                             // Prediction: add rules starting with next symbol

@@ -1,11 +1,14 @@
 [package]
 name = "earlgrey"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2018"
-authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
-description = "An earley parser library"
 license = "MIT"
-repository = "https://github.com/rodolf0/tox"
+authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
+description = "A library for parsing context-free grammars using Earley algorithm"
+repository = "https://github.com/rodolf0/tox/tree/master/earlgrey"
+readme = "README.md"
+keywords = ["parser", "earley", "cfg", "grammar", "ast"]
+categories = ["parsing", "text-processing"]
 
 [features]
 debug = []

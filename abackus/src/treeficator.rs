@@ -44,9 +44,9 @@ impl Sexpr {
 }
 
 impl ParserBuilder {
-    pub fn treeficator<S, SI>(self, grammar: &str, start: &str)
+    pub fn treeficator<SI>(self, grammar: &str, start: &str)
         -> impl Fn(SI) -> Result<Vec<Tree>, Error>
-        where S: AsRef<str> + Debug, SI: Iterator<Item=S>
+        where SI: Iterator, SI::Item: AsRef<str> + Debug
     {
         // User may pre-plug grammar (self.0) with terminals
         // 1. build a parser for user's grammar
@@ -66,9 +66,9 @@ impl ParserBuilder {
         move |tokenizer| tree_builder.eval_all(&parser.parse(tokenizer)?)
     }
 
-    pub fn sexprificator<S, SI>(self, grammar: &str, start: &str)
+    pub fn sexprificator<SI>(self, grammar: &str, start: &str)
         -> impl Fn(SI) -> Result<Vec<Sexpr>, Error>
-        where S: AsRef<str> + Debug, SI: Iterator<Item=S>
+        where SI: Iterator, SI::Item: AsRef<str> + Debug
     {
         // User may pre-plug grammar (self.0) with terminals
         // 1. build a parser for user's grammar

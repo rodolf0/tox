@@ -1,18 +1,21 @@
 [package]
 name = "abackus"
-version = "0.1.9"
+version = "0.2.0"
 edition = "2018"
+license = "MIT"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "Parser builder using EBNF"
-license = "MIT"
-repository = "https://github.com/rodolf0/tox"
+repository = "https://github.com/rodolf0/tox/tree/master/abackus"
+readme = "README.md"
+keywords = ["parser", "earley", "cfg", "grammar", "ast"]
+categories = ["parsing", "text-processing"]
 
 [features]
 debug = []
 
 [dependencies]
 lexers = { version = "0.1.2", path = "../lexers" }
-earlgrey = { version = "0.2.3", path = "../earlgrey" }
+earlgrey = { version = "0.2.4", path = "../earlgrey" }
 
 [[example]]
 name = "ebnftree"

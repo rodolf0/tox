@@ -21,7 +21,7 @@ dependencies = [
 
 [[package]]
 name = "lexers"
-version = "0.1.1"
+version = "0.1.2"
 
 [[package]]
 name = "libc"
@@ -32,7 +32,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "lisp"
 version = "0.0.3"
 dependencies = [
- "lexers 0.1.1",
+ "lexers 0.1.2",
  "rustyline 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

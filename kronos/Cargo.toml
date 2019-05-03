@@ -1,11 +1,14 @@
 [package]
 name = "kronos"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2018"
-authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
-description = "tools to manipulate time expressions"
 license = "MIT"
-repository = "https://github.com/rodolf0/tox"
+authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
+description = "A tool to calculate complex time expressions"
+repository = "https://github.com/rodolf0/tox/tree/master/kronos"
+readme = "README.md"
+keywords = ["time", "date", "calendar", "chrono", "sequence"]
+categories = ["date-and-time"]
 
 [dependencies]
 chrono = "0.4"

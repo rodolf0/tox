@@ -1,6 +1,26 @@
-# shunting
-A tiny math parser for the commandline
+# Documentation
 
+A library for evaluating math expressions.
+
+## Using the library
+
+```rust
+fn main() {
+  let input = "sin(0.2)^2 + cos(0.2)^2";
+  let expr = ShuntingParser::parse_str(input).unwrap();
+  let result = MathContext::new().eval(&expr).unwrap();
+  println!("{} = {}", expr, result);
+}
+```
+
+## A MathContext
+
+`MathContext` allows keeping context across multiple invocations to parse and evaluate. You can do this via the `setvar` method.
+
+
+## The tool in the crate
+
+The crate also ship with the `tox` binary with a math repl.
 ```
 $ tox
 >> 4!
@@ -15,13 +35,3 @@ NaN
 >> pi * 2.1^2 / cbrt(-(6+3))
 -6.660512
 ```
-
-### shunting references
-* http://en.wikipedia.org/wiki/Operator-precedence_grammar
-* http://en.wikipedia.org/wiki/Operator-precedence_parser
-* http://en.wikipedia.org/wiki/Shunting-yard_algorithm
-* http://wcipeg.com/wiki/Shunting_yard_algorithm
-* http://en.wikipedia.org/wiki/Operator_associativity
-* http://www.haskell.org/pipermail/haskell-prime/2010-July/003229.html
-* http://en.wikipedia.org/wiki/Algebraic_expression
-* http://h14s.p5r.org/2014/10/shiftreduce-expression-parsing-by-douglas-gregor.html

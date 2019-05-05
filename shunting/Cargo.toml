@@ -1,11 +1,14 @@
 [package]
 name = "shunting"
-version = "0.0.4"
+version = "0.0.5"
 edition = "2018"
-authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
-description = "A shunting-yard math parser"
 license = "MIT"
-repository = "https://github.com/rodolf0/tox"
+authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
+description = "A library for evaluating math expressions"
+repository = "https://github.com/rodolf0/tox/tree/master/shunting"
+readme = "README.md"
+keywords = ["shunting", "math", "parser", "expression", "eval"]
+categories = ["parsing", "algorithms"]
 
 [features]
 default = ["dynlink-eval"]

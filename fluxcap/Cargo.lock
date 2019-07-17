@@ -2,7 +2,7 @@
 # It is not intended for manual editing.
 [[package]]
 name = "abackus"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "earlgrey 0.2.4",
  "lexers 0.1.2",
@@ -24,9 +24,9 @@ version = "0.2.4"
 
 [[package]]
 name = "fluxcap"
-version = "0.0.9"
+version = "0.0.10"
 dependencies = [
- "abackus 0.2.0",
+ "abackus 0.2.1",
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "earlgrey 0.2.4",
  "kronos 0.1.2",

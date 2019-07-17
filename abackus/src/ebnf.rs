@@ -109,7 +109,7 @@ impl ParserBuilder {
             let mut t_gb = gb.borrow_mut();
             for rule in body {
                 debug!("Adding rule {:?} -> {:?}", id, rule);
-                t_gb.add_rule(id.as_ref(), rule.as_slice(), false);
+                t_gb.add_rule(&id, rule.as_slice(), false);
             }
             G::Nop
         });
@@ -144,11 +144,11 @@ impl ParserBuilder {
             let aux = gb.borrow().unique_symbol_name();
             debug!("Adding non-term {:?}", aux);
             let mut t_gb = gb.borrow_mut();
-            t_gb.add_nonterm(aux.as_ref(), false);
+            t_gb.add_nonterm(&aux, false);
             let body = pull!(G::Body, n.remove(1));
             for rule in body {
                 debug!("Adding rule {:?} -> {:?}", aux, rule);
-                t_gb.add_rule(aux.as_ref(), rule.as_slice(), false);
+                t_gb.add_rule(&aux, rule.as_slice(), false);
             }
             G::Atom(aux)
         });
@@ -156,11 +156,11 @@ impl ParserBuilder {
             let aux = pull!(G::Atom, n.remove(3));
             debug!("Adding non-term {:?}", aux);
             let mut t_gb = gb.borrow_mut();
-            t_gb.add_nonterm(aux.as_ref(), true);
+            t_gb.add_nonterm(&aux, true);
             let body = pull!(G::Body, n.remove(1));
             for rule in body {
                 debug!("Adding rule {:?} -> {:?}", aux, rule);
-                t_gb.add_rule(aux.as_ref(), rule.as_slice(), true);
+                t_gb.add_rule(&aux, rule.as_slice(), true);
             }
             G::Atom(aux)
         });
@@ -173,13 +173,13 @@ impl ParserBuilder {
             let aux = gb.borrow().unique_symbol_name();
             debug!("Adding non-term {:?}", aux);
             let mut t_gb = gb.borrow_mut();
-            t_gb.add_nonterm(aux.as_ref(), false);
+            t_gb.add_nonterm(&aux, false);
             let body = pull!(G::Body, n.remove(1));
             for rule in body {
                 debug!("Adding rule {:?} -> {:?}", aux, rule);
-                t_gb.add_rule(aux.as_ref(), rule.as_slice(), false);
+                t_gb.add_rule(&aux, rule.as_slice(), false);
                 debug!("Adding rule {:?} -> []", aux);
-                t_gb.add_rule::<_, String>(aux.as_ref(), &[], false);
+                t_gb.add_rule::<_, String>(&aux, &[], false);
             }
             G::Atom(aux)
         });
@@ -187,13 +187,13 @@ impl ParserBuilder {
             let aux = pull!(G::Atom, n.remove(3));
             debug!("Adding non-term {:?}", aux);
             let mut t_gb = gb.borrow_mut();
-            t_gb.add_nonterm(aux.as_ref(), true);
+            t_gb.add_nonterm(&aux, true);
             let body = pull!(G::Body, n.remove(1));
             for rule in body {
                 debug!("Adding rule {:?} -> {:?}", aux, rule);
-                t_gb.add_rule(aux.as_ref(), rule.as_slice(), true);
+                t_gb.add_rule(&aux, rule.as_slice(), true);
                 debug!("Adding rule {:?} -> []", aux);
-                t_gb.add_rule::<_, String>(aux.as_ref(), &[], true);
+                t_gb.add_rule::<_, String>(&aux, &[], true);
             }
             G::Atom(aux)
         });
@@ -206,14 +206,14 @@ impl ParserBuilder {
             let aux = gb.borrow().unique_symbol_name();
             debug!("Adding non-term {:?}", aux);
             let mut t_gb = gb.borrow_mut();
-            t_gb.add_nonterm(aux.as_ref(), false);
+            t_gb.add_nonterm(&aux, false);
             let body = pull!(G::Body, n.remove(1));
             for mut rule in body {
                 rule.push(aux.clone());
                 debug!("Adding rule {:?} -> {:?}", aux, rule);
-                t_gb.add_rule(aux.as_ref(), rule.as_slice(), false);
+                t_gb.add_rule(&aux, rule.as_slice(), false);
                 debug!("Adding rule {:?} -> []", aux);
-                t_gb.add_rule::<_, String>(aux.as_ref(), &[], false);
+                t_gb.add_rule::<_, String>(&aux, &[], false);
             }
             G::Atom(aux)
         });
@@ -222,14 +222,14 @@ impl ParserBuilder {
             let aux = pull!(G::Atom, n.remove(3));
             debug!("Adding non-term {:?}", aux);
             let mut t_gb = gb.borrow_mut();
-            t_gb.add_nonterm(aux.as_ref(), true);
+            t_gb.add_nonterm(&aux, true);
             let body = pull!(G::Body, n.remove(1));
             for mut rule in body {
                 rule.push(aux.clone());
                 debug!("Adding rule {:?} -> {:?}", aux, rule);
-                t_gb.add_rule(aux.as_ref(), rule.as_slice(), true);
+                t_gb.add_rule(&aux, rule.as_slice(), true);
                 debug!("Adding rule {:?} -> []", aux);
-                t_gb.add_rule::<_, String>(aux.as_ref(), &[], true);
+                t_gb.add_rule::<_, String>(&aux, &[], true);
             }
             G::Atom(aux)
         });
@@ -271,7 +271,7 @@ impl ParserBuilder {
     // Plug-in functions that parse Terminals before we build the grammar
     pub fn plug_terminal<N, F>(mut self, name: N, pred: F) -> Self
             where N: Into<String>, F: 'static + Fn(&str)->bool {
-        self.0.add_terminal(name.into().as_ref(), pred, false);
+        self.0.add_terminal(&name.into(), pred, false);
         ParserBuilder(self.0)
     }
 

@@ -7,7 +7,7 @@ use crate::types::{DateTime, Range, TimeSequence};
 // is a helper to allow different sequence types to be used as if they were one
 
 #[derive(Clone)]
-pub struct Shim(pub Rc<TimeSequence>);
+pub struct Shim(pub Rc<dyn TimeSequence>);
 
 impl TimeSequence for Shim {
     fn _future_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + '_> {

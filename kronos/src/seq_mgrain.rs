@@ -19,7 +19,7 @@ impl MGrain {
         MGrain{duration, resolution}
     }
 
-    fn _base(&self, t0: &DateTime, future: bool) -> Box<Iterator<Item=Range>> {
+    fn _base(&self, t0: &DateTime, future: bool) -> Box<dyn Iterator<Item=Range>> {
         let base = utils::truncate(*t0, self.resolution);
         let hop = if future { self.duration } else { - self.duration };
         let duration = self.duration;
@@ -33,11 +33,11 @@ impl MGrain {
 }
 
 impl TimeSequence for MGrain {
-    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
         self._base(t0, true)
     }
 
-    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
         self._base(t0, false)
     }
 }

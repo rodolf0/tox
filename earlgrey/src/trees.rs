@@ -7,9 +7,9 @@ use std::rc::Rc;
 
 
 // Semantic actions to execute when walking the tree
-type SemAction<'a, ASTNode> = Box<Fn(Vec<ASTNode>) -> ASTNode + 'a>;
+type SemAction<'a, ASTNode> = Box<dyn Fn(Vec<ASTNode>) -> ASTNode + 'a>;
 // Given a Rule and a Token build an ASTNode
-type LeafBuilder<'a, ASTNode> = Box<Fn(&str, &str) -> ASTNode + 'a>;
+type LeafBuilder<'a, ASTNode> = Box<dyn Fn(&str, &str) -> ASTNode + 'a>;
 
 pub struct EarleyForest<'a, ASTNode: Clone> {
     actions: HashMap<String, SemAction<'a, ASTNode>>,

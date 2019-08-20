@@ -17,7 +17,7 @@ impl<Frame, Win> LastOf<Frame, Win>
           Win: TimeSequence + Clone
 {
     fn _base(&self, t0: &DateTime, future: bool)
-        -> Box<Iterator<Item=Range> + '_>
+        -> Box<dyn Iterator<Item=Range> + '_>
     {
         let win = self.1.clone();
         let nth = self.0;
@@ -48,11 +48,11 @@ impl<Frame, Win> TimeSequence for LastOf<Frame, Win>
     where Frame: TimeSequence,
           Win: TimeSequence + Clone
 {
-    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + '_> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + '_> {
         self._base(t0, true)
     }
 
-    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + '_> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + '_> {
         self._base(t0, false)
     }
 }

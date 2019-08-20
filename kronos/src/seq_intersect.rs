@@ -29,7 +29,7 @@ impl<SeqA, SeqB> Intersect<SeqA, SeqB>
     where SeqA: TimeSequence,
           SeqB: TimeSequence
 {
-    fn _base(&self, t0: &DateTime, future: bool) -> Box<Iterator<Item=Range> + '_> {
+    fn _base(&self, t0: &DateTime, future: bool) -> Box<dyn Iterator<Item=Range> + '_> {
         let (mut astream, mut bstream) = if future {
             (self.0._future_raw(t0), self.1._future_raw(t0))
         } else {
@@ -59,11 +59,11 @@ impl<SeqA, SeqB> TimeSequence for Intersect<SeqA, SeqB>
     where SeqA: TimeSequence,
           SeqB: TimeSequence
 {
-    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + '_> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + '_> {
         self._base(t0, true)
     }
 
-    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + '_> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + '_> {
         self._base(t0, false)
     }
 }

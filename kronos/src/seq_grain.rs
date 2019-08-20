@@ -8,7 +8,7 @@ use crate::types::{DateTime, Range, Grain, TimeSequence};
 pub struct Grains(pub Grain);
 
 impl Grains {
-    fn _base(&self, t0: &DateTime, future: bool) -> Box<Iterator<Item=Range>> {
+    fn _base(&self, t0: &DateTime, future: bool) -> Box<dyn Iterator<Item=Range>> {
         let base = utils::truncate(*t0, self.0);
         let sign = if future { 1 } else { -1 };
         let grain = self.0;
@@ -21,11 +21,11 @@ impl Grains {
 }
 
 impl TimeSequence for Grains {
-    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
         self._base(t0, true)
     }
 
-    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
         self._base(t0, false)
     }
 }

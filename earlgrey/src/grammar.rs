@@ -8,7 +8,7 @@ use crate::parser::Error;
 
 pub enum Symbol {
     NonTerm(String),
-    Terminal(String, Box<Fn(&str)->bool>),  // predicate that matches Terminal
+    Terminal(String, Box<dyn Fn(&str)->bool>),  // predicate that matches Terminal
 }
 
 #[derive(PartialEq,Hash)]

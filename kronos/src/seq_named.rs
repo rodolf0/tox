@@ -8,7 +8,7 @@ use crate::types::{Date, DateTime, Duration, Range, Grain, TimeSequence};
 pub struct Weekday(pub u32);
 
 impl Weekday {
-    fn _base(&self, t0: &DateTime, future: bool) -> Box<Iterator<Item=Range>> {
+    fn _base(&self, t0: &DateTime, future: bool) -> Box<dyn Iterator<Item=Range>> {
         let base = utils::find_dow(t0.date(), self.0, future).and_hms(0, 0, 0);
         let sign = if future { 1 } else { -1 };
         Box::new((0..).map(move |x| Range{
@@ -20,11 +20,11 @@ impl Weekday {
 }
 
 impl TimeSequence for Weekday {
-    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
         self._base(t0, true)
     }
 
-    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
         self._base(t0, false)
     }
 }
@@ -34,7 +34,7 @@ impl TimeSequence for Weekday {
 pub struct Month(pub u32);
 
 impl Month {
-    fn _base(&self, t0: &DateTime, future: bool) -> Box<Iterator<Item=Range>> {
+    fn _base(&self, t0: &DateTime, future: bool) -> Box<dyn Iterator<Item=Range>> {
         let base = utils::truncate(*t0, Grain::Month).date();
         let base = utils::find_month(base, self.0, future).and_hms(0, 0, 0);
         let sign = if future { 1 } else { -1 };
@@ -47,11 +47,11 @@ impl Month {
 }
 
 impl TimeSequence for Month {
-    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
         self._base(t0, true)
     }
 
-    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
         self._base(t0, false)
     }
 }
@@ -61,7 +61,7 @@ impl TimeSequence for Month {
 pub struct Weekend;
 
 impl Weekend {
-    fn _base(&self, t0: &DateTime, future: bool) -> Box<Iterator<Item=Range>> {
+    fn _base(&self, t0: &DateTime, future: bool) -> Box<dyn Iterator<Item=Range>> {
         let base = utils::find_weekend(t0.date(), future).and_hms(0, 0, 0);
         let sign = if future { 1 } else { -1 };
         Box::new((0..).map(move |x| Range{
@@ -73,11 +73,11 @@ impl Weekend {
 }
 
 impl TimeSequence for Weekend {
-    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
         self._base(t0, true)
     }
 
-    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
         self._base(t0, false)
     }
 }
@@ -87,7 +87,7 @@ impl TimeSequence for Weekend {
 pub struct Year(pub i32);
 
 impl TimeSequence for Year {
-    fn _future_raw(&self, _: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _future_raw(&self, _: &DateTime) -> Box<dyn Iterator<Item=Range>> {
         use std::iter;
         Box::new(iter::once(Range{
             start: Date::from_ymd(self.0, 1, 1).and_hms(0, 0, 0),
@@ -96,7 +96,7 @@ impl TimeSequence for Year {
         }))
     }
 
-    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range> + '_> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + '_> {
         self._future_raw(t0)
     }
 }

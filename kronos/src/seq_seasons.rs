@@ -8,7 +8,7 @@ use crate::types::{Grain, DateTime, Range, TimeSequence, Season};
 pub struct Seasons(pub Season, pub bool); // north hemisphere
 
 impl Seasons {
-    fn _base(&self, t0: &DateTime, future: bool) -> Box<Iterator<Item=Range>> {
+    fn _base(&self, t0: &DateTime, future: bool) -> Box<dyn Iterator<Item=Range>> {
         let (s0, s1) = utils::find_season(t0.date(), self.0, future, self.1);
         let s0 = s0.and_hms(0, 0, 0);
         let s1 = s1.and_hms(0, 0, 0);
@@ -22,11 +22,11 @@ impl Seasons {
 }
 
 impl TimeSequence for Seasons {
-    fn _future_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _future_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
         self._base(t0, true)
     }
 
-    fn _past_raw(&self, t0: &DateTime) -> Box<Iterator<Item=Range>> {
+    fn _past_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
         self._base(t0, false)
     }
 }

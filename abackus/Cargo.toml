@@ -20,6 +20,3 @@ earlgrey = { version = "0.2.4", path = "../earlgrey" }
 [[example]]
 name = "ebnftree"
 path = "examples/ebnftree.rs"
-
-[dev-dependencies]
-rustyline = "1.0.0"

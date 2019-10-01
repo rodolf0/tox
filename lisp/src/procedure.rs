@@ -3,7 +3,7 @@ use crate::parser::LispExpr;
 use std::{fmt, cmp};
 use std::rc::Rc;
 
-pub type Fp = Rc<Fn(&Vec<LispExpr>) -> Result<LispExpr, EvalErr>>;
+pub type Fp = Rc<dyn Fn(&Vec<LispExpr>) -> Result<LispExpr, EvalErr>>;
 
 enum Body {
     Lisp(LispExpr),

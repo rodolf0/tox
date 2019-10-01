@@ -18,7 +18,7 @@ dynlink-eval = ["dylib"]
 dirs = "1.0"
 lexers = { version = "0.1.2", path = "../lexers" }
 rand = "0.6"
-rustyline = "3.0.0"
+rustyline = "5.0.0"
 
 [dependencies.dylib]
 version = "0.0.3"

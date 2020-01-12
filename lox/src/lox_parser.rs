@@ -56,9 +56,9 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
         let backtrack = self.scanner.buffer_pos();
         if let Some(token) = self.scanner.next() {
             let found = token_types.iter().any(|ttype| match &token.token {
-                &TT::Str(_) => match ttype { &TT::Str(_) => true, _ => false },
-                &TT::Id(_) => match ttype { &TT::Id(_) => true, _ => false },
-                &TT::Num(_) => match ttype { &TT::Num(_) => true, _ => false },
+                TT::Str(_) => match ttype { TT::Str(_) => true, _ => false },
+                TT::Id(_) => match ttype { TT::Id(_) => true, _ => false },
+                TT::Num(_) => match ttype { TT::Num(_) => true, _ => false },
                 other => other == ttype
             });
             if found { return true; }
@@ -487,9 +487,9 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
                 Err(err) => { errors.push(err); self.synchronize(); }
             }
         }
-        match errors.len() > 0 {
-            true => Err(errors),
-            false => Ok(statements)
+        match errors.is_empty() {
+            false => Err(errors),
+            true => Ok(statements)
         }
     }
 }

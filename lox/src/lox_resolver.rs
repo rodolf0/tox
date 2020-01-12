@@ -17,7 +17,7 @@ impl<'a> Resolver<'a> {
         Resolver{interpreter: interp, scopes: Vec::new()}
     }
 
-    pub fn resolve(&mut self, stmts: &Vec<Stmt>) -> ResolveResult {
+    pub fn resolve(&mut self, stmts: &[Stmt]) -> ResolveResult {
         stmts.iter().map(|stmt| self.resolve_stmt(stmt))
              .skip_while(|stmt| stmt.is_ok())
              .next()
@@ -60,8 +60,8 @@ impl<'a> Resolver<'a> {
         Ok(())
     }
 
-    fn resolve_function(&mut self, params: &Vec<String>,
-                        body: &Vec<Stmt>) -> ResolveResult {
+    fn resolve_function(&mut self, params: &[String],
+                        body: &[Stmt]) -> ResolveResult {
         self.begin_scope();
         for param in params {
             self.declare(param.clone())?;
@@ -111,42 +111,42 @@ impl<'a> Resolver<'a> {
 
     fn resolve_stmt(&mut self, stmt: &Stmt)  -> ResolveResult {
         match stmt {
-            &Stmt::Print(ref expr) => self.resolve_expr(expr),
-            &Stmt::Expr(ref expr) => self.resolve_expr(expr),
-            &Stmt::Var(ref name, ref init) => {
+            Stmt::Print(ref expr) => self.resolve_expr(expr),
+            Stmt::Expr(ref expr) => self.resolve_expr(expr),
+            Stmt::Var(ref name, ref init) => {
                 // split binding in declare/define to disallow self reference
                 self.declare(name.clone())?;
                 match init {
-                    &Expr::Nil => (),
+                    Expr::Nil => (),
                     _ => self.resolve_expr(init)?,
                 }
                 self.define(name.clone())
             },
-            &Stmt::Block(ref stmts) => {
+            Stmt::Block(ref stmts) => {
                 self.begin_scope();
                 self.resolve(stmts)?;
                 self.end_scope();
                 Ok(())
             },
-            &Stmt::If(ref cond, ref then, ref elseb) => {
+            Stmt::If(ref cond, ref then, ref elseb) => {
                 self.resolve_expr(cond)?;
                 self.resolve_stmt(then)?;
-                if let &Some(ref elseb) = elseb {
+                if let Some(ref elseb) = elseb {
                     self.resolve_stmt(elseb)?;
                 }
                 Ok(())
             },
-            &Stmt::While(ref cond, ref body) => {
+            Stmt::While(ref cond, ref body) => {
                 self.resolve_expr(cond)?;
                 self.resolve_stmt(body)
             },
-            &Stmt::Break(_) => Ok(()),
-            &Stmt::Function(ref name, ref parameters, ref body) => {
+            Stmt::Break(_) => Ok(()),
+            Stmt::Function(ref name, ref parameters, ref body) => {
                 self.declare(name.clone())?;
                 self.define(name.clone())?;
                 self.resolve_function(parameters, body)
             },
-            &Stmt::Return(ref expr) => self.resolve_expr(expr),
+            Stmt::Return(ref expr) => self.resolve_expr(expr),
         }
     }
 }

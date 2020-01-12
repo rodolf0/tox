@@ -45,7 +45,7 @@ impl<I: Iterator<Item=char>> LoxScanner<I> {
             TT::Str(_) => TT::Str(lexeme.trim_matches('"').to_string()),
             other => other
         };
-        Some(Token{line: self.line, token: literal, lexeme: lexeme})
+        Some(Token{line: self.line, token: literal, lexeme})
     }
 
     fn error<T: AsRef<str>>(&mut self, err: T) {

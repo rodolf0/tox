@@ -41,7 +41,7 @@ fn main() {
 
     let mut interpreter = LoxInterpreter::new();
     if env::args().len() == 2 {
-        let sourcefile = env::args().skip(1).next().unwrap();
+        let sourcefile = env::args().nth(1).unwrap();
         if let Ok(mut f) = File::open(&sourcefile) {
             let mut source = String::new();
             if f.read_to_string(&mut source).is_ok() {
@@ -53,7 +53,7 @@ fn main() {
     } else {
         loop {
             let mut input = String::new();
-            io::stdout().write(b"~> ").unwrap();
+            io::stdout().write_all(b"~> ").unwrap();
             io::stdout().flush().unwrap();
             match io::stdin().read_line(&mut input) {
                 Ok(_) => run(input, &mut interpreter),

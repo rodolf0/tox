@@ -13,7 +13,7 @@ pub struct Environment {
 
 impl Environment {
     pub fn new(parent: Option<Rc<RefCell<Environment>>>) -> Self {
-        Environment{values: HashMap::new(), parent: parent}
+        Environment{values: HashMap::new(), parent}
     }
 
     fn ancestor(&self, depth: usize) -> Option<Rc<RefCell<Environment>>> {

@@ -1,30 +1,30 @@
 #![deny(warnings)]
 
-use crate::grammar::{Symbol, Rule};
-use std::{cell, fmt, hash, iter};
+use crate::grammar::{Rule, Symbol};
 use std::collections::HashSet;
+use std::{cell, fmt, hash, iter};
 use std::rc::Rc;
 
 
-#[derive(PartialEq,Eq,Hash)]
+#[derive(PartialEq,Eq,Hash,Debug)]
 pub enum Trigger {
     Complete(Rc<Item>),
     Scan(String),
 }
 
-// Earley items
+/// An Item is a partially matched `Rule`. `dot` shows the match progress.
 pub struct Item {
     pub rule: Rc<Rule>,  // LR0item (dotted rule)
     pub dot: usize,      // dot position within the rule
-    pub start: usize,    // stream position where item starts
-    pub end: usize,      // stream position where item ends
-    // backpointers leading to this item: (source-item, Scan/Complete)
-    bp: cell::RefCell<HashSet<(Rc<Item>, Trigger)>>
+    pub start: usize,    // input stream position where item starts
+    pub end: usize,      // input stream position where item ends
+    /// sources leading to this item: (source-item, Scan/Complete)
+    sources: cell::RefCell<HashSet<(Rc<Item>, Trigger)>>
 }
 
 
 // Items are deduped only by rule, dot, start, end (ie: not bp)
-// This is needed to insert into StateSet merging back-pointers
+// The intention is that 2 Items are the same and can be merged ignoring bp.
 impl hash::Hash for Item {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.rule.hash(state);
@@ -53,63 +53,66 @@ impl fmt::Debug for Item {
             .map(|s| s.name()).collect::<Vec<_>>().join(" ");
         write!(f, "({} - {}) {} -> {} \u{00b7} {} #bp: {}",
                self.start, self.end, self.rule.head, pre, post,
-               self.bp.borrow().len())
+               self.sources.borrow().len())
     }
 }
 
 impl Item {
-    pub fn complete(&self) -> bool { self.dot >= self.rule.spec.len() }
+    /// Item is complete if Rule has being fully matched
+    pub fn complete(&self) -> bool {
+        self.dot >= self.rule.spec.len()
+    }
 
+    /// Exposes the next symbol in the progress of the Rule
     pub fn next_symbol(&self) -> Option<&Symbol> {
-        self.rule.symbol_at(self.dot).map(|s| &**s)
+        self.rule.spec.get(self.dot).map(|sym| &**sym)
     }
 
-    // only ever borrowed non-mutable ref returned for public consumption
-    pub fn source(&self) -> cell::Ref<HashSet<(Rc<Item>, Trigger)>> {
-        self.bp.borrow()
+    /// Scans or Completions that led to the creation of this Item.
+    /// only ever borrowed non-mutable ref returned for public consumption
+    pub fn sources(&self) -> cell::Ref<HashSet<(Rc<Item>, Trigger)>> {
+        self.sources.borrow()
     }
 
-    // check if other item's next-symbol matches our rule's name
-    fn can_complete(&self, other: &Rc<Item>) -> bool {
-        self.complete() && match other.next_symbol() {
-            Some(&Symbol::NonTerm(ref name)) => name == &self.rule.head,
-            _ => false
-        }
-    }
-
-    // check item's next symbol is a temrinal that scans lexeme
-    pub fn can_scan(&self, lexeme: &str) -> bool {
-        match self.next_symbol() {
-            Some(&Symbol::Terminal(_, ref f)) => f(lexeme),
-            _ => false
-        }
-    }
-
-    // build a new Item for a prediction
+    /// Build a new `Prediction` based Item.
     pub fn predict_new(rule: &Rc<Rule>, start: usize) -> Item {
-        Item{rule: rule.clone(), dot: 0, start, end: start,
-             bp: cell::RefCell::new(HashSet::new())}
+        Item{
+            rule: rule.clone(),
+            dot: 0,
+            start,
+            end: start,
+            sources: cell::RefCell::new(HashSet::new())
+        }
     }
 
-    // produce an Item after scanning a token
-    fn scan_new(source: &Rc<Item>, end: usize, input: String) -> Item {
+    /// Build `Scan` based Items.
+    /// An item where the rule is advanced by matching a terminal.
+    pub fn scan_new(source: &Rc<Item>, end: usize, input: &str) -> Item {
         let mut _bp = HashSet::new();
-        _bp.insert((source.clone(), Trigger::Scan(input)));
-        Item{rule: source.rule.clone(), dot: source.dot+1,
-             start: source.start, end, bp: cell::RefCell::new(_bp)}
+        _bp.insert((source.clone(), Trigger::Scan(input.to_string())));
+        Item{
+            rule: source.rule.clone(),
+            dot: source.dot + 1,
+            start: source.start,
+            end,
+            sources: cell::RefCell::new(_bp)
+        }
     }
 
-    // produce an Item by completing another one
-    fn complete_new(source: &Rc<Item>, trigger: &Rc<Item>, end: usize) -> Item {
+    /// Build `Completion` based Items.
+    /// `Rule` is advanced because its next symbol matches the completed `trigger`.
+    pub fn complete_new(source: &Rc<Item>, trigger: &Rc<Item>, end: usize) -> Item {
         let mut _bp = HashSet::new();
         _bp.insert((source.clone(), Trigger::Complete(trigger.clone())));
-        Item{rule: source.rule.clone(), dot: source.dot+1,
-             start: source.start, end, bp: cell::RefCell::new(_bp)}
+        Item{
+            rule: source.rule.clone(),
+            dot: source.dot + 1,
+            start: source.start,
+            end,
+            sources: cell::RefCell::new(_bp)
+        }
     }
 }
-
-
-///////////////////////////////////////////////////////////////////////////////
 
 
 #[derive(Default)]
@@ -120,9 +123,10 @@ impl StateSet {
     // StateSets override insertion to merge back-pointers for existing Items.
     // See implementations of Hash + PartialEq + Eq for Item excluding Item::bp
     fn insert(&mut self, item: Item) {
+        // TODO: really need refcell?
         if let Some(existent) = self.0.get(&item) {
-            let back_pointers = item.bp.into_inner();
-            existent.bp.borrow_mut().extend(back_pointers);
+            let bp = item.sources.into_inner();
+            existent.sources.borrow_mut().extend(bp);
             return;
         }
         self.0.insert(Rc::new(item));
@@ -131,22 +135,6 @@ impl StateSet {
     pub fn len(&self) -> usize { self.0.len() }
 
     pub fn iter(&self) -> impl Iterator<Item=&Rc<Item>> { self.0.iter() }
-
-    // Produce new items by advancing the dot on items completed by 'item' trig
-    pub fn completed_at(&self, item: &Rc<Item>, at: usize) -> Vec<Item> {
-        self.0.iter()
-            .filter(|source| item.can_complete(source))
-            .map(|source| Item::complete_new(source, item, at))
-            .collect()
-    }
-
-    // Produce new items by advancing the dot on items that can 'scan' lexeme
-    pub fn advanced_by_scan(&self, lexeme: &str, end: usize) -> Vec<Item> {
-        self.0.iter()
-            .filter(|item| item.can_scan(lexeme))
-            .map(|item| Item::scan_new(item, end, lexeme.to_string()))
-            .collect()
-    }
 }
 
 impl Extend<Item> for StateSet {
@@ -183,69 +171,141 @@ mod tests {
 
     fn gen_rule1() -> Rc<Rule> {
         fn testfn(o: &str) -> bool { o.len() == 1 && "+-".contains(o) }
-        Rc::new(Rule{
-            head: "S".to_string(),
-            spec: vec![
-                Rc::new(Symbol::NonTerm("S".to_string())),
-                Rc::new(Symbol::Terminal("+-".to_string(), Box::new(testfn))),
-                Rc::new(Symbol::Terminal("d".to_string(), Box::new(|n|
-                                      n.chars().all(|c| "123".contains(c))))),
-            ]})
+        // S -> S +- d
+        Rc::new(Rule::new("S", &[
+            Symbol::new("S"),
+            Symbol::new2("+-", testfn),
+            Symbol::new2("d", |n| n.chars().all(|c| "123".contains(c))),
+        ]))
     }
 
     fn gen_rule2() -> Rc<Rule> {
         fn testfn(o: &str) -> bool { o.len() == 1 && "*/".contains(o) }
-        Rc::new(Rule{
-            head: "M".to_string(),
-            spec: vec![
-                Rc::new(Symbol::NonTerm("M".to_string())),
-                Rc::new(Symbol::Terminal("*/".to_string(), Box::new(testfn))),
-                Rc::new(Symbol::Terminal("d".to_string(), Box::new(|n|
-                                      n.chars().all(|c| "123".contains(c))))),
-            ]})
+        // S -> S */ d
+        Rc::new(Rule::new("S", &[
+            Symbol::new("S"),
+            Symbol::new2("*/", testfn),
+            Symbol::new2("d", |n| n.chars().all(|c| "123".contains(c))),
+        ]))
     }
 
     fn item(rule: Rc<Rule>, dot: usize, start: usize, end: usize) -> Item {
-        Item{rule, dot, start, end, bp: RefCell::new(HashSet::new())}
+        Item{rule, dot, start, end, sources: RefCell::new(HashSet::new())}
     }
 
     #[test]
-    fn item_eq() {
-        let rule1 = gen_rule1();
-        let rule2 = gen_rule2();
-        let i = Item::predict_new(&rule1, 0);
-        let j = Item::predict_new(&rule2, 0);
-        assert_eq!(i, Item::predict_new(&rule1, 0));
-        assert_eq!(j, Item::predict_new(&rule2, 0));
-        assert_ne!(i, j);
-        assert_ne!(i, Item::predict_new(&rule1, 1));
+    fn item_basics() {
+        // Check item equality
+        assert_eq!(item(gen_rule1(), 0, 0, 0), item(gen_rule1(), 0, 0, 0));
+        assert_ne!(item(gen_rule2(), 0, 0, 0), item(gen_rule1(), 0, 0, 0));
+        assert_ne!(item(gen_rule1(), 1, 0, 0), item(gen_rule1(), 0, 0, 0));
+        // Check item complete
+        assert!(!item(gen_rule2(), 2, 0, 5).complete());
+        assert!(item(gen_rule2(), 3, 0, 4).complete());
+        // Check next symbol
+        assert!(item(gen_rule1(), 0, 0, 5).next_symbol().unwrap().nonterm().is_some());
+        assert!(item(gen_rule1(), 2, 0, 5).next_symbol().unwrap().terminal().is_some());
     }
 
     #[test]
-    fn scan_eq() {
-        let i = Rc::new(item(gen_rule1(), 2, 0, 0));
-        // i Item is doted after '/*', so it can scan a digit
-        assert!(i.can_scan("1"));
-        let i2 = Item::scan_new(&i, 1, "3".to_string());
-        assert_eq!(i2, item(gen_rule1(), 3, 0, 1));
-        // Assert i2 has back pointer
-        assert_eq!(i2.source().len(), 1);
-        assert!(i2.source().contains(&(i, Trigger::Scan("3".to_string()))));
+    fn item_predict() {
+        let predict = Item::predict_new(&gen_rule1(), 23);
+        assert_eq!(item(gen_rule1(), 0, 23, 23), predict);
+        assert_eq!(predict.start, predict.end);
+        assert_eq!(predict.sources.borrow().len(), 0);
     }
 
     #[test]
-    fn stateset_dups() {
-        let rule = gen_rule2();
+    fn item_scan() {
+        // Source: S -> S . + d
+        let source = Rc::new(item(gen_rule1(), 1, 0, 1));
+        // Scan a '+' token
+        let scan = Item::scan_new(&source, 2, "+");
+        assert_eq!(item(gen_rule1(), 2, 0, 2), scan);
+        // Check scan item sources/backpointers
+        let scan_src = scan.sources.borrow();
+        assert!(scan_src.contains(&(source, Trigger::Scan("+".to_string()))));
+        assert_eq!(scan_src.len(), 1);
+    }
+
+    #[test]
+    fn item_complete() {
+        // Input could be: 2 * 3 + 1
+        // Source: S -> . S + d
+        let source = Rc::new(item(gen_rule1(), 0, 0, 0));
+        // A trigger reaches completion (2 * 3) - S -> S * d .
+        let trigger = Rc::new(item(gen_rule2(), 0, 0, 3));
+        // generate completion
+        let complete_based = Item::complete_new(&source, &trigger, 3);
+        assert_eq!(item(gen_rule1(), 1, 0, 3), complete_based);
+        // Check completion item sources/backpointers
+        let src = complete_based.sources.borrow();
+        assert!(src.contains(&(source, Trigger::Complete(trigger))));
+        assert_eq!(src.len(), 1);
+    }
+
+    #[test]
+    fn stateset_dedups() {
         //check that items are deduped in statesets
         let mut ss = StateSet::default();
-        ss.insert(item(rule.clone(), 0, 0, 0));
-        ss.insert(item(rule.clone(), 0, 0, 0));
+        // Insert equivalent item twice
+        ss.insert(item(gen_rule2(), 0, 0, 0));
+        ss.insert(item(gen_rule2(), 0, 0, 0));
         assert_eq!(ss.len(), 1);
-        ss.insert(item(rule.clone(), 1, 0, 1));
+        // Insert new item, and again
+        ss.insert(item(gen_rule2(), 1, 0, 1));
         assert_eq!(ss.len(), 2);
-        ss.insert(item(rule.clone(), 1, 0, 1));
+        ss.insert(item(gen_rule2(), 1, 0, 1));
         assert_eq!(ss.len(), 2);
-        ss.insert(item(rule.clone(), 2, 0, 1));
+        // Yet another different item
+        ss.insert(item(gen_rule2(), 2, 0, 1));
         assert_eq!(ss.len(), 3);
+    }
+
+    #[test]
+    fn stateset_bp_merge() {
+        // Source: S -> . S + d
+        let source = Rc::new(item(gen_rule1(), 0, 0, 0));
+
+        // rule3: S -> d
+        let rule3 = Rc::new(Rule::new("S", &[
+            Symbol::new2("d", |n| n.chars().all(|c| "123".contains(c))),
+        ]));
+        // S -> d .
+        let trigger1 = Rc::new(item(rule3, 1, 0, 1));
+        // S -> S . + d
+        let complete1 = Item::complete_new(&source, &trigger1, 1);
+        assert_eq!(complete1, item(gen_rule1(), 1, 0, 1));
+
+        // A trigger2 reaches completion (2 * 3) - S -> S * d .
+        let trigger2 = Rc::new(item(gen_rule2(), 0, 0, 3));
+        // S -> S . * d
+        let complete2 = Item::complete_new(&source, &trigger2, 3);
+        assert_eq!(complete2, item(gen_rule1(), 1, 0, 3));
+
+        // rule4: S -> hex
+        let rule4 = Rc::new(Rule::new("S", &[Symbol::new2("hex", |n| n == "0x3")]));
+        // S -> hex .
+        let trigger3 = Rc::new(item(rule4, 1, 0, 1));
+        // S -> S . + d
+        let complete3 = Item::complete_new(&source, &trigger3, 1);
+        assert_eq!(complete3, item(gen_rule1(), 1, 0, 1));
+
+
+        // Check that complete1 and complete2 have been merged
+        let mut ss = StateSet::default();
+        ss.insert(complete1);
+        ss.insert(complete2);
+        ss.insert(complete3);
+        assert_eq!(ss.len(), 2);
+
+        // Check complete1 / complete3 merged item
+        let complete13_sources = ss.0.get(&item(gen_rule1(), 1, 0, 1))
+            .unwrap()
+            .sources.borrow();
+        assert!(complete13_sources.contains(
+                &(source.clone(), Trigger::Complete(trigger1))));
+        assert!(complete13_sources.contains(
+                &(source, Trigger::Complete(trigger3))));
     }
 }

@@ -139,7 +139,7 @@ impl EarleyParser {
             .cloned()
             .collect();
         if parse_trees.is_empty() {
-            return Err(format!("Parse Error: No Rule completes"));
+            return Err("Parse Error: No Rule completes".to_string());
         }
         Ok(ParseTrees(parse_trees))
     }

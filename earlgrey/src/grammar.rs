@@ -148,8 +148,8 @@ impl GrammarBuilder {
     }
 
     /// Register new rules for the grammar
-    fn _add_rule<S>(&mut self, head: S, spec: &[S], quiet: bool)
-        where S: AsRef<str>
+    fn _add_rule<S, S2>(&mut self, head: S, spec: &[S2], quiet: bool)
+        where S: AsRef<str>, S2: AsRef<str>
     {
         // First check that all symbols have been registered (need references)
         if let Some(s) = spec.iter().find(|n| !self.symbols.contains_key(n.as_ref())) {
@@ -174,12 +174,16 @@ impl GrammarBuilder {
         }
     }
 
-    pub fn rule<S>(mut self, head: S, spec: &[S]) -> Self where S: AsRef<str> {
+    pub fn rule<S, S2>(mut self, head: S, spec: &[S2]) -> Self
+        where S: AsRef<str>, S2: AsRef<str>
+    {
         self._add_rule(head, spec, false);
         self
     }
 
-    pub fn quiet_rule<S>(&mut self, head: S, spec: &[S]) where S: AsRef<str> {
+    pub fn quiet_rule<S, S2>(&mut self, head: S, spec: &[S2])
+        where S: AsRef<str>, S2: AsRef<str>
+    {
         self._add_rule(head, spec, true)
     }
 
@@ -191,7 +195,7 @@ impl GrammarBuilder {
         if !self.symbols.contains_key(&start) {
             self.error = Some(format!("Missing Symbol: {}", start));
         }
-        self.error.map_or(Ok(Grammar{start, rules: self.rules}), |e| Err(e))
+        self.error.map_or(Ok(Grammar{start, rules: self.rules}), Err)
     }
 
     /// Generate unique name for a Symbol (used to build grammar mechanically)

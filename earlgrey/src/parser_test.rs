@@ -198,7 +198,7 @@ fn grammar_ambiguous_epsilon() {
       .nonterm("X")
       .terminal("b", |n| n == "b")
       .rule("S", &["S", "S", "X"])
-      .rule("X", &[])
+      .rule::<_, String>("X", &[])
       .rule("S", &["b"])
       .into_grammar("S")
       .expect("Bad grammar");
@@ -470,7 +470,7 @@ mod earley_recognizer {
         let grammar = GrammarBuilder::default()
           .nonterm("A")
           .nonterm("B")
-          .rule("A", &[])
+          .rule::<_, String>("A", &[])
           .rule("A", &vec!["B"])
           .rule("B", &vec!["A"])
           .into_grammar("A")
@@ -491,7 +491,7 @@ mod earley_recognizer {
           .terminal(")", |l| l == ")")
           .rule("P", &["(", "P", ")"])
           .rule("P", &["P", "P"])
-          .rule("P", &[])
+          .rule::<_, String>("P", &[])
           .into_grammar("P")
           .expect("Bad grammar");
         let p = EarleyParser::new(grammar);
@@ -551,7 +551,7 @@ mod earley_recognizer {
               .nonterm("X")
               .terminal("+", |n| n == "+")
               .rule("E", &variant)
-              .rule("X", &[])
+              .rule::<_, String>("X", &[])
               .into_grammar("E")
               .expect("Bad grammar");
             let p = EarleyParser::new(g);
@@ -576,7 +576,7 @@ mod earley_recognizer {
           .terminal("n", |l| l == "n")
           .rule("Program", &["Letters", "m", "a", "i", "n", "Letters"])
           .rule("Letters", &["oneletter", "Letters"])
-          .rule("Letters", &[])
+          .rule::<_, String>("Letters", &[])
           .into_grammar("Program")
           .expect("Bad grammar");
         let p = EarleyParser::new(grammar);

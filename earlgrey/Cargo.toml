@@ -1,6 +1,6 @@
 [package]
 name = "earlgrey"
-version = "0.2.4"
+version = "0.3.0"
 edition = "2018"
 license = "MIT"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]

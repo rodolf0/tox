@@ -85,7 +85,7 @@ pub fn time_parser() -> earlgrey::EarleyParser {
         .unwrap_or_else(|e| panic!("TimeMachine grammar BUG: {:?}", e))
 }
 
-pub fn debug_time_expression(time: &str) -> Result<Vec<abackus::Sexpr>, earlgrey::Error> {
+pub fn debug_time_expression(time: &str) -> Result<Vec<abackus::Sexpr>, String> {
     let tokenizer = lexers::DelimTokenizer::new(time.chars(), ", ", true);
     let sexpr_writer = _parser_builder().sexprificator(time_grammar(), "time");
     sexpr_writer(tokenizer)

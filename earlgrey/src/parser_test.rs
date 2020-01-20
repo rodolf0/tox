@@ -17,7 +17,7 @@ enum Tree {
 fn tree_evaler<'a>(g: Grammar) -> EarleyForest<'a, Tree> {
     let mut evaler = EarleyForest::new(
         |sym, tok| Tree::Leaf(sym.to_string(), tok.to_string()));
-    for rule in g.str_rules() {
+    for rule in g.rules {
         evaler.action(&rule.to_string(), move |nodes|
                       Tree::Node(rule.to_string(), nodes));
     }
@@ -122,6 +122,44 @@ mod math {
 
 #[test]
 fn grammar_ambiguous() {
+    // Ambiguous, generates 2 trees
+    // S -> A B, A -> A c | a, B -> c B | b, Input = w = a c b
+    let grammar = GrammarBuilder::default()
+      .nonterm("S")
+      .nonterm("A")
+      .nonterm("B")
+      .terminal("a", |n| n == "a")
+      .terminal("b", |n| n == "b")
+      .terminal("c", |n| n == "c")
+      .rule("S", &["A", "B"])
+      .rule("A", &["A", "c"])
+      .rule("A", &["a"])
+      .rule("B", &["c", "B"])
+      .rule("B", &["b"])
+      .into_grammar("S")
+      .expect("Bad grammar");
+    let p = EarleyParser::new(grammar.clone());
+    let pout = p.parse("a c b".split_whitespace()).unwrap();
+    let trees = tree_evaler(grammar).eval_all(&pout).unwrap();
+    assert!(trees.len() == 2);
+    check_trees(&trees, vec![
+        concat!(
+            r#"Node("S -> A B", ["#,
+                r#"Node("A -> A c", ["#,
+                    r#"Node("A -> a", [Leaf("a", "a")]), "#,
+                    r#"Leaf("c", "c")]), "#,
+                r#"Node("B -> b", [Leaf("b", "b")])])"#),
+        concat!(
+            r#"Node("S -> A B", ["#,
+                r#"Node("A -> a", [Leaf("a", "a")]), "#,
+                r#"Node("B -> c B", ["#,
+                    r#"Leaf("c", "c"), "#,
+                    r#"Node("B -> b", [Leaf("b", "b")])])])"#)
+    ]);
+}
+
+#[test]
+fn earley_corner_case() {
     // Earley's corner case. We should only get 2 trees.
     // Broken parsers generate trees for bb and bbbb while parsing bbb.
     // S -> SS | b
@@ -160,7 +198,7 @@ fn grammar_ambiguous_epsilon() {
       .nonterm("X")
       .terminal("b", |n| n == "b")
       .rule("S", &["S", "S", "X"])
-      .rule::<_, &str>("X", &[])
+      .rule("X", &[])
       .rule("S", &["b"])
       .into_grammar("S")
       .expect("Bad grammar");
@@ -186,7 +224,6 @@ fn grammar_ambiguous_epsilon() {
                 r#"Node("X -> ", [])])"#)
     ]);
 }
-
 
 #[test]
 fn left_recurse() {
@@ -243,31 +280,6 @@ fn right_recurse() {
 }
 
 #[test]
-fn grammar_example() {
-    // Grammar for all words containing 'main'
-    // Program   -> Letters 'm' 'a' 'i' 'n' Letters
-    // Letters   -> oneletter Letters | <epsilon>
-    // oneletter -> [a-zA-Z]
-    let grammar = GrammarBuilder::default()
-      .nonterm("Program")
-      .nonterm("Letters")
-      .terminal("oneletter", |l| l.len() == 1 &&
-               l.chars().next().unwrap().is_alphabetic())
-      .terminal("m", |l| l == "m")
-      .terminal("a", |l| l == "a")
-      .terminal("i", |l| l == "i")
-      .terminal("n", |l| l == "n")
-      .rule("Program", &["Letters", "m", "a", "i", "n", "Letters"])
-      .rule("Letters", &["oneletter", "Letters"])
-      .rule::<_, &str>("Letters", &[])
-      .into_grammar("Program")
-      .expect("Bad grammar");
-    let p = EarleyParser::new(grammar);
-    let input = "containsmainword".chars().map(|c| c.to_string());
-    assert!(p.parse(input).is_ok());
-}
-
-#[test]
 fn math_ambiguous_catalan() {
     // E -> E + E | n
     let grammar = GrammarBuilder::default()
@@ -284,65 +296,6 @@ fn math_ambiguous_catalan() {
     // number of trees here should match Catalan numbers
     // https://en.wikipedia.org/wiki/Catalan_number
     assert_eq!(trees.len(), 42);
-}
-
-#[test]
-fn chained_terminals() {
-    // E -> X + +  (and other variants)
-    // X -> <epsilon>
-    let rule_variants = vec![
-        vec!["X", "+"],
-        vec!["+", "X"],
-        vec!["X", "+", "+"],
-        vec!["+", "+", "X"],
-        vec!["+", "X", "+"],
-    ];
-    for variant in rule_variants {
-        let tokens = match variant.len() {
-            2 => "+", 3 => "++", _ => unreachable!()
-        };
-        let g = GrammarBuilder::default()
-          .nonterm("E")
-          .nonterm("X")
-          .terminal("+", |n| n == "+")
-          .rule("E", &variant)
-          .rule::<_, &str>("X", &[])
-          .into_grammar("E")
-          .expect("Bad grammar");
-        let p = EarleyParser::new(g);
-        assert!(p.parse(tokens.chars().map(|c| c.to_string())).is_ok());
-    }
-}
-
-#[test]
-fn natural_lang() {
-    let grammar = GrammarBuilder::default()
-      .terminal("N", |noun|
-        vec!["flight", "banana", "time", "boy", "flies", "telescope"]
-        .contains(&noun))
-      .terminal("D", |det| vec!["the", "a", "an"].contains(&det))
-      .terminal("V", |verb| vec!["book", "eat", "sleep", "saw"].contains(&verb))
-      .terminal("P", |p| vec!["with", "in", "on", "at", "through"].contains(&p))
-      .terminal("[name]", |name| vec!["john", "houston"].contains(&name))
-      .nonterm("PP")
-      .nonterm("NP")
-      .nonterm("VP")
-      .nonterm("S")
-      .rule("NP", &["D", "N"])
-      .rule("NP", &["[name]"])
-      .rule("NP", &["NP", "PP"])
-      .rule("PP", &["P", "NP"])
-      .rule("VP", &["V", "NP"])
-      .rule("VP", &["VP", "PP"])
-      .rule("S", &["NP", "VP"])
-      .rule("S", &["VP"])
-      .into_grammar("S")
-      .expect("Bad grammar");
-    let p = EarleyParser::new(grammar);
-    assert!(vec![
-        "book the flight through houston",
-        "john saw the boy with the telescope",
-    ].iter().all(|input| p.parse(input.split_whitespace()).is_ok()));
 }
 
 mod small_math {
@@ -423,5 +376,211 @@ mod small_math {
             r#"List([List([Atom("3"), Atom("+"), Atom("4")]), Atom("*"), Atom("2")])"#,
             r#"List([Atom("3"), Atom("+"), List([Atom("4"), Atom("*"), Atom("2")])])"#,
         ]);
+    }
+}
+
+
+mod earley_recognizer {
+    use crate::grammar::GrammarBuilder;
+    use super::EarleyParser;
+
+    fn good(parser: &EarleyParser, input: &str) {
+        assert!(parser.parse(input.split_whitespace()).is_ok());
+    }
+
+    fn fail(parser: &EarleyParser, input: &str) {
+        assert_eq!(parser.parse(input.split_whitespace()).unwrap_err(),
+                   "Parse Error: No Rule completes");
+    }
+
+    #[test]
+    fn partial_parse() {
+        let grammar = GrammarBuilder::default()
+            .nonterm("Start")
+            .terminal("+", |n| n == "+")
+            .rule("Start", &["+", "+"])
+            .into_grammar("Start")
+            .expect("Bad Grammar");
+        let p = EarleyParser::new(grammar);
+        fail(&p, "+ + +");
+        good(&p, "+ +");
+
+        let grammar = GrammarBuilder::default()
+          .nonterm("Sum")
+          .nonterm("Num")
+          .terminal("Number", |n| n.chars().all(|c| "1234".contains(c)))
+          .terminal("[+-]", |n| n.len() == 1 && "+-".contains(n))
+          .rule("Sum", &["Sum", "[+-]", "Num"])
+          .rule("Sum", &["Num"])
+          .rule("Num", &["Number"])
+          .into_grammar("Sum")
+          .expect("Bad Grammar");
+        let p = EarleyParser::new(grammar);
+        fail(&p, "1 +");
+    }
+
+    #[test]
+    fn left_recurse() {
+        // S -> S + N | N
+        // N -> [0-9]
+        let grammar = GrammarBuilder::default()
+          .nonterm("S")
+          .nonterm("N")
+          .terminal("[+]", |n| n == "+")
+          .terminal("[0-9]", |n| "1234567890".contains(n))
+          .rule("S", &["S", "[+]", "N"])
+          .rule("S", &["N"])
+          .rule("N", &["[0-9]"])
+          .into_grammar("S")
+          .expect("Bad grammar");
+        let p = EarleyParser::new(grammar);
+        good(&p, "1 + 2");
+        good(&p, "1 + 2 + 3");
+        fail(&p, "1 2 + 3");
+        fail(&p, "+ 3");
+    }
+
+    #[test]
+    fn right_recurse() {
+        // P -> N ^ P | N
+        // N -> [0-9]
+        let grammar = GrammarBuilder::default()
+          .nonterm("P")
+          .nonterm("N")
+          .terminal("[^]", |n| n == "^")
+          .terminal("[0-9]", |n| "1234567890".contains(n))
+          .rule("P", &["N", "[^]", "P"])
+          .rule("P", &["N"])
+          .rule("N", &["[0-9]"])
+          .into_grammar("P")
+          .expect("Bad grammar");
+        let p = EarleyParser::new(grammar);
+        good(&p, "1 ^ 2");
+        fail(&p, "3 ^ ");
+        good(&p, "1 ^ 2 ^ 4");
+        good(&p, "1 ^ 2 ^ 4 ^ 5");
+        fail(&p, "1 2 ^ 4");
+    }
+
+    #[test]
+    fn bogus_empty() {
+        // A -> <empty> | B
+        // B -> A
+        // http://loup-vaillant.fr/tutorials/earley-parsing/empty-rules
+        let grammar = GrammarBuilder::default()
+          .nonterm("A")
+          .nonterm("B")
+          .rule("A", &[])
+          .rule("A", &vec!["B"])
+          .rule("B", &vec!["A"])
+          .into_grammar("A")
+          .expect("Bad grammar");
+        let p = EarleyParser::new(grammar);
+        good(&p, "");
+        good(&p, " ");
+        fail(&p, "X");
+    }
+
+    #[test]
+    fn epsilon_balanced() {
+        // Grammar for balanced parenthesis
+        // P  -> '(' P ')' | P P | <epsilon>
+        let grammar = GrammarBuilder::default()
+          .nonterm("P")
+          .terminal("(", |l| l == "(")
+          .terminal(")", |l| l == ")")
+          .rule("P", &["(", "P", ")"])
+          .rule("P", &["P", "P"])
+          .rule("P", &[])
+          .into_grammar("P")
+          .expect("Bad grammar");
+        let p = EarleyParser::new(grammar);
+        good(&p, "");
+        good(&p, "( )");
+        good(&p, "( ( ) )");
+        fail(&p, "( ) )");
+        fail(&p, ")");
+    }
+
+    #[test]
+    fn natural_lang() {
+        let grammar = GrammarBuilder::default()
+          .terminal("N", |noun|
+            vec!["flight", "banana", "time", "boy", "flies", "telescope"]
+            .contains(&noun))
+          .terminal("D", |det| vec!["the", "a", "an"].contains(&det))
+          .terminal("V", |verb| vec!["book", "eat", "sleep", "saw"].contains(&verb))
+          .terminal("P", |p| vec!["with", "in", "on", "at", "through"].contains(&p))
+          .terminal("[name]", |name| vec!["john", "houston"].contains(&name))
+          .nonterm("PP")
+          .nonterm("NP")
+          .nonterm("VP")
+          .nonterm("S")
+          .rule("NP", &["D", "N"])
+          .rule("NP", &["[name]"])
+          .rule("NP", &["NP", "PP"])
+          .rule("PP", &["P", "NP"])
+          .rule("VP", &["V", "NP"])
+          .rule("VP", &["VP", "PP"])
+          .rule("S", &["NP", "VP"])
+          .rule("S", &["VP"])
+          .into_grammar("S")
+          .expect("Bad grammar");
+        let p = EarleyParser::new(grammar);
+        good(&p, "book the flight through houston");
+        good(&p, "john saw the boy with the telescope");
+    }
+
+    #[test]
+    fn epsilon_variants() {
+        // E -> X + +  (and other variants)
+        // X -> <epsilon>
+        let rule_variants = vec![
+            vec!["X", "+"],
+            vec!["+", "X"],
+            vec!["X", "+", "+"],
+            vec!["+", "+", "X"],
+            vec!["+", "X", "+"],
+        ];
+        for variant in rule_variants {
+            let tokens = match variant.len() {
+                2 => "+", 3 => "+ +", _ => unreachable!()
+            };
+            let g = GrammarBuilder::default()
+              .nonterm("E")
+              .nonterm("X")
+              .terminal("+", |n| n == "+")
+              .rule("E", &variant)
+              .rule("X", &[])
+              .into_grammar("E")
+              .expect("Bad grammar");
+            let p = EarleyParser::new(g);
+            good(&p, tokens);
+        }
+    }
+
+    #[test]
+    fn grammar_example() {
+        // Grammar for all words containing 'main'
+        // Program   -> Letters 'm' 'a' 'i' 'n' Letters
+        // Letters   -> oneletter Letters | <epsilon>
+        // oneletter -> [a-zA-Z]
+        let grammar = GrammarBuilder::default()
+          .nonterm("Program")
+          .nonterm("Letters")
+          .terminal("oneletter", |l| l.len() == 1 &&
+                    l.chars().next().unwrap().is_alphabetic())
+          .terminal("m", |l| l == "m")
+          .terminal("a", |l| l == "a")
+          .terminal("i", |l| l == "i")
+          .terminal("n", |l| l == "n")
+          .rule("Program", &["Letters", "m", "a", "i", "n", "Letters"])
+          .rule("Letters", &["oneletter", "Letters"])
+          .rule("Letters", &[])
+          .into_grammar("Program")
+          .expect("Bad grammar");
+        let p = EarleyParser::new(grammar);
+        let input = "containsmainword".chars().map(|c| c.to_string());
+        assert!(p.parse(input).is_ok());
     }
 }

@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
 use crate::items::{Item, Trigger};
-use crate::parser::{ParseTrees, Error};
+use crate::parser::ParseTrees;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -33,12 +33,12 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 
 impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     fn reduce(&self, root: &Rc<Item>, args: Vec<ASTNode>)
-            -> Result<Vec<ASTNode>, Error> {
+            -> Result<Vec<ASTNode>, String> {
         // if item is not complete, keep collecting args
         if !root.complete() { return Ok(args) }
         let rulename = root.rule.to_string();
         match self.actions.get(&rulename) {
-            None => Err(Error::MissingAction(rulename)),
+            None => Err(format!("Missing Action: {}", rulename)),
             Some(action) => {
                 if cfg!(feature="debug") {
                     eprintln!("Reduction: {}", rulename);
@@ -55,10 +55,10 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     // left side. Trigger is either a scan or a completion, only those can
     // advance a prediction. To write this helper just draw a tree of the
     // backpointers and see how they link
-    fn walker(&self, root: &Rc<Item>) -> Result<Vec<ASTNode>, Error> {
+    fn walker(&self, root: &Rc<Item>) -> Result<Vec<ASTNode>, String> {
         let mut args = Vec::new();
         // collect arguments for semantic actions
-        let source = root.source();
+        let source = root.sources();
         if let Some((ref prediction, ref trigger)) = source.iter().next() {
             // explore left side of the root
             args.extend(self.walker(prediction)?);
@@ -76,7 +76,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     }
 
     // for non-ambiguous grammars this retreieves the only possible parse
-    pub fn eval(&self, ptrees: &ParseTrees) -> Result<ASTNode, Error> {
+    pub fn eval(&self, ptrees: &ParseTrees) -> Result<ASTNode, String> {
         // walker will always return a Vec of size 1 because root.complete
         Ok(self.walker(ptrees.0.first().expect("BUG: ParseTrees empty"))?
            .swap_remove(0))
@@ -86,8 +86,8 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 
 impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 
-    fn walker_all(&self, root: &Rc<Item>) -> Result<Vec<Vec<ASTNode>>, Error> {
-        let source = root.source();
+    fn walker_all(&self, root: &Rc<Item>) -> Result<Vec<Vec<ASTNode>>, String> {
+        let source = root.sources();
         if source.len() == 0 {
             return Ok(vec![self.reduce(root, Vec::new())?]);
         }
@@ -117,7 +117,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     }
 
     // Retrieves all parse trees
-    pub fn eval_all(&self, ptrees: &ParseTrees) -> Result<Vec<ASTNode>, Error> {
+    pub fn eval_all(&self, ptrees: &ParseTrees) -> Result<Vec<ASTNode>, String> {
         let mut trees = Vec::new();
         for root in &ptrees.0 {
             trees.extend(

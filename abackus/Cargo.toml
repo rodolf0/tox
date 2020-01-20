@@ -1,6 +1,6 @@
 [package]
 name = "abackus"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2018"
 license = "MIT"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
@@ -15,7 +15,7 @@ debug = []
 
 [dependencies]
 lexers = { version = "0.1.2", path = "../lexers" }
-earlgrey = { version = "0.2.4", path = "../earlgrey" }
+earlgrey = { version = "0.3", path = "../earlgrey" }
 
 [[example]]
 name = "ebnftree"

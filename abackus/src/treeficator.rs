@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
 use crate::ebnf::ParserBuilder;
-use earlgrey::{EarleyParser, EarleyForest, Error};
+use earlgrey::{EarleyParser, EarleyForest};
 use std::fmt::Debug;
 
 #[derive(Clone,Debug)]
@@ -45,7 +45,7 @@ impl Sexpr {
 
 impl ParserBuilder {
     pub fn treeficator<SI>(self, grammar: &str, start: &str)
-        -> impl Fn(SI) -> Result<Vec<Tree>, Error>
+        -> impl Fn(SI) -> Result<Vec<Tree>, String>
         where SI: Iterator, SI::Item: AsRef<str> + Debug
     {
         // User may pre-plug grammar (self.0) with terminals
@@ -57,9 +57,9 @@ impl ParserBuilder {
         // 2. build evaler that builds trees when executing semantic actions
         let mut tree_builder = EarleyForest::new(
             |sym, tok| Tree::Leaf(sym.to_string(), tok.to_string()));
-        for rule in grammar.str_rules() {
-            tree_builder.action(&rule.to_string(),
-                move |nodes| Tree::Node(rule.to_string(), nodes));
+        for rule in grammar.rules.iter().map(|r| r.to_string()) {
+            tree_builder.action(
+                &rule.clone(), move |nodes| Tree::Node(rule.clone(), nodes));
         }
         // 3. make function that parses strings into trees
         let parser = EarleyParser::new(grammar);
@@ -67,7 +67,7 @@ impl ParserBuilder {
     }
 
     pub fn sexprificator<SI>(self, grammar: &str, start: &str)
-        -> impl Fn(SI) -> Result<Vec<Sexpr>, Error>
+        -> impl Fn(SI) -> Result<Vec<Sexpr>, String>
         where SI: Iterator, SI::Item: AsRef<str> + Debug
     {
         // User may pre-plug grammar (self.0) with terminals
@@ -79,11 +79,12 @@ impl ParserBuilder {
         // 2. build evaler that builds trees when executing semantic actions
         let mut tree_builder = EarleyForest::new(
             |_, tok| Sexpr::Atom(tok.to_string()));
-        for rule in grammar.str_rules() {
-            tree_builder.action(&rule, move |mut nodes| match nodes.len() {
-                1 => nodes.swap_remove(0),
-                _ => Sexpr::List(nodes),
-            });
+        for rule in &grammar.rules {
+            tree_builder.action(&rule.to_string(),
+                move |mut nodes| match nodes.len() {
+                    1 => nodes.swap_remove(0),
+                    _ => Sexpr::List(nodes),
+                });
         }
         // 3. make function that parses strings into trees
         let parser = EarleyParser::new(grammar);

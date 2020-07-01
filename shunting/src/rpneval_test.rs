@@ -2,7 +2,9 @@ use crate::parser::ShuntingParser;
 use crate::rpneval::MathContext;
 
 macro_rules! fuzzy_eq {
-    ($lhs:expr, $rhs:expr) => { assert!(($lhs - $rhs).abs() < 1.0e-10) }
+    ($lhs:expr, $rhs:expr) => {
+        assert!(($lhs - $rhs).abs() < 1.0e-10)
+    };
 }
 
 #[test]
@@ -20,7 +22,10 @@ fn test_eval2() {
 #[test]
 fn test_eval3() {
     let expr = ShuntingParser::parse_str("(-(1-9^2) / (1 + 6^2))^0.5").unwrap();
-    fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), 1.470429244187615496759);
+    fuzzy_eq!(
+        MathContext::new().eval(&expr).unwrap(),
+        1.470429244187615496759
+    );
 }
 
 #[test]

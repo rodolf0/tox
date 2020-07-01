@@ -1,5 +1,5 @@
+use crate::parser::{RPNExpr, ShuntingParser};
 use lexers::MathToken;
-use crate::parser::{ShuntingParser, RPNExpr};
 
 #[test]
 fn test_parse1() {
@@ -80,8 +80,8 @@ fn bad_parse() {
 #[test]
 fn check_arity() {
     use std::collections::HashMap;
-    let rpn = ShuntingParser::parse_str(
-        "sin(1)+(max(2, gamma(3.5), gcd(24, 8))+sum(i,0,10))").unwrap();
+    let rpn =
+        ShuntingParser::parse_str("sin(1)+(max(2, gamma(3.5), gcd(24, 8))+sum(i,0,10))").unwrap();
     let mut expect = HashMap::new();
     expect.insert("sin", 1);
     expect.insert("max", 3);
@@ -94,8 +94,8 @@ fn check_arity() {
             MathToken::Function(ref func, arity) => {
                 let expected_arity = expect.get(&func[..]);
                 assert_eq!(*expected_arity.unwrap(), arity);
-            },
-            _ => ()
+            }
+            _ => (),
         }
     }
 }

@@ -1,14 +1,14 @@
 mod repl {
-    use shunting::{ShuntingParser, MathContext};
-    use lexers::{MathTokenizer, MathToken};
+    use lexers::{MathToken, MathTokenizer};
+    use shunting::{MathContext, ShuntingParser};
 
     pub fn evalexpr(input: &str) {
         match ShuntingParser::parse_str(input) {
             Err(e) => println!("Parse error: {:?}", e),
             Ok(expr) => match MathContext::new().eval(&expr) {
                 Err(e) => println!("Eval error: {:?}", e),
-                Ok(result) => println!("{} = {}", expr, result)
-            }
+                Ok(result) => println!("{} = {}", expr, result),
+            },
         };
     }
 
@@ -21,8 +21,8 @@ mod repl {
                     Err(e) => println!("Parse error: {:?}", e),
                     Ok(rpn) => match cx.eval(&rpn) {
                         Err(e) => println!("Eval error: {:?}", e),
-                        Ok(result) => cx.setvar(&var[..], result)
-                    }
+                        Ok(result) => cx.setvar(&var[..], result),
+                    },
                 }
                 return;
             }
@@ -33,24 +33,22 @@ mod repl {
             Err(e) => println!("Parse error: {:?}", e),
             Ok(rpn) => match cx.eval(&rpn) {
                 Err(e) => println!("Eval error: {:?}", e),
-                Ok(result) => println!("{}", result)
-            }
+                Ok(result) => println!("{}", result),
+            },
         };
     }
 }
 
 fn main() {
     if std::env::args().len() > 1 {
-        let input = std::env::args().skip(1).
-            collect::<Vec<String>>().join(" ");
+        let input = std::env::args().skip(1).collect::<Vec<String>>().join(" ");
         repl::evalexpr(&input[..]);
     } else {
         use shunting::MathContext;
         let mut cx = MathContext::new();
-        let histpath =
-            dirs::home_dir().map(|h| h.join(".tox_history")).unwrap();
+        let histpath = dirs::home_dir().map(|h| h.join(".tox_history")).unwrap();
         let mut rl = rustyline::Editor::<()>::new();
-        if let Err(_) = rl.load_history(&histpath) {
+        if rl.load_history(&histpath).is_err() {
             println!("No history yet");
         }
         while let Ok(input) = rl.readline(">> ") {

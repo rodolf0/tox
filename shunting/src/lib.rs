@@ -2,7 +2,7 @@ mod parser;
 mod rpneval;
 mod rpnprint;
 
-pub use crate::parser::{ShuntingParser, RPNExpr};
+pub use crate::parser::{RPNExpr, ShuntingParser};
 pub use crate::rpneval::MathContext;
 
 #[cfg(test)]

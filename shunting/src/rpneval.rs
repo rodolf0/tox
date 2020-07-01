@@ -2,19 +2,11 @@ use std::collections::HashMap;
 use lexers::MathToken;
 use crate::parser::RPNExpr;
 
-#[derive(Debug, PartialEq)]
-pub enum EvalErr {
-    UnknownVar(String),
-    LinkError(String),
-    WrongNumberOfArgs,
-    BadNumber,
-    BadToken(String),
-}
 
 // a shorthand for checking number of arguments before eval_fn
 macro_rules! nargs {
     ($argcheck:expr, $ifok:expr) => {
-        if $argcheck { $ifok } else { Err(EvalErr::WrongNumberOfArgs) }
+        if $argcheck { $ifok } else { Err(format!("Wrong number of arguments")) }
     }
 }
 
@@ -33,7 +25,7 @@ impl MathContext {
         self.0.insert(var.to_string(), val);
     }
 
-    pub fn eval(&self, rpn: &RPNExpr) -> Result<f64, EvalErr> {
+    pub fn eval(&self, rpn: &RPNExpr) -> Result<f64, String> {
         let mut operands = Vec::new();
 
         for token in rpn.0.iter() {
@@ -41,11 +33,11 @@ impl MathContext {
                 MathToken::Number(num)       => operands.push(num),
                 MathToken::Variable(ref var) => match self.0.get(var) {
                     Some(value) => operands.push(*value),
-                    None => return Err(EvalErr::UnknownVar(var.to_string()))
+                    None => return Err(format!("Unknown Variable: {}", var.to_string()))
                 },
                 MathToken::BOp(ref op) => {
-                    let r = operands.pop().ok_or(EvalErr::WrongNumberOfArgs)?;
-                    let l = operands.pop().ok_or(EvalErr::WrongNumberOfArgs)?;
+                    let r = operands.pop().ok_or(format!("Wrong number of arguments"))?;
+                    let l = operands.pop().ok_or(format!("Wrong number of arguments"))?;
                     match &op[..] {
                         "+" => operands.push(l + r),
                         "-" => operands.push(l - r),
@@ -53,38 +45,32 @@ impl MathContext {
                         "/" => operands.push(l / r),
                         "%" => operands.push(l % r),
                         "^" => operands.push(l.powf(r)),
-                        _ => return Err(EvalErr::BadToken(op.clone()))
+                        _ => return Err(format!("Bad Token: {}", op.clone()))
                     }
                 },
                 MathToken::UOp(ref op) => {
-                    let o = operands.pop().ok_or(EvalErr::WrongNumberOfArgs)?;
+                    let o = operands.pop().ok_or(format!("Wrong number of arguments"))?;
                     match &op[..] {
                         "-" => operands.push(-o),
-                        "!" => match Self::eval_fn("tgamma", vec![o + 1.0]) {
-                            Ok(n) => operands.push(n),
-                            Err(e) => return Err(e)
-                        },
-                        _ => return Err(EvalErr::BadToken(op.clone()))
+                        "!" => operands.push(Self::eval_fn("tgamma", vec![o + 1.0])?),
+                        _ => return Err(format!("Bad Token: {}", op.clone()))
                     }
                 },
                 MathToken::Function(ref fname, arity) => {
                     if arity > operands.len() {
-                        return Err(EvalErr::WrongNumberOfArgs);
+                        return Err(format!("Wrong number of arguments"));
                     }
                     let cut = operands.len() - arity;
                     let args = operands.split_off(cut);
-                    match Self::eval_fn(fname, args) {
-                        Ok(n) => operands.push(n),
-                        Err(e) => return Err(e)
-                    }
+                    operands.push(Self::eval_fn(fname, args)?)
                 },
-                _ => return Err(EvalErr::BadToken(format!("{:?}", *token)))
+                _ => return Err(format!("Bad Token: {:?}", *token))
             }
         }
-        operands.pop().ok_or(EvalErr::WrongNumberOfArgs)
+        operands.pop().ok_or(format!("Wrong number of arguments"))
     }
 
-    fn eval_fn(fname: &str, args: Vec<f64>) -> Result<f64, EvalErr> {
+    fn eval_fn(fname: &str, args: Vec<f64>) -> Result<f64, String> {
         match fname {
             "sin"   => nargs!(args.len() == 1, Ok(args[0].sin())),
             "cos"   => nargs!(args.len() == 1, Ok(args[0].cos())),
@@ -95,10 +81,8 @@ impl MathContext {
                               Ok(args[1..].iter().fold(args[0], |a, &item| a.min(item)))),
             "abs"   => nargs!(args.len() == 1, Ok(f64::abs(args[0]))),
             "rand"  => nargs!(args.len() == 1, Ok(args[0] * rand::random::<f64>())),
-            _       => match mathlink::link_fn(fname) {
-                Ok(func) => nargs!(args.len() == 1, Ok(func(args[0]))),
-                Err(e) => Err(EvalErr::LinkError(e))
-            }
+            // Resolve function fname and call it
+            _       => nargs!(args.len() == 1, Ok((mathlink::link_fn(fname)?)(args[0])))
         }
     }
 }

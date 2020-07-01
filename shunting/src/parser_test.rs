@@ -1,5 +1,5 @@
 use lexers::MathToken;
-use crate::parser::{ShuntingParser, RPNExpr, ParseError};
+use crate::parser::{ShuntingParser, RPNExpr};
 
 #[test]
 fn test_parse1() {
@@ -68,13 +68,13 @@ fn test_parse3() {
 #[test]
 fn bad_parse() {
     let rpn = ShuntingParser::parse_str("sqrt(-(1-x^2) / (1 + x^2)");
-    assert_eq!(rpn, Err(ParseError::MissingCParen));
+    assert_eq!(rpn, Err(format!("Missing Closing Paren")));
 
     let rpn = ShuntingParser::parse_str("-(1-x^2) / (1 + x^2))");
-    assert_eq!(rpn, Err(ParseError::MissingOParen));
+    assert_eq!(rpn, Err(format!("Missing Opening Paren")));
 
     let rpn = ShuntingParser::parse_str("max 4, 6, 4)");
-    assert_eq!(rpn, Err(ParseError::MissingOParen));
+    assert_eq!(rpn, Err(format!("Missing Opening Paren")));
 }
 
 #[test]

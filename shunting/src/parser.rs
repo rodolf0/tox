@@ -27,13 +27,6 @@ pub fn precedence(mt: &MathToken) -> (usize, Assoc) {
     }
 }
 
-#[derive(PartialEq, Debug)]
-pub enum ParseError {
-    MissingOParen,
-    MissingCParen,
-    NonAssoc,
-    BadToken(String),
-}
 
 #[derive(PartialEq, Debug)]
 pub struct RPNExpr(pub Vec<MathToken>);
@@ -41,11 +34,11 @@ pub struct RPNExpr(pub Vec<MathToken>);
 pub struct ShuntingParser;
 
 impl ShuntingParser {
-    pub fn parse_str(expr: &str) -> Result<RPNExpr, ParseError> {
+    pub fn parse_str(expr: &str) -> Result<RPNExpr, String> {
         Self::parse(&mut MathTokenizer::new(expr.chars()))
     }
 
-    pub fn parse(lex: &mut impl Iterator<Item=MathToken>) -> Result<RPNExpr, ParseError> {
+    pub fn parse(lex: &mut impl Iterator<Item=MathToken>) -> Result<RPNExpr, String> {
         let mut out = Vec::new();
         let mut stack = Vec::new();
         let mut arity = Vec::<usize>::new();
@@ -61,7 +54,7 @@ impl ShuntingParser {
                         out.push(stack.pop().unwrap());
                     }
                     if stack.is_empty() {
-                        return Err(ParseError::MissingOParen);
+                        return Err(format!("Missing Opening Paren"));
                     }
                     // end of grouping: check if this is a function call
                     if token == MathToken::CParen {
@@ -85,19 +78,19 @@ impl ShuntingParser {
                         } else {
                             match assoc_rhs {
                                 Assoc::Left  => out.push(stack.pop().unwrap()),
-                                Assoc::None  => return Err(ParseError::NonAssoc),
+                                Assoc::None  => return Err(format!("No Associativity")),
                                 Assoc::Right => break
                             }
                         }
                     }
                     stack.push(token);
                 },
-                MathToken::Unknown(lexeme) => return Err(ParseError::BadToken(lexeme))
+                MathToken::Unknown(lexeme) => return Err(format!("Bad token: {}", lexeme))
             }
         }
         while let Some(top) = stack.pop() {
             match top {
-                MathToken::OParen => return Err(ParseError::MissingCParen),
+                MathToken::OParen => return Err(format!("Missing Closing Paren")),
                 token             => out.push(token),
             }
         }

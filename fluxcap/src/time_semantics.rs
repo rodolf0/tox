@@ -96,11 +96,9 @@ impl TimeNode {
             Next(seq, n) => TimeEl::Time(seq.future(&reftime)
                                          // skip_while needed to go over 'This'
                                          .skip_while(|x| x.start <= reftime)
-                                         .skip(*n)
-                                         .next().unwrap()),
+                                         .nth(*n).unwrap()),
             Last(seq, n) => TimeEl::Time(seq.past(&reftime)
-                                         .skip(*n)
-                                         .next().unwrap()),
+                                         .nth(*n).unwrap()),
             RefNext(seq, t0) => TimeEl::Time(seq.future(&t0).next().unwrap()),
             RefPrev(seq, t0) => TimeEl::Time(seq.past(&t0).next().unwrap()),
             Until(seq, tn) => TimeEl::Count(seq.future(&reftime)

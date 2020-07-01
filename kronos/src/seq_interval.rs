@@ -38,7 +38,7 @@ impl<SeqA, SeqB> Interval<SeqA, SeqB>
         // initial interval can contain t0 even if end-of start element past
         let probe = interval(self.start._future_raw(t0).next().unwrap());
         // estimate grain from interval length
-        let trunc_grain = utils::enclosing_grain_from_duration(probe.len());
+        let trunc_grain = utils::enclosing_grain_from_duration(probe.duration());
         // choose a time of reference aligned to interval on enclosing grain
         let t0 = utils::truncate(*t0, trunc_grain);
         let t0 = self.start._future_raw(&t0).next().unwrap().start;

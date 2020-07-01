@@ -88,7 +88,7 @@ impl Range {
         None
     }
 
-    pub fn len(&self) -> Duration {
+    pub fn duration(&self) -> Duration {
         self.end.signed_duration_since(self.start)
     }
 }

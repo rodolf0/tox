@@ -60,6 +60,7 @@ fn main() {
       collect::<Vec<String>>().join(" ");
 
   // Print resulting parse trees
+  // See example for tokenizer https://github.com/rodolf0/tox/blob/master/abackus/examples/ebnftree.rs
   match trif(&mut tokenizer(input.chars())) {
       Ok(trees) => for t in trees { println!("{}", t.print()); },
       Err(e) => println!("{:?}", e)

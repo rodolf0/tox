@@ -13,6 +13,7 @@ macro_rules! nargs {
     };
 }
 
+#[derive(Debug, Clone)]
 pub struct MathContext(pub HashMap<String, f64>);
 
 impl MathContext {

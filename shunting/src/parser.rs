@@ -31,7 +31,7 @@ pub fn precedence(mt: &MathToken) -> (usize, Assoc) {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct RPNExpr(pub Vec<MathToken>);
 
 pub struct ShuntingParser;

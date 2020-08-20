@@ -38,6 +38,8 @@ Underneath the covers an `earlgrey::EarleyParser` is used to build a parser for 
 ## Example
 
 ```rust
+// NOTE: extract from abackus/examples/ebnftree.rs
+
 fn main() {
   let grammar = r#"
     expr   := expr ('+'|'-') term | term ;

@@ -6,7 +6,7 @@ pub use crate::types::{Grain, TimeSequence, Range, Season};
 mod utils;
 
 mod seq_named;
-pub use crate::seq_named::{Weekday, Month, Weekend, Year};
+pub use crate::seq_named::{Weekday, Month, NMonth, Weekend, Year};
 
 mod seq_grain;
 pub use crate::seq_grain::Grains;

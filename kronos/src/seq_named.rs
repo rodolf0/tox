@@ -56,6 +56,33 @@ impl TimeSequence for Month {
     }
 }
 
+#[derive(Clone)]
+pub struct NMonth(pub u32, pub i32);
+
+impl NMonth {
+    fn _base(&self, t0: &DateTime, future: bool) -> Box<dyn Iterator<Item=Range>> {
+        let base = utils::truncate(*t0, Grain::Month).date();
+        let base = utils::find_month(base, self.0, future).and_hms(0, 0, 0);
+        let endshift = self.1;
+        let sign = if future { 1 } else { -1 };
+        Box::new((0..).map(move |x| Range{
+            start: utils::shift_datetime(base, Grain::Month, sign * endshift * x),
+            end: utils::shift_datetime(base, Grain::Month, sign * endshift * x + 1),
+            grain: Grain::Month
+        }))
+    }
+}
+
+impl TimeSequence for NMonth {
+    fn _future_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
+        self._base(t0, true)
+    }
+
+    fn _past_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range>> {
+        self._base(t0, false)
+    }
+}
+
 
 #[derive(Clone)]
 pub struct Weekend;

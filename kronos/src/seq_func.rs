@@ -1,14 +1,16 @@
 #![deny(warnings)]
 
-use std::rc::Rc;
 use crate::types::{DateTime, Range, Grain, TimeSequence};
 
 #[derive(Clone)]
-pub struct Map<Seq>(pub Seq, pub Rc<dyn Fn(Range)->Option<Range>>)
-    where Seq: TimeSequence;
+pub struct Map<Seq, RangeMapper>(pub Seq, pub RangeMapper)
+    where Seq: TimeSequence,
+          RangeMapper: Fn(Range)->Option<Range> + Clone;
 
-impl<Seq> TimeSequence for Map<Seq>
-    where Seq: TimeSequence + Clone
+impl<Seq, RangeMapper> TimeSequence for Map<Seq, RangeMapper>
+    where Seq: TimeSequence + Clone,
+  RangeMapper: Fn(Range)->Option<Range> + Clone,
+
 {
     fn _future_raw(&self, t0: &DateTime) -> Box<dyn Iterator<Item=Range> + '_> {
         let f = self.1.clone();
@@ -26,8 +28,8 @@ pub fn shift<Seq>(seq: Seq, grain: Grain, n: i32) -> impl TimeSequence
     where Seq: TimeSequence + Clone
 {
     use crate::utils;
-    Map(seq, Rc::new(move |x| Some(Range{
+    Map(seq, move |x| Some(Range{
         start: utils::shift_datetime(x.start, grain, n),
         end: utils::shift_datetime(x.end, grain, n),
-        grain: x.grain})))
+        grain: x.grain}))
 }

@@ -214,6 +214,40 @@ mod test {
     }
 
     #[test]
+    fn nmonth() {
+        let t0_april = dt(2018, 4, 3);
+
+        // Standing on April, next third month after April is the same month
+        let it = NMonth(4, 3).future(&t0_april).next().unwrap();
+        assert_eq!(it, Range{
+            start: dt(2018, 4, 1), end: dt(2018, 5, 1), grain: Grain::Month});
+        
+        // Standing on April, next March is in the following year
+        let mut it = NMonth(3, 3).future(&t0_april);
+        assert_eq!(it.next().unwrap(), Range{
+            start: dt(2019, 3, 1), end: dt(2019, 4, 1), grain: Grain::Month});
+        // the next occurrence is June
+        assert_eq!(it.next().unwrap(), Range{
+            start: dt(2019, 6, 1), end: dt(2019, 7, 1), grain: Grain::Month});
+        
+        // Standing on April, next March is the month prior
+        let mut it = NMonth(3, 3).past(&t0_april);
+        assert_eq!(it.next().unwrap(), Range{
+            start: dt(2018, 3, 1), end: dt(2018, 4, 1), grain: Grain::Month});
+        // the next occurrence is December of the previous year
+        assert_eq!(it.next().unwrap(), Range{
+            start: dt(2017, 12, 1), end: dt(2018, 1, 1), grain: Grain::Month});
+        
+        // Standing on April, the next May is the next month
+        let mut it = NMonth(5, 7).future(&t0_april);
+        assert_eq!(it.next().unwrap(), Range{
+            start: dt(2018, 5, 1), end: dt(2018, 6, 1), grain: Grain::Month});
+        // the next seventh month is December
+        assert_eq!(it.next().unwrap(), Range{
+            start: dt(2018, 12, 1), end: dt(2019, 1, 1), grain: Grain::Month});
+    }
+
+    #[test]
     fn weekend() {
         // start from a Wednesday
         let mut weekend = Weekend.future(&dt(2016, 3, 23));

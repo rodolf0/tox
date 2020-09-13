@@ -36,7 +36,7 @@ mod seq_mgrain;
 pub use crate::seq_mgrain::MGrain;
 
 mod seq_func;
-pub use crate::seq_func::{Map, shift};
+pub use crate::seq_func::{Map, shift, step_by};
 
 mod seq_shim;
 pub use crate::seq_shim::Shim;

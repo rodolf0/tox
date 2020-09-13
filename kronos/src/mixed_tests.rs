@@ -50,3 +50,31 @@ fn test_multi() {
     assert_eq!(iter.next().unwrap(),
         Range{start: dt(2022, 2, 28), end: dt(2022, 3, 1), grain: Grain::Day});
 }
+
+#[test]
+fn test_every_nmonths_from_offset() {
+    // Ref: https://github.com/rodolf0/tox/pull/8/commits
+    let t0_april = dt(2018, 4, 3);
+
+    // Filtering once the iterator has been triggered
+    let mut every_3months_iter = Grains(Grain::Month)
+        .future(&t0_april)
+        .step_by(3);
+
+   assert_eq!(every_3months_iter.next().unwrap(), Range{
+        start: dt(2018, 4, 1), end: dt(2018, 5, 1), grain: Grain::Month});
+
+    // Specifying the template
+    let seq = step_by(Grains(Grain::Month), 3);
+   assert_eq!(seq.future(&t0_april).next().unwrap(), Range{
+        start: dt(2018, 4, 1), end: dt(2018, 5, 1), grain: Grain::Month});
+
+   // Every n-months but using an offset
+    use chrono::Datelike;
+    let mut every_3months_from_next_march_iter = Grains(Grain::Month)
+        .future(&t0_april)
+        .skip_while(|r| r.start.date().month() != 3)
+        .step_by(3);
+    assert_eq!(every_3months_from_next_march_iter.next().unwrap(), Range{
+        start: dt(2019, 3, 1), end: dt(2019, 4, 1), grain: Grain::Month});
+}

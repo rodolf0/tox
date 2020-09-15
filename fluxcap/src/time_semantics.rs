@@ -5,8 +5,7 @@ type Date = chrono::NaiveDate;
 
 use earlgrey::{EarleyParser, EarleyForest};
 use kronos as k;
-use std::rc::Rc;
-
+type Shim = kronos::Shim<'static>;
 
 #[derive(Debug,PartialEq)]
 pub enum TimeEl {
@@ -26,18 +25,16 @@ enum TimeNode {
     Grain(k::Grain),
     Shifts(Vec<(k::Grain, i32)>),
     Nop,
-    Seq(k::Shim),
-    This(k::Shim),
-    Next(k::Shim, usize),
-    Last(k::Shim, usize),
-    RefNext(k::Shim, DateTime),
-    RefPrev(k::Shim, DateTime),
-    Until(k::Shim, DateTime),
-    Since(k::Shim, DateTime),
-    Between(k::Shim, DateTime, DateTime),
+    Seq(Shim),
+    This(Shim),
+    Next(Shim, usize),
+    Last(Shim, usize),
+    RefNext(Shim, DateTime),
+    RefPrev(Shim, DateTime),
+    Until(Shim, DateTime),
+    Since(Shim, DateTime),
+    Between(Shim, DateTime, DateTime),
 }
-
-fn shim<T: k::TimeSequence + 'static>(b: T) -> k::Shim { k::Shim(Rc::new(b)) }
 
 // Used to cap granularity of time-shifts for rendering
 fn time_shift_resolution(grain: k::Grain) -> k::Grain {
@@ -52,21 +49,21 @@ fn time_shift_resolution(grain: k::Grain) -> k::Grain {
 }
 
 // Shift a sequence by multiple shifts
-fn build_shifter(shifts: Vec<(k::Grain, i32)>, sign: i32) -> k::Shim {
+fn build_shifter(shifts: Vec<(k::Grain, i32)>, sign: i32) -> Shim {
     // get the finest grain of the composition to anchor the lookback
     let grain = shifts.iter().min_by_key(|g| g.0).unwrap().0;
     // cap to day granularity at most
     let grain = time_shift_resolution(grain);
-    let mut shifted = shim(kronos::Grains(grain));
+    let mut shifted = Shim::new(kronos::Grains(grain));
     // shift the initial sequence by composed shifts
     for s in shifts {
-        shifted = shim(kronos::shift(shifted, s.0, sign * s.1));
+        shifted = Shim::new(kronos::shift(shifted, s.0, sign * s.1));
     }
     shifted
 }
 
 
-macro_rules! s { ($e:expr) => (TimeNode::Seq(Shim(Rc::new($e)))) }
+macro_rules! s { ($e:expr) => (TimeNode::Seq(Shim::new($e))) }
 
 impl TimeNode {
     fn i32(&self) -> i32 {
@@ -81,7 +78,7 @@ impl TimeNode {
     fn grain(&self) -> k::Grain {
         if let TimeNode::Grain(x) = self { *x } else { panic!("BUG") }
     }
-    fn seq(&self) -> k::Shim {
+    fn seq(&self) -> Shim {
         if let TimeNode::Seq(x) = self { x.clone() } else { panic!("BUG") }
     }
     fn shifts(self) -> Vec<(k::Grain, i32)> {
@@ -199,10 +196,10 @@ fn evaler_comp_grain<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
 fn evaler_time<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
     use TimeNode::*;
     use kronos::*;
-    ev.action("time -> today", |_| This(shim(Grains(k::Grain::Day))));
-    ev.action("time -> tomorrow", |_| Next(shim(Grains(k::Grain::Day)), 0));
-    ev.action("time -> yesterday", |_| Last(shim(Grains(k::Grain::Day)), 0));
-    ev.action("time -> on weekday", |t| Next(shim(Weekday(t[1].u32())), 0));
+    ev.action("time -> today", |_| This(Shim::new(Grains(k::Grain::Day))));
+    ev.action("time -> tomorrow", |_| Next(Shim::new(Grains(k::Grain::Day)), 0));
+    ev.action("time -> yesterday", |_| Last(Shim::new(Grains(k::Grain::Day)), 0));
+    ev.action("time -> on weekday", |t| Next(Shim::new(Weekday(t[1].u32())), 0));
     ev.action("time -> named_seq", |t| This(t[0].seq()));
 
     ev.action("time -> the comp_seq", |t| This(t[1].seq()));
@@ -229,14 +226,14 @@ fn evaler_time<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
         Next(build_shifter(shifts, 1), 0)
     });
 
-    ev.action("time -> year", |t| RefNext(shim(Grains(k::Grain::Year)),
+    ev.action("time -> year", |t| RefNext(Shim::new(Grains(k::Grain::Year)),
         Date::from_ymd(t[0].i32(), 1, 1).and_hms(0, 0, 0)));
 
-    ev.action("time -> month year", |t| RefNext(shim(Grains(k::Grain::Month)),
+    ev.action("time -> month year", |t| RefNext(Shim::new(Grains(k::Grain::Month)),
         Date::from_ymd(t[1].i32(), t[0].u32(), 1).and_hms(0, 0, 0)));
 
     ev.action("time -> month day_ordinal year",
-              |t| RefNext(shim(Grains(k::Grain::Day)),
+              |t| RefNext(Shim::new(Grains(k::Grain::Day)),
         Date::from_ymd(t[2].i32(), t[0].u32(), t[1].u32()).and_hms(0, 0, 0)));
 
     ev.action("time -> comp_grain after time", |mut t| {

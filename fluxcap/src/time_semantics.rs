@@ -89,7 +89,7 @@ impl TimeNode {
         use TimeNode::*;
         use kronos::TimeSequence;
         match self {
-            This(seq) => TimeEl::Time(seq.future(&reftime).next().unwrap()),
+            This(seq) => TimeEl::Time(seq._future_raw(&reftime).next().unwrap()),
             Next(seq, n) => TimeEl::Time(seq.future(&reftime)
                                          // skip_while needed to go over 'This'
                                          .skip_while(|x| x.start <= reftime)
@@ -153,6 +153,8 @@ fn evaler_sequence<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
                         NthOf(t[2].usize(),
                               Grains(Grain::Day), Month(t[1].u32())))));
 
+    ev.action("named_seq -> year", |t| s!(Year(t[0].i32())));
+
     ev.action("named_seq -> weekend", |_| s!(Weekend));
     ev.action("named_seq -> weekends", |_| s!(Weekend));
 
@@ -193,7 +195,7 @@ fn evaler_comp_grain<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
 }
 
 
-fn evaler_time<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
+fn evaler_time<'a>(ev: &mut EarleyForest<'a, TimeNode>, reftime: DateTime) {
     use TimeNode::*;
     use kronos::*;
     ev.action("time -> today", |_| This(Shim::new(Grains(k::Grain::Day))));
@@ -226,9 +228,6 @@ fn evaler_time<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
         Next(build_shifter(shifts, 1), 0)
     });
 
-    ev.action("time -> year", |t| RefNext(Shim::new(Grains(k::Grain::Year)),
-        Date::from_ymd(t[0].i32(), 1, 1).and_hms(0, 0, 0)));
-
     ev.action("time -> month year", |t| RefNext(Shim::new(Grains(k::Grain::Month)),
         Date::from_ymd(t[1].i32(), t[0].u32(), 1).and_hms(0, 0, 0)));
 
@@ -236,34 +235,29 @@ fn evaler_time<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
               |t| RefNext(Shim::new(Grains(k::Grain::Day)),
         Date::from_ymd(t[2].i32(), t[0].u32(), t[1].u32()).and_hms(0, 0, 0)));
 
-    ev.action("time -> comp_grain after time", |mut t| {
-        let reftime = chrono::Local::now().naive_local();
+    ev.action("time -> comp_grain after time", move |mut t| {
         let time = t.remove(2).eval(reftime).range().start;
         let shifts = t.remove(0).shifts();
         RefNext(build_shifter(shifts, 1), time)
     });
 
-    ev.action("time -> comp_grain before time", |mut t| {
-        let reftime = chrono::Local::now().naive_local();
+    ev.action("time -> comp_grain before time", move |mut t| {
         let time = t.remove(2).eval(reftime).range().start;
         let shifts = t.remove(0).shifts();
         RefPrev(build_shifter(shifts, -1), time)
     });
 
-    ev.action("time -> sequence until time", |mut t| {
-        let reftime = chrono::Local::now().naive_local();
+    ev.action("time -> sequence until time", move |mut t| {
         let time = t.remove(2).eval(reftime).range().start;
         Until(t.remove(0).seq(), time)
     });
 
-    ev.action("time -> sequence since time", |mut t| {
-        let reftime = chrono::Local::now().naive_local();
+    ev.action("time -> sequence since time", move |mut t| {
         let time = t.remove(2).eval(reftime).range().start;
         Since(t.remove(0).seq(), time)
     });
 
-    ev.action("time -> sequence between time and time", |mut t| {
-        let reftime = chrono::Local::now().naive_local();
+    ev.action("time -> sequence between time and time", move |mut t| {
         let tn = t.remove(4).eval(reftime).range().start;
         let t0 = t.remove(2).eval(reftime).range().start;
         Between(t.remove(0).seq(), t0, tn)
@@ -271,20 +265,20 @@ fn evaler_time<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
 }
 
 
-pub struct TimeMachine<'a>(EarleyParser, EarleyForest<'a, TimeNode>);
+pub struct TimeMachine<'a>(EarleyParser, EarleyForest<'a, TimeNode>, DateTime);
 
 impl<'a> TimeMachine<'a> {
-    pub fn new() -> TimeMachine<'a> {
+    pub fn new(reftime: DateTime) -> TimeMachine<'a> {
         use crate::time_parser;
         let mut ev = EarleyForest::new(terminal_eval());
         evaler_sequence(&mut ev);
         evaler_comp_seq(&mut ev);
         evaler_comp_grain(&mut ev);
-        evaler_time(&mut ev);
-        TimeMachine(time_parser::time_parser(), ev)
+        evaler_time(&mut ev, reftime);
+        TimeMachine(time_parser::time_parser(), ev, reftime)
     }
 
-    pub fn eval(&self, reftime: DateTime, time: &str) -> Vec<TimeEl> {
+    pub fn eval(&self, time: &str) -> Vec<TimeEl> {
         let mut tokenizer = lexers::DelimTokenizer::new(time.chars(), ", ", true);
         let state = match self.0.parse(&mut tokenizer) {
             Ok(state) => state,
@@ -296,7 +290,7 @@ impl<'a> TimeMachine<'a> {
         self.1.eval_all(&state)
               .unwrap_or_else(|e| panic!("TimeMachine Error: {:?}", e))
               .into_iter()
-              .map(|tree| tree.eval(reftime))
+              .map(|tree| tree.eval(self.2))
               .collect()
     }
 }

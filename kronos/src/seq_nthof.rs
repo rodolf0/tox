@@ -83,6 +83,12 @@ mod test {
         assert_eq!(day3.next().unwrap(),
             Range{start: dt(2016, 3, 3), end: dt(2016, 3, 4), grain: Grain::Day});
 
+        // inclusive
+        let day3 = NthOf(3, Grains(Grain::Day), Grains(Grain::Month));
+        let mut day3 = day3._future_raw(&dt(2016, 9, 5));
+        assert_eq!(day3.next().unwrap(),
+            Range{start: dt(2016, 9, 3), end: dt(2016, 9, 4), grain: Grain::Day});
+
         // 3rd tuesday of the month
         let tue3mo = NthOf(3, Weekday(2), Grains(Grain::Month));
         let mut tue3mo = tue3mo.future(&dt(2016, 2, 10));

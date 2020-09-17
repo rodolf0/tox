@@ -19,7 +19,7 @@ fn main() {
     };
 
     let reftime = chrono::Local::now().naive_local();
-    let tm = fluxcap::TimeMachine::new();
+    let tm = fluxcap::TimeMachine::new(reftime);
 
     fn fmt(grain: kronos::Grain) -> &'static str {
         use kronos::Grain::*;
@@ -33,7 +33,7 @@ fn main() {
         }
     }
 
-    for r in tm.eval(reftime, &input) {
+    for r in tm.eval(&input) {
         match &r {
             &fluxcap::TimeEl::Time(ref r) if r.grain <= kronos::Grain::Day =>
                 println!("({:?}) {}", r.grain, r.start.format(fmt(r.grain))),

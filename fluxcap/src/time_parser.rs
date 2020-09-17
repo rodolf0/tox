@@ -14,6 +14,7 @@ pub fn time_grammar() -> &'static str {
               | weekday day_ordinal 'of' month
               | weekday month day_ordinal
               | 'weekend' | 'weekends'
+              | year
               ;
 
     sequence := named_seq | grain;
@@ -50,7 +51,6 @@ pub fn time_grammar() -> &'static str {
           | comp_grain 'ago'
           | 'in' comp_grain
 
-          | year
           | month year
           | month day_ordinal year
 

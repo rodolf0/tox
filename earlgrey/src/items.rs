@@ -7,9 +7,9 @@ use std::rc::Rc;
 
 
 #[derive(PartialEq,Eq,Hash,Debug,Clone)]
-pub enum Trigger {
-    Complete(Rc<Item>),
-    Scan(String),
+pub enum BackPointer {
+    Complete(Rc<Item>, Rc<Item>),
+    Scan(Rc<Item>, String),
 }
 
 /// An Item is a partially matched `Rule`. `dot` shows the match progress.
@@ -23,7 +23,7 @@ pub struct Item {
     // of backpointers would invalidate other Items already pointing to this one.
     // Those invalidated items wouldn't have the whole back-pointer list.
     /// backpointers leading to this item: (source-item, Scan/Complete)
-    backpointers: cell::RefCell<HashSet<(Rc<Item>, Trigger)>>,
+    backpointers: cell::RefCell<HashSet<BackPointer>>,
 }
 
 
@@ -74,7 +74,7 @@ impl Item {
 
     /// Scans or Completions that led to the creation of this Item.
     /// only ever borrowed non-mutable ref returned for public consumption
-    pub fn sources(&self) -> cell::Ref<HashSet<(Rc<Item>, Trigger)>> {
+    pub fn sources(&self) -> cell::Ref<HashSet<BackPointer>> {
         self.backpointers.borrow()
     }
 
@@ -100,7 +100,7 @@ impl Item {
     /// An item where the rule is advanced by matching a terminal.
     pub fn scan_new(source: &Rc<Item>, end: usize, input: &str) -> Item {
         let mut _bp = HashSet::new();
-        _bp.insert((source.clone(), Trigger::Scan(input.to_string())));
+        _bp.insert(BackPointer::Scan(source.clone(), input.to_string()));
         Item{
             rule: source.rule.clone(),
             dot: source.dot + 1,
@@ -114,7 +114,7 @@ impl Item {
     /// `Rule` is advanced because its next symbol matches the completed `trigger`.
     pub fn complete_new(source: &Rc<Item>, trigger: &Rc<Item>, end: usize) -> Item {
         let mut _bp = HashSet::new();
-        _bp.insert((source.clone(), Trigger::Complete(trigger.clone())));
+        _bp.insert(BackPointer::Complete(source.clone(), trigger.clone()));
         Item{
             rule: source.rule.clone(),
             dot: source.dot + 1,
@@ -132,7 +132,7 @@ mod tests {
     use std::rc::Rc;
     use std::collections::HashSet;
     use std::cell::RefCell;
-    use super::{Rule, Item, Symbol, Trigger};
+    use super::{Rule, Item, Symbol, BackPointer};
 
     fn gen_rule1() -> Rc<Rule> {
         fn testfn(o: &str) -> bool { o.len() == 1 && "+-".contains(o) }
@@ -189,7 +189,7 @@ mod tests {
         assert_eq!(item(gen_rule1(), 2, 0, 2), scan);
         // Check scan item backpointers
         let scan_src = scan.sources();
-        assert!(scan_src.contains(&(source, Trigger::Scan("+".to_string()))));
+        assert!(scan_src.contains(&BackPointer::Scan(source, "+".to_string())));
         assert_eq!(scan_src.len(), 1);
     }
 
@@ -205,7 +205,7 @@ mod tests {
         assert_eq!(item(gen_rule1(), 1, 0, 3), complete_based);
         // Check completion item backpointers
         let src = complete_based.sources();
-        assert!(src.contains(&(source, Trigger::Complete(trigger))));
+        assert!(src.contains(&BackPointer::Complete(source, trigger)));
         assert_eq!(src.len(), 1);
     }
 

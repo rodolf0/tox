@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use crate::items::{Item, Trigger};
+use crate::items::{Item, BackPointer};
 use crate::parser::ParseTrees;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -58,19 +58,19 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     fn walker(&self, root: &Rc<Item>) -> Result<Vec<ASTNode>, String> {
         let mut args = Vec::new();
         // collect arguments for semantic actions
-        let source = root.sources();
-        if let Some((ref prediction, ref trigger)) = source.iter().next() {
-            // explore left side of the root
-            args.extend(self.walker(prediction)?);
-            // explore right side of the root
-            args.extend(match *trigger {
-                Trigger::Complete(ref item) => self.walker(item)?,
-                Trigger::Scan(ref token) => {
-                    let symbol = prediction.next_symbol()
-                        .expect("BUG: missing scan trigger symbol").name();
-                    vec![(self.leaf_builder)(&symbol, token)]
+        if let Some(backpointer) = root.sources().iter().next() {
+            match backpointer {
+                BackPointer::Complete(source, trigger) => {
+                    args.extend(self.walker(source)?);
+                    args.extend(self.walker(trigger)?);
                 }
-            });
+                BackPointer::Scan(source, trigger) => {
+                    let symbol = source.next_symbol()
+                        .expect("BUG: missing scan trigger symbol").name();
+                    args.extend(self.walker(source)?);
+                    args.push((self.leaf_builder)(&symbol, trigger));
+                }
+            }
         }
         self.reduce(root, args)
     }
@@ -92,22 +92,24 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
             return Ok(vec![self.reduce(root, Vec::new())?]);
         }
         let mut trees = Vec::new();
-        for (ref prediction, ref trigger) in source.iter() {
-            // get left-side-tree of each source
-            for mut args in self.walker_all(prediction)? {
-                match *trigger {
-                    Trigger::Complete(ref itm) => {
-                        // collect right-side-tree of each source
-                        for trig in self.walker_all(itm)? {
+        for backpointer in source.iter() {
+            match backpointer {
+                BackPointer::Complete(source, trigger) => {
+                    // collect left-side-tree of each node
+                    for args in self.walker_all(source)? {
+                        // collect right-side-tree of each node
+                        for trig in self.walker_all(trigger)? {
                             let mut args = args.clone();
                             args.extend(trig);
                             trees.push(self.reduce(root, args)?);
                         }
-                    },
-                    Trigger::Scan(ref token) => {
-                        let symbol = prediction.next_symbol()
+                    }
+                }
+                BackPointer::Scan(source, trigger) => {
+                    for mut args in self.walker_all(source)? {
+                        let symbol = source.next_symbol()
                             .expect("BUG: missing scan trigger symbol").name();
-                        args.push((self.leaf_builder)(&symbol, token));
+                        args.push((self.leaf_builder)(&symbol, trigger));
                         trees.push(self.reduce(root, args)?);
                     }
                 }

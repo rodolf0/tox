@@ -121,7 +121,7 @@ impl EarleyParser {
                 eprintln!("=== StateSet {} ===", idx);
                 stateset.iter().inspect(|item| {
                     let src = item.sources().iter()
-                        .map(|(s, t)| format!("Src({:?}) + {:?}", s, t))
+                        .map(|bp| format!("{:?}", bp))
                         .collect::<Vec<_>>().join(", ");
                     eprintln!("{:?} -- SRC: {}", item, src);
                 }).count();

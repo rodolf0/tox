@@ -64,6 +64,19 @@ fn accept() {
 }
 
 #[test]
+fn accept_all() {
+    let mut s = Scanner::new("12.3 hPa".chars());
+    assert!(s.accept_all("12.3".chars()));
+    assert_eq!(s.current(), Some('3'));
+    assert_eq!(s.next(), Some(' '));
+    s.extract();
+    assert!(!s.accept_all("hXa".chars()));
+    assert!(s.accept_all("hPa".chars()));
+    assert_eq!(s.current(), Some('a'));
+    assert_eq!(s.extract_string(), "hPa");
+}
+
+#[test]
 fn skips() {
     let mut s = Scanner::new("heey  you!".chars());
     assert_eq!(s.accept_any(&['h']), Some('h'));

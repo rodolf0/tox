@@ -141,6 +141,19 @@ where
         None
     }
 
+    // Advance the scanner only if a full match for items form 'what'.
+    // self.current() will return the last item from 'what'
+    pub fn accept_all(&mut self, what: impl Iterator<Item=I::Item>) -> bool {
+        let backtrack = self.buffer_pos();
+        for item in what {
+            if self.accept(&item).is_none() {
+                self.set_buffer_pos(backtrack);
+                return false;
+            }
+        }
+        true
+    }
+
     // Skip over the 'over' set, result is if the scanner was advanced,
     // self.current() will return the last matching char
     pub fn skip_all(&mut self, over: &[I::Item]) -> bool {

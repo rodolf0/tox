@@ -18,3 +18,5 @@ pub use crate::lisp_tokenizer::{LispToken, LispTokenizer};
 
 #[cfg(test)]
 mod scanner_test;
+#[cfg(test)]
+mod helpers_test;

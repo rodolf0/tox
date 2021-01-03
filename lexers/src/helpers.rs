@@ -116,79 +116,35 @@ impl<I: Iterator<Item = char>> Scanner<I> {
         self.skip_all(ALNUM);
         Some(self.extract_string())
     }
-}
 
-///////////////////////////////////////////////////////////////////////////////
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn scan_number() {
-        let tests = vec![
-            "987",
-            "-543",
-            "435i",
-            "41.98",
-            "-83.5",
-            "-54.3i",
-            "28e3",
-            "54E+2",
-            "54e-33",
-            "43e0i",
-            "3E8i",
-            "-38e3",
-            "-53e+5",
-            "-65E-4",
-            "-32E-4i",
-            "-33e+2i",
-            "85.365e3",
-            "54.234E+2",
-            "54.849e-33",
-            "1.4e+2i",
-            "3.14e-5i",
-            "-38.657e3",
-            "53.845e+5",
-            "65.987E-4",
-            "-4.4e+2i",
-            "-6.14e-5i",
+    // scan an optional prefix (unit multiplier) and unit
+    pub fn scan_unit(&mut self) -> Option<(String, String)> {
+        static PFX: &[&str] = &[
+            "da", "h", "k", "M", "G", "T", "P", "E", "Z", "Y",
+            "y", "z", "a", "f", "p", "n", "μ", "m", "c", "d",
+            "", // no multiplier prefix, raw unit
         ];
-        for t in tests.iter() {
-            let result = Scanner::new(t.chars()).scan_number();
-            assert_eq!(Some(t.to_string()), result);
-        }
-    }
-
-    #[test]
-    fn scan_math_ops() {
-        let tests = vec![
-            "<", "<=", "==", ">=", ">", "(", ")", ",", "*", "**", "^", "!", "+", "-", "/", "%",
+        // NOTE: longest prefix first for longest match (ie: 'da')
+        assert_eq!(PFX[0], "da");
+        static BARE_UNITS: &[&str] = &[
+            "kat", "mol", "rad",
+            "Bq", "cd", "Gy", "Hz", "lm", "lx", "Pa", "sr", "Sv", "Wb",
+            "A", "°C", "C", "F", "g", "H", "J", "K", "m", "N", "s", "S",
+            "T", "V", "W", "Ω",
         ];
-        for t in tests.iter() {
-            let result = Scanner::new(t.chars()).scan_math_op();
-            assert_eq!(Some(t.to_string()), result);
+        assert_eq!(BARE_UNITS[0].len(), 3);
+        for prefix in PFX {
+            let pfx_backtrack = self.buffer_pos();
+            if self.accept_all(prefix.chars()) {
+                for unit in BARE_UNITS {
+                    if self.accept_all(unit.chars()) {
+                        self.extract_string(); // ignore
+                        return Some((prefix.to_string(), unit.to_string()))
+                    }
+                }
+            }
+            self.set_buffer_pos(pfx_backtrack);
         }
-    }
-
-    #[test]
-    fn scan_identifiers() {
-        let tests = vec!["id1", "func", "anyword", "_00", "bla23"];
-        for t in tests.iter() {
-            let result = Scanner::new(t.chars()).scan_identifier();
-            assert_eq!(Some(t.to_string()), result);
-        }
-    }
-
-    #[test]
-    fn scan_string() {
-        let tests = vec![
-            r"'this is a test'",
-            r"'another test \' with an escaped quote'",
-        ];
-        for t in tests.iter() {
-            let result = Scanner::new(t.chars()).scan_quoted_string('\'');
-            assert_eq!(Some(t.to_string()), result);
-        }
+        None
     }
 }

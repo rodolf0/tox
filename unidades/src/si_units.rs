@@ -15,7 +15,7 @@ const fn magnitude_prefix(factor: i32) -> Option<(&'static str, &'static str)> {
         -15 => ("f", "femto"),
         -12 => ("p", "pico"),
         -9 => ("n", "nano"),
-        -6 => ("μ", "micro"),
+        -6 => ("µ", "micro"),
         -3 => ("m", "milli"),
         -2 => ("c", "centi"),
         -1 => ("d", "deci"),
@@ -85,6 +85,7 @@ impl Dimension {
             Dimension{s: -2, m: 2, kg: 1, A: -1, K: 0, mol: 0, cd: 0} => ("Wb", "weber"),
             Dimension{s: -2, m: 0, kg: 1, A: -1, K: 0, mol: 0, cd: 0} => ("T", "tesla"),
             Dimension{s: -2, m: 2, kg: 1, A: -2, K: 0, mol: 0, cd: 0} => ("H", "henry"),
+            Dimension{s: -1, m: 0, kg: 0, A: 0, K: 0, mol: 1, cd: 0} => ("kat", "katal"),
             _ => return None
         })
     }
@@ -241,7 +242,6 @@ impl Quantity {
 impl fmt::Display for Quantity {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.name().is_some() {
-
             if self.dimension == units::kg.dimension {
                 let (value, factor) = normalize(self.value * 1000.0);
                 write!(f, "{} {}g", value, magnitude_prefix(factor).unwrap().0)
@@ -250,8 +250,16 @@ impl fmt::Display for Quantity {
                 write!(f, "{} {}{}",
                     value, magnitude_prefix(factor).unwrap().0, self.symbol())
             }
-        } else {
+        } else if self.dimension != UNITD {
             write!(f, "{} {}", self.value, self.symbol())
+        } else {
+            // Dimensionless, just add magnitude prefix
+            let (value, factor) = normalize(self.value);
+            if factor != 0 {
+                write!(f, "{} {}", value, magnitude_prefix(factor).unwrap().0)
+            } else {
+                write!(f, "{}", value)
+            }
         }
     }
 }
@@ -284,6 +292,7 @@ pub mod units {
     pub const Wb: Quantity = Quantity::unit(Dimension{s: -2, m: 2, kg: 1, A: -1, ..UNITD});
     pub const T: Quantity = Quantity::unit(Dimension{s: -2,  kg: 1, A: -1, ..UNITD});
     pub const H: Quantity = Quantity::unit(Dimension{s: -2, m: 2, kg: 1, A: -2, ..UNITD});
+    pub const kat: Quantity = Quantity::unit(Dimension{s: -2, m: 2, kg: 1, A: -2, ..UNITD});
 }
 
 
@@ -291,14 +300,28 @@ pub mod units {
 mod tests {
 
     #[test]
-    fn x() {
+    fn quantity_tostring() {
         use super::units::*;
-        println!("resistance symbol: {} dimension: {}", ohm.symbol(), ohm.dimension);
-        println!("gravity {}", 9.81 * m * m / s);
-        println!("force {}", 3.2e-5 * kg * m / s / s);
-        println!("freq {}", 1e8 / s);
-        println!("pressure {}", 100.0 * kg / m / s / s);
-        println!("weights {}, {}, {}", 100.0 * kg, 0.1 * kg, 0.0001 * kg);
+        // Random
+        assert_eq!((7.91 * m * m / s).to_string(), "7.91 m²·s⁻¹");
+        // Force
+        assert_eq!((3.2e-5 * kg * m / s / s).to_string(), "32 µN");
+        // Frequency
+        assert_eq!((1e8 / s).to_string(), "100 MHz");
+        // Pressure
+        assert_eq!((100.0 * N / m / m).to_string(), "100 Pa");
+        assert_eq!((100.0 * kg / m / s / s).to_string(), "100 Pa");
+        // Weights
+        assert_eq!((100.0 * kg).to_string(), "100 kg");
+        assert_eq!((0.1 * kg).to_string(), "100 g");
+        assert_eq!((0.0001 * kg).to_string(), "100 mg");
+        // Resistance
+        assert_eq!(ohm.dimension.to_string(), "m²·kg·A⁻²·s⁻³");
+        // Power
+        assert_eq!((1e6 * J / s).to_string(), "1 MW");
+        // Radian
+        assert_eq!(((3.0 * m) / (1.0 * m)).to_string(), "3");
+        assert_eq!(((3e5 * m) / (10.0 * m)).to_string(), "30 k");
     }
 
     #[test]

@@ -7,7 +7,7 @@
 use std::ops;
 use std::fmt;
 
-const fn magnitude_prefix(factor: isize) -> Option<(&'static str, &'static str)> {
+const fn magnitude_prefix(factor: i32) -> Option<(&'static str, &'static str)> {
     Some(match factor {
         -24 => ("y", "yocto"),
         -21 => ("z", "zepto"),
@@ -19,6 +19,7 @@ const fn magnitude_prefix(factor: isize) -> Option<(&'static str, &'static str)>
         -3 => ("m", "milli"),
         -2 => ("c", "centi"),
         -1 => ("d", "deci"),
+        0 => ("", ""),
         1 => ("da", "deca"),
         2 => ("h", "hecto"),
         3 => ("k", "kilo"),
@@ -31,6 +32,20 @@ const fn magnitude_prefix(factor: isize) -> Option<(&'static str, &'static str)>
         24 => ("Y", "yotta"),
         _ => return None
     })
+}
+
+// Reduce mantisa to complement with magnitude prefix
+fn normalize(value: f64) -> (f64, i32) {
+    let factor = value.abs().log10() as i32;
+    // Round factor to multiple of 3.
+    // For abs values < 1.0 decrease the value for > 1.0 mantisa.
+    // Clamp factor to 24, prefixes for which we have names.
+    let factor = if value.abs() < 1.0 {
+        (-3 + factor - factor % 3).max(-24)
+    } else {
+        (factor - factor % 3).min(24)
+    };
+    (value / 10.0_f64.powi(factor), factor)
 }
 
 #[allow(non_snake_case)]
@@ -221,30 +236,19 @@ impl Quantity {
         self.dimension.names()
             .map(|x| x.1.to_string())
     }
-
-    // Reduce mantisa to complement with magnitude prefix
-    pub fn normalize(&self) -> (f64, i32) {
-        let factor = self.value.abs().log10() as i32;
-        // Round factor to multiple of 3.
-        // For abs values < 1.0 decrease the value for > 1.0 mantisa.
-        // Clamp factor to 24, prefixes for which we have names.
-        let factor = if self.value.abs() < 1.0 {
-            (-3 + factor - factor % 3).max(-24)
-        } else {
-            (factor - factor % 3).min(24)
-        };
-        (self.value / 10.0_f64.powi(factor), factor)
-    }
 }
 
 impl fmt::Display for Quantity {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // TODO: work on this
         if self.name().is_some() {
+
             if self.dimension == units::kg.dimension {
-                write!(f, "{} g", self.value * 1000.0)
+                let (value, factor) = normalize(self.value * 1000.0);
+                write!(f, "{} {}g", value, magnitude_prefix(factor).unwrap().0)
             } else {
-                write!(f, "{} {}", self.value, self.symbol())
+                let (value, factor) = normalize(self.value);
+                write!(f, "{} {}{}",
+                    value, magnitude_prefix(factor).unwrap().0, self.symbol())
             }
         } else {
             write!(f, "{} {}", self.value, self.symbol())
@@ -285,28 +289,32 @@ pub mod units {
 
 #[cfg(test)]
 mod tests {
-    use super::units::*;
 
     #[test]
     fn x() {
-        println!("gravity={}", 9.81 * m * m / s);
+        use super::units::*;
         println!("resistance symbol: {} dimension: {}", ohm.symbol(), ohm.dimension);
-        println!("force={}", (3.2e-5 * kg * m / s / s));
+        println!("gravity {}", 9.81 * m * m / s);
+        println!("force {}", 3.2e-5 * kg * m / s / s);
+        println!("freq {}", 1e8 / s);
+        println!("pressure {}", 100.0 * kg / m / s / s);
+        println!("weights {}, {}, {}", 100.0 * kg, 0.1 * kg, 0.0001 * kg);
     }
 
     #[test]
     fn magnitude_normalization() {
+        use super::normalize;
         // small positives
-        assert_eq!((3.2e-1 * kg * m / s / s).normalize().1, -3);
-        assert_eq!((3.2e-4 * kg * m / s / s).normalize().1, -6);
+        assert_eq!(normalize(3.2e-1).1, -3);
+        assert_eq!(normalize(3.2e-4).1, -6);
         // small negatives
-        assert_eq!((-3.2e-1 * kg * m / s / s).normalize().1, -3);
-        assert_eq!((-3.2e-4 * kg * m / s / s).normalize().1, -6);
+        assert_eq!(normalize(-3.2e-1).1, -3);
+        assert_eq!(normalize(-3.2e-4).1, -6);
         // large positives
-        assert_eq!((3.2e1 * kg * m / s / s).normalize().1, 0);
-        assert_eq!((3.2e4 * kg * m / s / s).normalize().1, 3);
+        assert_eq!(normalize(3.2e1).1, 0);
+        assert_eq!(normalize(3.2e4).1, 3);
         // large negatives
-        assert_eq!((-3.2e1 * kg * m / s / s).normalize().1, 0);
-        assert_eq!((-3.2e4 * kg * m / s / s).normalize().1, 3);
+        assert_eq!(normalize(-3.2e1).1, 0);
+        assert_eq!(normalize(-3.2e4).1, 3);
     }
 }

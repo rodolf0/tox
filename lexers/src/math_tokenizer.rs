@@ -6,6 +6,7 @@ use crate::scanner::Scanner;
 pub enum MathToken {
     Unknown(String),
     Number(f64),
+    Quantity(f64, String, String),
     Variable(String),
     Function(String, usize), // arity
     UOp(String),
@@ -61,8 +62,13 @@ impl<I: Iterator<Item = char>> MathTokenizer<I> {
             };
         }
         if let Some(num) = self.src.scan_number() {
+            self.src.scan_whitespace(); // discard whatever came before + and spaces
             use std::str::FromStr;
-            return Some(MathToken::Number(f64::from_str(&num).unwrap()));
+            let value = f64::from_str(&num).unwrap();
+            if let Some((prefix, unit)) = self.src.scan_unit() {
+                return Some(MathToken::Quantity(value, prefix, unit));
+            }
+            return Some(MathToken::Number(value));
         }
         if self.src.next().is_some() {
             return Some(MathToken::Unknown(self.src.extract_string()));
@@ -156,6 +162,27 @@ mod tests {
             UOp(format!("-")),
             UOp(format!("-")),
             Variable(format!("y")),
+        ];
+        for exp_token in expect.iter() {
+            let token = lx.next().unwrap();
+            assert_eq!(*exp_token, token);
+        }
+        assert_eq!(lx.next(), None);
+    }
+
+    #[test]
+    fn quantity() {
+        let mut lx = MathTokenizer::new("30km / (10 s) * 20g * 3 GHz".chars());
+        let expect = [
+            Quantity(30.0, "k".to_string(), "m".to_string()),
+            BOp("/".to_string()),
+            OParen,
+            Quantity(10.0, "".to_string(), "s".to_string()),
+            CParen,
+            BOp("*".to_string()),
+            Quantity(20.0, "".to_string(), "g".to_string()),
+            BOp("*".to_string()),
+            Quantity(3.0, "G".to_string(), "Hz".to_string()),
         ];
         for exp_token in expect.iter() {
             let token = lx.next().unwrap();

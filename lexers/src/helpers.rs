@@ -121,7 +121,7 @@ impl<I: Iterator<Item = char>> Scanner<I> {
     pub fn scan_unit(&mut self) -> Option<(String, String)> {
         static PFX: &[&str] = &[
             "da", "h", "k", "M", "G", "T", "P", "E", "Z", "Y",
-            "y", "z", "a", "f", "p", "n", "μ", "m", "c", "d",
+            "y", "z", "a", "f", "p", "n", "µ", "m", "c", "d",
             "", // no multiplier prefix, raw unit
         ];
         // NOTE: longest prefix first for longest match (ie: 'da')

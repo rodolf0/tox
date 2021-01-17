@@ -71,7 +71,7 @@ fn scan_string() {
 #[test]
 fn scan_units() {
     static PFX: &[&str] = &[
-        "y", "z", "a", "f", "p", "n", "μ", "m", "c", "d",
+        "y", "z", "a", "f", "p", "n", "µ", "m", "c", "d",
         "", // no multiplier prefix, raw unit
         "da", "h", "k", "M", "G", "T", "P", "E", "Z", "Y"
     ];

@@ -5,5 +5,5 @@ edition = "2018"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 
 [dependencies]
-lexers = { version = "0.1.2", path = "../lexers" }
+lexers = { version = "0.1.3", path = "../lexers" }
 time = "0.1"

@@ -94,6 +94,7 @@ impl ShuntingParser {
                     }
                     stack.push(token);
                 }
+                MathToken::Quantity(_, _, _) => return Err(format!("Can't handle quantities")),
                 MathToken::Unknown(lexeme) => return Err(format!("Bad token: {}", lexeme)),
             }
         }

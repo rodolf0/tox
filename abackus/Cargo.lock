@@ -4,8 +4,8 @@
 name = "abackus"
 version = "0.2.2"
 dependencies = [
- "earlgrey 0.3.0",
- "lexers 0.1.2",
+ "earlgrey",
+ "lexers",
 ]
 
 [[package]]
@@ -14,5 +14,4 @@ version = "0.3.0"
 
 [[package]]
 name = "lexers"
-version = "0.1.2"
-
+version = "0.1.3"

@@ -1,6 +1,6 @@
 [package]
 name = "shunting"
-version = "0.0.7"
+version = "0.0.8"
 edition = "2018"
 license = "MIT"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
@@ -16,7 +16,7 @@ dynlink-eval = ["dylib"]
 
 [dependencies]
 dirs = "1.0"
-lexers = { version = "0.1.2", path = "../lexers" }
+lexers = { version = "0.1.3", path = "../lexers" }
 rand = "0.6"
 rustyline = "5.0.0"
 

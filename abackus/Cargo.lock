@@ -2,7 +2,7 @@
 # It is not intended for manual editing.
 [[package]]
 name = "abackus"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "earlgrey",
  "lexers",

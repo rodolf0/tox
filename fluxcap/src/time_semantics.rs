@@ -265,32 +265,33 @@ fn evaler_time<'a>(ev: &mut EarleyForest<'a, TimeNode>, reftime: DateTime) {
 }
 
 
-pub struct TimeMachine<'a>(EarleyParser, EarleyForest<'a, TimeNode>, DateTime);
+pub struct TimeMachine<'a> {
+    parser: EarleyParser,
+    evaler: EarleyForest<'a, TimeNode>,
+    reftime: DateTime,
+}
 
 impl<'a> TimeMachine<'a> {
     pub fn new(reftime: DateTime) -> TimeMachine<'a> {
         use crate::time_parser;
-        let mut ev = EarleyForest::new(terminal_eval());
-        evaler_sequence(&mut ev);
-        evaler_comp_seq(&mut ev);
-        evaler_comp_grain(&mut ev);
-        evaler_time(&mut ev, reftime);
-        TimeMachine(time_parser::time_parser(), ev, reftime)
+        let mut evaler = EarleyForest::new(terminal_eval());
+        evaler_sequence(&mut evaler);
+        evaler_comp_seq(&mut evaler);
+        evaler_comp_grain(&mut evaler);
+        evaler_time(&mut evaler, reftime);
+        TimeMachine{parser: time_parser::time_parser(), evaler, reftime}
     }
 
-    pub fn eval(&self, time: &str) -> Vec<TimeEl> {
+    pub fn eval(&self, time: &str) -> Result<Vec<TimeEl>, String> {
         let mut tokenizer = lexers::DelimTokenizer::new(time.chars(), ", ", true);
-        let state = match self.0.parse(&mut tokenizer) {
-            Ok(state) => state,
-            Err(e) => {
-                eprintln!("TimeMachine {:?} for '{}'", e, time);
-                return Vec::new();
-            }
-        };
-        self.1.eval_all(&state)
-              .unwrap_or_else(|e| panic!("TimeMachine Error: {:?}", e))
-              .into_iter()
-              .map(|tree| tree.eval(self.2))
-              .collect()
+
+        let state = self.parser.parse(&mut tokenizer)
+            .map_err(|e| format!("TimeMachine {:?} for '{}'", e, time))?;
+
+        Ok(self.evaler.eval_all(&state)
+            .map_err(|e| format!("TimeMachine {:?} for '{}'", e, time))?
+            .into_iter()
+            .map(|tree| tree.eval(self.reftime))
+            .collect())
     }
 }

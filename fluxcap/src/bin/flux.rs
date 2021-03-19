@@ -4,7 +4,7 @@ extern crate kronos;
 
 use std::io;
 
-fn main() {
+fn main() -> Result<(), String> {
     let input = if std::env::args().len() <= 1 {
         let mut buffer = String::new();
         io::stdin().read_line(&mut buffer).ok();
@@ -33,7 +33,7 @@ fn main() {
         }
     }
 
-    for r in tm.eval(&input) {
+    for r in tm.eval(&input)? {
         match &r {
             &fluxcap::TimeEl::Time(ref r) if r.grain <= kronos::Grain::Day =>
                 println!("({:?}) {}", r.grain, r.start.format(fmt(r.grain))),
@@ -46,12 +46,12 @@ fn main() {
     }
 
     let verbose = std::env::args().any(|arg| arg == "-v");
-    if verbose {
+    Ok(if verbose {
         match fluxcap::debug_time_expression(&input) {
-            Err(e) => eprintln!("TimeMachine {:?} for '{}'", e, input),
+            Err(error) => eprintln!("{}", error),
             Ok(trees) => for t in trees {
                 println!("{}", t.print());
             }
         }
-    }
+    })
 }

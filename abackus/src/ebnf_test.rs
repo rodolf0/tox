@@ -10,7 +10,6 @@ fn build_ebnf_grammar() {
 
 fn check_trees<T: fmt::Debug>(trees: &Vec<T>, expected: Vec<&str>) {
     use std::collections::HashSet;
-    use std::iter::FromIterator;
     assert_eq!(trees.len(), expected.len());
     let mut expect = HashSet::<&str>::from_iter(expected);
     for t in trees {

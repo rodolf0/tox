@@ -1,8 +1,11 @@
 [package]
 name = "unidades"
 version = "0.1.0"
+edition = "2021"
+license = "MIT"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
-edition = "2018"
+description = "A library for playing with physical units"
+repository = "https://github.com/rodolf0/tox/tree/master/unidades"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

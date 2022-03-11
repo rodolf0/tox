@@ -1,7 +1,7 @@
 [package]
 name = "shunting"
-version = "0.0.9"
-edition = "2018"
+version = "0.0.12"
+edition = "2021"
 license = "MIT"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "A library for evaluating math expressions"
@@ -15,13 +15,13 @@ default = ["dynlink-eval"]
 dynlink-eval = ["dylib"]
 
 [dependencies]
-lexers = { version = "0.1.3", path = "../lexers" }
-rand = "0.8"
-rustyline = "5.0.0"
+lexers = { version = "0.1.4", path = "../lexers" }
+rand = "0.8.5"
 
 [dependencies.dylib]
 version = "0.0.3"
 optional = true
 
 [dev-dependencies]
-dirs = "3.0"
+home = "0.5"
+rustyline = "9.1.0"

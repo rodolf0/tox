@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 fn build_grammar() -> earlgrey::Grammar {
-    use std::str::FromStr;;
+    use std::str::FromStr;
     earlgrey::GrammarBuilder::default()
       .nonterm("expr")
       .nonterm("term")

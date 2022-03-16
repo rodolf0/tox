@@ -10,7 +10,7 @@ macro_rules! fuzzy_eq {
 #[test]
 fn test_eval1() {
     let expr = ShuntingParser::parse_str("3+4*2/-(1-5)^2^3").unwrap();
-    fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), 2.99987792969);
+    fuzzy_eq!(MathContext::new().eval(&expr).unwrap(), 3.000122070313);
 }
 
 #[test]

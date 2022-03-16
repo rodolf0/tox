@@ -37,7 +37,7 @@ impl MathContext {
                 MathToken::Number(num) => operands.push(num),
                 MathToken::Variable(ref var) => match self.0.get(var) {
                     Some(value) => operands.push(*value),
-                    None => return Err(format!("Unknown Variable: {}", var.to_string())),
+                    None => return Err(format!("Unknown Variable: {}", var)),
                 },
                 MathToken::BOp(ref op) => {
                     let r = operands.pop().ok_or(format!("Wrong number of arguments"))?;

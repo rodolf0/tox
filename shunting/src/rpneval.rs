@@ -1,103 +1,128 @@
 use crate::parser::RPNExpr;
 use lexers::MathToken;
 use std::collections::HashMap;
+use std::rc::Rc;
 
-// a shorthand for checking number of arguments before eval_fn
-macro_rules! nargs {
-    ($argcheck:expr, $ifok:expr) => {
-        if $argcheck {
-            $ifok
-        } else {
-            Err(format!("Wrong number of arguments"))
-        }
-    };
+
+pub trait RandomVariable {
+    fn sample(&self) -> f64;
 }
 
-#[derive(Debug, Clone)]
-pub struct MathContext(pub HashMap<String, f64>);
+impl<D: rand::distributions::Distribution<f64>> RandomVariable for D {
+    fn sample(&self) -> f64 {
+        self.sample(&mut rand::thread_rng())
+    }
+}
+
+pub enum MathValue {
+    Number(f64),
+    RandVar(Rc<dyn RandomVariable>),
+}
+
+pub struct MathContext(pub HashMap<String, MathValue>);
 
 impl MathContext {
     pub fn new() -> MathContext {
         use std::f64::consts;
         let mut cx = HashMap::new();
-        cx.insert(format!("pi"), consts::PI);
-        cx.insert(format!("e"), consts::E);
+        cx.insert("pi".to_string(), MathValue::Number(consts::PI));
+        cx.insert("e".to_string(), MathValue::Number(consts::E));
         MathContext(cx)
     }
 
-    pub fn setvar(&mut self, var: &str, val: f64) {
+    pub fn setvar(&mut self, var: &str, val: MathValue) {
         self.0.insert(var.to_string(), val);
     }
 
-    pub fn eval(&self, rpn: &RPNExpr) -> Result<f64, String> {
+    pub fn eval(&self, rpn: &RPNExpr) -> Result<MathValue, String> {
         let mut operands = Vec::new();
 
-        for token in rpn.0.iter() {
-            match *token {
-                MathToken::Number(num) => operands.push(num),
+        for token in &rpn.0 {
+            match token {
+                MathToken::Number(num) => operands.push(MathValue::Number(*num)),
                 MathToken::Variable(ref var) => match self.0.get(var) {
-                    Some(value) => operands.push(*value),
+                    Some(MathValue::Number(n)) => operands.push(MathValue::Number(*n)),
+                    Some(MathValue::RandVar(r)) => operands.push(MathValue::RandVar(r.clone())),
                     None => return Err(format!("Unknown Variable: {}", var)),
                 },
-                MathToken::BOp(ref op) => {
-                    let r = operands.pop().ok_or(format!("Wrong number of arguments"))?;
-                    let l = operands.pop().ok_or(format!("Wrong number of arguments"))?;
+                MathToken::BOp(op) => {
+                    let r = match operands.pop() {
+                        Some(MathValue::Number(n)) => n,
+                        Some(MathValue::RandVar(x)) => x.sample(),
+                        None => return Err(format!("Missing args for operator {}", op)),
+                    };
+                    let l = match operands.pop() {
+                        Some(MathValue::Number(n)) => n,
+                        Some(MathValue::RandVar(x)) => x.sample(),
+                        None => return Err(format!("Missing args for operator {}", op)),
+                    };
                     match &op[..] {
-                        "+" => operands.push(l + r),
-                        "-" => operands.push(l - r),
-                        "*" => operands.push(l * r),
-                        "/" => operands.push(l / r),
-                        "%" => operands.push(l % r),
-                        "^" => operands.push(l.powf(r)),
-                        _ => return Err(format!("Bad Token: {}", op.clone())),
+                        "+" => operands.push(MathValue::Number(l + r)),
+                        "-" => operands.push(MathValue::Number(l - r)),
+                        "*" => operands.push(MathValue::Number(l * r)),
+                        "/" => operands.push(MathValue::Number(l / r)),
+                        "%" => operands.push(MathValue::Number(l % r)),
+                        "^" | "**" => operands.push(MathValue::Number(l.powf(r))),
+                        _ => return Err(format!("Unknown BOp: {}", op)),
                     }
                 }
-                MathToken::UOp(ref op) => {
-                    let o = operands.pop().ok_or(format!("Wrong number of arguments"))?;
+                MathToken::UOp(op) => {
+                    let o = match operands.pop() {
+                        Some(MathValue::Number(n)) => n,
+                        Some(MathValue::RandVar(x)) => x.sample(),
+                        None => return Err(format!("Missing args for operator {}", op)),
+                    };
                     match &op[..] {
-                        "-" => operands.push(-o),
-                        "!" => operands.push(Self::eval_fn("tgamma", vec![o + 1.0])?),
-                        _ => return Err(format!("Bad Token: {}", op.clone())),
+                        "-" => operands.push(MathValue::Number(-o)),
+                        "!" => operands.push(Self::eval_fn("tgamma", &[o + 1.0])?),
+                        _ => return Err(format!("Unknown UOp: {}", op)),
                     }
                 }
-                MathToken::Function(ref fname, arity) => {
-                    if arity > operands.len() {
-                        return Err(format!("Wrong number of arguments"));
+                MathToken::Function(fname, arity) => {
+                    if *arity > operands.len() {
+                        return Err(format!("Missing args for function {}", fname));
                     }
-                    let cut = operands.len() - arity;
-                    let args = operands.split_off(cut);
-                    operands.push(Self::eval_fn(fname, args)?)
+                    let args: Vec<_> = operands.split_off(operands.len() - arity)
+                        .into_iter()
+                        .map(|arg| match arg {
+                            MathValue::Number(n) => n,
+                            MathValue::RandVar(x) => x.sample(),
+                        }).collect();
+                    operands.push(Self::eval_fn(fname, &args).or(Self::eval_rv(fname, &args))?)
                 }
-                _ => return Err(format!("Bad Token: {:?}", *token)),
+                _ => return Err(format!("Bad Token: {:?}", token)),
             }
         }
-        operands.pop().ok_or(format!("Wrong number of arguments"))
+        operands.pop().ok_or(format!("Failed to eval: {:?}", rpn))
     }
 
-    fn eval_fn(fname: &str, args: Vec<f64>) -> Result<f64, String> {
-        match fname {
-            "sin" => nargs!(args.len() == 1, Ok(args[0].sin())),
-            "cos" => nargs!(args.len() == 1, Ok(args[0].cos())),
-            "atan2" => nargs!(args.len() == 2, Ok(args[0].atan2(args[1]))),
-            "max" => nargs!(
-                !args.is_empty(),
-                Ok(args[1..].iter().fold(args[0], |a, &item| a.max(item)))
-            ),
-            "min" => nargs!(
-                !args.is_empty(),
-                Ok(args[1..].iter().fold(args[0], |a, &item| a.min(item)))
-            ),
-            "abs" => nargs!(args.len() == 1, Ok(f64::abs(args[0]))),
-            "rand" => nargs!(args.len() == 1, Ok(args[0] * rand::random::<f64>())),
+    fn eval_fn(fname: &str, args: &[f64]) -> Result<MathValue, String> {
+        Ok(MathValue::Number(match fname {
+            "sin" if args.len() == 1 => args[0].sin(),
+            "cos" if args.len() == 1 => args[0].cos(),
+            "atan2" if args.len() == 2 => args[0].atan2(args[1]),
+            "max" if !args.is_empty() => args.iter().fold(args[0], |a, &b| a.max(b)),
+            "min" if !args.is_empty() => args.iter().fold(args[0], |a, &b| a.min(b)),
+            "abs" if args.len() == 1 => args[0].abs(),
+            "rand" if args.len() == 1 => rand::random::<f64>() * args[0],
             // Order not important
-            "nCr" => nargs!(args.len() == 2, funcs::combinations(args[0], args[1])),
-            "nMCr" => nargs!(args.len() == 2, funcs::multicombinations(args[0], args[1])),
+            "nCr" if args.len() == 2 => funcs::combinations(args[0], args[1])?,
+            "nMCr" if args.len() == 2 => funcs::multicombinations(args[0], args[1])?,
             // Order is important
-            "nPr" => nargs!(args.len() == 2, funcs::permutations(args[0], args[1])),
-            "nMPr" => nargs!(args.len() == 2, Ok(args[0].powf(args[1]))),
-            // Resolve function fname and call it
-            _ => nargs!(args.len() == 1, Ok((mathlink::link_fn(fname)?)(args[0]))),
-        }
+            "nPr" if args.len() == 2 => funcs::permutations(args[0], args[1])?,
+            "nMPr" if args.len() == 2 => args[0].powf(args[1]),
+            _ => return Err(format!("Unknown Function: {} with {} args", fname, args.len()))
+        }))
+    }
+
+    fn eval_rv(dname: &str, args: &[f64]) -> Result<MathValue, String> {
+        use rand_distr::*;
+        Ok(MathValue::RandVar(match dname {
+            "normal" if args.len() == 2 => Rc::new(Normal::new(args[0], args[1]).unwrap()),
+            "uniform" if args.len() == 2 => Rc::new(Uniform::new(args[0], args[1])),
+            "lognormal" if args.len() == 2 => Rc::new(LogNormal::new(args[0], args[1]).unwrap()),
+            _ => return Err(format!("Unknown distribution: {} with {} args", dname, args.len()))
+        }))
     }
 }
 

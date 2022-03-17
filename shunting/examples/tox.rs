@@ -1,13 +1,14 @@
 mod repl {
     use lexers::{MathToken, MathTokenizer};
-    use shunting::{MathContext, ShuntingParser};
+    use shunting::{MathContext, ShuntingParser, MathValue};
 
     pub fn evalexpr(input: &str) {
         match ShuntingParser::parse_str(input) {
             Err(e) => println!("Parse error: {:?}", e),
             Ok(expr) => match MathContext::new().eval(&expr) {
                 Err(e) => println!("Eval error: {:?}", e),
-                Ok(result) => println!("{} = {}", expr, result),
+                Ok(MathValue::Number(r)) => println!("{} = {}", expr, r),
+                Ok(MathValue::RandVar(r)) => println!("{} = {}", expr, r.sample()),
             },
         };
     }
@@ -33,7 +34,8 @@ mod repl {
             Err(e) => println!("Parse error: {:?}", e),
             Ok(rpn) => match cx.eval(&rpn) {
                 Err(e) => println!("Eval error: {:?}", e),
-                Ok(result) => println!("{}", result),
+                Ok(MathValue::Number(r)) => println!("{}", r),
+                Ok(MathValue::RandVar(r)) => println!("*{}", r.sample()),
             },
         };
     }

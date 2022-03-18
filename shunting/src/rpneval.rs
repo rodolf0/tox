@@ -30,8 +30,8 @@ impl MathContext {
         MathContext(cx)
     }
 
-    pub fn setvar(&mut self, var: &str, val: MathValue) {
-        self.0.insert(var.to_string(), val);
+    pub fn setvar(&mut self, name: &str, value: MathValue) {
+        self.0.insert(name.to_string(), value);
     }
 
     pub fn eval(&self, rpn: &RPNExpr) -> Result<MathValue, String> {
@@ -40,11 +40,11 @@ impl MathContext {
         for token in &rpn.0 {
             match token {
                 MathToken::Number(num) => operands.push(MathValue::Number(*num)),
-                MathToken::Variable(ref var) => match self.0.get(var) {
-                    Some(MathValue::Number(n)) => operands.push(MathValue::Number(*n)),
-                    Some(MathValue::RandVar(r)) => operands.push(MathValue::RandVar(r.clone())),
+                MathToken::Variable(ref var) => operands.push(match self.0.get(var) {
+                    Some(MathValue::Number(n)) => MathValue::Number(*n),
+                    Some(MathValue::RandVar(r)) => MathValue::RandVar(r.clone()),
                     None => return Err(format!("Unknown Variable: {}", var)),
-                },
+                }),
                 MathToken::BOp(op) => {
                     let r = match operands.pop() {
                         Some(MathValue::Number(n)) => n,
@@ -56,15 +56,15 @@ impl MathContext {
                         Some(MathValue::RandVar(x)) => x.sample(),
                         None => return Err(format!("Missing args for operator {}", op)),
                     };
-                    match &op[..] {
-                        "+" => operands.push(MathValue::Number(l + r)),
-                        "-" => operands.push(MathValue::Number(l - r)),
-                        "*" => operands.push(MathValue::Number(l * r)),
-                        "/" => operands.push(MathValue::Number(l / r)),
-                        "%" => operands.push(MathValue::Number(l % r)),
-                        "^" | "**" => operands.push(MathValue::Number(l.powf(r))),
+                    operands.push(match &op[..] {
+                        "+" => MathValue::Number(l + r),
+                        "-" => MathValue::Number(l - r),
+                        "*" => MathValue::Number(l * r),
+                        "/" => MathValue::Number(l / r),
+                        "%" => MathValue::Number(l % r),
+                        "^" | "**" => MathValue::Number(l.powf(r)),
                         _ => return Err(format!("Unknown BOp: {}", op)),
-                    }
+                    });
                 }
                 MathToken::UOp(op) => {
                     let o = match operands.pop() {
@@ -72,11 +72,11 @@ impl MathContext {
                         Some(MathValue::RandVar(x)) => x.sample(),
                         None => return Err(format!("Missing args for operator {}", op)),
                     };
-                    match &op[..] {
-                        "-" => operands.push(MathValue::Number(-o)),
-                        "!" => operands.push(Self::eval_fn("tgamma", &[o + 1.0])?),
+                    operands.push(match &op[..] {
+                        "-" => MathValue::Number(-o),
+                        "!" => MathValue::Number(libm::tgamma(o + 1.0)),
                         _ => return Err(format!("Unknown UOp: {}", op)),
-                    }
+                    });
                 }
                 MathToken::Function(fname, arity) => {
                     if *arity > operands.len() {
@@ -88,7 +88,12 @@ impl MathContext {
                             MathValue::Number(n) => n,
                             MathValue::RandVar(x) => x.sample(),
                         }).collect();
-                    operands.push(Self::eval_fn(fname, &args).or(Self::eval_rv(fname, &args))?)
+
+                    if let Ok(numeric) = Self::eval_fn(fname, &args) {
+                        operands.push(MathValue::Number(numeric));
+                    } else {
+                        return Err(format!("Unknown Function: {}", fname));
+                    }
                 }
                 _ => return Err(format!("Bad Token: {:?}", token)),
             }
@@ -96,8 +101,8 @@ impl MathContext {
         operands.pop().ok_or(format!("Failed to eval: {:?}", rpn))
     }
 
-    fn eval_fn(fname: &str, args: &[f64]) -> Result<MathValue, String> {
-        Ok(MathValue::Number(match fname {
+    fn eval_fn(fname: &str, args: &[f64]) -> Result<f64, String> {
+        Ok(match fname {
             "sin" if args.len() == 1 => args[0].sin(),
             "cos" if args.len() == 1 => args[0].cos(),
             "atan2" if args.len() == 2 => args[0].atan2(args[1]),
@@ -112,7 +117,7 @@ impl MathContext {
             "nPr" if args.len() == 2 => funcs::permutations(args[0], args[1])?,
             "nMPr" if args.len() == 2 => args[0].powf(args[1]),
             _ => return Err(format!("Unknown Function: {} with {} args", fname, args.len()))
-        }))
+        })
     }
 
     fn eval_rv(dname: &str, args: &[f64]) -> Result<MathValue, String> {
@@ -127,45 +132,18 @@ impl MathContext {
 }
 
 mod funcs {
-    use super::mathlink;
     pub fn combinations(n: f64, r: f64) -> Result<f64, String> {
-        let tgamma = mathlink::link_fn("tgamma")?;
+        use libm::tgamma;
         Ok(tgamma(n + 1.0) / tgamma(r + 1.0) / tgamma(n - r + 1.0))
     }
 
     pub fn multicombinations(n: f64, r: f64) -> Result<f64, String> {
-        let tgamma = mathlink::link_fn("tgamma")?;
+        use libm::tgamma;
         Ok(tgamma(n + r) / tgamma(r + 1.0) / tgamma(n))
     }
 
     pub fn permutations(n: f64, r: f64) -> Result<f64, String> {
-        let tgamma = mathlink::link_fn("tgamma")?;
+        use libm::tgamma;
         Ok(tgamma(n + 1.0) / tgamma(n - r + 1.0))
-    }
-}
-
-#[cfg(feature = "dynlink-eval")]
-mod mathlink {
-    use std::mem;
-    pub fn link_fn(fname: &str) -> Result<fn(f64) -> f64, String> {
-        match dylib::DynamicLibrary::open(None) {
-            Ok(lib) => unsafe {
-                match lib.symbol(fname) {
-                    Ok(f) => Ok(mem::transmute::<*mut u8, fn(f64) -> f64>(f)),
-                    Err(e) => Err(e),
-                }
-            },
-            Err(e) => Err(e),
-        }
-    }
-}
-
-#[cfg(not(feature = "dynlink-eval"))]
-mod mathlink {
-    pub fn link_fn(fname: &str) -> Result<fn(f64) -> f64, String> {
-        Err(format!(
-            "Dynamic linking not enabled, unknown function: {}",
-            fname
-        ))
     }
 }

@@ -10,18 +10,11 @@ readme = "README.md"
 keywords = ["shunting", "math", "parser", "expression", "eval"]
 categories = ["parsing", "algorithms"]
 
-[features]
-default = ["dynlink-eval"]
-dynlink-eval = ["dylib"]
-
 [dependencies]
 lexers = { version = "0.1.4", path = "../lexers" }
 rand = "0.8.5"
 rand_distr = "0.4"
-
-[dependencies.dylib]
-version = "0.0.3"
-optional = true
+libm = "0.2"
 
 [dev-dependencies]
 home = "0.5"

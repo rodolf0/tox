@@ -41,15 +41,15 @@ impl fmt::Display for RPNExpr {
         fn printer(root: &AST) -> (String, (usize, Assoc)) {
             match root {
                 AST::Leaf(ref token) => match token {
-                    MathToken::Number(x) => (x.to_string(), op_precedence(token)),
-                    MathToken::Variable(x) => (x.to_string(), op_precedence(token)),
+                    MathToken::Number(x) => (x.to_string(), op_precedence(token).unwrap()),
+                    MathToken::Variable(x) => (x.to_string(), op_precedence(token).unwrap()),
                     _ => unreachable!(),
                 },
                 AST::Node(ref token, ref args) => {
                     match token {
                         MathToken::UOp(op) => {
                             let subtree = printer(&args[0]);
-                            let (prec, assoc) = op_precedence(token);
+                            let (prec, assoc) = op_precedence(token).unwrap();
                             // TODO: distinguish perfix/postfix operators
                             if prec > (subtree.1).0 {
                                 (format!("{}({})", op, subtree.0), (prec, assoc))
@@ -59,7 +59,7 @@ impl fmt::Display for RPNExpr {
                         }
                         MathToken::BOp(op) => {
                             let (lhs, rhs) = (printer(&args[0]), printer(&args[1]));
-                            let (prec, assoc) = op_precedence(token);
+                            let (prec, assoc) = op_precedence(token).unwrap();
 
                             let lh = if prec > (lhs.1).0
                                 || (prec == (lhs.1).0 && assoc != Assoc::Left)
@@ -85,7 +85,7 @@ impl fmt::Display for RPNExpr {
                                 .map(|leaf| printer(leaf).0)
                                 .collect::<Vec<String>>()
                                 .join(", ");
-                            (format!("{}({})", func, expr), op_precedence(token))
+                            (format!("{}({})", func, expr), op_precedence(token).unwrap())
                         }
                         _ => unreachable!(),
                     }

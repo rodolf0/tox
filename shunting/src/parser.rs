@@ -6,14 +6,14 @@ pub enum Assoc {
     Right,
 }
 
-pub fn op_precedence(mt: &MathToken) -> (usize, Assoc) {
+pub fn op_precedence(mt: &MathToken) -> Result<(usize, Assoc), String> {
     // NOTE: This can't encode relations between all tokens, just Ops.
     // For example:
     // In https://github.com/rodolf0/natools/blob/master/libparser/parser.c#L56-L94
     // - unary-minus has to be < than Numbers and OParen
     // - but OParen has to be < than unary-minus too!
     // - At the same time, unary-minus has to be > than bin-ops (eg: +)
-    match mt {
+    Ok(match mt {
         MathToken::BOp(o) if o == "+" => (2, Assoc::Left),
         MathToken::BOp(o) if o == "-" => (2, Assoc::Left),
         MathToken::BOp(o) if o == "*" => (3, Assoc::Left),
@@ -22,8 +22,8 @@ pub fn op_precedence(mt: &MathToken) -> (usize, Assoc) {
         MathToken::BOp(o) if o == "^" || o == "**" => (4, Assoc::Right),
         MathToken::UOp(o) if o == "-" => (5, Assoc::Right), // unary minus
         MathToken::UOp(o) if o == "!" => (6, Assoc::Left), // factorial
-        _ => unreachable!() // Functions and OParen are popped before checking
-    }
+        _ => return Err(format!("Undefined precedence for {:?}", mt)),
+    })
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -74,13 +74,13 @@ impl ShuntingParser {
                     }
                 }
                 MathToken::UOp(_) | MathToken::BOp(_) => {
-                    let (input_token_prec, input_token_assoc) = op_precedence(&token);
+                    let (input_token_prec, input_token_assoc) = op_precedence(&token)?;
                     // Flush stack while its precedence is lower than input or reach OParen
                     while let Some(stack_top) = stack.last() {
                         if stack_top == &MathToken::OParen {
                             break;
                         }
-                        let (stack_top_prec, _) = op_precedence(stack_top);
+                        let (stack_top_prec, _) = op_precedence(stack_top)?;
                         if stack_top_prec < input_token_prec || (
                             stack_top_prec == input_token_prec &&
                             input_token_assoc == Assoc::Right) {

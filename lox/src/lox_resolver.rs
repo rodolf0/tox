@@ -19,8 +19,7 @@ impl<'a> Resolver<'a> {
 
     pub fn resolve(&mut self, stmts: &[Stmt]) -> ResolveResult {
         stmts.iter().map(|stmt| self.resolve_stmt(stmt))
-             .skip_while(|stmt| stmt.is_ok())
-             .next()
+             .find(|stmt| stmt.is_err())
              .unwrap_or(Ok(()))
     }
 
@@ -51,8 +50,7 @@ impl<'a> Resolver<'a> {
         // find the scope that contains the name
         let scope = self.scopes.iter().rev()
             .enumerate()
-            .skip_while(|&(_, scope)| !scope.contains_key(name))
-            .next();
+            .find(|&(_, scope)| scope.contains_key(name));
         // bind the interpreter's reference to that scope
         if let Some((idx, _)) = scope {
             self.interpreter.resolve(expr.id(), idx);
@@ -102,8 +100,7 @@ impl<'a> Resolver<'a> {
             &Expr::Call(ref callee, ref args) => {
                 self.resolve_expr(callee)?;
                 args.iter().map(|arg| self.resolve_expr(arg))
-                    .skip_while(|arg| arg.is_ok())
-                    .next()
+                    .find(|arg| arg.is_err())
                     .unwrap_or(Ok(()))
             },
         }

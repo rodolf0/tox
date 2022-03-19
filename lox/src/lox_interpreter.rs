@@ -209,7 +209,7 @@ impl LoxInterpreter {
                     _ => self.eval(rhs)
                 }
             },
-            Expr::Var(ref var) => self.lookup_var(expr, &var),
+            Expr::Var(ref var) => self.lookup_var(expr, var),
             Expr::Assign(ref var, ref aexpr) => {
                 let value = self.eval(aexpr)?;
                 if let Some(depth) = self.locals.get(&expr.id()) {

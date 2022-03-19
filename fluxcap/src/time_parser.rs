@@ -68,8 +68,8 @@ fn _parser_builder() -> abackus::ParserBuilder {
     use std::str::FromStr;
     use crate::constants::*;
     abackus::ParserBuilder::default()
-        .plug_terminal("ordinal", |d| ordinal(d).or(short_ordinal(d)).is_some())
-        .plug_terminal("day_ordinal", |d| ordinal(d).or(short_ordinal(d)).is_some())
+        .plug_terminal("ordinal", |d| ordinal(d).or_else(|| short_ordinal(d)).is_some())
+        .plug_terminal("day_ordinal", |d| ordinal(d).or_else(|| short_ordinal(d)).is_some())
         .plug_terminal("weekday", |d| weekday(d).is_some())
         .plug_terminal("month", |d| month(d).is_some())
         .plug_terminal("grain", |g| kronos::Grain::from_str(g).is_ok())

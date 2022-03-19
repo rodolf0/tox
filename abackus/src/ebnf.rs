@@ -78,7 +78,7 @@ macro_rules! pull {
 
 impl ParserBuilder {
     // Parsing terminals / non-terminal leaf nodes
-    fn evaler<'a>(gb: &'a RefCell<GrammarBuilder>) -> EarleyForest<'a, G> {
+    fn evaler(gb: &RefCell<GrammarBuilder>) -> EarleyForest<'_, G> {
         EarleyForest::new(move |symbol, token| {
             match symbol {
                 "<Id>" => {
@@ -115,7 +115,7 @@ impl ParserBuilder {
         });
     }
 
-    fn action_body<'a>(ev: &mut EarleyForest<'a, G>) {
+    fn action_body(ev: &mut EarleyForest<'_, G>) {
         ev.action("<Body> -> <Body> | <Part>", |mut n| {
             let mut body = pull!(G::Body, n.remove(0));
             body.push(pull!(G::Part, n.remove(1)));
@@ -127,7 +127,7 @@ impl ParserBuilder {
         });
     }
 
-    fn action_part<'a>(ev: &mut EarleyForest<'a, G>) {
+    fn action_part(ev: &mut EarleyForest<'_, G>) {
         ev.action("<Part> -> <Part> <Atom>", |mut n| {
             let mut part = pull!(G::Part, n.remove(0));
             part.push(pull!(G::Atom, n.remove(0)));

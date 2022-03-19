@@ -96,15 +96,15 @@ impl TimeNode {
                                          .nth(*n).unwrap()),
             Last(seq, n) => TimeEl::Time(seq.past(&reftime)
                                          .nth(*n).unwrap()),
-            RefNext(seq, t0) => TimeEl::Time(seq.future(&t0).next().unwrap()),
-            RefPrev(seq, t0) => TimeEl::Time(seq.past(&t0).next().unwrap()),
+            RefNext(seq, t0) => TimeEl::Time(seq.future(t0).next().unwrap()),
+            RefPrev(seq, t0) => TimeEl::Time(seq.past(t0).next().unwrap()),
             Until(seq, tn) => TimeEl::Count(seq.future(&reftime)
                                             .take_while(|x| x.start < *tn)
                                             .count() as u32),
             Since(seq, tn) => TimeEl::Count(seq.future(tn)
                                             .take_while(|x| x.start < reftime)
                                             .count() as u32),
-            Between(seq, t0, tn) => TimeEl::Count(seq.future(&t0)
+            Between(seq, t0, tn) => TimeEl::Count(seq.future(t0)
                                             .take_while(|x| x.start < *tn)
                                             .count() as u32),
             _ => unreachable!()
@@ -118,7 +118,7 @@ fn terminal_eval() -> impl Fn(&str, &str) -> TimeNode {
     use std::str::FromStr;
     |terminal, lex| match terminal {
         "day_ordinal" |
-        "ordinal" => Int(ordinal(lex).or(short_ordinal(lex)).unwrap() as i32),
+        "ordinal" => Int(ordinal(lex).or_else(|| short_ordinal(lex)).unwrap() as i32),
         "weekday" => Int(weekday(lex).unwrap() as i32),
         "month" => Int(month(lex).unwrap() as i32),
         "grain" => Grain(k::Grain::from_str(lex).unwrap()),
@@ -128,7 +128,7 @@ fn terminal_eval() -> impl Fn(&str, &str) -> TimeNode {
     }
 }
 
-fn evaler_sequence<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
+fn evaler_sequence(ev: &mut EarleyForest<'_, TimeNode>) {
     use kronos::*;
 
     ev.action("named_seq -> day_ordinal", |t| s!(
@@ -163,7 +163,7 @@ fn evaler_sequence<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
 }
 
 
-fn evaler_comp_seq<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
+fn evaler_comp_seq(ev: &mut EarleyForest<'_, TimeNode>) {
     use kronos::*;
 
     ev.action("@opt_the -> the", |_| TimeNode::Nop);
@@ -177,7 +177,7 @@ fn evaler_comp_seq<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
 }
 
 
-fn evaler_comp_grain<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
+fn evaler_comp_grain(ev: &mut EarleyForest<'_, TimeNode>) {
     ev.action("comp_grain -> small_int grain",
               |t| TimeNode::Shifts(vec![(t[1].grain(), t[0].i32())]));
     ev.action("comp_grain -> a grain",
@@ -195,7 +195,7 @@ fn evaler_comp_grain<'a>(ev: &mut EarleyForest<'a, TimeNode>) {
 }
 
 
-fn evaler_time<'a>(ev: &mut EarleyForest<'a, TimeNode>, reftime: DateTime) {
+fn evaler_time(ev: &mut EarleyForest<'_, TimeNode>, reftime: DateTime) {
     use TimeNode::*;
     use kronos::*;
     ev.action("time -> today", |_| This(Shim::new(Grains(k::Grain::Day))));

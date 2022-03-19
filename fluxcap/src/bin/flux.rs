@@ -34,10 +34,10 @@ fn main() -> Result<(), String> {
     }
 
     for r in tm.eval(&input)? {
-        match &r {
-            &fluxcap::TimeEl::Time(ref r) if r.grain <= kronos::Grain::Day =>
+        match r {
+            fluxcap::TimeEl::Time(ref r) if r.grain <= kronos::Grain::Day =>
                 println!("({:?}) {}", r.grain, r.start.format(fmt(r.grain))),
-            &fluxcap::TimeEl::Time(ref r) =>
+            fluxcap::TimeEl::Time(ref r) =>
                 println!("({:?}) {} - {}", r.grain,
                          r.start.format(fmt(r.grain)),
                          r.end.format(fmt(r.grain))),
@@ -46,12 +46,13 @@ fn main() -> Result<(), String> {
     }
 
     let verbose = std::env::args().any(|arg| arg == "-v");
-    Ok(if verbose {
+    if verbose {
         match fluxcap::debug_time_expression(&input) {
             Err(error) => eprintln!("{}", error),
             Ok(trees) => for t in trees {
                 println!("{}", t.print());
             }
         }
-    })
+    }
+    Ok(())
 }

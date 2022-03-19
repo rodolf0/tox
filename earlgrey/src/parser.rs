@@ -28,7 +28,7 @@ impl EarleyParser {
     ) -> Box<dyn Iterator<Item=Item> + 'r>
     {
         Box::new(rules.filter(move |rule| rule.head == next_terminal)
-            .map(move |rule| Item::predict_new(&rule, start_pos)))
+            .map(move |rule| Item::predict_new(rule, start_pos)))
     }
 
     /// Build new `Completion` items based on `trigger` item having completed.
@@ -68,7 +68,7 @@ impl EarleyParser {
         // Populate S0, add items for each rule matching the start symbol
         let s0: HashSet<_> = self.grammar.rules.iter()
             .filter(|rule| rule.head == self.grammar.start)
-            .map(|rule| Rc::new(Item::predict_new(&rule, 0)))
+            .map(|rule| Rc::new(Item::predict_new(rule, 0)))
             .collect();
 
         let mut statesets = vec![s0];

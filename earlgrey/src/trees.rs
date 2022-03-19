@@ -68,7 +68,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
                     let symbol = source.next_symbol()
                         .expect("BUG: missing scan trigger symbol").name();
                     args.extend(self.walker(source)?);
-                    args.push((self.leaf_builder)(&symbol, trigger));
+                    args.push((self.leaf_builder)(symbol, trigger));
                 }
             }
         }
@@ -109,7 +109,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
                     for mut args in self.walker_all(source)? {
                         let symbol = source.next_symbol()
                             .expect("BUG: missing scan trigger symbol").name();
-                        args.push((self.leaf_builder)(&symbol, trigger));
+                        args.push((self.leaf_builder)(symbol, trigger));
                         trees.push(self.reduce(root, args)?);
                     }
                 }

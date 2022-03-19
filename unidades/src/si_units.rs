@@ -229,7 +229,7 @@ impl Quantity {
     pub fn symbol(&self) -> String {
         self.dimension.names()
             .map(|x| x.0.to_string())
-            .or(Some(self.dimension.to_string()))
+            .or_else(|| Some(self.dimension.to_string()))
             .unwrap()
     }
 

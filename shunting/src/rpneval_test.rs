@@ -1,15 +1,9 @@
 use crate::parser::ShuntingParser;
-use crate::rpneval::{MathContext, MathValue};
+use crate::rpneval::MathContext;
 
 macro_rules! fuzzy_eq {
     ($lhs:expr, $rhs:expr) => {
-        {
-            let lhs = match $lhs {
-                MathValue::Number(n) => n,
-                MathValue::RandVar(x) => x.sample()
-            };
-            assert!((lhs - $rhs).abs() < 1.0e-10)
-        }
+        assert!(($lhs - $rhs).abs() < 1.0e-10)
     };
 }
 

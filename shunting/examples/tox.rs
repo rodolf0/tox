@@ -1,28 +1,27 @@
 mod repl {
     use lexers::{MathToken, MathTokenizer};
-    use shunting::{MathContext, ShuntingParser, MathValue};
+    use shunting::{MathContext, ShuntingParser};
 
     pub fn evalexpr(input: &str) {
         match ShuntingParser::parse_str(input) {
             Err(e) => println!("Parse error: {:?}", e),
             Ok(expr) => match MathContext::new().eval(&expr) {
                 Err(e) => println!("Eval error: {:?}", e),
-                Ok(MathValue::Number(r)) => println!("{} = {}", expr, r),
-                Ok(MathValue::RandVar(r)) => println!("{} = {}", expr, r.sample()),
+                Ok(r) => println!("{} = {}", expr, r),
             },
         };
     }
 
-    pub fn parse_statement(cx: &mut MathContext, input: &str) {
+    pub fn parse_statement(cx: &MathContext, input: &str) {
         let mut ml = MathTokenizer::scanner(input.chars());
         let backtrack = ml.buffer_pos();
-        if let (Some(MathToken::Variable(var)), Some(assig)) = (ml.next(), ml.next()) {
-            if assig == MathToken::BOp(format!("=")) {
+        if let (Some(MathToken::Variable(var)), Some(op)) = (ml.next(), ml.next()) {
+            if op == MathToken::BOp("=".to_string()) {
                 match ShuntingParser::parse(&mut ml) {
                     Err(e) => println!("Parse error: {:?}", e),
-                    Ok(rpn) => match cx.eval(&rpn) {
-                        Err(e) => println!("Eval error: {:?}", e),
-                        Ok(result) => cx.setvar(&var[..], result),
+                    Ok(expr) => match cx.compile(&expr) {
+                        Err(e) => println!("Compile error: {:?}", e),
+                        Ok(code) => cx.setvar(&var, code),
                     },
                 }
                 return;
@@ -34,8 +33,7 @@ mod repl {
             Err(e) => println!("Parse error: {:?}", e),
             Ok(rpn) => match cx.eval(&rpn) {
                 Err(e) => println!("Eval error: {:?}", e),
-                Ok(MathValue::Number(r)) => println!("{}", r),
-                Ok(MathValue::RandVar(r)) => println!("*{}", r.sample()),
+                Ok(r) => println!("{}", r),
             },
         };
     }
@@ -47,7 +45,7 @@ fn main() {
         repl::evalexpr(&input[..]);
     } else {
         use shunting::MathContext;
-        let mut cx = MathContext::new();
+        let cx = MathContext::new();
         let histpath = home::home_dir().map(|h| h.join(".tox_history")).unwrap();
         let mut rl = rustyline::Editor::<()>::new();
         if rl.load_history(&histpath).is_err() {
@@ -55,7 +53,7 @@ fn main() {
         }
         while let Ok(input) = rl.readline(">> ") {
             rl.add_history_entry(input.as_str());
-            repl::parse_statement(&mut cx, &input[..]);
+            repl::parse_statement(&cx, &input[..]);
         }
         rl.save_history(&histpath).unwrap();
     }

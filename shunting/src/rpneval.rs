@@ -15,11 +15,11 @@ impl<D: rand::distributions::Distribution<f64>> RandomVariable for D {
     }
 }
 
+#[derive(Clone)]
 pub enum MathOp {
     Number(f64),
-    Variable(String, MathContext),
-    RandVar(Box<dyn RandomVariable>),
-    Function(Box<dyn Fn() -> f64>),
+    RandVar(Rc<dyn RandomVariable>),
+    Dynamic(Rc<dyn Fn() -> Result<f64, String>>),
 }
 
 impl RandomVariable for MathOp {
@@ -27,16 +27,11 @@ impl RandomVariable for MathOp {
         match self {
             MathOp::Number(n) => *n,
             MathOp::RandVar(r) => r.eval(),
-            MathOp::Function(f) => f(),
-            MathOp::Variable(v, cx) => match cx.0.borrow().get(v) {
-                Some(rv) => rv.eval(),
-                None => panic!("Variable {} not in context", v),
-            },
+            MathOp::Dynamic(f) => f().unwrap(),
         }
     }
 }
 
-#[derive(Clone)]
 pub struct MathContext(Rc<RefCell<HashMap<String, MathOp>>>);
 
 impl MathContext {
@@ -106,78 +101,67 @@ impl MathContext {
             match token {
                 MathToken::Number(n) => stack.push(MathOp::Number(*n)),
                 MathToken::Variable(v) => stack.push(
-                    MathOp::Variable(v.to_string(), self.clone())),
+                    self.0.borrow().get(v).ok_or(format!("Unknown variable: {}", v))?.clone()),
                 MathToken::BOp(op) => {
+                    let rhs = stack.pop().ok_or(format!("Missing operands for {}", op))?;
+                    let lhs = stack.pop().ok_or(format!("Missing operands for {}", op))?;
+                    let dynamic = !(
+                        matches!(rhs, MathOp::Number(_)) && matches!(lhs, MathOp::Number(_)));
                     let op = op.clone();
-                    let rhs = stack.pop().ok_or("Missing operands")?;
-                    let lhs = stack.pop().ok_or("Missing operands")?;
-                    match (lhs, rhs) {
-                        (MathOp::Number(lhs), MathOp::Number(rhs)) => stack.push(
-                            MathOp::Number(match &op[..] {
-                                "+" => lhs + rhs,
-                                "-" => lhs - rhs,
-                                "*" => lhs * rhs,
-                                "/" => lhs / rhs,
-                                "%" => lhs % rhs,
-                                "^" | "**" => lhs.powf(rhs),
-                                _ => return Err(format!("Unknown BOp: {}", op)),
-                            })),
-                        (lhs, rhs) => stack.push(
-                            MathOp::Function(Box::new(move || match &op[..] {
-                                "+" => lhs.eval() + rhs.eval(),
-                                "-" => lhs.eval() - rhs.eval(),
-                                "*" => lhs.eval() * rhs.eval(),
-                                "/" => lhs.eval() / rhs.eval(),
-                                "%" => lhs.eval() % rhs.eval(),
-                                "^" | "**" => lhs.eval().powf(rhs.eval()),
-                                _ => panic!("Unknown BOp: {}", op)
-                            })))
-                    }
+                    let eval = move || {
+                        Ok(match op.as_str() {
+                            "+" => lhs.eval() + rhs.eval(),
+                            "-" => lhs.eval() - rhs.eval(),
+                            "*" => lhs.eval() * rhs.eval(),
+                            "/" => lhs.eval() / rhs.eval(),
+                            "%" => lhs.eval() % rhs.eval(),
+                            "^" | "**" => lhs.eval().powf(rhs.eval()),
+                            _ => return Err(format!("Unknown BOp: {}", op)),
+                        })
+                    };
+                    stack.push(if dynamic {
+                        MathOp::Dynamic(Rc::new(eval))
+                    } else {
+                        MathOp::Number(eval()?)
+                    });
                 }
                 MathToken::UOp(op) => {
+                    let arg = stack.pop().ok_or(format!("Missing operands for {}", op))?;
+                    let dynamic = !matches!(arg, MathOp::Number(_));
                     let op = op.clone();
-                    match stack.pop().ok_or("Missing operands")? {
-                        MathOp::Number(arg) => stack.push(
-                            MathOp::Number(match &op[..] {
-                                "-" => -arg,
-                                "!" => libm::tgamma(arg + 1.0),
-                                _ => return Err(format!("Unknown UOp: {}", op)),
-                            })),
-                        arg => stack.push(
-                            MathOp::Function(Box::new(move || match &op[..] {
-                                "-" => -arg.eval(),
-                                "!" => libm::tgamma(arg.eval() + 1.0),
-                                _ => panic!("Unknown UOp: {}", op)
-                            }))
-                        )
-                    }
+                    let eval = move || {
+                        Ok(match op.as_str() {
+                            "-" => -arg.eval(),
+                            "!" => libm::tgamma(arg.eval() + 1.0),
+                            _ => return Err(format!("Unknown UOp: {}", op)),
+                        })
+                    };
+                    stack.push(if dynamic {
+                        MathOp::Dynamic(Rc::new(eval))
+                    } else {
+                        MathOp::Number(eval()?)
+                    });
                 }
                 MathToken::Function(fname, arity) => {
                     if *arity > stack.len() {
-                        return Err(format!("Missing args for function {}", fname));
+                        return Err(format!("Missing args for {}", fname));
                     }
                     let args: Vec<_> = stack.split_off(stack.len() - arity);
-                    // All arguments to function call are numbers (static)
-                    if args.iter().all(|a| matches!(a, MathOp::Number(_))) {
-                        // All args are numbers, use .eval to extract f64s
+                    let dynamic = !args.iter().all(|arg| matches!(arg, MathOp::Number(_)));
+                    let fname = fname.clone();
+                    let eval = move || -> Result<MathOp, String> {
                         let args: Vec<_> = args.iter().map(|v| v.eval()).collect();
-                        if let Ok(rv) = build_rv(fname, &args) {
-                            stack.push(MathOp::RandVar(rv));
+                        Ok(if let Ok(rv) = build_rv(&fname, &args) {
+                            MathOp::RandVar(rv)
                         } else {
-                            stack.push(MathOp::Number(eval_fn(fname, &args)?));
-                        }
+                            MathOp::Number(eval_fn(&fname, &args)?)
+                        })
+                    };
+                    stack.push(if dynamic {
+                        MathOp::Dynamic(Rc::new(move || eval().map(|v| v.eval())))
                     } else {
-                        // Args for function call determined at runtime.
-                        let fname = fname.clone();
-                        stack.push(MathOp::Function(Box::new(move || {
-                            let args: Vec<_> = args.iter().map(|v| v.eval()).collect();
-                            if let Ok(rv) = build_rv(&fname, &args) {
-                                rv.eval()
-                            } else {
-                                eval_fn(&fname, &args).unwrap()
-                            }
-                        })));
-                    }
+                        eval()?
+                    });
                 }
                 _ => return Err(format!("Unexpected token for RPN compile: {:?}", token)),
             }
@@ -206,12 +190,12 @@ fn eval_fn(fname: &str, args: &[f64]) -> Result<f64, String> {
     })
 }
 
-fn build_rv(dname: &str, args: &[f64]) -> Result<Box<dyn RandomVariable>, String> {
+fn build_rv(dname: &str, args: &[f64]) -> Result<Rc<dyn RandomVariable>, String> {
     use rand_distr::*;
     Ok(match dname {
-        "normal" if args.len() == 2 => Box::new(Normal::new(args[0], args[1]).unwrap()),
-        "uniform" if args.len() == 2 => Box::new(Uniform::new(args[0], args[1])),
-        "lognormal" if args.len() == 2 => Box::new(LogNormal::new(args[0], args[1]).unwrap()),
+        "normal" if args.len() == 2 => Rc::new(Normal::new(args[0], args[1]).unwrap()),
+        "uniform" if args.len() == 2 => Rc::new(Uniform::new(args[0], args[1])),
+        "lognormal" if args.len() == 2 => Rc::new(LogNormal::new(args[0], args[1]).unwrap()),
         _ => return Err(format!("Unknown distribution: {} with {} args", dname, args.len()))
     })
 }

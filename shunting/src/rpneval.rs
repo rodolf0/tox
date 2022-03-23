@@ -32,6 +32,31 @@ impl RandomVariable for MathOp {
     }
 }
 
+#[derive(Debug)]
+pub struct Histogram<const BUCKETS: usize> {
+    pub buckets: [u32; BUCKETS],
+    pub min: f64,
+    pub max: f64,
+}
+
+impl MathOp {
+    pub fn histogram<const BUCKETS: usize>(&self, samples: usize) -> Histogram<BUCKETS> {
+        // collect samples from random variable
+        let data: Vec<_> = (0..samples).map(|_| self.eval()).collect();
+        // extract info from data to build histogram
+        let (min, max) = data.iter().fold((f64::MAX, f64::MIN), |(min, max), &x| {
+            (min.min(x), max.max(x))
+        });
+        let bucket_size = (max + 1.0e-10 - min) / BUCKETS as f64;
+        // map samples to histogram buckets
+        let mut histogram = Histogram{buckets: [0; BUCKETS], min, max};
+        for bucket in data.into_iter().map(|x| (x - min) / bucket_size) {
+            histogram.buckets[bucket as usize] += 1;
+        }
+        histogram
+    }
+}
+
 pub struct MathContext(Rc<RefCell<HashMap<String, MathOp>>>);
 
 impl MathContext {

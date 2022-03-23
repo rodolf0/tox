@@ -1,6 +1,6 @@
 mod repl {
     use lexers::{MathToken, MathTokenizer};
-    use shunting::{MathContext, ShuntingParser};
+    use shunting::{MathContext, ShuntingParser, MathOp};
 
     pub fn evalexpr(input: &str) {
         match ShuntingParser::parse_str(input) {
@@ -22,7 +22,7 @@ mod repl {
                     Ok(expr) => match cx.compile(&expr) {
                         Err(e) => println!("Compile error: {:?}", e),
                         Ok(code) => cx.setvar(&var, code),
-                    },
+                    }
                 }
                 return;
             }
@@ -31,10 +31,11 @@ mod repl {
         ml.set_buffer_pos(backtrack);
         match ShuntingParser::parse(&mut ml) {
             Err(e) => println!("Parse error: {:?}", e),
-            Ok(rpn) => match cx.eval(&rpn) {
-                Err(e) => println!("Eval error: {:?}", e),
-                Ok(r) => println!("{}", r),
-            },
+            Ok(expr) => match cx.compile(&expr) {
+                Err(e) => println!("Compile error: {:?}", e),
+                Ok(MathOp::Number(n)) => println!("{}", n),
+                Ok(x) => println!("{:?}", x.histogram::<15>(2000)),
+            }
         };
     }
 }

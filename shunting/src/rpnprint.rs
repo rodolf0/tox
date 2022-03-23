@@ -1,4 +1,4 @@
-use crate::parser::{op_precedence, Assoc, RPNExpr};
+use crate::parser::RPNExpr;
 use lexers::MathToken;
 use std::fmt;
 
@@ -11,24 +11,22 @@ enum AST<'a> {
 impl RPNExpr {
     fn build_ast(&self) -> AST {
         let mut ops = Vec::new();
-        for token in self.0.iter() {
+        for token in &self.0 {
             match token {
-                MathToken::Number(_) | MathToken::Variable(_) => ops.push(AST::Leaf(token)),
+                MathToken::Number(_) | MathToken::Variable(_) =>
+                    ops.push(AST::Leaf(token)),
                 MathToken::Function(_, arity) => {
-                    let n = ops.len() - arity;
-                    let operands = ops.split_off(n);
-                    ops.push(AST::Node(token, operands));
-                }
+                    let children = ops.split_off(ops.len() - arity);
+                    ops.push(AST::Node(token, children));
+                },
                 MathToken::BOp(_) => {
-                    let n = ops.len() - 2;
-                    let operands = ops.split_off(n);
-                    ops.push(AST::Node(token, operands));
-                }
+                    let children = ops.split_off(ops.len() - 2);
+                    ops.push(AST::Node(token, children));
+                },
                 MathToken::UOp(_) => {
-                    let n = ops.len() - 1;
-                    let operands = ops.split_off(n);
-                    ops.push(AST::Node(token, operands));
-                }
+                    let children = ops.split_off(ops.len() - 1);
+                    ops.push(AST::Node(token, children));
+                },
                 _ => unreachable!(),
             }
         }
@@ -38,60 +36,26 @@ impl RPNExpr {
 
 impl fmt::Display for RPNExpr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fn printer(root: &AST) -> (String, (usize, Assoc)) {
+        fn print_helper(root: &AST, indent: &str, out: &mut String) {
             match root {
-                AST::Leaf(ref token) => match token {
-                    MathToken::Number(x) => (x.to_string(), op_precedence(token).unwrap()),
-                    MathToken::Variable(x) => (x.to_string(), op_precedence(token).unwrap()),
-                    _ => unreachable!(),
-                },
-                AST::Node(ref token, ref args) => {
-                    match token {
-                        MathToken::UOp(op) => {
-                            let subtree = printer(&args[0]);
-                            let (prec, assoc) = op_precedence(token).unwrap();
-                            // TODO: distinguish perfix/postfix operators
-                            if prec > (subtree.1).0 {
-                                (format!("{}({})", op, subtree.0), (prec, assoc))
-                            } else {
-                                (format!("{}{}", op, subtree.0), (prec, assoc))
-                            }
+                AST::Leaf(tok) => *out += &format!("\u{2500}{:?}\n", tok),
+                AST::Node(tok, children) => {
+                    // Print current node
+                    *out += &format!("\u{252c}{:?}\n", tok);
+                    // Print its children
+                    if let Some((last_node, rest)) = children.split_last() {
+                        for mid_node in rest {
+                            *out += &format!("{}\u{251c}", indent);
+                            print_helper(mid_node, &format!("{}\u{2502}", indent), out);
                         }
-                        MathToken::BOp(op) => {
-                            let (lhs, rhs) = (printer(&args[0]), printer(&args[1]));
-                            let (prec, assoc) = op_precedence(token).unwrap();
-
-                            let lh = if prec > (lhs.1).0
-                                || (prec == (lhs.1).0 && assoc != Assoc::Left)
-                            {
-                                format!("({})", lhs.0)
-                            } else {
-                                lhs.0
-                            };
-                            let rh = if prec > (rhs.1).0
-                                || (prec == (rhs.1).0 && assoc != Assoc::Right)
-                            {
-                                format!("({})", rhs.0)
-                            } else {
-                                rhs.0
-                            };
-                            // NOTE: '2+(3+4)' will show parens to indicate that user
-                            // explicitly put them there
-                            (format!("{} {} {}", lh, op, rh), (prec, assoc))
-                        }
-                        MathToken::Function(func, _) => {
-                            let expr = args
-                                .iter()
-                                .map(|leaf| printer(leaf).0)
-                                .collect::<Vec<String>>()
-                                .join(", ");
-                            (format!("{}({})", func, expr), op_precedence(token).unwrap())
-                        }
-                        _ => unreachable!(),
+                        *out += &format!("{}\u{2570}", indent);
+                        print_helper(last_node, &format!("{} ", indent), out);
                     }
                 }
             }
         }
-        write!(f, "{}", printer(&self.build_ast()).0)
+        let mut output = String::new();
+        print_helper(&self.build_ast(), "", &mut output);
+        write!(f, "{}", output)
     }
 }

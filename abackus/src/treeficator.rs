@@ -26,18 +26,21 @@ impl Sexpr {
         out
     }
 
-    fn print_helper(&self, level: &str, out: &mut String) {
+    fn print_helper(&self, indent: &str, out: &mut String) {
         match *self {
             Sexpr::Atom(ref lexeme) =>
-                *out += &format!("{}`-- {:?}\n", level, lexeme),
+                *out += &format!("\u{2500} {}\n", lexeme),
             Sexpr::List(ref subn) => {
-                *out += &format!("{}`--\n", level);
-                if let Some((last, rest)) = subn.split_last() {
-                    let l = format!("{}  |", level);
-                    for n in rest { n.print_helper(&l, out); }
-                    let l = format!("{}   ", level);
-                    last.print_helper(&l, out);
+                let (first, rest) = subn.split_first().unwrap();
+                let (last, rest) = rest.split_last().unwrap();
+                *out += &format!("\u{252c}");
+                first.print_helper(&format!("{}\u{2502}", indent), out);
+                for mid in rest {
+                    *out += &format!("{}\u{251c}", indent);
+                    mid.print_helper(&format!("{}\u{2502}", indent), out);
                 }
+                *out += &format!("{}\u{2570}", indent);
+                last.print_helper(&format!("{} ", indent), out);
             }
         }
     }

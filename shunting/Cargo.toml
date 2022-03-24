@@ -1,6 +1,6 @@
 [package]
 name = "shunting"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
@@ -11,11 +11,11 @@ keywords = ["shunting", "math", "parser", "expression", "eval"]
 categories = ["parsing", "algorithms"]
 
 [dependencies]
-lexers = { version = "0.1.4", path = "../lexers" }
-rand = "0.8.5"
+lexers = { version = "0.1", path = "../lexers" }
+rand = "0.8"
 rand_distr = "0.4"
 libm = "0.2"
 
 [dev-dependencies]
 home = "0.5"
-rustyline = "9.1.0"
+rustyline = "9.1"

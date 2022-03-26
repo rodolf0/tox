@@ -39,12 +39,16 @@ fn scan_number() {
 #[test]
 fn scan_math_ops() {
     let tests = vec![
-        "<", "<=", "==", ">=", ">", "(", ")", ",", "*", "**", "^", "!", "+", "-", "/", "%",
+        "<", "<=", "=", "==", ">=", ">", "(", ")", ",", "*",
+        "**", "^", "!", "+", "-", "/", "%", ":=",
     ];
     for t in tests.iter() {
         let result = Scanner::new(t.chars()).scan_math_op();
         assert_eq!(Some(t.to_string()), result);
     }
+    // Negative tests
+    let result = Scanner::new(":".chars()).scan_math_op();
+    assert_eq!(result, None);
 }
 
 #[test]

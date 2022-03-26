@@ -65,6 +65,9 @@ impl<I: Iterator<Item = char>> Scanner<I> {
             // accept '<', '>', '=', '<=', '>=', '=='
             self.accept(&'=');
             Some(self.extract_string())
+        } else if self.accept(&':').is_some() && self.accept(&'=').is_some() {
+            // accept ':='. Set delayed to avoid immediate eval of rhs.
+            Some(self.extract_string())
         } else if self.accept(&'*').is_some() {
             // accept '*', '**'
             self.accept(&'*');

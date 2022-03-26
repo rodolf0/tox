@@ -7,7 +7,7 @@ mod repl {
             Err(e) => println!("Parse error: {:?}", e),
             Ok(expr) => match MathContext::new().eval(&expr) {
                 Err(e) => println!("Eval error: {:?}", e),
-                Ok(r) => println!("{} = {}", expr, r),
+                Ok(r) => println!("{} -> {}", expr, r),
             },
         };
     }
@@ -16,7 +16,7 @@ mod repl {
         let mut ml = MathTokenizer::scanner(input.chars());
         let backtrack = ml.buffer_pos();
         if let (Some(MathToken::Variable(var)), Some(op)) = (ml.next(), ml.next()) {
-            if op == MathToken::BOp("=".to_string()) {
+            if op == MathToken::BOp(":=".to_string()) {
                 match ShuntingParser::parse(&mut ml) {
                     Err(e) => println!("Parse error: {:?}", e),
                     Ok(expr) => match cx.compile(&expr) {

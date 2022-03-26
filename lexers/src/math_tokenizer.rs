@@ -95,21 +95,35 @@ mod tests {
         let mut lx = MathTokenizer::new("3+4*2/-(1-5)^2^3".chars());
         let expect = [
             Number(3.0),
-            BOp(format!("+")),
+            BOp("+".to_string()),
             Number(4.0),
-            BOp(format!("*")),
+            BOp("*".to_string()),
             Number(2.0),
-            BOp(format!("/")),
-            UOp(format!("-")),
+            BOp("/".to_string()),
+            UOp("-".to_string()),
             OParen,
             Number(1.0),
-            BOp(format!("-")),
+            BOp("-".to_string()),
             Number(5.0),
             CParen,
-            BOp(format!("^")),
+            BOp("^".to_string()),
             Number(2.0),
-            BOp(format!("^")),
+            BOp("^".to_string()),
             Number(3.0),
+        ];
+        for exp_token in expect.iter() {
+            let token = lx.next().unwrap();
+            assert_eq!(*exp_token, token);
+        }
+        assert_eq!(lx.next(), None);
+
+        let mut lx = MathTokenizer::new("x := a + b".chars());
+        let expect = [
+            Variable("x".to_string()),
+            BOp(":=".to_string()),
+            Variable("a".to_string()),
+            BOp("+".to_string()),
+            Variable("b".to_string()),
         ];
         for exp_token in expect.iter() {
             let token = lx.next().unwrap();
@@ -123,25 +137,25 @@ mod tests {
         let mut lx = MathTokenizer::new("3.4e-2 * sin(x)/(7! % -4) * max(2, x)".chars());
         let expect = [
             Number(3.4e-2),
-            BOp(format!("*")),
-            Function(format!("sin"), 0),
+            BOp("*".to_string()),
+            Function("sin".to_string(), 0),
             OParen,
-            Variable(format!("x")),
+            Variable("x".to_string()),
             CParen,
-            BOp(format!("/")),
+            BOp("/".to_string()),
             OParen,
             Number(7.0),
-            UOp(format!("!")),
-            BOp(format!("%")),
-            UOp(format!("-")),
+            UOp("!".to_string()),
+            BOp("%".to_string()),
+            UOp("-".to_string()),
             Number(4.0),
             CParen,
-            BOp(format!("*")),
-            Function(format!("max"), 0),
+            BOp("*".to_string()),
+            Function("max".to_string(), 0),
             OParen,
             Number(2.0),
             Comma,
-            Variable(format!("x")),
+            Variable("x".to_string()),
             CParen,
         ];
         for exp_token in expect.iter() {
@@ -155,11 +169,11 @@ mod tests {
     fn unary_ops() {
         let mut lx = MathTokenizer::new("x---y".chars());
         let expect = [
-            Variable(format!("x")),
-            BOp(format!("-")),
-            UOp(format!("-")),
-            UOp(format!("-")),
-            Variable(format!("y")),
+            Variable("x".to_string()),
+            BOp("-".to_string()),
+            UOp("-".to_string()),
+            UOp("-".to_string()),
+            Variable("y".to_string()),
         ];
         for exp_token in expect.iter() {
             let token = lx.next().unwrap();

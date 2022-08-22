@@ -200,6 +200,7 @@ fn eval_fn(fname: &str, args: &[f64]) -> Result<f64, String> {
     Ok(match fname {
         "sin" if args.len() == 1 => args[0].sin(),
         "cos" if args.len() == 1 => args[0].cos(),
+        "tan" if args.len() == 1 => args[0].tan(),
         "atan2" if args.len() == 2 => args[0].atan2(args[1]),
         "max" if !args.is_empty() => args.iter().fold(args[0], |a, &b| a.max(b)),
         "min" if !args.is_empty() => args.iter().fold(args[0], |a, &b| a.min(b)),

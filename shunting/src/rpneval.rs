@@ -198,19 +198,20 @@ impl MathContext {
 
 fn eval_fn(fname: &str, args: &[f64]) -> Result<f64, String> {
     Ok(match fname {
-        "sin" if args.len() == 1 => args[0].sin(),
-        "cos" if args.len() == 1 => args[0].cos(),
+        "abs" if args.len() == 1 => args[0].abs(),
         "atan2" if args.len() == 2 => args[0].atan2(args[1]),
+        "cos" if args.len() == 1 => args[0].cos(),
+        "log" if args.len() == 1 => args[0].log10(),
         "max" if !args.is_empty() => args.iter().fold(args[0], |a, &b| a.max(b)),
         "min" if !args.is_empty() => args.iter().fold(args[0], |a, &b| a.min(b)),
-        "abs" if args.len() == 1 => args[0].abs(),
-        "rand" if args.len() == 1 => rand::random::<f64>() * args[0],
         // Order not important
         "nCr" if args.len() == 2 => funcs::combinations(args[0], args[1])?,
         "nMCr" if args.len() == 2 => funcs::multicombinations(args[0], args[1])?,
         // Order is important
-        "nPr" if args.len() == 2 => funcs::permutations(args[0], args[1])?,
         "nMPr" if args.len() == 2 => args[0].powf(args[1]),
+        "nPr" if args.len() == 2 => funcs::permutations(args[0], args[1])?,
+        "rand" if args.len() == 1 => rand::random::<f64>() * args[0],
+        "sin" if args.len() == 1 => args[0].sin(),
         _ => return Err(format!("Unknown Function: {} with {} args", fname, args.len()))
     })
 }

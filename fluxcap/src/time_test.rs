@@ -18,6 +18,10 @@ fn r(s: DateTime, e: DateTime, gr: kronos::Grain) -> Vec<TimeEl> {
     })]
 }
 
+fn dttm(year: i32, month: u32, day: u32, h: u32, m: u32, s: u32) -> DateTime {
+    chrono::NaiveDate::from_ymd(year, month, day).and_hms(h, m, s)
+}
+
 #[test]
 fn t_thisnext() -> Result<(), String> {
     let tm = TimeMachine::new(d(2016, 9, 5));
@@ -96,25 +100,28 @@ fn t_timediff() -> Result<(), String> {
     // until
     assert_eq!(tm.eval("days until tomorrow")?, vec![TimeEl::Count(1)]);
     assert_eq!(tm.eval("months until 2018")?, vec![TimeEl::Count(16)]);
-    assert_eq!(tm.eval("weeks until dec")?, vec![TimeEl::Count(13)]);
+    assert_eq!(tm.eval("weeks until dec")?, vec![TimeEl::Count(12)]);
     // since
     assert_eq!(tm.eval("feb 29th since 2000")?, vec![TimeEl::Count(5)]);
-    assert_eq!(tm.eval("years since 2000")?, vec![TimeEl::Count(17)]);
-    assert_eq!(tm.eval("days since sep")?, vec![TimeEl::Count(4)]); // TODO: CHECK 5?
+    assert_eq!(tm.eval("years since 2000")?, vec![TimeEl::Count(16)]);
+    assert_eq!(tm.eval("days since sep")?, vec![TimeEl::Count(4)]);
     // between
     assert_eq!(tm.eval("days between mar and apr")?, vec![TimeEl::Count(31)]);
 
     let tm = TimeMachine::new(d(2016, 10, 25));
     assert_eq!(tm.eval("mon until nov 14th")?, vec![TimeEl::Count(2)]);
+
+    let tm = TimeMachine::new(d(2023, 3, 13));
+    assert_eq!(tm.eval("years since mar 13th 2005")?, vec![TimeEl::Count(18)]);
     Ok(())
 }
 
 #[test]
 fn t_shifts() -> Result<(), String> {
     let tm = TimeMachine::new(d(2016, 10, 26));
-    assert_eq!(tm.eval("2 weeks ago")?, r(d(2016, 10, 12), d(2016, 10, 13), g::Day));
+    assert_eq!(tm.eval("2 weeks ago")?, r(d(2016, 10, 12), dttm(2016, 10, 12, 0, 0, 1), g::Second));
     assert_eq!(tm.eval("a week after feb 14th")?, r(d(2017, 2, 21), d(2017, 2, 22), g::Day));
     assert_eq!(tm.eval("a week before feb 28th")?, r(d(2017, 2, 21), d(2017, 2, 22), g::Day));
-    assert_eq!(tm.eval("in a year")?, r(d(2017, 10, 26), d(2017, 10, 27), g::Day));
+    assert_eq!(tm.eval("in a year")?, r(d(2017, 10, 26), dttm(2017, 10, 26, 0, 0, 1), g::Second));
     Ok(())
 }

@@ -49,6 +49,44 @@ impl PartialEq for Item {
 
 impl Eq for Item {}
 
+impl Item {
+    // Unwind backpointers recursively
+    pub fn stringify(&self, nest: usize) -> String {
+        let pre = self.rule.spec.iter().take(self.dot)
+            .map(|s| s.name()).collect::<Vec<_>>().join(" ");
+        let post = self.rule.spec.iter().skip(self.dot)
+            .map(|s| s.name()).collect::<Vec<_>>().join(" ");
+        format!("({} - {}) {} -> {} \u{00b7} {} #bp: {}{}",
+               self.start, self.end, self.rule.head, pre, post,
+               self.backpointers.borrow().len(),
+               self.stringify_bp(nest + 1))
+    }
+
+    fn stringify_bp(&self, nest: usize) -> String {
+        let mut out = String::new();
+        let pfx = "   ".repeat(nest);
+        for bp in self.backpointers.borrow().iter() {
+            match bp {
+                BackPointer::Complete(a, b) => {
+                    out += format!("\n{}Complete(\n{}   {}, \n{}   {}\n{})",
+                        pfx,
+                        pfx, a.stringify(nest + 1),
+                        pfx, b.stringify(nest + 1),
+                        pfx).as_str();
+                },
+                BackPointer::Scan(a, b) => {
+                    out += format!("\n{}Scan(\n{}   {}, \n{}   {}\n{})",
+                        pfx,
+                        pfx, a.stringify(nest + 1),
+                        pfx, b,
+                        pfx).as_str();
+                }
+            }
+        }
+        out
+    }
+}
+
 impl fmt::Debug for Item {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let pre = self.rule.spec.iter().take(self.dot)

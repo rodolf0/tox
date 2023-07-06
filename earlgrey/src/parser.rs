@@ -141,6 +141,12 @@ impl EarleyParser {
         if parse_trees.is_empty() {
             return Err("Parse Error: No Rule completes".to_string());
         }
+        if cfg!(feature="debug") {
+            eprintln!("=== Parse Trees ===");
+            for t in &parse_trees {
+                eprintln!("{}", t.stringify(0));
+            }
+        }
         Ok(ParseTrees(parse_trees))
     }
 }

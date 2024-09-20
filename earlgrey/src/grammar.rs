@@ -5,34 +5,49 @@ use std::{fmt, hash};
 use std::rc::Rc;
 use std::string;
 
+pub enum Symbol {
+    NonTerm(String),
+    // A terminal has a predicate to validate that input is accepted
+    Term(String, Box<dyn Fn(&str)->bool>),
+}
 
-/// Symbol has a unique name. It is a non-terminal unless it
-/// provides a predicate to match lexemes and becomes a terminal
-pub struct Symbol(String, Option<Box<dyn Fn(&str)->bool>>);
+#[derive(PartialEq, Hash)]
+pub struct Rule {
+    pub head: String,
+    pub spec: Vec<Rc<Symbol>>,
+}
+
+#[derive(Clone,Debug)]
+pub struct Grammar {
+    pub start: String,
+    pub rules: Vec<Rc<Rule>>,
+}
+
+#[derive(Default)]
+pub struct GrammarBuilder {
+    symbols: HashMap<String, Rc<Symbol>>,
+    rules: Vec<Rc<Rule>>,
+    error: Option<String>,
+}
+
 
 impl Symbol {
-    /// Return the name of the symbol only if its a NonTerminal
-    pub fn nonterm(&self) -> Option<&str> {
-        self.1.as_ref().map_or(Some(self.0.as_ref()), |_| None)
-    }
-
-    /// Return the name and the predicate only if this symbols is a Terminal
-    pub fn terminal(&self) -> Option<(&str, &dyn Fn(&str) -> bool)> {
-        self.1.as_ref().map(|f| (self.0.as_ref(), f.as_ref()))
-    }
-
     pub fn name(&self) -> &str {
-        &self.0
+        match self {
+            Symbol::NonTerm(name) => name,
+            Symbol::Term(name, _) => name,
+        }
     }
 
-    #[cfg(test)]
-    pub fn new(name: &str) -> Rc<Symbol> {
-        Rc::new(Symbol(name.to_string(), None))
+    pub fn matches(&self, input: &str) -> bool {
+        match self {
+            Symbol::Term(_, matcher) => matcher(input),
+            _ => false
+        }
     }
 
-    #[cfg(test)]
-    pub fn new2(name: &str, pred: impl Fn(&str)->bool + 'static) -> Rc<Symbol> {
-        Rc::new(Symbol(name.to_string(), Some(Box::new(pred))))
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, Symbol::Term(_, _))
     }
 }
 
@@ -40,34 +55,43 @@ impl Symbol {
 // The name is the only way to dedup Terminals (ie: predicate is ignored)
 impl hash::Hash for Symbol {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state)
+        match self {
+            // non-eq objects don't "have to" hash differently
+            Symbol::Term(name, _) => name.hash(state),
+            Symbol::NonTerm(name) => name.hash(state),
+        }
     }
 }
 
 impl PartialEq for Symbol {
     fn eq(&self, other: &Symbol) -> bool {
-        self.0 == other.0
+        match (self, other) {
+            (Symbol::Term(s, _), Symbol::Term(o, _))  => s == o,
+            (Symbol::NonTerm(s), Symbol::NonTerm(o))  => s == o,
+            _ => false
+        }
     }
 }
+
+impl Eq for Symbol {}
 
 impl fmt::Debug for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some((name, _)) = self.terminal() {
-            return write!(f, "Terminal({})", name);
-        } else if let Some(name) = self.nonterm() {
-            return write!(f, "NonTerm({})", name);
-        };
-        write!(f, "BUG: unknown symbol type")
+        match self {
+            Symbol::Term(name, _) => write!(f, "Term({})", name),
+            Symbol::NonTerm(name) => write!(f, "NonTerm({})", name),
+        }
     }
 }
 
-/// A grammar Rule "S -> S b" has a head that must be a non-Terminal.
-/// The spec is a list of Terminal and Non-Terminal Symbols.
-/// Normally `Rule`s are built by GrammarBuilder not directly by user.
-#[derive(PartialEq, Hash)]
-pub struct Rule {
-    pub head: String,
-    pub spec: Vec<Rc<Symbol>>,
+impl Rule {
+    #[cfg(test)]
+    pub fn new(head: &str, spec: &[Rc<Symbol>]) -> Self {
+        Rule {
+            head: head.to_string(),
+            spec: spec.iter().cloned().collect()
+        }
+    }
 }
 
 impl string::ToString for Rule {
@@ -83,34 +107,9 @@ impl fmt::Debug for Rule {
     }
 }
 
-impl Rule {
-    #[cfg(test)]
-    pub fn new(head: &str, spec: &[Rc<Symbol>]) -> Self {
-        Rule {
-            head: head.to_string(),
-            spec: spec.iter().cloned().collect()
-        }
-    }
-}
-
-
-#[derive(Clone,Debug)]
-pub struct Grammar {
-    pub start: String,
-    pub rules: Vec<Rc<Rule>>,
-}
-
-
 /// Builds a Gramar while validating existence of Symbols and checking rules.
-#[derive(Default)]
-pub struct GrammarBuilder {
-    symbols: HashMap<String, Rc<Symbol>>,
-    rules: Vec<Rc<Rule>>,
-    error: Option<String>,
-}
-
 impl GrammarBuilder {
-    fn _add_symbol(&mut self, symbol: Symbol, quiet: bool) {
+    fn add_symbol(&mut self, symbol: Symbol, quiet: bool) {
         // Check for duplicate symbols to avoid overwriting by mistake
         if !self.symbols.contains_key(symbol.name()) {
             self.symbols.insert(symbol.name().to_string(), Rc::new(symbol));
@@ -120,31 +119,33 @@ impl GrammarBuilder {
         }
     }
 
-    pub fn nonterm<S>(mut self, name: S) -> Self where S: Into<String> {
-        self._add_symbol(Symbol(name.into(), None), false);
+    pub fn nonterm(mut self, name: impl Into<String>) -> Self {
+        self.add_symbol(Symbol::NonTerm(name.into()), false);
         self
     }
 
-    pub fn terminal<S, P>(mut self, name: S, pred: P) -> Self
-        where S: Into<String>,
-              P: 'static + Fn(&str) -> bool,
+    pub fn terminal(
+        mut self, 
+        name: impl Into<String>,
+        pred: impl Fn(&str) -> bool + 'static) -> Self
     {
-        self._add_symbol(Symbol(name.into(), Some(Box::new(pred))), false);
+        self.add_symbol(Symbol::Term(name.into(), Box::new(pred)), false);
         self
     }
 
     // Quiet silently ignores adding pre-existent symbols to the grammar.
     // Also quiet versions don't use chaining to be invoked in loops.
 
-    pub fn quiet_nonterm<S>(&mut self, name: S) where S: Into<String> {
-        self._add_symbol(Symbol(name.into(), None), true)
+    pub fn quiet_nonterm(&mut self, name: impl Into<String>) {
+        self.add_symbol(Symbol::NonTerm(name.into()), true);
     }
 
-    pub fn quiet_terminal<S, P>(&mut self, name: S, pred: P)
-        where S: Into<String>,
-              P: 'static + Fn(&str) -> bool,
+    pub fn quiet_terminal(
+        &mut self,
+        name: impl Into<String>,
+        pred: impl Fn(&str) -> bool + 'static)
     {
-        self._add_symbol(Symbol(name.into(), Some(Box::new(pred))), true)
+        self.add_symbol(Symbol::Term(name.into(), Box::new(pred)), true);
     }
 
     /// Register new rules for the grammar
@@ -187,9 +188,7 @@ impl GrammarBuilder {
         self._add_rule(head, spec, true)
     }
 
-    /// Consume builder into Grammar
-    pub fn into_grammar<S>(mut self, start: S) -> Result<Grammar, String>
-        where S: Into<String>
+    pub fn into_grammar(mut self, start: impl Into<String>) -> Result<Grammar, String>
     {
         let start = start.into();
         if !self.symbols.contains_key(&start) {
@@ -210,32 +209,29 @@ impl GrammarBuilder {
 #[cfg(test)]
 mod tests {
     use super::{GrammarBuilder, Symbol};
-    use std::collections::HashMap;
+    use std::collections::HashSet;
 
     #[test]
-    fn symbol_eq() {
-        assert_eq!(Symbol::new("X"), Symbol::new2("X", |_| true));
-        let mut m = HashMap::new();
-        m.insert("X", Symbol::new("X"));
-        m.insert("X", Symbol::new2("X", |_| true));
-        assert!(m.len() == 1);
-    }
-
-    #[test]
-    fn symbol_extract() {
-        assert!(Symbol::new("X").terminal().is_none());
-        assert!(Symbol::new("X").nonterm().is_some());
-        assert!(Symbol::new2("X", |_| true).terminal().is_some());
-        assert!(Symbol::new2("X", |_| true).nonterm().is_none());
+    fn symbol_eq_hash() {
+        assert_ne!(
+            Symbol::NonTerm("X".to_string()),
+            Symbol::Term("X".to_string(), Box::new(|_| true))
+        );
+        // Check that term and non-term of equal name are not the same
+        let mut m = HashSet::new();
+        m.insert(Symbol::NonTerm("X".to_string()));
+        m.insert(Symbol::Term("X".to_string(), Box::new(|_| true)));
+        assert_eq!(m.len(), 2);
     }
 
     #[test]
     fn symbol_terminal() {
-        let symd = Symbol::new2("d", |n| n.chars().all(|c| "123".contains(c)));
-        let (name, pred) = symd.terminal().unwrap();
-        assert_eq!(name, "d");
-        assert!(pred("32"));
-        assert!(!pred("55"));
+        let term = Symbol::Term(
+            "uint".to_string(),
+            Box::new(|n| n.chars().all(|c| "1234567890".contains(c)))
+        );
+        assert_eq!(term.name(), "uint");
+        assert!(term.matches("123"));
     }
 
     #[test]

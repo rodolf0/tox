@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use crate::grammar::{Rule, Grammar};
+use crate::grammar::{Rule, Grammar, Symbol};
 use crate::items::Item;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -42,8 +42,10 @@ impl EarleyParser {
     {
         assert!(trigger.complete(), "Incomplete `trigger` used for completions");
         Box::new(starting_stateset.filter(move |item| {
-            item.next_symbol().and_then(
-                |s| s.nonterm()) == Some(trigger.rule.head.as_ref())
+            match item.next_symbol() {
+                Some(Symbol::NonTerm(name)) => name == &trigger.rule.head,
+                _ => false
+            }
         }).map(move |item| Item::complete_new(item, trigger, complete_pos)))
     }
 
@@ -55,11 +57,10 @@ impl EarleyParser {
         end: usize,
     ) -> impl Iterator<Item=Rc<Item>> + 'r
     {
-        current_stateset.filter(move |item| {
+        current_stateset.filter(move |item| 
             // check item's next symbol is a temrinal that scans lexeme
-            let next_sym_term = item.next_symbol().and_then(|s| s.terminal());
-            next_sym_term.map(|(_, matcher)| matcher(lexeme)) == Some(true)
-        }).map(move |item| Rc::new(Item::scan_new(item, end, lexeme)))
+            item.next_symbol().is_some_and(|s| s.matches(lexeme))
+        ).map(move |item| Rc::new(Item::scan_new(item, end, lexeme)))
     }
 
     pub fn parse<T>(&self, mut tokenizer: T) -> Result<ParseTrees, String>
@@ -80,14 +81,14 @@ impl EarleyParser {
             loop {
                 let new_items: Vec<_> = statesets[idx].iter().flat_map(|trigger| {
                     let next_sym = trigger.next_symbol();
-                    if let Some(next_terminal) = next_sym.and_then(|s| s.nonterm()) {
-                        EarleyParser::predictions(self.grammar.rules.iter(), next_terminal, idx)
+                    if let Some(Symbol::NonTerm(name)) = next_sym {
+                        EarleyParser::predictions(self.grammar.rules.iter(), name, idx)
                     } else if trigger.complete() {
                         assert!(next_sym.is_none(), "Expected next symbol to be None");
                         EarleyParser::completions(statesets[trigger.start].iter(), trigger, idx)
                     } else {
                         // Scan items populate next stateset only when done with current state
-                        assert!(next_sym.and_then(|s| s.terminal()).is_some());
+                        assert!(matches!(next_sym, Some(&Symbol::Term(_, _))));
                         Box::new(std::iter::empty())
                     }
                 }).collect();

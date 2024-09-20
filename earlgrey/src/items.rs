@@ -172,13 +172,21 @@ mod tests {
     use std::cell::RefCell;
     use super::{Rule, Item, Symbol, BackPointer};
 
+    fn terminal(name: impl Into<String>, pred: impl Fn(&str) -> bool + 'static) -> Rc<Symbol> {
+        Rc::new(Symbol::Term(name.into(), Box::new(pred)))
+    }
+
+    fn nonterm(name: impl Into<String>) -> Rc<Symbol> {
+        Rc::new(Symbol::NonTerm(name.into()))
+    }
+
     fn gen_rule1() -> Rc<Rule> {
         fn testfn(o: &str) -> bool { o.len() == 1 && "+-".contains(o) }
         // S -> S +- d
         Rc::new(Rule::new("S", &[
-            Symbol::new("S"),
-            Symbol::new2("+-", testfn),
-            Symbol::new2("d", |n| n.chars().all(|c| "123".contains(c))),
+            nonterm("S"),
+            terminal("+-", testfn),
+            terminal("d", |n| n.chars().all(|c| "123".contains(c))),
         ]))
     }
 
@@ -186,9 +194,9 @@ mod tests {
         fn testfn(o: &str) -> bool { o.len() == 1 && "*/".contains(o) }
         // S -> S */ d
         Rc::new(Rule::new("S", &[
-            Symbol::new("S"),
-            Symbol::new2("*/", testfn),
-            Symbol::new2("d", |n| n.chars().all(|c| "123".contains(c))),
+            nonterm("S"),
+            terminal("*/", testfn),
+            terminal("d", |n| n.chars().all(|c| "123".contains(c))),
         ]))
     }
 
@@ -206,8 +214,8 @@ mod tests {
         assert!(!item(gen_rule2(), 2, 0, 5).complete());
         assert!(item(gen_rule2(), 3, 0, 4).complete());
         // Check next symbol
-        assert!(item(gen_rule1(), 0, 0, 5).next_symbol().unwrap().nonterm().is_some());
-        assert!(item(gen_rule1(), 2, 0, 5).next_symbol().unwrap().terminal().is_some());
+        assert!(!item(gen_rule1(), 0, 0, 5).next_symbol().unwrap().is_terminal());
+        assert!(item(gen_rule1(), 2, 0, 5).next_symbol().unwrap().is_terminal());
     }
 
     #[test]
@@ -253,7 +261,7 @@ mod tests {
         let source = Rc::new(item(gen_rule1(), 0, 0, 0));
         // rule3: S -> d
         let rule3 = Rc::new(Rule::new("S", &[
-            Symbol::new2("d", |n| n.chars().all(|c| "123".contains(c))),
+            terminal("d", |n| n.chars().all(|c| "123".contains(c))),
         ]));
         // S -> d .
         let trigger1 = Rc::new(item(rule3, 1, 0, 1));
@@ -261,7 +269,7 @@ mod tests {
         let complete1 = Item::complete_new(&source, &trigger1, 1);
         assert_eq!(complete1, item(gen_rule1(), 1, 0, 1));
         // rule4: S -> hex
-        let rule4 = Rc::new(Rule::new("S", &[Symbol::new2("hex", |n| n == "0x3")]));
+        let rule4 = Rc::new(Rule::new("S", &[terminal("hex", |n| n == "0x3")]));
         // S -> hex .
         let trigger3 = Rc::new(item(rule4, 1, 0, 1));
         // S -> S . + d

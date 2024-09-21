@@ -1,14 +1,14 @@
 #![deny(warnings)]
 
 use std::collections::HashMap;
-use std::{fmt, hash};
 use std::rc::Rc;
 use std::string;
+use std::{fmt, hash};
 
 pub enum Symbol {
     NonTerm(String),
     // A terminal has a predicate to validate that input is accepted
-    Term(String, Box<dyn Fn(&str)->bool>),
+    Term(String, Box<dyn Fn(&str) -> bool>),
 }
 
 impl Symbol {
@@ -22,7 +22,7 @@ impl Symbol {
     pub fn matches(&self, input: &str) -> bool {
         match self {
             Symbol::Term(_, matcher) => matcher(input),
-            _ => false
+            _ => false,
         }
     }
 
@@ -38,7 +38,7 @@ impl hash::Hash for Symbol {
             Symbol::Term(name, matcher) => {
                 name.hash(state);
                 (matcher as *const dyn Fn(&str) -> bool).hash(state);
-            },
+            }
             Symbol::NonTerm(name) => name.hash(state),
         }
     }
@@ -47,12 +47,12 @@ impl hash::Hash for Symbol {
 impl PartialEq for Symbol {
     fn eq(&self, other: &Symbol) -> bool {
         match (self, other) {
-            (Symbol::Term(s, m1), Symbol::Term(o, m2))  => {
-                s == o && 
-                (&m1 as *const dyn Fn(&str) -> bool) == (&m2 as *const dyn Fn(&str) -> bool)
-            },
-            (Symbol::NonTerm(s), Symbol::NonTerm(o))  => s == o,
-            _ => false
+            (Symbol::Term(s, m1), Symbol::Term(o, m2)) => {
+                s == o
+                    && (&m1 as *const dyn Fn(&str) -> bool) == (&m2 as *const dyn Fn(&str) -> bool)
+            }
+            (Symbol::NonTerm(s), Symbol::NonTerm(o)) => s == o,
+            _ => false,
         }
     }
 }
@@ -79,15 +79,22 @@ impl Rule {
     pub fn new(head: &str, spec: &[Rc<Symbol>]) -> Self {
         Rule {
             head: head.to_string(),
-            spec: spec.iter().cloned().collect()
+            spec: spec.iter().cloned().collect(),
         }
     }
 }
 
 impl string::ToString for Rule {
     fn to_string(&self) -> String {
-        format!("{} -> {}", self.head, self.spec.iter().map(
-                |s| s.name()).collect::<Vec<_>>().join(" "))
+        format!(
+            "{} -> {}",
+            self.head,
+            self.spec
+                .iter()
+                .map(|s| s.name())
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
     }
 }
 
@@ -113,7 +120,7 @@ impl fmt::Debug for Grammar {
                 Entry::Vacant(e) => {
                     group_order.push(&r.head);
                     e.insert(Vec::new()).push(r);
-                },
+                }
                 Entry::Occupied(mut e) => e.get_mut().push(r),
             }
         }
@@ -140,7 +147,8 @@ impl GrammarBuilder {
     fn add_symbol(&mut self, symbol: Symbol, ignore_dups: bool) {
         // Check for duplicate symbols to avoid overwriting by mistake
         if !self.symbols.contains_key(symbol.name()) {
-            self.symbols.insert(symbol.name().to_string(), Rc::new(symbol));
+            self.symbols
+                .insert(symbol.name().to_string(), Rc::new(symbol));
         } else if !ignore_dups {
             // Convenience for adding symbols programatically
             self.error = Some(format!("Duplicate Symbol: {}", symbol.name()));
@@ -152,11 +160,7 @@ impl GrammarBuilder {
         self
     }
 
-    pub fn terminal(
-        mut self, 
-        name: &str,
-        pred: impl Fn(&str) -> bool + 'static) -> Self
-    {
+    pub fn terminal(mut self, name: &str, pred: impl Fn(&str) -> bool + 'static) -> Self {
         self.add_symbol(Symbol::Term(name.into(), Box::new(pred)), false);
         self
     }
@@ -166,18 +170,13 @@ impl GrammarBuilder {
         self
     }
 
-    pub fn terminal_try(
-        mut self,
-        name: &str,
-        pred: impl Fn(&str) -> bool + 'static) -> Self
-    {
+    pub fn terminal_try(mut self, name: &str, pred: impl Fn(&str) -> bool + 'static) -> Self {
         self.add_symbol(Symbol::Term(name.into(), Box::new(pred)), true);
         self
     }
 
     // Register new rules for the grammar
-    fn add_rule(&mut self, head: &str, spec: &[&str], ignore_dups: bool)
-    {
+    fn add_rule(&mut self, head: &str, spec: &[&str], ignore_dups: bool) {
         // First check that all symbols have been registered (need references)
         if let Some(s) = spec.iter().find(|&n| !self.symbols.contains_key(*n)) {
             self.error = Some(format!("Missing Symbol: {}", s));
@@ -196,7 +195,7 @@ impl GrammarBuilder {
         // Build the rule
         let rule = Rc::new(Rule {
             head: head.to_string(),
-            spec: spec.iter().map(|&s| self.symbols[s].clone()).collect()
+            spec: spec.iter().map(|&s| self.symbols[s].clone()).collect(),
         });
         // Check this rule is only added once. NOTE: `Rc`s equal on inner value
         if !self.rules.contains(&rule) {
@@ -206,19 +205,16 @@ impl GrammarBuilder {
         }
     }
 
-    pub fn rule(mut self, head: &str, spec: &[&str]) -> Self
-    {
+    pub fn rule(mut self, head: &str, spec: &[&str]) -> Self {
         self.add_rule(head, spec, false);
         self
     }
 
-    pub fn rule_try(&mut self, head: &str, spec: &[&str])
-    {
+    pub fn rule_try(&mut self, head: &str, spec: &[&str]) {
         self.add_rule(head, spec, true)
     }
 
-    pub fn into_grammar(mut self, start: &str) -> Result<Grammar, String>
-    {
+    pub fn into_grammar(mut self, start: &str) -> Result<Grammar, String> {
         let start = start.into();
         if let Some(s) = self.symbols.get(&start) {
             if s.is_terminal() {
@@ -227,7 +223,13 @@ impl GrammarBuilder {
         } else {
             self.error = Some(format!("Missing start Symbol: {}", start));
         }
-        self.error.map_or(Ok(Grammar{start, rules: self.rules}), Err)
+        self.error.map_or(
+            Ok(Grammar {
+                start,
+                rules: self.rules,
+            }),
+            Err,
+        )
     }
 
     // Generate unique name for a Symbol (used to build grammar mechanically)
@@ -235,7 +237,6 @@ impl GrammarBuilder {
         format!("<Uniq-{}>", self.symbols.len())
     }
 }
-
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -261,7 +262,7 @@ mod tests {
     fn symbol_terminal_matches() {
         let term = Symbol::Term(
             "uint".to_string(),
-            Box::new(|n| n.chars().all(|c| "1234567890".contains(c)))
+            Box::new(|n| n.chars().all(|c| "1234567890".contains(c))),
         );
         assert_eq!(term.name(), "uint");
         assert!(term.matches("123"));
@@ -334,9 +335,8 @@ mod tests {
         let g = GrammarBuilder::default()
             .nonterm("Sum")
             .terminal("Num", |n| n.chars().all(|c| "123".contains(c)))
-            .rule("Cum", &["Num"])
+            .rule("Rum", &["Num"])
             .into_grammar("Sum");
-        assert_eq!(g.unwrap_err(), "Missing Symbol: Cum");
-
+        assert_eq!(g.unwrap_err(), "Missing Symbol: Rum");
     }
 }

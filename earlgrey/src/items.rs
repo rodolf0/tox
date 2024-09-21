@@ -207,21 +207,24 @@ mod tests {
     #[test]
     fn item_basics() {
         // Check item equality
-        assert_eq!(item(gen_rule1(), 0, 0, 0), item(gen_rule1(), 0, 0, 0));
-        assert_ne!(item(gen_rule2(), 0, 0, 0), item(gen_rule1(), 0, 0, 0));
-        assert_ne!(item(gen_rule1(), 1, 0, 0), item(gen_rule1(), 0, 0, 0));
+        let rule1 = gen_rule1();
+        let rule2 = gen_rule2();
+        assert_eq!(item(rule1.clone(), 0, 0, 0), item(rule1.clone(), 0, 0, 0));
+        assert_ne!(item(rule2.clone(), 0, 0, 0), item(rule1.clone(), 0, 0, 0));
+        assert_ne!(item(rule1.clone(), 1, 0, 0), item(rule1.clone(), 0, 0, 0));
         // Check item complete
-        assert!(!item(gen_rule2(), 2, 0, 5).complete());
-        assert!(item(gen_rule2(), 3, 0, 4).complete());
+        assert!(!item(rule2.clone(), 2, 0, 5).complete());
+        assert!(item(rule2.clone(), 3, 0, 4).complete());
         // Check next symbol
-        assert!(!item(gen_rule1(), 0, 0, 5).next_symbol().unwrap().is_terminal());
-        assert!(item(gen_rule1(), 2, 0, 5).next_symbol().unwrap().is_terminal());
+        assert!(!item(rule1.clone(), 0, 0, 5).next_symbol().unwrap().is_terminal());
+        assert!(item(rule1.clone(), 2, 0, 5).next_symbol().unwrap().is_terminal());
     }
 
     #[test]
     fn item_predict() {
-        let predict = Item::predict_new(&gen_rule1(), 23);
-        assert_eq!(item(gen_rule1(), 0, 23, 23), predict);
+        let rule1 = gen_rule1();
+        let predict = Item::predict_new(&rule1, 23);
+        assert_eq!(item(rule1.clone(), 0, 23, 23), predict);
         assert_eq!(predict.start, predict.end);
         assert_eq!(predict.sources().len(), 0);
     }
@@ -229,10 +232,11 @@ mod tests {
     #[test]
     fn item_scan() {
         // Source: S -> S . + d
-        let source = Rc::new(item(gen_rule1(), 1, 0, 1));
+        let rule1 = gen_rule1();
+        let source = Rc::new(item(rule1.clone(), 1, 0, 1));
         // Scan a '+' token
         let scan = Item::scan_new(&source, 2, "+");
-        assert_eq!(item(gen_rule1(), 2, 0, 2), scan);
+        assert_eq!(item(rule1.clone(), 2, 0, 2), scan);
         // Check scan item backpointers
         let scan_src = scan.sources();
         assert!(scan_src.contains(&BackPointer::Scan(source, "+".to_string())));
@@ -243,12 +247,14 @@ mod tests {
     fn item_complete() {
         // Input could be: 2 * 3 + 1
         // Source: S -> . S + d
-        let source = Rc::new(item(gen_rule1(), 0, 0, 0));
+        let rule1 = gen_rule1();
+        let source = Rc::new(item(rule1.clone(), 0, 0, 0));
         // A trigger reaches completion (2 * 3) - S -> S * d .
-        let trigger = Rc::new(item(gen_rule2(), 0, 0, 3));
+        let rule2 = gen_rule2();
+        let trigger = Rc::new(item(rule2.clone(), 0, 0, 3));
         // generate completion
         let complete_based = Item::complete_new(&source, &trigger, 3);
-        assert_eq!(item(gen_rule1(), 1, 0, 3), complete_based);
+        assert_eq!(item(rule1.clone(), 1, 0, 3), complete_based);
         // Check completion item backpointers
         let src = complete_based.sources();
         assert!(src.contains(&BackPointer::Complete(source, trigger)));
@@ -258,7 +264,8 @@ mod tests {
     #[test]
     fn item_merge_sources() {
         // Source: S -> . S + d
-        let source = Rc::new(item(gen_rule1(), 0, 0, 0));
+        let rule1 = gen_rule1();
+        let source = Rc::new(item(rule1.clone(), 0, 0, 0));
         // rule3: S -> d
         let rule3 = Rc::new(Rule::new("S", &[
             terminal("d", |n| n.chars().all(|c| "123".contains(c))),
@@ -267,14 +274,14 @@ mod tests {
         let trigger1 = Rc::new(item(rule3, 1, 0, 1));
         // S -> S . + d
         let complete1 = Item::complete_new(&source, &trigger1, 1);
-        assert_eq!(complete1, item(gen_rule1(), 1, 0, 1));
+        assert_eq!(complete1, item(rule1.clone(), 1, 0, 1));
         // rule4: S -> hex
         let rule4 = Rc::new(Rule::new("S", &[terminal("hex", |n| n == "0x3")]));
         // S -> hex .
         let trigger3 = Rc::new(item(rule4, 1, 0, 1));
         // S -> S . + d
         let complete3 = Item::complete_new(&source, &trigger3, 1);
-        assert_eq!(complete3, item(gen_rule1(), 1, 0, 1));
+        assert_eq!(complete3, item(rule1.clone(), 1, 0, 1));
         // Merge complete1 / complete3
         assert!(complete1.sources().len() == 1);
         assert!(complete3.sources().len() == 1);
@@ -284,9 +291,18 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn item_failed_merge() {
-        let item1 = item(gen_rule1(), 0, 0, 0);
-        let item2 = item(gen_rule1(), 0, 1, 0);
+    fn item_failed_merge_1() {
+        let rule1 = gen_rule1();
+        let item1 = item(rule1.clone(), 0, 0, 0);
+        let item2 = item(rule1.clone(), 0, 1, 0);
         item1.merge_sources(item2);
+    }
+
+    #[test]
+    #[should_panic]
+    fn item_failed_merge_2() {
+        let item3 = item(gen_rule2(), 0, 0, 0);
+        let item4 = item(gen_rule2(), 0, 0, 0);
+        item3.merge_sources(item4);
     }
 }

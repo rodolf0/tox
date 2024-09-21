@@ -94,7 +94,11 @@ fn main() {
         Box::new((0..).map(|_| rl.borrow_mut().readline("~> "))
                  .take_while(|i| i.is_ok()).map(|i| i.unwrap()))
     };
-    let parser = earlgrey::EarleyParser::new(build_grammar());
+
+    let grammar = build_grammar();
+    println!("{:?}", grammar);
+
+    let parser = earlgrey::EarleyParser::new(grammar);
     let evaler = semanter();
     for expr in input {
         match parser.parse(&mut tokenizer(expr.chars())) {

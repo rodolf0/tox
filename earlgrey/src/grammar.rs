@@ -11,26 +11,6 @@ pub enum Symbol {
     Term(String, Box<dyn Fn(&str)->bool>),
 }
 
-#[derive(PartialEq, Hash)]
-pub struct Rule {
-    pub head: String,
-    pub spec: Vec<Rc<Symbol>>,
-}
-
-#[derive(Clone,Debug)]
-pub struct Grammar {
-    pub start: String,
-    pub rules: Vec<Rc<Rule>>,
-}
-
-#[derive(Default)]
-pub struct GrammarBuilder {
-    symbols: HashMap<String, Rc<Symbol>>,
-    rules: Vec<Rc<Rule>>,
-    error: Option<String>,
-}
-
-
 impl Symbol {
     pub fn name(&self) -> &str {
         match self {
@@ -52,12 +32,13 @@ impl Symbol {
 }
 
 // Hashable Symbols allow storing them in containers (eg: HashMap)
-// The name is the only way to dedup Terminals (ie: predicate is ignored)
 impl hash::Hash for Symbol {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {
-            // non-eq objects don't "have to" hash differently
-            Symbol::Term(name, _) => name.hash(state),
+            Symbol::Term(name, matcher) => {
+                name.hash(state);
+                (matcher as *const dyn Fn(&str) -> bool).hash(state);
+            },
             Symbol::NonTerm(name) => name.hash(state),
         }
     }
@@ -66,7 +47,10 @@ impl hash::Hash for Symbol {
 impl PartialEq for Symbol {
     fn eq(&self, other: &Symbol) -> bool {
         match (self, other) {
-            (Symbol::Term(s, _), Symbol::Term(o, _))  => s == o,
+            (Symbol::Term(s, m1), Symbol::Term(o, m2))  => {
+                s == o && 
+                (&m1 as *const dyn Fn(&str) -> bool) == (&m2 as *const dyn Fn(&str) -> bool)
+            },
             (Symbol::NonTerm(s), Symbol::NonTerm(o))  => s == o,
             _ => false
         }
@@ -82,6 +66,12 @@ impl fmt::Debug for Symbol {
             Symbol::NonTerm(name) => write!(f, "NonTerm({})", name),
         }
     }
+}
+
+#[derive(PartialEq, Hash)]
+pub struct Rule {
+    pub head: String,
+    pub spec: Vec<Rc<Symbol>>,
 }
 
 impl Rule {
@@ -107,97 +97,140 @@ impl fmt::Debug for Rule {
     }
 }
 
+#[derive(Clone)]
+pub struct Grammar {
+    pub start: String,
+    pub rules: Vec<Rc<Rule>>,
+}
+
+impl fmt::Debug for Grammar {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use std::collections::hash_map::Entry;
+        let mut group_order = Vec::new();
+        let mut rule_groups = HashMap::new();
+        for r in &self.rules {
+            match rule_groups.entry(&r.head) {
+                Entry::Vacant(e) => {
+                    group_order.push(&r.head);
+                    e.insert(Vec::new()).push(r);
+                },
+                Entry::Occupied(mut e) => e.get_mut().push(r),
+            }
+        }
+        write!(f, "Start: {}\n", self.start)?;
+        for head in group_order {
+            write!(f, "\n")?;
+            for rule in rule_groups.get(head).unwrap() {
+                write!(f, "{}\n", rule.to_string())?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+pub struct GrammarBuilder {
+    symbols: HashMap<String, Rc<Symbol>>,
+    rules: Vec<Rc<Rule>>,
+    error: Option<String>,
+}
+
 /// Builds a Gramar while validating existence of Symbols and checking rules.
 impl GrammarBuilder {
-    fn add_symbol(&mut self, symbol: Symbol, quiet: bool) {
+    fn add_symbol(&mut self, symbol: Symbol, ignore_dups: bool) {
         // Check for duplicate symbols to avoid overwriting by mistake
         if !self.symbols.contains_key(symbol.name()) {
             self.symbols.insert(symbol.name().to_string(), Rc::new(symbol));
-        } else if !quiet {
+        } else if !ignore_dups {
             // Convenience for adding symbols programatically
             self.error = Some(format!("Duplicate Symbol: {}", symbol.name()));
         }
     }
 
-    pub fn nonterm(mut self, name: impl Into<String>) -> Self {
+    pub fn nonterm(mut self, name: &str) -> Self {
         self.add_symbol(Symbol::NonTerm(name.into()), false);
         self
     }
 
     pub fn terminal(
         mut self, 
-        name: impl Into<String>,
+        name: &str,
         pred: impl Fn(&str) -> bool + 'static) -> Self
     {
         self.add_symbol(Symbol::Term(name.into(), Box::new(pred)), false);
         self
     }
 
-    // Quiet silently ignores adding pre-existent symbols to the grammar.
-    // Also quiet versions don't use chaining to be invoked in loops.
-
-    pub fn quiet_nonterm(&mut self, name: impl Into<String>) {
+    pub fn nonterm_try(mut self, name: &str) -> Self {
         self.add_symbol(Symbol::NonTerm(name.into()), true);
+        self
     }
 
-    pub fn quiet_terminal(
-        &mut self,
-        name: impl Into<String>,
-        pred: impl Fn(&str) -> bool + 'static)
+    pub fn terminal_try(
+        mut self,
+        name: &str,
+        pred: impl Fn(&str) -> bool + 'static) -> Self
     {
         self.add_symbol(Symbol::Term(name.into(), Box::new(pred)), true);
+        self
     }
 
-    /// Register new rules for the grammar
-    fn _add_rule<S, S2>(&mut self, head: S, spec: &[S2], quiet: bool)
-        where S: AsRef<str>, S2: AsRef<str>
+    // Register new rules for the grammar
+    fn add_rule(&mut self, head: &str, spec: &[&str], ignore_dups: bool)
     {
         // First check that all symbols have been registered (need references)
-        if let Some(s) = spec.iter().find(|n| !self.symbols.contains_key(n.as_ref())) {
-            self.error = Some(format!("Missing Symbol: {}", s.as_ref()));
+        if let Some(s) = spec.iter().find(|&n| !self.symbols.contains_key(*n)) {
+            self.error = Some(format!("Missing Symbol: {}", s));
             return;
         }
-        // nit TODO: check if head is a nonterminal
-        if !self.symbols.contains_key(head.as_ref()) {
-            self.error = Some(format!("Missing Symbol: {}", head.as_ref()));
+        // Check the head
+        if let Some(s) = self.symbols.get(head) {
+            if s.is_terminal() {
+                self.error = Some(format!("Rule head must be Term: {}", head));
+                return;
+            }
+        } else {
+            self.error = Some(format!("Missing Symbol: {}", head));
             return;
         }
         // Build the rule
         let rule = Rc::new(Rule {
-            head: head.as_ref().to_string(),
-            spec: spec.iter().map(|s| self.symbols[s.as_ref()].clone()).collect()
+            head: head.to_string(),
+            spec: spec.iter().map(|&s| self.symbols[s].clone()).collect()
         });
         // Check this rule is only added once. NOTE: `Rc`s equal on inner value
         if !self.rules.contains(&rule) {
             self.rules.push(rule);
-        } else if !quiet {
+        } else if !ignore_dups {
             self.error = Some(format!("Duplicate Rule: {}", rule.to_string()));
         }
     }
 
-    pub fn rule<S, S2>(mut self, head: S, spec: &[S2]) -> Self
-        where S: AsRef<str>, S2: AsRef<str>
+    pub fn rule(mut self, head: &str, spec: &[&str]) -> Self
     {
-        self._add_rule(head, spec, false);
+        self.add_rule(head, spec, false);
         self
     }
 
-    pub fn quiet_rule<S, S2>(&mut self, head: S, spec: &[S2])
-        where S: AsRef<str>, S2: AsRef<str>
+    pub fn rule_try(&mut self, head: &str, spec: &[&str])
     {
-        self._add_rule(head, spec, true)
+        self.add_rule(head, spec, true)
     }
 
-    pub fn into_grammar(mut self, start: impl Into<String>) -> Result<Grammar, String>
+    pub fn into_grammar(mut self, start: &str) -> Result<Grammar, String>
     {
         let start = start.into();
-        if !self.symbols.contains_key(&start) {
-            self.error = Some(format!("Missing Symbol: {}", start));
+        if let Some(s) = self.symbols.get(&start) {
+            if s.is_terminal() {
+                self.error = Some(format!("Grammar start must be NonTerm: {}", start));
+            }
+        } else {
+            self.error = Some(format!("Missing start Symbol: {}", start));
         }
         self.error.map_or(Ok(Grammar{start, rules: self.rules}), Err)
     }
 
-    /// Generate unique name for a Symbol (used to build grammar mechanically)
+    // Generate unique name for a Symbol (used to build grammar mechanically)
     pub fn unique_symbol_name(&self) -> String {
         format!("<Uniq-{}>", self.symbols.len())
     }
@@ -212,7 +245,7 @@ mod tests {
     use std::collections::HashSet;
 
     #[test]
-    fn symbol_eq_hash() {
+    fn symbol_check_eq_hash() {
         assert_ne!(
             Symbol::NonTerm("X".to_string()),
             Symbol::Term("X".to_string(), Box::new(|_| true))
@@ -225,7 +258,7 @@ mod tests {
     }
 
     #[test]
-    fn symbol_terminal() {
+    fn symbol_terminal_matches() {
         let term = Symbol::Term(
             "uint".to_string(),
             Box::new(|n| n.chars().all(|c| "1234567890".contains(c)))
@@ -247,7 +280,7 @@ mod tests {
     }
 
     #[test]
-    fn dup_symbol() {
+    fn grammar_has_dup_symbol() {
         let g = GrammarBuilder::default()
             .nonterm("Sum")
             .nonterm("Sum")
@@ -256,7 +289,7 @@ mod tests {
     }
 
     #[test]
-    fn dup_rule() {
+    fn grammar_has_dup_rule() {
         let g = GrammarBuilder::default()
             .nonterm("Sum")
             .terminal("Num", |n| n.chars().all(|c| "123".contains(c)))
@@ -269,18 +302,41 @@ mod tests {
     }
 
     #[test]
-    fn missing_symbol() {
+    fn grammar_rule_head_nonterm() {
+        let g = GrammarBuilder::default()
+            .nonterm("Sum")
+            .terminal("Num", |n| n.chars().all(|c| "123".contains(c)))
+            .terminal("+", |n| n == "+")
+            .rule("Sum", &["Sum", "+", "Num"])
+            .rule("Sum", &["Num"])
+            .into_grammar("Num");
+        assert_eq!(g.unwrap_err(), "Grammar start must be NonTerm: Num");
+    }
+
+    #[test]
+    fn grammar_missing_symbol() {
         let g = GrammarBuilder::default()
             .nonterm("Sum")
             .terminal("Num", |n| n.chars().all(|c| "123".contains(c)))
             .rule("Sum", &["Num"])
             .into_grammar("Xum");
-        assert_eq!(g.unwrap_err(), "Missing Symbol: Xum");
+        assert_eq!(g.unwrap_err(), "Missing start Symbol: Xum");
 
+        // Check missing symbol in rule body
         let g = GrammarBuilder::default()
             .nonterm("Sum")
-            .rule("Sum", &["Num"])
+            .terminal("Num", |n| n.chars().all(|c| "123".contains(c)))
+            .rule("Sum", &["Num", "+", "Num"])
             .into_grammar("Sum");
-        assert_eq!(g.unwrap_err(), "Missing Symbol: Num");
+        assert_eq!(g.unwrap_err(), "Missing Symbol: +");
+
+        // Check missing rule head symbol
+        let g = GrammarBuilder::default()
+            .nonterm("Sum")
+            .terminal("Num", |n| n.chars().all(|c| "123".contains(c)))
+            .rule("Cum", &["Num"])
+            .into_grammar("Sum");
+        assert_eq!(g.unwrap_err(), "Missing Symbol: Cum");
+
     }
 }

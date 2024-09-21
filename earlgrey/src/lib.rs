@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
 mod grammar;
-pub use grammar::{Symbol, GrammarBuilder, Grammar};
+pub use grammar::{GrammarBuilder, Grammar};
 
 mod items;
 mod parser;

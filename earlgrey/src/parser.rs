@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
 use crate::grammar::{Rule, Grammar, Symbol};
-use crate::items::Item;
+use crate::spans::{Span, Trigger};
 use std::collections::HashSet;
 use std::rc::Rc;
 use std::fmt::Debug;
@@ -11,7 +11,7 @@ pub struct EarleyParser {
 }
 
 #[derive(Debug)]
-pub struct ParseTrees(pub Vec<Rc<Item>>);
+pub struct ParseTrees(pub Vec<Rc<Span>>);
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -25,42 +25,42 @@ impl EarleyParser {
         rules: impl Iterator<Item=&'r Rc<Rule>> + 'r,
         next_terminal: &'r str,
         start_pos: usize,
-    ) -> Box<dyn Iterator<Item=Item> + 'r>
+    ) -> Box<dyn Iterator<Item=Span> + 'r>
     {
         Box::new(rules.filter(move |rule| rule.head == next_terminal)
-            .map(move |rule| Item::predict_new(rule, start_pos)))
+            .map(move |rule| Span::new(rule, start_pos)))
     }
 
     /// Build new `Completion` items based on `trigger` item having completed.
     /// When an item is completed it advances all items in the same starting
     /// StateSet whose next symbol matches its rule name.
     fn completions<'r>(
-        starting_stateset: impl Iterator<Item=&'r Rc<Item>> + 'r,
-        trigger: &'r Rc<Item>,
+        starting_stateset: impl Iterator<Item=&'r Rc<Span>> + 'r,
+        trigger: &'r Rc<Span>,
         complete_pos: usize,
-    ) -> Box<dyn Iterator<Item=Item> + 'r>
+    ) -> Box<dyn Iterator<Item=Span> + 'r>
     {
         assert!(trigger.complete(), "Incomplete `trigger` used for completions");
-        Box::new(starting_stateset.filter(move |item| {
-            match item.next_symbol() {
+        Box::new(starting_stateset.filter(move |span| {
+            match span.next_symbol() {
                 Some(Symbol::NonTerm(name)) => name == &trigger.rule.head,
                 _ => false
             }
-        }).map(move |item| Item::complete_new(item, trigger, complete_pos)))
+        }).map(move |span| span.extend(Trigger::Completion(trigger.clone()), complete_pos)))
     }
 
     /// Build new `Scan` items for items in the current stateset whose next
     /// symbol is a Terminal that matches the input lexeme ahead in the stream.
     fn scans<'r>(
-        current_stateset: impl Iterator<Item=&'r Rc<Item>> + 'r,
+        current_stateset: impl Iterator<Item=&'r Rc<Span>> + 'r,
         lexeme: &'r str,
         end: usize,
-    ) -> impl Iterator<Item=Rc<Item>> + 'r
+    ) -> impl Iterator<Item=Rc<Span>> + 'r
     {
-        current_stateset.filter(move |item| 
-            // check item's next symbol is a temrinal that scans lexeme
-            item.next_symbol().is_some_and(|s| s.matches(lexeme))
-        ).map(move |item| Rc::new(Item::scan_new(item, end, lexeme)))
+        current_stateset.filter(move |span| 
+            // check span's next symbol is a temrinal that scans lexeme
+            span.next_symbol().is_some_and(|s| s.matches(lexeme))
+        ).map(move |span| Rc::new(span.extend(Trigger::Scan(lexeme.to_string()), end)))
     }
 
     pub fn parse<T>(&self, mut tokenizer: T) -> Result<ParseTrees, String>
@@ -69,14 +69,14 @@ impl EarleyParser {
         // Populate S0, add items for each rule matching the start symbol
         let s0: HashSet<_> = self.grammar.rules.iter()
             .filter(|rule| rule.head == self.grammar.start)
-            .map(|rule| Rc::new(Item::predict_new(rule, 0)))
+            .map(|rule| Rc::new(Span::new(rule, 0)))
             .collect();
 
         let mut statesets = vec![s0];
 
         // New statesets are generated from input stream (Scans)
         for idx in 0.. {
-            // Predict/Complete until no new Items are added to the StateSet
+            // Predict/Complete until no new Spans are added to the StateSet
             // Instead of looping we could pre-populate completions of nullable symbols
             loop {
                 let new_items: Vec<_> = statesets[idx].iter().flat_map(|trigger| {

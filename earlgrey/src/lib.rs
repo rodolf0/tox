@@ -3,7 +3,7 @@
 mod grammar;
 pub use grammar::{GrammarBuilder, Grammar};
 
-mod items;
+mod spans; 
 mod parser;
 pub use parser::EarleyParser;
 

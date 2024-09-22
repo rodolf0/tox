@@ -8,28 +8,33 @@ use std::rc::Rc;
 
 #[derive(PartialEq,Eq,Hash,Debug,Clone)]
 pub enum BackPointer {
-    Complete(Rc<Item>, Rc<Item>),
-    Scan(Rc<Item>, String),
+    Complete(Rc<Span>, Rc<Span>),
+    Scan(Rc<Span>, String),
 }
 
-/// An Item is a partially matched `Rule`. `dot` shows the match progress.
-pub struct Item {
+pub enum Trigger {
+    Completion(Rc<Span>),
+    Scan(String),
+}
+
+/// An Span is a partially matched `Rule`. `dot` shows the match progress.
+pub struct Span {
     pub rule: Rc<Rule>,  // LR0item (dotted rule)
     pub dot: usize,      // dot position within the rule
     pub start: usize,    // input stream position where item starts
     pub end: usize,      // input stream position where item ends
 
-    // Need a RefCell to update existing Items. A replacement with the union
-    // of backpointers would invalidate other Items already pointing to this one.
+    // Need a RefCell to update existing Spans. A replacement with the union
+    // of backpointers would invalidate other Spans already pointing to this one.
     // Those invalidated items wouldn't have the whole back-pointer list.
     /// backpointers leading to this item: (source-item, Scan/Complete)
     backpointers: cell::RefCell<HashSet<BackPointer>>,
 }
 
 
-// Items are deduped only by rule, dot, start, end (ie: not bp)
-// The intention is that 2 Items are the same and can be merged ignoring bp.
-impl hash::Hash for Item {
+// Spans are deduped only by rule, dot, start, end (ie: not bp)
+// The intention is that 2 Spans are the same and can be merged ignoring bp.
+impl hash::Hash for Span {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.rule.hash(state);
         self.dot.hash(state);
@@ -38,8 +43,8 @@ impl hash::Hash for Item {
     }
 }
 
-impl PartialEq for Item {
-    fn eq(&self, other: &Item) -> bool {
+impl PartialEq for Span {
+    fn eq(&self, other: &Span) -> bool {
         self.rule == other.rule &&
         self.dot == other.dot &&
         self.start == other.start &&
@@ -47,9 +52,9 @@ impl PartialEq for Item {
     }
 }
 
-impl Eq for Item {}
+impl Eq for Span {}
 
-impl Item {
+impl Span {
     // Unwind backpointers recursively
     pub fn stringify(&self, nest: usize) -> String {
         let pre = self.rule.spec.iter().take(self.dot)
@@ -87,7 +92,7 @@ impl Item {
     }
 }
 
-impl fmt::Debug for Item {
+impl fmt::Debug for Span {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let pre = self.rule.spec.iter().take(self.dot)
             .map(|s| s.name()).collect::<Vec<_>>().join(" ");
@@ -99,8 +104,8 @@ impl fmt::Debug for Item {
     }
 }
 
-impl Item {
-    /// Item is complete if Rule has being fully matched
+impl Span {
+    /// Span is complete if Rule has being fully matched
     pub fn complete(&self) -> bool {
         self.dot >= self.rule.spec.len()
     }
@@ -110,22 +115,21 @@ impl Item {
         self.rule.spec.get(self.dot).map(|sym| &**sym)
     }
 
-    /// Scans or Completions that led to the creation of this Item.
-    /// only ever borrowed non-mutable ref returned for public consumption
+    /// Scans or Completions that led to the creation of this Span.
+    /// Only ever borrowed non-mutable ref returned for public consumption
     pub fn sources(&self) -> cell::Ref<HashSet<BackPointer>> {
         self.backpointers.borrow()
     }
 
-    /// Merge other Item into this one moving over its backpointers
-    pub fn merge_sources(&self, other: Item) {
-        assert_eq!(*self, other, "Items to merge should be Eq");
+    /// Merge other Span into this one moving over its backpointers
+    pub fn merge_sources(&self, other: Span) {
+        assert_eq!(*self, other, "Spans to merge should be Eq");
         let other_bp = other.backpointers.into_inner();
         self.backpointers.borrow_mut().extend(other_bp);
     }
 
-    /// Build a new `Prediction` based Item.
-    pub fn predict_new(rule: &Rc<Rule>, start: usize) -> Item {
-        Item{
+    pub fn new(rule: &Rc<Rule>, start: usize) -> Span {
+        Span{
             rule: rule.clone(),
             dot: 0,
             start,
@@ -134,29 +138,16 @@ impl Item {
         }
     }
 
-    /// Build `Scan` based Items.
-    /// An item where the rule is advanced by matching a terminal.
-    pub fn scan_new(source: &Rc<Item>, end: usize, input: &str) -> Item {
+    pub fn extend(self: &Rc<Self>, trigger: Trigger, end: usize) -> Span {
         let mut _bp = HashSet::new();
-        _bp.insert(BackPointer::Scan(source.clone(), input.to_string()));
-        Item{
-            rule: source.rule.clone(),
-            dot: source.dot + 1,
-            start: source.start,
-            end,
-            backpointers: cell::RefCell::new(_bp),
-        }
-    }
-
-    /// Build `Completion` based Items.
-    /// `Rule` is advanced because its next symbol matches the completed `trigger`.
-    pub fn complete_new(source: &Rc<Item>, trigger: &Rc<Item>, end: usize) -> Item {
-        let mut _bp = HashSet::new();
-        _bp.insert(BackPointer::Complete(source.clone(), trigger.clone()));
-        Item{
-            rule: source.rule.clone(),
-            dot: source.dot + 1,
-            start: source.start,
+        _bp.insert(match trigger {
+            Trigger::Scan(s) => BackPointer::Scan(self.clone(), s),
+            Trigger::Completion(s) => BackPointer::Complete(self.clone(), s)
+        });
+        Span{
+            rule: self.rule.clone(),
+            dot: self.dot + 1,
+            start: self.start,
             end,
             backpointers: cell::RefCell::new(_bp),
         }
@@ -170,7 +161,7 @@ mod tests {
     use std::rc::Rc;
     use std::collections::HashSet;
     use std::cell::RefCell;
-    use super::{Rule, Item, Symbol, BackPointer};
+    use super::*;
 
     fn terminal(name: impl Into<String>, pred: impl Fn(&str) -> bool + 'static) -> Rc<Symbol> {
         Rc::new(Symbol::Term(name.into(), Box::new(pred)))
@@ -200,8 +191,8 @@ mod tests {
         ]))
     }
 
-    fn item(rule: Rc<Rule>, dot: usize, start: usize, end: usize) -> Item {
-        Item{rule, dot, start, end, backpointers: RefCell::new(HashSet::new())}
+    fn item(rule: Rc<Rule>, dot: usize, start: usize, end: usize) -> Span {
+        Span{rule, dot, start, end, backpointers: RefCell::new(HashSet::new())}
     }
 
     #[test]
@@ -223,7 +214,7 @@ mod tests {
     #[test]
     fn item_predict() {
         let rule1 = gen_rule1();
-        let predict = Item::predict_new(&rule1, 23);
+        let predict = Span::new(&rule1, 23);
         assert_eq!(item(rule1.clone(), 0, 23, 23), predict);
         assert_eq!(predict.start, predict.end);
         assert_eq!(predict.sources().len(), 0);
@@ -235,7 +226,7 @@ mod tests {
         let rule1 = gen_rule1();
         let source = Rc::new(item(rule1.clone(), 1, 0, 1));
         // Scan a '+' token
-        let scan = Item::scan_new(&source, 2, "+");
+        let scan = source.extend(Trigger::Scan("+".to_string()), 2);
         assert_eq!(item(rule1.clone(), 2, 0, 2), scan);
         // Check scan item backpointers
         let scan_src = scan.sources();
@@ -253,7 +244,7 @@ mod tests {
         let rule2 = gen_rule2();
         let trigger = Rc::new(item(rule2.clone(), 0, 0, 3));
         // generate completion
-        let complete_based = Item::complete_new(&source, &trigger, 3);
+        let complete_based = source.extend(Trigger::Completion(trigger.clone()), 3);
         assert_eq!(item(rule1.clone(), 1, 0, 3), complete_based);
         // Check completion item backpointers
         let src = complete_based.sources();
@@ -273,14 +264,14 @@ mod tests {
         // S -> d .
         let trigger1 = Rc::new(item(rule3, 1, 0, 1));
         // S -> S . + d
-        let complete1 = Item::complete_new(&source, &trigger1, 1);
+        let complete1 = source.extend(Trigger::Completion(trigger1.clone()), 1);
         assert_eq!(complete1, item(rule1.clone(), 1, 0, 1));
         // rule4: S -> hex
         let rule4 = Rc::new(Rule::new("S", &[terminal("hex", |n| n == "0x3")]));
         // S -> hex .
         let trigger3 = Rc::new(item(rule4, 1, 0, 1));
         // S -> S . + d
-        let complete3 = Item::complete_new(&source, &trigger3, 1);
+        let complete3 = source.extend(Trigger::Completion(trigger3.clone()), 1);
         assert_eq!(complete3, item(rule1.clone(), 1, 0, 1));
         // Merge complete1 / complete3
         assert!(complete1.sources().len() == 1);

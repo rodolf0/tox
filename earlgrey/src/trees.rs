@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use crate::items::{Item, BackPointer};
+use crate::spans::{Span, BackPointer};
 use crate::parser::ParseTrees;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -32,7 +32,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 }
 
 impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
-    fn reduce(&self, root: &Rc<Item>, args: Vec<ASTNode>)
+    fn reduce(&self, root: &Rc<Span>, args: Vec<ASTNode>)
             -> Result<Vec<ASTNode>, String> {
         // if item is not complete, keep collecting args
         if !root.complete() { return Ok(args) }
@@ -51,11 +51,10 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 
 impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 
-    // Source is always a prediction, can't be anything else cause it's on the
-    // left side. Trigger is either a scan or a completion, only those can
+    // Trigger is either a scan or a completion, only those can
     // advance a prediction. To write this helper just draw a tree of the
     // backpointers and see how they link
-    fn walker(&self, root: &Rc<Item>) -> Result<Vec<ASTNode>, String> {
+    fn walker(&self, root: &Rc<Span>) -> Result<Vec<ASTNode>, String> {
         let mut args = Vec::new();
         // collect arguments for semantic actions
         if let Some(backpointer) = root.sources().iter().next() {
@@ -86,7 +85,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 
 impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 
-    fn walker_all(&self, root: &Rc<Item>) -> Result<Vec<Vec<ASTNode>>, String> {
+    fn walker_all(&self, root: &Rc<Span>) -> Result<Vec<Vec<ASTNode>>, String> {
         let source = root.sources();
         if source.len() == 0 {
             return Ok(vec![self.reduce(root, Vec::new())?]);

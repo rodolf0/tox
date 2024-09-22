@@ -297,6 +297,24 @@ fn math_ambiguous_catalan() {
     assert_eq!(trees.len(), 42);
 }
 
+#[test]
+fn trigger_has_multiple_bp() {
+    // E -> E + n | n + E | n
+    let grammar = GrammarBuilder::default()
+      .nonterm("E")
+      .terminal("+", |n| n == "+")
+      .terminal("n", |n| "1234567890".contains(n))
+      .rule("E", &["E", "+", "n"])
+      .rule("E", &["n", "+", "E"])
+      .rule("E", &["n"])
+      .into_grammar("E")
+      .expect("Bad grammar");
+    let p = EarleyParser::new(grammar.clone());
+    let pout = p.parse("3 + 4 + 5 + 6".split_whitespace()).unwrap();
+    let trees = tree_evaler(grammar).eval_all(&pout).unwrap();
+    assert_eq!(trees.len(), 8);
+}
+
 mod small_math {
     use crate::grammar::{Grammar, GrammarBuilder};
     use crate::parser::EarleyParser;

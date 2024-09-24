@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
 use crate::grammar::{Rule, Grammar, Symbol};
-use crate::spans::{Span, Trigger};
+use crate::spans::{Span, SpanSource};
 use std::collections::HashSet;
 use std::rc::Rc;
 use std::fmt::Debug;
@@ -46,7 +46,7 @@ impl EarleyParser {
                 Some(Symbol::NonTerm(name)) => name == &trigger.rule.head,
                 _ => false
             }
-        }).map(move |span| span.extend(Trigger::Completion(trigger.clone()), complete_pos)))
+        }).map(move |span| Span::extend(SpanSource::Completion(span.clone(), trigger.clone()), complete_pos)))
     }
 
     /// Build new `Scan` items for items in the current stateset whose next
@@ -60,7 +60,7 @@ impl EarleyParser {
         current_stateset.filter(move |span| 
             // check span's next symbol is a temrinal that scans lexeme
             span.next_symbol().is_some_and(|s| s.matches(lexeme))
-        ).map(move |span| Rc::new(span.extend(Trigger::Scan(lexeme.to_string()), end)))
+        ).map(move |span| Rc::new(Span::extend(SpanSource::Scan(span.clone(), lexeme.to_string()), end)))
     }
 
     pub fn parse<T>(&self, mut tokenizer: T) -> Result<ParseTrees, String>

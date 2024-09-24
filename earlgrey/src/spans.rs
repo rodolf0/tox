@@ -7,14 +7,9 @@ use std::rc::Rc;
 
 
 #[derive(PartialEq,Eq,Hash,Debug,Clone)]
-pub enum BackPointer {
-    Complete(Rc<Span>, Rc<Span>),
+pub enum SpanSource {
+    Completion(Rc<Span>, Rc<Span>),
     Scan(Rc<Span>, String),
-}
-
-pub enum Trigger {
-    Completion(Rc<Span>),
-    Scan(String),
 }
 
 /// An Span is a partially matched `Rule`. `dot` shows the match progress.
@@ -27,8 +22,8 @@ pub struct Span {
     // Need a RefCell to update existing Spans. A replacement with the union
     // of backpointers would invalidate other Spans already pointing to this one.
     // Those invalidated items wouldn't have the whole back-pointer list.
-    /// backpointers leading to this item: (source-item, Scan/Complete)
-    backpointers: cell::RefCell<HashSet<BackPointer>>,
+    /// backpointers leading to this item: (source-item, Scan/Completion)
+    backpointers: cell::RefCell<HashSet<SpanSource>>,
 }
 
 
@@ -72,14 +67,14 @@ impl Span {
         let pfx = "   ".repeat(nest);
         for bp in self.backpointers.borrow().iter() {
             match bp {
-                BackPointer::Complete(a, b) => {
+                SpanSource::Completion(a, b) => {
                     out += format!("\n{}Complete(\n{}   {}, \n{}   {}\n{})",
                         pfx,
                         pfx, a.stringify(nest + 1),
                         pfx, b.stringify(nest + 1),
                         pfx).as_str();
                 },
-                BackPointer::Scan(a, b) => {
+                SpanSource::Scan(a, b) => {
                     out += format!("\n{}Scan(\n{}   {}, \n{}   {}\n{})",
                         pfx,
                         pfx, a.stringify(nest + 1),
@@ -117,7 +112,7 @@ impl Span {
 
     /// Scans or Completions that led to the creation of this Span.
     /// Only ever borrowed non-mutable ref returned for public consumption
-    pub fn sources(&self) -> cell::Ref<HashSet<BackPointer>> {
+    pub fn sources(&self) -> cell::Ref<HashSet<SpanSource>> {
         self.backpointers.borrow()
     }
 
@@ -138,18 +133,17 @@ impl Span {
         }
     }
 
-    pub fn extend(self: &Rc<Self>, trigger: Trigger, end: usize) -> Span {
-        let mut _bp = HashSet::new();
-        _bp.insert(match trigger {
-            Trigger::Scan(s) => BackPointer::Scan(self.clone(), s),
-            Trigger::Completion(s) => BackPointer::Complete(self.clone(), s)
-        });
+    pub fn extend(extension: SpanSource, end: usize) -> Span {
+        let source = match &extension {
+            SpanSource::Completion(span, _) => span,
+            SpanSource::Scan(span, _) => span,
+        };
         Span{
-            rule: self.rule.clone(),
-            dot: self.dot + 1,
-            start: self.start,
+            rule: source.rule.clone(),
+            dot: source.dot + 1,
+            start: source.start,
             end,
-            backpointers: cell::RefCell::new(_bp),
+            backpointers: cell::RefCell::new([extension].into()),
         }
     }
 }
@@ -163,12 +157,12 @@ mod tests {
     use std::cell::RefCell;
     use super::*;
 
-    fn terminal(name: impl Into<String>, pred: impl Fn(&str) -> bool + 'static) -> Rc<Symbol> {
-        Rc::new(Symbol::Term(name.into(), Box::new(pred)))
+    fn terminal(name: &str, pred: impl Fn(&str) -> bool + 'static) -> Rc<Symbol> {
+        Rc::new(Symbol::Term(name.to_string(), Box::new(pred)))
     }
 
-    fn nonterm(name: impl Into<String>) -> Rc<Symbol> {
-        Rc::new(Symbol::NonTerm(name.into()))
+    fn nonterm(name: &str) -> Rc<Symbol> {
+        Rc::new(Symbol::NonTerm(name.to_string()))
     }
 
     fn gen_rule1() -> Rc<Rule> {
@@ -226,11 +220,11 @@ mod tests {
         let rule1 = gen_rule1();
         let source = Rc::new(item(rule1.clone(), 1, 0, 1));
         // Scan a '+' token
-        let scan = source.extend(Trigger::Scan("+".to_string()), 2);
+        let scan = Span::extend(SpanSource::Scan(source.clone(), "+".to_string()), 2);
         assert_eq!(item(rule1.clone(), 2, 0, 2), scan);
         // Check scan item backpointers
         let scan_src = scan.sources();
-        assert!(scan_src.contains(&BackPointer::Scan(source, "+".to_string())));
+        assert!(scan_src.contains(&SpanSource::Scan(source, "+".to_string())));
         assert_eq!(scan_src.len(), 1);
     }
 
@@ -244,11 +238,11 @@ mod tests {
         let rule2 = gen_rule2();
         let trigger = Rc::new(item(rule2.clone(), 0, 0, 3));
         // generate completion
-        let complete_based = source.extend(Trigger::Completion(trigger.clone()), 3);
+        let complete_based = Span::extend(SpanSource::Completion(source.clone(), trigger.clone()), 3);
         assert_eq!(item(rule1.clone(), 1, 0, 3), complete_based);
         // Check completion item backpointers
         let src = complete_based.sources();
-        assert!(src.contains(&BackPointer::Complete(source, trigger)));
+        assert!(src.contains(&SpanSource::Completion(source, trigger)));
         assert_eq!(src.len(), 1);
     }
 
@@ -264,14 +258,14 @@ mod tests {
         // S -> d .
         let trigger1 = Rc::new(item(rule3, 1, 0, 1));
         // S -> S . + d
-        let complete1 = source.extend(Trigger::Completion(trigger1.clone()), 1);
+        let complete1 = Span::extend(SpanSource::Completion(source.clone(), trigger1.clone()), 1);
         assert_eq!(complete1, item(rule1.clone(), 1, 0, 1));
         // rule4: S -> hex
         let rule4 = Rc::new(Rule::new("S", &[terminal("hex", |n| n == "0x3")]));
         // S -> hex .
         let trigger3 = Rc::new(item(rule4, 1, 0, 1));
         // S -> S . + d
-        let complete3 = source.extend(Trigger::Completion(trigger3.clone()), 1);
+        let complete3 = Span::extend(SpanSource::Completion(source.clone(), trigger3.clone()), 1);
         assert_eq!(complete3, item(rule1.clone(), 1, 0, 1));
         // Merge complete1 / complete3
         assert!(complete1.sources().len() == 1);

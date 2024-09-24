@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use crate::spans::{Span, BackPointer};
+use crate::spans::{Span, SpanSource};
 use crate::parser::ParseTrees;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -59,11 +59,11 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
         // collect arguments for semantic actions
         if let Some(backpointer) = root.sources().iter().next() {
             match backpointer {
-                BackPointer::Complete(source, trigger) => {
+                SpanSource::Completion(source, trigger) => {
                     args.extend(self.walker(source)?);
                     args.extend(self.walker(trigger)?);
                 }
-                BackPointer::Scan(source, trigger) => {
+                SpanSource::Scan(source, trigger) => {
                     let symbol = source.next_symbol()
                         .expect("BUG: missing scan trigger symbol").name();
                     args.extend(self.walker(source)?);
@@ -93,7 +93,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
         let mut trees = Vec::new();
         for backpointer in source.iter() {
             match backpointer {
-                BackPointer::Complete(source, trigger) => {
+                SpanSource::Completion(source, trigger) => {
                     // collect left-side-tree of each node
                     for args in self.walker_all(source)? {
                         // collect right-side-tree of each node
@@ -104,7 +104,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
                         }
                     }
                 }
-                BackPointer::Scan(source, trigger) => {
+                SpanSource::Scan(source, trigger) => {
                     for mut args in self.walker_all(source)? {
                         let symbol = source.next_symbol()
                             .expect("BUG: missing scan trigger symbol").name();

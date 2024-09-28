@@ -104,24 +104,6 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 impl<'a, ASTNode: Clone + std::fmt::Debug> EarleyForest<'a, ASTNode> {
 
     /*
-    ## E -> E + n | n
-    ## "1 + 2"
-                              Sources
-                E -> E + n.   Scan
-                   /\
-                  /  \
-              E +.n   "2"     Scan
-               /\
-              /  \
-           E.+ n  "+"         Completion
-           /\
-          /  \
-     .E + n   E -> n.         None, Scan
-                /\
-               /  \
-             .n   "1"         None
-    */
-    /*
     ## S -> S + N | N
     ## N -> [0-9]
 
@@ -145,13 +127,12 @@ impl<'a, ASTNode: Clone + std::fmt::Debug> EarleyForest<'a, ASTNode> {
                   .[0-9]   "1"
     */
     fn walker2(&self, root: &Rc<Span>) -> Result<ASTNode, String> {
-        use std::collections::VecDeque;
 
         let mut completions = Vec::new();
-        let mut args = VecDeque::new();
+        let mut args = Vec::new();
         let mut spans = Vec::new();
-        spans.push(root.clone());
 
+        spans.push(root.clone());
         while let Some(cursor) = spans.pop() {
 
             if cursor.complete() {
@@ -166,24 +147,25 @@ impl<'a, ASTNode: Clone + std::fmt::Debug> EarleyForest<'a, ASTNode> {
                 Some(SpanSource::Scan(source, trigger)) => {
                     let symbol = source.next_symbol()
                         .expect("BUG: missing scan trigger symbol").name();
-                    args.push_front((self.leaf_builder)(symbol, trigger));
+                    args.push((self.leaf_builder)(symbol, trigger));
                     spans.push(source.clone());
                 },
                 None => {
                     let completed = completions.pop().unwrap();
                     assert_eq!(cursor.rule, completed.rule);
                     let nargs = dbg!(completed.rule.spec.len());
-                    let remaining_args = dbg!(args.split_off(nargs));
+
+                    let reduce_args = args.split_off(args.len() - nargs).into_iter().rev().collect();
 
                     let rulename = completed.rule.to_string();
-                    let reduced = self.reduce2(&rulename, args.into())?;
-                    args = [reduced].into();
-                    args.extend(remaining_args);
+                    let reduced = self.reduce2(&rulename, reduce_args)?;
+                    args.push(reduced);
                 }
             }
         }
 
-        Ok(args.pop_front().unwrap())
+        assert_eq!(args.len(), 1);
+        Ok(args.pop().unwrap())
     }
 
     // for non-ambiguous grammars this retreieves the only possible parse

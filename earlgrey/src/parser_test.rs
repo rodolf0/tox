@@ -82,7 +82,7 @@ mod math {
             Tree::Node(rules[0].to_string(), vec![leafify(&rules[1..], subtree)])
         }
 
-        let tree =
+        let expected_tree =
             node("Sum -> Sum [+-] Mul", vec![
                 leafify(&["Sum -> Mul",
                           "Mul -> Pow",
@@ -114,8 +114,14 @@ mod math {
         let grammar = grammar_math();
         let p = EarleyParser::new(grammar.clone());
         let pout = p.parse("1 + ( 2 * 3 - 4 )".split_whitespace()).unwrap();
-        let trees = tree_evaler(grammar).eval_all(&pout).unwrap();
-        assert_eq!(trees, vec![tree]);
+
+        // Test evaluation of all possible parse trees (even though just 1)
+        let trees = tree_evaler(grammar.clone()).eval_all(&pout).unwrap();
+        assert_eq!(trees, vec![expected_tree.clone()]);
+
+        // Test evaluation of the unique parse tree.
+        let tree = tree_evaler(grammar).eval(&pout).unwrap();
+        assert_eq!(tree, expected_tree);
     }
 }
 
@@ -294,12 +300,15 @@ fn math_ambiguous_catalan() {
     let trees = tree_evaler(grammar).eval_all(&pout).unwrap();
     // number of trees here should match Catalan numbers
     // https://en.wikipedia.org/wiki/Catalan_number
+    // https://en.wikipedia.org/wiki/Associahedron
     assert_eq!(trees.len(), 42);
 }
 
 #[test]
 fn trigger_has_multiple_bp() {
     // E -> E + n | n + E | n
+    // SpanSource::Completion has multiple sources.
+    // This is a scenario that would trigger that but we're not asserting.
     let grammar = GrammarBuilder::default()
       .nonterm("E")
       .terminal("+", |n| n == "+")

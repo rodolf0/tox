@@ -116,12 +116,15 @@ mod math {
         let pout = p.parse("1 + ( 2 * 3 - 4 )".split_whitespace()).unwrap();
 
         // Test evaluation of all possible parse trees (even though just 1)
-        let trees = tree_evaler(grammar.clone()).eval_all(&pout).unwrap();
+        let trees = tree_evaler(grammar.clone()).eval_all_recursive(&pout).unwrap();
         assert_eq!(trees, vec![expected_tree.clone()]);
 
         // Test evaluation of the unique parse tree.
-        let tree = tree_evaler(grammar).eval(&pout).unwrap();
+        let tree = tree_evaler(grammar.clone()).eval(&pout).unwrap();
         assert_eq!(tree, expected_tree);
+
+        let tree2 = tree_evaler(grammar.clone()).eval_recursive(&pout).unwrap();
+        assert_eq!(tree2, expected_tree);
     }
 }
 
@@ -145,7 +148,7 @@ fn grammar_ambiguous() {
       .expect("Bad grammar");
     let p = EarleyParser::new(grammar.clone());
     let pout = p.parse("a c b".split_whitespace()).unwrap();
-    let trees = tree_evaler(grammar).eval_all(&pout).unwrap();
+    let trees = tree_evaler(grammar).eval_all_recursive(&pout).unwrap();
     assert!(trees.len() == 2);
     check_trees(&trees, vec![
         concat!(
@@ -177,7 +180,7 @@ fn earley_corner_case() {
       .expect("Bad grammar");
     let p = EarleyParser::new(grammar.clone());
     let pout = p.parse("b b b".split_whitespace()).unwrap();
-    let trees = tree_evaler(grammar).eval_all(&pout).unwrap();
+    let trees = tree_evaler(grammar).eval_all_recursive(&pout).unwrap();
     check_trees(&trees, vec![
         concat!(
             r#"Node("S -> S S", ["#,
@@ -209,7 +212,7 @@ fn grammar_ambiguous_epsilon() {
       .expect("Bad grammar");
     let p = EarleyParser::new(grammar.clone());
     let pout = p.parse("b b b".split_whitespace()).unwrap();
-    let trees = tree_evaler(grammar).eval_all(&pout).unwrap();
+    let trees = tree_evaler(grammar).eval_all_recursive(&pout).unwrap();
     check_trees(&trees, vec![
         concat!(
             r#"Node("S -> S S X", ["#,
@@ -246,15 +249,22 @@ fn left_recurse() {
       .expect("Bad grammar");
     let p = EarleyParser::new(grammar.clone());
     let pout = p.parse("1 + 2".split_whitespace()).unwrap();
-    let tree = tree_evaler(grammar).eval(&pout).unwrap();
-    check_trees(&vec![tree], vec![
+    let expected_tree = 
         concat!(
             r#"Node("S -> S [+] N", ["#,
                 r#"Node("S -> N", ["#,
                     r#"Node("N -> [0-9]", [Leaf("[0-9]", "1")])]), "#,
                 r#"Leaf("[+]", "+"), "#,
-                r#"Node("N -> [0-9]", [Leaf("[0-9]", "2")])])"#)
-    ]);
+                r#"Node("N -> [0-9]", [Leaf("[0-9]", "2")])])"#);
+
+    let tree1 = tree_evaler(grammar.clone()).eval(&pout).unwrap();
+    check_trees(&vec![tree1], vec![expected_tree.clone()]);
+
+    let tree2 = tree_evaler(grammar.clone()).eval_recursive(&pout).unwrap();
+    check_trees(&vec![tree2], vec![expected_tree.clone()]);
+
+    let trees3 = tree_evaler(grammar).eval_all_recursive(&pout).unwrap();
+    check_trees(&trees3, vec![expected_tree.clone()]);
 }
 
 #[test]
@@ -273,15 +283,22 @@ fn right_recurse() {
       .expect("Bad grammar");
     let p = EarleyParser::new(grammar.clone());
     let pout = p.parse("1 ^ 2".split_whitespace()).unwrap();
-    let tree = tree_evaler(grammar).eval(&pout).unwrap();
-    check_trees(&vec![tree], vec![
+    let expected_tree = 
         concat!(
             r#"Node("P -> N [^] P", ["#,
                 r#"Node("N -> [0-9]", [Leaf("[0-9]", "1")]), "#,
                 r#"Leaf("[^]", "^"), "#,
                 r#"Node("P -> N", ["#,
-                    r#"Node("N -> [0-9]", [Leaf("[0-9]", "2")])])])"#)
-    ]);
+                    r#"Node("N -> [0-9]", [Leaf("[0-9]", "2")])])])"#);
+
+    let tree1 = tree_evaler(grammar.clone()).eval(&pout).unwrap();
+    check_trees(&vec![tree1], vec![expected_tree.clone()]);
+
+    let tree2 = tree_evaler(grammar.clone()).eval_recursive(&pout).unwrap();
+    check_trees(&vec![tree2], vec![expected_tree.clone()]);
+
+    let trees3 = tree_evaler(grammar).eval_all_recursive(&pout).unwrap();
+    check_trees(&trees3, vec![expected_tree.clone()]);
 }
 
 #[test]
@@ -297,7 +314,7 @@ fn math_ambiguous_catalan() {
       .expect("Bad grammar");
     let p = EarleyParser::new(grammar.clone());
     let pout = p.parse("0 + 1 + 2 + 3 + 4 + 5".split_whitespace()).unwrap();
-    let trees = tree_evaler(grammar).eval_all(&pout).unwrap();
+    let trees = tree_evaler(grammar).eval_all_recursive(&pout).unwrap();
     // number of trees here should match Catalan numbers
     // https://en.wikipedia.org/wiki/Catalan_number
     // https://en.wikipedia.org/wiki/Associahedron
@@ -320,7 +337,7 @@ fn trigger_has_multiple_bp() {
       .expect("Bad grammar");
     let p = EarleyParser::new(grammar.clone());
     let pout = p.parse("3 + 4 + 5 + 6".split_whitespace()).unwrap();
-    let trees = tree_evaler(grammar).eval_all(&pout).unwrap();
+    let trees = tree_evaler(grammar).eval_all_recursive(&pout).unwrap();
     assert_eq!(trees.len(), 8);
 }
 
@@ -355,7 +372,7 @@ mod small_math {
         // parse 2 ambiguous results
         let input = "3 + 4 * 2".split_whitespace();
         let ps = EarleyParser::new(small_math()).parse(input).unwrap();
-        let trees = ev.eval_all(&ps).unwrap();
+        let trees = ev.eval_all_recursive(&ps).unwrap();
         assert_eq!(trees.len(), 2);
         assert!(trees.contains(&11.0));
         assert!(trees.contains(&14.0));
@@ -379,7 +396,7 @@ mod small_math {
         // check both possible parses
         let input = "3 + 4 * 2".split_whitespace();
         let ps = EarleyParser::new(small_math()).parse(input).unwrap();
-        let trees = ev.eval_all(&ps).unwrap();
+        let trees = ev.eval_all_recursive(&ps).unwrap();
         check_trees(&trees, vec![
             r#"BinOP(BinOP(Num(3), "+", Num(4)), "*", Num(2))"#,
             r#"BinOP(Num(3), "+", BinOP(Num(4), "*", Num(2)))"#,
@@ -397,7 +414,7 @@ mod small_math {
         // check both trees
         let input = "3 + 4 * 2".split_whitespace();
         let output = EarleyParser::new(small_math()).parse(input).unwrap();
-        let trees = ev.eval_all(&output).unwrap();
+        let trees = ev.eval_all_recursive(&output).unwrap();
         check_trees(&trees, vec![
             r#"List([List([Atom("3"), Atom("+"), Atom("4")]), Atom("*"), Atom("2")])"#,
             r#"List([Atom("3"), Atom("+"), List([Atom("4"), Atom("*"), Atom("2")])])"#,

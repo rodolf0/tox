@@ -50,19 +50,6 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
             }
         }
     }
-
-    fn reduce2(&self, rulename: &str, args: Vec<ASTNode>)
-            -> Result<ASTNode, String> {
-        match self.actions.get(rulename) {
-            None => Err(format!("Missing Action: {}", rulename)),
-            Some(action) => {
-                if cfg!(feature="debug") {
-                    eprintln!("Reduction: {}", rulename);
-                }
-                Ok(action(args))
-            }
-        }
-    }
 }
 
 impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
@@ -93,20 +80,17 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     }
 
     // for non-ambiguous grammars this retreieves the only possible parse
-    pub fn eval2(&self, ptrees: &ParseTrees) -> Result<ASTNode, String> {
+    pub fn eval_recursive(&self, ptrees: &ParseTrees) -> Result<ASTNode, String> {
         // walker will always return a Vec of size 1 because root.complete
         Ok(self.walker(ptrees.0.first().expect("BUG: ParseTrees empty"))?
            .swap_remove(0))
     }
 }
 
-
-impl<'a, ASTNode: Clone + std::fmt::Debug> EarleyForest<'a, ASTNode> {
-
+impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     /*
     ## S -> S + N | N
     ## N -> [0-9]
-
     ## "1 + 2"
 
                  S -> S + N. 
@@ -126,52 +110,49 @@ impl<'a, ASTNode: Clone + std::fmt::Debug> EarleyForest<'a, ASTNode> {
                       /   \
                   .[0-9]   "1"
     */
-    fn walker2(&self, root: &Rc<Span>) -> Result<ASTNode, String> {
-
-        let mut completions = Vec::new();
+    // for non-ambiguous grammars this retreieves the only possible parse
+    pub fn eval(&self, ptrees: &ParseTrees) -> Result<ASTNode, String> {
         let mut args = Vec::new();
-        let mut spans = Vec::new();
+        let mut completions = Vec::new();
+        let mut spans = vec![ptrees.0.first().expect("BUG: ParseTrees empty").clone()];
 
-        spans.push(root.clone());
         while let Some(cursor) = spans.pop() {
-
+            // As Earley chart is unwound keep a record of semantic actions to apply
             if cursor.complete() {
                 completions.push(cursor.clone());
             }
-
-            match dbg!(cursor.sources().iter().next()) {
+            // Walk the chart following span sources (back-pointers) of the tree.
+            match cursor.sources().iter().next() {
+                // Completion sources -> Walk the chart. 
                 Some(SpanSource::Completion(source, trigger)) => {
                     spans.push(source.clone());
                     spans.push(trigger.clone());
                 },
+                // Scan sources -> lift scanned tokens into AST nodes.
                 Some(SpanSource::Scan(source, trigger)) => {
                     let symbol = source.next_symbol()
                         .expect("BUG: missing scan trigger symbol").name();
                     args.push((self.leaf_builder)(symbol, trigger));
                     spans.push(source.clone());
                 },
+                // (Reachable) Spans with no sources mean we've unwound to the
+                // begining of a production/rule. Apply the rule reducing args.
                 None => {
-                    let completed = completions.pop().unwrap();
-                    assert_eq!(cursor.rule, completed.rule);
-                    let nargs = dbg!(completed.rule.spec.len());
-
-                    let reduce_args = args.split_off(args.len() - nargs).into_iter().rev().collect();
-
-                    let rulename = completed.rule.to_string();
-                    let reduced = self.reduce2(&rulename, reduce_args)?;
-                    args.push(reduced);
+                    let completed_rule = &completions.pop().expect("BUG: span rule never completed").rule;
+                    assert_eq!(&cursor.rule, completed_rule);
+                    // Get input AST nodes for this reduction. Stored reversed.
+                    let num_rule_slots = completed_rule.spec.len();
+                    let rule_args = args.split_off(args.len() - num_rule_slots).into_iter().rev().collect();
+                    // Apply the reduction.
+                    let rulename = completed_rule.to_string();
+                    let action = self.actions.get(&rulename).ok_or(format!("Missing Action: {}", rulename))?;
+                    args.push(action(rule_args));
                 }
             }
         }
 
         assert_eq!(args.len(), 1);
-        Ok(args.pop().unwrap())
-    }
-
-    // for non-ambiguous grammars this retreieves the only possible parse
-    pub fn eval(&self, ptrees: &ParseTrees) -> Result<ASTNode, String> {
-        // walker will always return a Vec of size 1 because root.complete
-        self.walker2(ptrees.0.first().expect("BUG: ParseTrees empty"))
+        Ok(args.pop().expect("BUG: mismatched reduce args"))
     }
 }
 
@@ -211,7 +192,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     }
 
     // Retrieves all parse trees
-    pub fn eval_all(&self, ptrees: &ParseTrees) -> Result<Vec<ASTNode>, String> {
+    pub fn eval_all_recursive(&self, ptrees: &ParseTrees) -> Result<Vec<ASTNode>, String> {
         let mut trees = Vec::new();
         for root in &ptrees.0 {
             trees.extend(

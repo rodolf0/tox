@@ -1,7 +1,6 @@
 #![deny(warnings)]
 
 use crate::grammar::{Rule, Symbol};
-use std::collections::HashSet;
 use std::{cell, fmt, hash};
 use std::rc::Rc;
 
@@ -23,7 +22,7 @@ pub struct Span {
     // of backpointers would invalidate other Spans already pointing to this one.
     // Those invalidated items wouldn't have the whole back-pointer list.
     /// backpointers leading to this item: (source-item, Scan/Completion)
-    backpointers: cell::RefCell<HashSet<SpanSource>>,
+    backpointers: cell::RefCell<Vec<SpanSource>>,
 }
 
 
@@ -112,15 +111,22 @@ impl Span {
 
     /// Scans or Completions that led to the creation of this Span.
     /// Only ever borrowed non-mutable ref returned for public consumption
-    pub fn sources(&self) -> cell::Ref<HashSet<SpanSource>> {
+    pub fn sources(&self) -> cell::Ref<Vec<SpanSource>> {
         self.backpointers.borrow()
     }
 
     /// Merge other Span into this one moving over its backpointers
+    // NOTE: backpointers used to be a HashSet for dedup but this container
+    // being small we can use a Vec with O(n) seach without a real perf hit.
+    // This gives us ordered+indexable iteration over back-pointers.
     pub fn merge_sources(&self, other: Span) {
         assert_eq!(*self, other, "Spans to merge should be Eq");
-        let other_bp = other.backpointers.into_inner();
-        self.backpointers.borrow_mut().extend(other_bp);
+        let mut dest_bp = self.backpointers.borrow_mut();
+        for bp in other.backpointers.into_inner() {
+            if ! dest_bp.contains(&bp) {
+                dest_bp.push(bp);
+            }
+        }
     }
 
     pub fn new(rule: &Rc<Rule>, start: usize) -> Span {
@@ -129,7 +135,7 @@ impl Span {
             dot: 0,
             start,
             end: start,
-            backpointers: cell::RefCell::new(HashSet::new()),
+            backpointers: cell::RefCell::new(Vec::new()),
         }
     }
 
@@ -153,7 +159,6 @@ impl Span {
 #[cfg(test)]
 mod tests {
     use std::rc::Rc;
-    use std::collections::HashSet;
     use std::cell::RefCell;
     use super::*;
 
@@ -186,7 +191,7 @@ mod tests {
     }
 
     fn item(rule: Rc<Rule>, dot: usize, start: usize, end: usize) -> Span {
-        Span{rule, dot, start, end, backpointers: RefCell::new(HashSet::new())}
+        Span{rule, dot, start, end, backpointers: RefCell::new(Vec::new())}
     }
 
     #[test]

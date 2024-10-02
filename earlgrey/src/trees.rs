@@ -88,76 +88,6 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 }
 
 impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
-    /*
-    ## S -> S + N | N
-    ## N -> [0-9]
-    ## "1 + 2"
-
-                 S -> S + N. 
-                    /  \
-                   /    \
-              S +.N     N -> [0-9].
-               / \             / \
-              /   \           /   \
-           S.+ N   "+"    .[0-9]   "2"
-             /\
-            /  \
-       .S + N   S -> N.
-                  /\
-                 /  \
-               .N    N -> [0-9].
-                       / \
-                      /   \
-                  .[0-9]   "1"
-    */
-    // for non-ambiguous grammars this retreieves the only possible parse
-    pub fn eval(&self, ptrees: &ParseTrees) -> Result<ASTNode, String> {
-        let mut args = Vec::new();
-        let mut completions = Vec::new();
-        let mut spans = vec![ptrees.0.first().expect("BUG: ParseTrees empty").clone()];
-
-        while let Some(cursor) = spans.pop() {
-            // As Earley chart is unwound keep a record of semantic actions to apply
-            if cursor.complete() {
-                completions.push(cursor.clone());
-            }
-            // Walk the chart following span sources (back-pointers) of the tree.
-            match cursor.sources().iter().next() {
-                // Completion sources -> Walk the chart. 
-                Some(SpanSource::Completion(source, trigger)) => {
-                    spans.push(source.clone());
-                    spans.push(trigger.clone());
-                },
-                // Scan sources -> lift scanned tokens into AST nodes.
-                Some(SpanSource::Scan(source, trigger)) => {
-                    let symbol = source.next_symbol()
-                        .expect("BUG: missing scan trigger symbol").name();
-                    args.push((self.leaf_builder)(symbol, trigger));
-                    spans.push(source.clone());
-                },
-                // (Reachable) Spans with no sources mean we've unwound to the
-                // begining of a production/rule. Apply the rule reducing args.
-                None => {
-                    let completed_rule = &completions.pop().expect("BUG: span rule never completed").rule;
-                    assert_eq!(&cursor.rule, completed_rule);
-                    // Get input AST nodes for this reduction. Stored reversed.
-                    let num_rule_slots = completed_rule.spec.len();
-                    let rule_args = args.split_off(args.len() - num_rule_slots).into_iter().rev().collect();
-                    // Apply the reduction.
-                    let rulename = completed_rule.to_string();
-                    let action = self.actions.get(&rulename).ok_or(format!("Missing Action: {}", rulename))?;
-                    args.push(action(rule_args));
-                }
-            }
-        }
-
-        assert_eq!(args.len(), 1);
-        Ok(args.pop().expect("BUG: mismatched reduce args"))
-    }
-}
-
-
-impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 
     fn walker_all(&self, root: &Rc<Span>) -> Result<Vec<Vec<ASTNode>>, String> {
         let source = root.sources();
@@ -204,4 +134,170 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 
     // TODO: provide an estimate
     pub fn num_trees(&self) -> Option<u32> { None }
+}
+
+
+impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
+    /*
+    ## S -> S + N | N
+    ## N -> [0-9]
+    ## "1 + 2"
+
+                 S -> S + N. 
+                    /  \
+                   /    \
+              S +.N     N -> [0-9].
+               / \             / \
+              /   \           /   \
+           S.+ N   "+"    .[0-9]   "2"
+             /\
+            /  \
+       .S + N   S -> N.
+                  /\
+                 /  \
+               .N    N -> [0-9].
+                       / \
+                      /   \
+                  .[0-9]   "1"
+    */
+    // for non-ambiguous grammars this retreieves the only possible parse
+    pub fn eval(&self, ptrees: &ParseTrees) -> Result<ASTNode, String> {
+        let mut args = Vec::new();
+        let mut completions = Vec::new();
+        let mut spans = vec![ptrees.0.first().expect("BUG: ParseTrees empty").clone()];
+
+        while let Some(cursor) = spans.pop() {
+            // As Earley chart is unwound keep a record of semantic actions to apply
+            if cursor.complete() {
+                completions.push(cursor.clone());
+            }
+
+            // (Reachable) Spans with no sources mean we've unwound to the
+            // begining of a production/rule. Apply the rule reducing args.
+            if cursor.sources().len() == 0 {
+                let completed_rule = &completions.pop().expect("BUG: span rule never completed").rule;
+                assert_eq!(&cursor.rule, completed_rule);
+                // Get input AST nodes for this reduction. Stored reversed.
+                let num_rule_slots = completed_rule.spec.len();
+                let rule_args = args.split_off(args.len() - num_rule_slots).into_iter().rev().collect();
+                // Apply the reduction.
+                let rulename = completed_rule.to_string();
+                let action = self.actions.get(&rulename).ok_or(format!("Missing Action: {}", rulename))?;
+                args.push(action(rule_args));
+            } else {
+                // Walk the chart following span sources (back-pointers) of the tree.
+                match cursor.sources().iter().next().unwrap() {
+                    // Completion sources -> Walk the chart. 
+                    SpanSource::Completion(source, trigger) => {
+                        spans.push(source.clone());
+                        spans.push(trigger.clone());
+                    },
+                    // Scan sources -> lift scanned tokens into AST nodes.
+                    SpanSource::Scan(source, trigger) => {
+                        let symbol = source.next_symbol()
+                            .expect("BUG: missing scan trigger symbol").name();
+                        args.push((self.leaf_builder)(symbol, trigger));
+                        spans.push(source.clone());
+                    },
+                }
+            }
+        }
+        assert_eq!(args.len(), 1);
+        Ok(args.pop().expect("BUG: mismatched reduce args"))
+    }
+}
+
+
+#[derive(Clone, Debug)]
+struct EarleyForestPath<ASTNode: Clone> {
+    args: Vec<ASTNode>,
+    completions: Vec<Rc<Span>>,
+    spans: Vec<Rc<Span>>,
+}
+
+// TODO: change name of this method
+impl<ASTNode: Clone> EarleyForestPath<ASTNode> {
+    fn new() -> Self {
+        Self{
+            args: Vec::new(), completions: Vec::new(), spans: Vec::new()
+        }
+    }
+}
+
+impl<'a, ASTNode: Clone + std::fmt::Debug> EarleyForest<'a, ASTNode> {
+    // TODO: change name of this method
+    pub fn eval_all(&self, ptrees: &ParseTrees) -> Result<Vec<ASTNode>, String> {
+        let mut paths = Vec::new();
+
+        for root in &ptrees.0 {
+            let mut path = EarleyForestPath::new();
+            path.spans.push(root.clone());
+            paths.push(path);
+        }
+
+        let mut results = Vec::new();
+
+        // Keep going as long as there's a path that hasn't been explored
+
+        while let Some(mut path) = paths.pop() {
+            let mut forked = false;
+            while let Some(cursor) = path.spans.pop() {
+                // As Earley chart is unwound keep a record of semantic actions to apply
+                if cursor.complete() {
+                    path.completions.push(cursor.clone());
+                }
+
+                if cursor.sources().len() == 0 {
+                    // (Reachable) Spans with no sources mean we've unwound to the
+                    // begining of a production/rule. Apply the rule reducing args.
+                    // dbg!(&path);
+                    let completed_rule = &path.completions.pop().expect("BUG: span rule never completed").rule;
+                    assert_eq!(&cursor.rule, completed_rule);
+                    // Get input AST nodes for this reduction. Stored reversed.
+                    let num_rule_slots = completed_rule.spec.len();
+                    let rule_args = path.args.split_off(path.args.len() - num_rule_slots).into_iter().rev().collect();
+                    // Apply the reduction.
+                    let rulename = completed_rule.to_string();
+                    let action = self.actions.get(&rulename).ok_or(format!("Missing Action: {}", rulename))?;
+                    path.args.push(action(rule_args));
+                }
+
+
+                // Walk the chart following span sources (back-pointers) of the tree.
+                for backpointer in cursor.sources().iter() {
+                    // TODO: this should skip the 1st iteration
+                    let mut forked_path = path.clone();
+
+                    match backpointer {
+                        // Completion sources -> Walk the chart. 
+                        SpanSource::Completion(source, trigger) => {
+                            forked_path.spans.push(source.clone());
+                            forked_path.spans.push(trigger.clone());
+                        },
+                        // Scan sources -> lift scanned tokens into AST nodes.
+                        SpanSource::Scan(source, trigger) => {
+                            let symbol = source.next_symbol()
+                                .expect("BUG: missing scan trigger symbol").name();
+                            forked_path.args.push((self.leaf_builder)(symbol, trigger));
+                            forked_path.spans.push(source.clone());
+                        },
+                    }
+
+                    paths.push(forked_path);
+                }
+
+                if cursor.sources().len() > 0 {
+                    forked = true;
+                    break;
+                }
+
+            }
+            if ! forked {
+            assert_eq!(path.args.len(), 1);
+            results.push(path.args.pop().expect("BUG: mismatched reduce args"));
+            }
+        }
+
+        Ok(results)
+    }
 }

@@ -225,8 +225,7 @@ impl<ASTNode: Clone> EarleyForestPath<ASTNode> {
 }
 
 impl<'a, ASTNode: Clone + std::fmt::Debug> EarleyForest<'a, ASTNode> {
-    // TODO: change name of this method
-    pub fn eval_all(&self, ptrees: &ParseTrees) -> Result<Vec<ASTNode>, String> {
+    pub fn eval_all_forks(&self, ptrees: &ParseTrees) -> Result<Vec<ASTNode>, String> {
         let mut paths = Vec::new();
 
         for root in &ptrees.0 {
@@ -265,7 +264,6 @@ impl<'a, ASTNode: Clone + std::fmt::Debug> EarleyForest<'a, ASTNode> {
 
                 // Walk the chart following span sources (back-pointers) of the tree.
                 for backpointer in cursor.sources().iter() {
-                    // TODO: this should skip the 1st iteration
                     let mut forked_path = path.clone();
 
                     match backpointer {
@@ -298,6 +296,98 @@ impl<'a, ASTNode: Clone + std::fmt::Debug> EarleyForest<'a, ASTNode> {
             }
         }
 
+        Ok(results)
+    }
+}
+
+struct ForestIterator {
+    // need a stack of spans with source-num which is incremented on each go
+    // when the top one reaches length it should be popped and prev one incremented
+    // the popped one will make it back from 0, but with top incremented.
+    source_idx: Vec<(Rc<Span>, usize)>,
+}
+
+impl ForestIterator {
+    fn source_index(&mut self, cursor: &Rc<Span>) -> usize {
+        if let Some(itidx) = self.source_idx.iter().find(|s| s.0 == *cursor) {
+            itidx.1
+        } else {
+            self.source_idx.push((cursor.clone(), 0));
+            0
+        }
+    }
+
+    fn advance(&mut self) -> bool {
+        while let Some((span, idx)) = self.source_idx.pop() {
+            if idx + 1 < span.sources().len() {
+                self.source_idx.push((span, idx + 1));
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
+
+    fn eval_x(&self, root: Rc<Span>, it: &mut ForestIterator) -> Result<ASTNode, String> {
+        let mut args = Vec::new();
+        let mut completions = Vec::new();
+        let mut spans = vec![root];
+
+        while let Some(cursor) = spans.pop() {
+            // As Earley chart is unwound keep a record of semantic actions to apply
+            if cursor.complete() {
+                completions.push(cursor.clone());
+            }
+
+            // (Reachable) Spans with no sources mean we've unwound to the
+            // begining of a production/rule. Apply the rule reducing args.
+            if cursor.sources().len() == 0 {
+                let completed_rule = &completions.pop().expect("BUG: span rule never completed").rule;
+                assert_eq!(&cursor.rule, completed_rule);
+                // Get input AST nodes for this reduction. Stored reversed.
+                let num_rule_slots = completed_rule.spec.len();
+                let rule_args = args.split_off(args.len() - num_rule_slots).into_iter().rev().collect();
+                // Apply the reduction.
+                let rulename = completed_rule.to_string();
+                let action = self.actions.get(&rulename).ok_or(format!("Missing Action: {}", rulename))?;
+                args.push(action(rule_args));
+            } else {
+                let n = it.source_index(&cursor);
+                // Walk the chart following span sources (back-pointers) of the tree.
+                match &cursor.sources()[n] {
+                    // Completion sources -> Walk the chart. 
+                    SpanSource::Completion(source, trigger) => {
+                        spans.push(source.clone());
+                        spans.push(trigger.clone());
+                    },
+                    // Scan sources -> lift scanned tokens into AST nodes.
+                    SpanSource::Scan(source, trigger) => {
+                        let symbol = source.next_symbol()
+                            .expect("BUG: missing scan trigger symbol").name();
+                        args.push((self.leaf_builder)(symbol, trigger));
+                        spans.push(source.clone());
+                    },
+                }
+            }
+        }
+        assert_eq!(args.len(), 1);
+        Ok(args.pop().expect("BUG: mismatched reduce args"))
+    }
+
+    pub fn eval_all(&self, ptrees: &ParseTrees) -> Result<Vec<ASTNode>, String> {
+        let mut results = Vec::new();
+        for root in &ptrees.0 {
+            let mut fi = ForestIterator{source_idx: Vec::new()};
+
+            loop {
+                results.push(self.eval_x(root.clone(), &mut fi)?);
+                if ! fi.advance() {
+                    break;
+                }
+            }
+        }
         Ok(results)
     }
 }

@@ -5,30 +5,22 @@ use crate::parser::ParseTrees;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-
-// Semantic actions to execute when walking the tree
-type SemAction<'a, ASTNode> = Box<dyn Fn(Vec<ASTNode>) -> ASTNode + 'a>;
-// Given a Rule and a Token build an ASTNode
-type LeafBuilder<'a, ASTNode> = Box<dyn Fn(&str, &str) -> ASTNode + 'a>;
-
-// type TerminalParser<'a, ASTNode> = Box<dyn Fn(&str, &str) -> ASTNode + 'a>;
-
 pub struct EarleyForest<'a, ASTNode: Clone> {
-    actions: HashMap<String, SemAction<'a, ASTNode>>,
-    leaf_builder: LeafBuilder<'a, ASTNode>,
+    // Semantic actions to apply when a production is completed
+    actions: HashMap<String, Box<dyn Fn(Vec<ASTNode>) -> ASTNode + 'a>>,
+    // How to lift a 'scanned' terminal into an AST node.
+    terminal_parser: Box<dyn Fn(&str, &str) -> ASTNode + 'a>,
 }
 
 impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
-    pub fn new<Builder>(leaf_builder: Builder) -> Self
-            where Builder: Fn(&str, &str) -> ASTNode + 'a {
+    pub fn new(terminal_parser: impl Fn(&str, &str) -> ASTNode + 'a) -> Self {
         EarleyForest{
             actions: HashMap::new(),
-            leaf_builder: Box::new(leaf_builder)}
+            terminal_parser: Box::new(terminal_parser)}
     }
 
     // Register semantic actions to act when rules are matched
-    pub fn action<Action>(&mut self, rule: &str, action: Action)
-            where Action: Fn(Vec<ASTNode>) -> ASTNode + 'a {
+    pub fn action(&mut self, rule: &str, action: impl Fn(Vec<ASTNode>) -> ASTNode + 'a) {
         self.actions.insert(rule.to_string(), Box::new(action));
     }
 }
@@ -70,7 +62,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
                 let symbol = source.next_symbol()
                     .expect("BUG: missing scan trigger symbol").name();
                 args.extend(self.walker(source)?);
-                args.push((self.leaf_builder)(symbol, trigger));
+                args.push((self.terminal_parser)(symbol, trigger));
             },
             None => (),
         }
@@ -107,7 +99,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
                     for mut args in self.walker_all(source)? {
                         let symbol = source.next_symbol()
                             .expect("BUG: missing scan trigger symbol").name();
-                        args.push((self.leaf_builder)(symbol, trigger));
+                        args.push((self.terminal_parser)(symbol, trigger));
                         trees.push(self.reduce(root, args)?);
                     }
                 }
@@ -137,8 +129,6 @@ struct ForestIterator {
     // the new top-of-stack span. If this one is exhausted, then rinse, repeat.
     source_idx: Vec<(Rc<Span>, usize)>,
 }
-
-// type SpanSourceSelector = Box<dyn Fn(&Rc<Span>) -> usize>;
 
 impl ForestIterator {
     fn source_index(&mut self, cursor: &Rc<Span>) -> usize {
@@ -184,7 +174,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
                       /   \
                   .[0-9]   "1"
     */
-    fn eval_one(&self, root: Rc<Span>, it: &mut ForestIterator) -> Result<ASTNode, String> {
+    fn eval_one(&self, root: Rc<Span>, mut selector: impl FnMut(&Rc<Span>) -> usize) -> Result<ASTNode, String> {
         let mut args = Vec::new();
         let mut completions = Vec::new();
         let mut spans = vec![root];
@@ -208,9 +198,9 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
                 let action = self.actions.get(&rulename).ok_or(format!("Missing Action: {}", rulename))?;
                 args.push(action(rule_args));
             } else {
-                let n = it.source_index(&cursor);
+                let span_source_idx = selector(&cursor);
                 // Walk the chart following span sources (back-pointers) of the tree.
-                match &cursor.sources()[n] {
+                match &cursor.sources()[span_source_idx] {
                     // Completion sources -> Walk the chart. 
                     SpanSource::Completion(source, trigger) => {
                         spans.push(source.clone());
@@ -220,7 +210,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
                     SpanSource::Scan(source, trigger) => {
                         let symbol = source.next_symbol()
                             .expect("BUG: missing scan trigger symbol").name();
-                        args.push((self.leaf_builder)(symbol, trigger));
+                        args.push((self.terminal_parser)(symbol, trigger));
                         spans.push(source.clone());
                     },
                 }
@@ -232,26 +222,18 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 
     pub fn eval(&self, ptrees: &ParseTrees) -> Result<ASTNode, String> {
         let root = ptrees.0.first().expect("BUG: ParseTrees empty").clone();
-        let mut fi = ForestIterator{source_idx: Vec::new()};
-        Ok(self.eval_one(root, &mut fi)?)
+        Ok(self.eval_one(root, |_| 0)?)
     }
 
     pub fn eval_all(&self, ptrees: &ParseTrees) -> Result<Vec<ASTNode>, String> {
         let mut results = Vec::new();
         for root in &ptrees.0 {
             let mut fi = ForestIterator{source_idx: Vec::new()};
-
-            results.push(self.eval_one(root.clone(), &mut fi)?);
-            while fi.advance() {
-                results.push(self.eval_one(root.clone(), &mut fi)?);
+            let mut iterator_has_more_items = true;
+            while iterator_has_more_items {
+                results.push(self.eval_one(root.clone(), |s| fi.source_index(s))?);
+                iterator_has_more_items = fi.advance();
             }
-
-            // loop {
-            //     results.push(self.eval_one(root.clone(), &mut fi)?);
-            //     if ! fi.advance() {
-            //         break;
-            //     }
-            // }
         }
         Ok(results)
     }

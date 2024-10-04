@@ -1,8 +1,9 @@
 #![deny(warnings)]
 
 mod ebnf;
-mod treeficator;
 pub use crate::ebnf::ParserBuilder;
+
+mod treeficator;
 pub use crate::treeficator::{Tree, Sexpr};
 
 #[cfg(test)]

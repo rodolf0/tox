@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use crate::grammar::{Rule, Grammar, Symbol};
+use crate::grammar::{Grammar, Symbol};
 use crate::spans::{Span, SpanSource};
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -18,17 +18,6 @@ pub struct ParseTrees(pub Vec<Rc<Span>>);
 impl EarleyParser {
     pub fn new(grammar: Grammar) -> EarleyParser {
         EarleyParser{grammar}
-    }
-
-    /// Build new `Prediction` items from `next_terminal` of some Symbol:
-    fn predictions<'r>(
-        rules: impl Iterator<Item=&'r Rc<Rule>> + 'r,
-        next_terminal: &'r str,
-        start_pos: usize,
-    ) -> Box<dyn Iterator<Item=Span> + 'r>
-    {
-        Box::new(rules.filter(move |rule| rule.head == next_terminal)
-            .map(move |rule| Span::new(rule, start_pos)))
     }
 
     /// Build new `Completion` items based on `trigger` item having completed.
@@ -81,8 +70,10 @@ impl EarleyParser {
             loop {
                 let new_items: Vec<_> = statesets[idx].iter().flat_map(|trigger| {
                     let next_sym = trigger.next_symbol();
-                    if let Some(Symbol::NonTerm(name)) = next_sym {
-                        EarleyParser::predictions(self.grammar.rules.iter(), name, idx)
+                    if let Some(Symbol::NonTerm(next_terminal)) = next_sym {
+                        // Prediction: Build new items from `next_terminal` of some Symbol
+                        Box::new(self.grammar.rules.iter().filter(|rule| rule.head == *next_terminal)
+                            .map(move |rule| Span::new(rule, idx)))
                     } else if trigger.complete() {
                         assert!(next_sym.is_none(), "Expected next symbol to be None");
                         EarleyParser::completions(statesets[trigger.start].iter(), trigger, idx)

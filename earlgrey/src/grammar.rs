@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::string;
 use std::{fmt, hash};
 
 pub enum Symbol {
@@ -49,7 +48,7 @@ impl PartialEq for Symbol {
         match (self, other) {
             (Symbol::Term(s, m1), Symbol::Term(o, m2)) => {
                 s == o
-                    && (&m1 as *const dyn Fn(&str) -> bool) == (&m2 as *const dyn Fn(&str) -> bool)
+                    && std::ptr::addr_eq(&m1 as *const dyn Fn(&str) -> bool, &m2 as *const dyn Fn(&str) -> bool)
             }
             (Symbol::NonTerm(s), Symbol::NonTerm(o)) => s == o,
             _ => false,
@@ -84,9 +83,9 @@ impl Rule {
     }
 }
 
-impl string::ToString for Rule {
-    fn to_string(&self) -> String {
-        format!(
+impl fmt::Display for Rule {
+    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
+        write!(f,
             "{} -> {}",
             self.head,
             self.spec
@@ -100,7 +99,7 @@ impl string::ToString for Rule {
 
 impl fmt::Debug for Rule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        write!(f, "{}", self)
     }
 }
 
@@ -124,11 +123,11 @@ impl fmt::Debug for Grammar {
                 Entry::Occupied(mut e) => e.get_mut().push(r),
             }
         }
-        write!(f, "Start: {}\n", self.start)?;
+        writeln!(f, "Start: {}", self.start)?;
         for head in group_order {
-            write!(f, "\n")?;
+            writeln!(f)?;
             for rule in rule_groups.get(head).unwrap() {
-                write!(f, "{}\n", rule.to_string())?;
+                writeln!(f, "{}", rule)?;
             }
         }
         Ok(())
@@ -201,7 +200,7 @@ impl GrammarBuilder {
         if !self.rules.contains(&rule) {
             self.rules.push(rule);
         } else if !ignore_dups {
-            self.error = Some(format!("Duplicate Rule: {}", rule.to_string()));
+            self.error = Some(format!("Duplicate Rule: {}", rule));
         }
     }
 

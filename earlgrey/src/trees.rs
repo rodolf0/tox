@@ -147,7 +147,7 @@ impl ForestIterator {
                 return true;
             }
         }
-        return false;
+        false
     }
 }
 
@@ -222,7 +222,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
 
     pub fn eval(&self, ptrees: &ParseTrees) -> Result<ASTNode, String> {
         let root = ptrees.0.first().expect("BUG: ParseTrees empty").clone();
-        Ok(self.eval_one(root, |_| 0)?)
+        self.eval_one(root, |_| 0)
     }
 
     pub fn eval_all(&self, ptrees: &ParseTrees) -> Result<Vec<ASTNode>, String> {

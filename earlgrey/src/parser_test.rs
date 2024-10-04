@@ -272,10 +272,10 @@ fn left_recurse() {
                 r#"Node("N -> [0-9]", [Leaf("[0-9]", "2")])])"#);
 
     let evaler = tree_evaler(grammar);
-    check_trees(&vec![evaler.eval(&pout).unwrap()], vec![expected_tree.clone()]);
-    check_trees(&vec![evaler.eval_recursive(&pout).unwrap()], vec![expected_tree.clone()]);
-    check_trees(&evaler.eval_all_recursive(&pout).unwrap(), vec![expected_tree.clone()]);
-    check_trees(&evaler.eval_all(&pout).unwrap(), vec![expected_tree.clone()]);
+    check_trees(&vec![evaler.eval(&pout).unwrap()], vec![expected_tree]);
+    check_trees(&vec![evaler.eval_recursive(&pout).unwrap()], vec![expected_tree]);
+    check_trees(&evaler.eval_all_recursive(&pout).unwrap(), vec![expected_tree]);
+    check_trees(&evaler.eval_all(&pout).unwrap(), vec![expected_tree]);
 }
 
 #[test]
@@ -303,10 +303,10 @@ fn right_recurse() {
                     r#"Node("N -> [0-9]", [Leaf("[0-9]", "2")])])])"#);
 
     let evaler = tree_evaler(grammar);
-    check_trees(&vec![evaler.eval(&pout).unwrap()], vec![expected_tree.clone()]);
-    check_trees(&vec![evaler.eval_recursive(&pout).unwrap()], vec![expected_tree.clone()]);
-    check_trees(&evaler.eval_all_recursive(&pout).unwrap(), vec![expected_tree.clone()]);
-    check_trees(&evaler.eval_all(&pout).unwrap(), vec![expected_tree.clone()]);
+    check_trees(&vec![evaler.eval(&pout).unwrap()], vec![expected_tree]);
+    check_trees(&vec![evaler.eval_recursive(&pout).unwrap()], vec![expected_tree]);
+    check_trees(&evaler.eval_all_recursive(&pout).unwrap(), vec![expected_tree]);
+    check_trees(&evaler.eval_all(&pout).unwrap(), vec![expected_tree]);
 }
 
 #[test]
@@ -393,6 +393,7 @@ mod small_math {
     #[test]
     fn build_ast() {
         #[derive(Clone, Debug)]
+        #[allow(dead_code)]
         enum AST { BinOP(Box<AST>, String, Box<AST>), Num(u64) }
         let mut ev = EarleyForest::new(|symbol, token| {
             match symbol {
@@ -421,6 +422,7 @@ mod small_math {
     #[test]
     fn build_sexpr() {
         #[derive(Clone,Debug)]
+        #[allow(dead_code)]
         pub enum Sexpr { Atom(String), List(Vec<Sexpr>) }
         let mut ev = EarleyForest::new(|_, tok| Sexpr::Atom(tok.to_string()));
         ev.action("E -> E + E", |nodes| Sexpr::List(nodes.clone()));

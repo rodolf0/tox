@@ -10,13 +10,22 @@ readme = "README.md"
 keywords = ["parser", "earley", "cfg", "grammar", "ast"]
 categories = ["parsing", "text-processing"]
 
+
+# The library crate has no dependencies. Optionals are for tools
+[dependencies]
+lexers = { optional = true, version = "0.1", path = "../lexers" }
+rustyline = { optional = true, version = "14.0.0" }
+
 [features]
+# Allow building with 'debug' feature to de verbose printing of internal parsing state.
 debug = []
+# A special feature to list binary crate dependencies.
+# dependencies implicitly declare these features.
+# https://doc.rust-lang.org/cargo/reference/features.html#optional-dependencies
+tools = ["dep:lexers", "dep:rustyline"]
 
-[[example]]
+
+# Use "cargo build --features tools" to build these
+[[bin]]
 name = "arith"
-path = "examples/arith.rs"
-
-[dev-dependencies]
-lexers = { version = "0.1", path = "../lexers" }
-rustyline = "9.1"
+required-features = ["tools"]

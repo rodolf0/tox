@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
-use crate::spans::{Span, SpanSource};
-use crate::parser::ParseTrees;
+use super::spans::{Span, SpanSource};
+use super::parser::ParseTrees;
 use std::collections::HashMap;
 use std::rc::Rc;
 

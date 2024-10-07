@@ -1,8 +1,8 @@
 #![deny(warnings)]
 
-use crate::grammar::{GrammarBuilder, Grammar};
-use crate::parser::EarleyParser;
-use crate::trees::EarleyForest;
+use super::grammar::{GrammarBuilder, Grammar};
+use super::parser::EarleyParser;
+use super::trees::EarleyForest;
 use std::fmt;
 
 
@@ -37,7 +37,7 @@ fn check_trees<T: fmt::Debug>(trees: &Vec<T>, expected: Vec<&str>) {
 }
 
 mod math {
-    use crate::grammar::{Grammar, GrammarBuilder};
+    use super::super::grammar::{Grammar, GrammarBuilder};
 
     fn grammar_math() -> Grammar {
         // Sum -> Sum + Mul | Mul
@@ -69,7 +69,7 @@ mod math {
 
     #[test]
     fn math_grammar_test() {
-        use crate::parser::EarleyParser;
+        use super::super::parser::EarleyParser;
         use super::{Tree, tree_evaler};
         fn node(rule: &str, subtree: Vec<Tree>) -> Tree {
             Tree::Node(rule.to_string(), subtree)
@@ -352,9 +352,9 @@ fn trigger_has_multiple_bp() {
 }
 
 mod small_math {
-    use crate::grammar::{Grammar, GrammarBuilder};
-    use crate::parser::EarleyParser;
-    use crate::trees::EarleyForest;
+    use super::super::grammar::{Grammar, GrammarBuilder};
+    use super::super::parser::EarleyParser;
+    use super::super::trees::EarleyForest;
     use super::check_trees;
 
     fn small_math() -> Grammar {
@@ -444,8 +444,8 @@ mod small_math {
 
 
 mod earley_recognizer {
-    use crate::grammar::GrammarBuilder;
-    use super::EarleyParser;
+    use super::super::grammar::GrammarBuilder;
+    use super::super::EarleyParser;
 
     fn good(parser: &EarleyParser, input: &str) {
         assert!(parser.parse(input.split_whitespace()).is_ok());

@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
-use crate::grammar::{Grammar, Symbol};
-use crate::spans::{Span, SpanSource};
+use super::grammar::{Grammar, Symbol};
+use super::spans::{Span, SpanSource};
 use std::collections::HashSet;
 use std::rc::Rc;
 use std::fmt::Debug;

@@ -86,7 +86,7 @@ fn semanter<'a>() -> earlgrey::EarleyForest<'a, f64> {
 }
 
 fn main() {
-    let rl = RefCell::new(rustyline::Editor::<()>::new());
+    let rl = RefCell::new(rustyline::DefaultEditor::new().unwrap());
     let input: Box<dyn Iterator<Item=_>> = if std::env::args().len() > 1 {
         Box::new((0..1).map(|_| std::env::args()
                             .skip(1).collect::<Vec<String>>().join(" ")))

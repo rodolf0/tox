@@ -13,7 +13,9 @@ categories = ["parsing", "text-processing"]
 
 # The library crate has no dependencies. Optionals are for tools
 [dependencies]
-lexers = { optional = true, version = "0.1", path = "../lexers" }
+# TODO: shouldn't depend on lexers
+lexers = { version = "0.1", path = "../lexers" }
+# lexers = { optional = true, version = "0.1", path = "../lexers" }
 rustyline = { optional = true, version = "14.0.0" }
 
 [features]
@@ -22,7 +24,9 @@ debug = []
 # A special feature to list binary crate dependencies.
 # dependencies implicitly declare these features.
 # https://doc.rust-lang.org/cargo/reference/features.html#optional-dependencies
-tools = ["dep:lexers", "dep:rustyline"]
+tools = ["dep:rustyline"]
+
+# tools = ["dep:lexers", "dep:rustyline"]
 
 
 # Use "cargo build --features tools" to build these

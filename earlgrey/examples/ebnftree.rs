@@ -30,7 +30,7 @@ fn main() {
         collect::<Vec<String>>().join(" ");
 
     use std::str::FromStr;
-    let trificator = abackus::ParserBuilder::default()
+    let trificator = earlgrey::ParserBuilder::default()
         .plug_terminal("num", |n| f64::from_str(n).is_ok())
         .sexprificator(&grammar, "expr");
 

@@ -1,66 +1,70 @@
 # Documentation
 
-Earlgrey is a crate for building parsers that can understand context-free grammars.
+Abackus crate adds a layer on top of [earlgrey crate](https://crates.io/crates/earlgrey) to simplify writing a **grammar**. You can simply use an EBNF style String instead of manually adding rules.
 
-## How to use it
+You can describe your grammar like this:
+```rust
+let grammar = r#"
+    S := S '+' N | N ;
+    N := '[0-9]' ;
+"#;
 
-Parsing stage:
+ParserBuilder::default()
+  .plug_terminal("[0-9]", |n| "1234567890".contains(n))
+  .plug_terminal("[+]", |c| c == "+")
+  .into_parser("S")
+```
+Instead of the more verbose:
+```rust
+// Gramar:  S -> S + N | N;  N -> [0-9];
+let g = earlgrey::GrammarBuilder::default()
+  .nonterm("S")
+  .nonterm("N")
+  .terminal("[+]", |c| c == "+")
+  .terminal("[0-9]", |n| "1234567890".contains(n))
+  .rule("S", &["S", "[+]", "N"])
+  .rule("S", &["N"])
+  .rule("N", &["[0-9]"])
+  .into_grammar("S")
+  .unwrap();
 
-- First you need to define a grammar using `GrammarBuilder` to define terminals and rules.
-- Then build an `EarleyParser` for that grammar and call `parse` on some input.
+earlgrey::EarleyParser::new(g)
+```
 
-Invoking the parser on some input returns an opaque type (list of Earley items) that encodes all possible trees. If the grammar is unambiguous this should represent a single tree.
+### How it works
 
-Evaluating the result:
-
-You need an `EarleyForest` that will walk through all resulting parse trees and act on them.
-- To build this you provide a function that given a terminal produces an AST node.
-- Then you define semantic actions to evaluate how to interpret each rule in the grammar.
+Underneath the covers an `earlgrey::EarleyParser` is used to build a parser for EBNF grammar. (For details you can check `earlgrey/ebnf.rs`). That parser is then used to build a final parser for the grammar provided by the user.
 
 ## Example
 
-A toy parser that can understand sums.
-
 ```rust
+// NOTE: extract from abackus/examples/ebnftree.rs
+
 fn main() {
-    // Gramar:  S -> S + N | N;  N -> [0-9];
-    let g = earlgrey::GrammarBuilder::default()
-      .nonterm("S")
-      .nonterm("N")
-      .terminal("[+]", |c| c == "+")
-      .terminal("[0-9]", |n| "1234567890".contains(n))
-      .rule("S", &["S", "[+]", "N"])
-      .rule("S", &["N"])
-      .rule("N", &["[0-9]"])
-      .into_grammar("S")
-      .unwrap();
+  let grammar = r#"
+    expr   := expr ('+'|'-') term | term ;
+    term   := term ('*'|'/') factor | factor ;
+    factor := '-' factor | power ;
+    power  := ufact '^' factor | ufact ;
+    ufact  := ufact '!' | group ;
+    group  := num | '(' expr ')' ;
+  "#;
 
-    // Parse some sum
-    let input = "1 + 2 + 3".split_whitespace();
-    let trees = earlgrey::EarleyParser::new(g)
-        .parse(input)
-        .unwrap();
+  // Build a parser for our grammar and while at it, plug in an
+  // evaluator to extract the resulting tree as S-expressions.
+  use std::str::FromStr;
+  let trif = abackus::ParserBuilder::default()
+      .plug_terminal("num", |n| f64::from_str(n).is_ok())
+      .sexprificator(&grammar, "expr");
 
-    // Evaluate the results
-    // Describe what to do when we find a Terminal
-    let mut ev = earlgrey::EarleyForest::new(
-        |symbol, token| match symbol {
-            "[0-9]" => token.parse().unwrap(),
-            _ => 0.0,
-        });
+  // Read some input from command-line
+  let input = std::env::args().skip(1).
+      collect::<Vec<String>>().join(" ");
 
-    // Describe how to execute grammar rules
-    ev.action("S -> S [+] N", |n| n[0] + n[2]);
-    ev.action("S -> N", |n| n[0]);
-    ev.action("N -> [0-9]", |n| n[0]);
-
-    println!("{}", ev.eval(&trees).unwrap());
+  // Print resulting parse trees
+  match trif(&mut tokenizer(input.chars())) {
+      Ok(trees) => for t in trees { println!("{}", t.print()); },
+      Err(e) => println!("{:?}", e)
+  }
 }
 ```
-
-
-#### References for Earley's algorithm
-* http://loup-vaillant.fr/tutorials/earley-parsing/
-* https://user.phil-fak.uni-duesseldorf.de/~kallmeyer/Parsing/earley.pdf
-* http://joshuagrams.github.io/pep/
-* https://github.com/tomerfiliba/tau/blob/master/earley3.py

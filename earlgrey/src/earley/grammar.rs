@@ -164,14 +164,12 @@ impl GrammarBuilder {
         self
     }
 
-    pub fn nonterm_try(mut self, name: &str) -> Self {
+    pub fn nonterm_try(&mut self, name: &str) {
         self.add_symbol(Symbol::NonTerm(name.into()), true);
-        self
     }
 
-    pub fn terminal_try(mut self, name: &str, pred: impl Fn(&str) -> bool + 'static) -> Self {
+    pub fn terminal_try(&mut self, name: &str, pred: impl Fn(&str) -> bool + 'static) {
         self.add_symbol(Symbol::Term(name.into(), Box::new(pred)), true);
-        self
     }
 
     // Register new rules for the grammar

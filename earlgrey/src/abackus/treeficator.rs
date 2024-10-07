@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
-use crate::ebnf::ParserBuilder;
-use earlgrey::{EarleyParser, EarleyForest};
+use super::ebnf::ParserBuilder;
+use crate::earley::{EarleyParser, EarleyForest};
 use std::fmt::Debug;
 
 #[derive(Clone,Debug)]
@@ -53,7 +53,7 @@ impl ParserBuilder {
     {
         // User may pre-plug grammar (self.0) with terminals
         // 1. build a parser for user's grammar
-        let grammar = ParserBuilder::parse_grammar(self.0, grammar)
+        let grammar = ParserBuilder::parse_grammar(self.user_gb, grammar)
             .unwrap_or_else(|e| panic!("treeficator error: {:?}", e))
             .into_grammar(start)
             .unwrap_or_else(|e| panic!("treeficator error: {:?}", e));
@@ -75,7 +75,7 @@ impl ParserBuilder {
     {
         // User may pre-plug grammar (self.0) with terminals
         // 1. build a parser for user's grammar
-        let grammar = ParserBuilder::parse_grammar(self.0, grammar)
+        let grammar = ParserBuilder::parse_grammar(self.user_gb, grammar)
             .unwrap_or_else(|e| panic!("treeficator error: {:?}", e))
             .into_grammar(start)
             .unwrap_or_else(|e| panic!("treeficator error: {:?}", e));

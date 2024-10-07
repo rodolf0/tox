@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use crate::ebnf::{ebnf_grammar, ParserBuilder};
+use super::ebnf::{ebnf_grammar, ParserBuilder};
 use std::fmt;
 
 #[test]
@@ -62,15 +62,15 @@ fn repetition() {
     let trees = parser("1 , 0 , 1".split_whitespace()).unwrap();
     check_trees(&trees, vec![
         concat!(
-            r#"Node("arg -> b <Uniq-3>", ["#,
+            r#"Node("arg -> b <Uniq-4>", ["#,
                 r#"Node("b -> 1", [Leaf("1", "1")]), "#,
-                r#"Node("<Uniq-3> -> , b <Uniq-3>", ["#,
+                r#"Node("<Uniq-4> -> , b <Uniq-4>", ["#,
                     r#"Leaf(",", ","), "#,
                     r#"Node("b -> 0", [Leaf("0", "0")]), "#,
-                    r#"Node("<Uniq-3> -> , b <Uniq-3>", ["#,
+                    r#"Node("<Uniq-4> -> , b <Uniq-4>", ["#,
                         r#"Leaf(",", ","), "#,
                         r#"Node("b -> 1", [Leaf("1", "1")]), "#,
-                        r#"Node("<Uniq-3> -> ", [])])])])"#)
+                        r#"Node("<Uniq-4> -> ", [])])])])"#)
     ]);
 }
 
@@ -106,17 +106,17 @@ fn option() {
     let trees = parser(["1"].iter()).unwrap();
     check_trees(&trees, vec![
         concat!(
-            r#"Node("complex -> d <Uniq-3>", ["#,
+            r#"Node("complex -> d <Uniq-5>", ["#,
                 r#"Node("d -> 1", [Leaf("1", "1")]), "#,
-                r#"Node("<Uniq-3> -> ", [])])"#)
+                r#"Node("<Uniq-5> -> ", [])])"#)
     ]);
 
     let trees = parser(["2", "i"].iter()).unwrap();
     check_trees(&trees, vec![
         concat!(
-            r#"Node("complex -> d <Uniq-3>", ["#,
+            r#"Node("complex -> d <Uniq-5>", ["#,
                 r#"Node("d -> 2", [Leaf("2", "2")]), "#,
-                r#"Node("<Uniq-3> -> i", [Leaf("i", "i")])])"#)
+                r#"Node("<Uniq-5> -> i", [Leaf("i", "i")])])"#)
     ]);
 
     assert!(parser(["2", "i", "i"].iter()).is_err());
@@ -157,17 +157,17 @@ fn grouping() {
     let trees = parser(["b", "1"].iter()).unwrap();
     check_trees(&trees, vec![
         concat!(
-            r#"Node("row -> <Uniq-3> <Uniq-6>", ["#,
-                r#"Node("<Uniq-3> -> b", [Leaf("b", "b")]), "#,
-                r#"Node("<Uniq-6> -> 1", [Leaf("1", "1")])])"#)
+            r#"Node("row -> <Uniq-5> <Uniq-2>", ["#,
+                r#"Node("<Uniq-5> -> b", [Leaf("b", "b")]), "#,
+                r#"Node("<Uniq-2> -> 1", [Leaf("1", "1")])])"#)
     ]);
 
     let trees = parser(["a", "0"].iter()).unwrap();
     check_trees(&trees, vec![
         concat!(
-            r#"Node("row -> <Uniq-3> <Uniq-6>", ["#,
-                r#"Node("<Uniq-3> -> a", [Leaf("a", "a")]), "#,
-                r#"Node("<Uniq-6> -> 0", [Leaf("0", "0")])])"#)
+            r#"Node("row -> <Uniq-5> <Uniq-2>", ["#,
+                r#"Node("<Uniq-5> -> a", [Leaf("a", "a")]), "#,
+                r#"Node("<Uniq-2> -> 0", [Leaf("0", "0")])])"#)
     ]);
 
     assert!(parser(["a", "b"].iter()).is_err());
@@ -209,31 +209,31 @@ fn mixed() {
     let trees = parser(["a", "0"].iter()).unwrap();
     check_trees(&trees, vec![
         concat!(
-            r#"Node("row -> a <Uniq-3> <Uniq-6> <Uniq-8>", ["#,
+            r#"Node("row -> a <Uniq-6> <Uniq-4> <Uniq-1>", ["#,
                 r#"Leaf("a", "a"), "#,
-                r#"Node("<Uniq-3> -> ", []), "#,
-                r#"Node("<Uniq-6> -> 0", [Leaf("0", "0")]), "#,
-                r#"Node("<Uniq-8> -> ", [])])"#)
+                r#"Node("<Uniq-6> -> ", []), "#,
+                r#"Node("<Uniq-4> -> 0", [Leaf("0", "0")]), "#,
+                r#"Node("<Uniq-1> -> ", [])])"#)
     ]);
 
     let trees = parser(["a", "b", "1"].iter()).unwrap();
     check_trees(&trees, vec![
         concat!(
-            r#"Node("row -> a <Uniq-3> <Uniq-6> <Uniq-8>", ["#,
+            r#"Node("row -> a <Uniq-6> <Uniq-4> <Uniq-1>", ["#,
                 r#"Leaf("a", "a"), "#,
-                r#"Node("<Uniq-3> -> b", [Leaf("b", "b")]), "#,
-                r#"Node("<Uniq-6> -> 1", [Leaf("1", "1")]), "#,
-                r#"Node("<Uniq-8> -> ", [])])"#)
+                r#"Node("<Uniq-6> -> b", [Leaf("b", "b")]), "#,
+                r#"Node("<Uniq-4> -> 1", [Leaf("1", "1")]), "#,
+                r#"Node("<Uniq-1> -> ", [])])"#)
     ]);
 
     let trees = parser(["a", "1", "c"].iter()).unwrap();
     check_trees(&trees, vec![
         concat!(
-            r#"Node("row -> a <Uniq-3> <Uniq-6> <Uniq-8>", ["#,
+            r#"Node("row -> a <Uniq-6> <Uniq-4> <Uniq-1>", ["#,
                 r#"Leaf("a", "a"), "#,
-                r#"Node("<Uniq-3> -> ", []), "#,
-                r#"Node("<Uniq-6> -> 1", [Leaf("1", "1")]), "#,
-                r#"Node("<Uniq-8> -> c", [Leaf("c", "c")])])"#)
+                r#"Node("<Uniq-6> -> ", []), "#,
+                r#"Node("<Uniq-4> -> 1", [Leaf("1", "1")]), "#,
+                r#"Node("<Uniq-1> -> c", [Leaf("c", "c")])])"#)
     ]);
 
     assert!(parser(["a", "b"].iter()).is_err());

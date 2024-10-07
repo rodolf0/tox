@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
 use lexers::EbnfTokenizer;
-use earlgrey::{
+use crate::earley::{
     Grammar, GrammarBuilder,
     EarleyParser, EarleyForest,
 };
@@ -63,7 +63,9 @@ macro_rules! debug {
 
 
 #[derive(Default)]
-pub struct ParserBuilder(pub GrammarBuilder);
+pub struct ParserBuilder {
+    pub user_gb: GrammarBuilder,
+}
 
 #[derive(Clone,Debug)]
 enum G {Body(Vec<Vec<String>>), Part(Vec<String>), Atom(String), Nop}
@@ -77,23 +79,23 @@ macro_rules! pull {
 }
 
 impl ParserBuilder {
-    // Parsing terminals / non-terminal leaf nodes
+
     fn evaler(gb: &RefCell<GrammarBuilder>) -> EarleyForest<'_, G> {
         EarleyForest::new(move |symbol, token| {
             match symbol {
                 "<Id>" => {
                     debug!("Adding non-term {:?}", token);
-                    gb.borrow_mut().quiet_nonterm(token);
+                    gb.borrow_mut().nonterm_try(token);
                 },
                 "@<Tag>" => {
                     debug!("Adding non-term {:?}", token);
-                    gb.borrow_mut().quiet_nonterm(token);
+                    gb.borrow_mut().nonterm_try(token);
                 },
                 "<Chars>" => {
                     debug!("Adding terminal {:?}", token);
                     let tok = token.to_string();
                     gb.borrow_mut()
-                        .quiet_terminal(token, move |s| s == tok);
+                        .terminal_try(token, move |s| s == tok);
                 },
                 _ => ()
             }
@@ -109,7 +111,7 @@ impl ParserBuilder {
             let mut t_gb = gb.borrow_mut();
             for rule in body {
                 debug!("Adding rule {:?} -> {:?}", id, rule);
-                t_gb.quiet_rule(&id, rule.as_slice());
+                t_gb.rule_try(&id, &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>());
             }
             G::Nop
         });
@@ -144,11 +146,11 @@ impl ParserBuilder {
             let aux = gb.borrow().unique_symbol_name();
             debug!("Adding non-term {:?}", aux);
             let mut t_gb = gb.borrow_mut();
-            t_gb.quiet_nonterm(&aux);
+            t_gb.nonterm_try(&aux);
             let body = pull!(G::Body, n.remove(1));
             for rule in body {
                 debug!("Adding rule {:?} -> {:?}", aux, rule);
-                t_gb.quiet_rule(&aux, rule.as_slice());
+                t_gb.rule_try(&aux, &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>());
             }
             G::Atom(aux)
         });
@@ -156,11 +158,11 @@ impl ParserBuilder {
             let aux = pull!(G::Atom, n.remove(3));
             debug!("Adding non-term {:?}", aux);
             let mut t_gb = gb.borrow_mut();
-            t_gb.quiet_nonterm(&aux);
+            t_gb.nonterm_try(&aux);
             let body = pull!(G::Body, n.remove(1));
             for rule in body {
                 debug!("Adding rule {:?} -> {:?}", aux, rule);
-                t_gb.quiet_rule(&aux, rule.as_slice());
+                t_gb.rule_try(&aux, &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>());
             }
             G::Atom(aux)
         });
@@ -173,13 +175,13 @@ impl ParserBuilder {
             let aux = gb.borrow().unique_symbol_name();
             debug!("Adding non-term {:?}", aux);
             let mut t_gb = gb.borrow_mut();
-            t_gb.quiet_nonterm(&aux);
+            t_gb.nonterm_try(&aux);
             let body = pull!(G::Body, n.remove(1));
             for rule in body {
                 debug!("Adding rule {:?} -> {:?}", aux, rule);
-                t_gb.quiet_rule(&aux, rule.as_slice());
+                t_gb.rule_try(&aux, &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>());
                 debug!("Adding rule {:?} -> []", aux);
-                t_gb.quiet_rule::<_, String>(&aux, &[]);
+                t_gb.rule_try(&aux, &[]);
             }
             G::Atom(aux)
         });
@@ -187,13 +189,13 @@ impl ParserBuilder {
             let aux = pull!(G::Atom, n.remove(3));
             debug!("Adding non-term {:?}", aux);
             let mut t_gb = gb.borrow_mut();
-            t_gb.quiet_nonterm(&aux);
+            t_gb.nonterm_try(&aux);
             let body = pull!(G::Body, n.remove(1));
             for rule in body {
                 debug!("Adding rule {:?} -> {:?}", aux, rule);
-                t_gb.quiet_rule(&aux, rule.as_slice());
+                t_gb.rule_try(&aux, &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>());
                 debug!("Adding rule {:?} -> []", aux);
-                t_gb.quiet_rule::<_, String>(&aux, &[]);
+                t_gb.rule_try(&aux, &[]);
             }
             G::Atom(aux)
         });
@@ -206,14 +208,14 @@ impl ParserBuilder {
             let aux = gb.borrow().unique_symbol_name();
             debug!("Adding non-term {:?}", aux);
             let mut t_gb = gb.borrow_mut();
-            t_gb.quiet_nonterm(&aux);
+            t_gb.nonterm_try(&aux);
             let body = pull!(G::Body, n.remove(1));
             for mut rule in body {
                 rule.push(aux.clone());
                 debug!("Adding rule {:?} -> {:?}", aux, rule);
-                t_gb.quiet_rule(&aux, rule.as_slice());
+                t_gb.rule_try(&aux, &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>());
                 debug!("Adding rule {:?} -> []", aux);
-                t_gb.quiet_rule::<_, String>(&aux, &[]);
+                t_gb.rule_try(&aux, &[]);
             }
             G::Atom(aux)
         });
@@ -222,14 +224,14 @@ impl ParserBuilder {
             let aux = pull!(G::Atom, n.remove(3));
             debug!("Adding non-term {:?}", aux);
             let mut t_gb = gb.borrow_mut();
-            t_gb.quiet_nonterm(&aux);
+            t_gb.nonterm_try(&aux);
             let body = pull!(G::Body, n.remove(1));
             for mut rule in body {
                 rule.push(aux.clone());
                 debug!("Adding rule {:?} -> {:?}", aux, rule);
-                t_gb.quiet_rule(&aux, rule.as_slice());
+                t_gb.rule_try(&aux, &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>());
                 debug!("Adding rule {:?} -> []", aux);
-                t_gb.quiet_rule::<_, String>(&aux, &[]);
+                t_gb.rule_try(&aux, &[]);
             }
             G::Atom(aux)
         });
@@ -269,17 +271,16 @@ impl ParserBuilder {
     }
 
     // Plug-in functions that parse Terminals before we build the grammar
-    pub fn plug_terminal<N, F>(mut self, name: N, pred: F) -> Self
-            where N: Into<String>, F: 'static + Fn(&str)->bool {
-        self.0.quiet_terminal(&name.into(), pred);
-        ParserBuilder(self.0)
+    pub fn plug_terminal(mut self, name: &str, pred: impl Fn(&str) -> bool + 'static) -> Self {
+        self.user_gb.terminal_try(&name, pred);
+        self
     }
 
     // Build a parser for the provided grammar in EBNF syntax
     pub fn into_parser(self, start: &str, grammar: &str)
             -> Result<EarleyParser, String> {
         let user_grammar =
-            ParserBuilder::parse_grammar(self.0, grammar)?
+            ParserBuilder::parse_grammar(self.user_gb, grammar)?
                 .into_grammar(start)?;
         Ok(EarleyParser::new(user_grammar))
     }

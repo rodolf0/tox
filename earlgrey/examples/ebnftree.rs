@@ -33,7 +33,7 @@ fn main() -> Result<(), String>{
     let grammar = earlgrey::EbnfGrammarParser::new(grammar, "expr")
         .plug_terminal("num", |n| f64::from_str(n).is_ok())
         .into_grammar()?;
-    let parser = earlgrey::sexprificator(grammar)?;
+    let parser = earlgrey::sexpr_parser(grammar)?;
 
     for tree in parser(tokenizer(input.chars()))? {
         println!("{}", tree.print());

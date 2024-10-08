@@ -44,8 +44,7 @@ impl Sexpr {
     }
 }
 
-
-pub fn treeficator<InputIter>(grammar: Grammar)
+pub fn ast_parser<InputIter>(grammar: Grammar)
     -> Result<impl Fn(InputIter) -> Result<Vec<Tree>, String>, String>
         where InputIter: Iterator, InputIter::Item: AsRef<str> + std::fmt::Debug
 {
@@ -62,7 +61,7 @@ pub fn treeficator<InputIter>(grammar: Grammar)
 }
 
 
-pub fn sexprificator<InputIter>(grammar: Grammar)
+pub fn sexpr_parser<InputIter>(grammar: Grammar)
     -> Result<impl Fn(InputIter) -> Result<Vec<Sexpr>, String>, String>
         where InputIter: Iterator, InputIter::Item: AsRef<str> + std::fmt::Debug
 {

@@ -1,12 +1,8 @@
 #![deny(warnings)]
 
-use super::ebnf::{ebnf_grammar, ParserBuilder};
+use super::ebnf::EbnfGrammarParser;
+use super::treeficator::treeficator;
 use std::fmt;
-
-#[test]
-fn build_ebnf_grammar() {
-    ebnf_grammar();
-}
 
 fn check_trees<T: fmt::Debug>(trees: &Vec<T>, expected: Vec<&str>) {
     use std::collections::HashSet;
@@ -20,11 +16,13 @@ fn check_trees<T: fmt::Debug>(trees: &Vec<T>, expected: Vec<&str>) {
     assert_eq!(0, expect.len());
 }
 
-
 #[test]
 fn minimal_parser() {
     let g = r#" Number := "0" ; "#;
-    let parser = ParserBuilder::default().treeficator(g, "Number");
+    let grammar = EbnfGrammarParser::new(&g, "Number")
+        .into_grammar().unwrap();
+    let parser = treeficator(grammar).unwrap();
+
     let trees = parser(["0"].iter()).unwrap();
     check_trees(&trees, vec![r#"Node("Number -> 0", [Leaf("0", "0")])"#]);
 }
@@ -37,7 +35,10 @@ fn arith_parser() {
 
         Number := "0" | "1" | "2" | "3" ;
     "#;
-    let parser = ParserBuilder::default().treeficator(&g, "expr");
+    let grammar = EbnfGrammarParser::new(&g, "expr")
+        .into_grammar().unwrap();
+    let parser = treeficator(grammar).unwrap();
+
     let trees = parser("3 + 2 + 1".split_whitespace()).unwrap();
     check_trees(&trees, vec![
         concat!(
@@ -58,7 +59,10 @@ fn repetition() {
         arg := b { "," b } ;
         b := "0" | "1" ;
     "#;
-    let parser = ParserBuilder::default().treeficator(&g, "arg");
+    let grammar = EbnfGrammarParser::new(&g, "arg")
+        .into_grammar().unwrap();
+    let parser = treeficator(grammar).unwrap();
+
     let trees = parser("1 , 0 , 1".split_whitespace()).unwrap();
     check_trees(&trees, vec![
         concat!(
@@ -80,7 +84,10 @@ fn repetition_tagged() {
         arg := b { "," b } @x;
         b := "0" | "1" ;
     "#;
-    let parser = ParserBuilder::default().treeficator(&g, "arg");
+    let grammar = EbnfGrammarParser::new(&g, "arg")
+        .into_grammar().unwrap();
+    let parser = treeficator(grammar).unwrap();
+
     let trees = parser("1 , 0 , 1".split_whitespace()).unwrap();
     check_trees(&trees, vec![
         concat!(
@@ -102,7 +109,10 @@ fn option() {
         complex := d [ "i" ];
         d := "0" | "1" | "2";
     "#;
-    let parser = ParserBuilder::default().treeficator(&g, "complex");
+    let grammar = EbnfGrammarParser::new(&g, "complex")
+        .into_grammar().unwrap();
+    let parser = treeficator(grammar).unwrap();
+
     let trees = parser(["1"].iter()).unwrap();
     check_trees(&trees, vec![
         concat!(
@@ -128,7 +138,10 @@ fn option_tagged() {
         complex := d [ "i" ] @x;
         d := "0" | "1" | "2";
     "#;
-    let parser = ParserBuilder::default().treeficator(&g, "complex");
+    let grammar = EbnfGrammarParser::new(&g, "complex")
+        .into_grammar().unwrap();
+    let parser = treeficator(grammar).unwrap();
+
     let trees = parser(["1"].iter()).unwrap();
     check_trees(&trees, vec![
         concat!(
@@ -153,7 +166,10 @@ fn grouping() {
     let g = r#"
         row := ("a" | "b") ("0" | "1") ;
     "#;
-    let parser = ParserBuilder::default().treeficator(&g, "row");
+    let grammar = EbnfGrammarParser::new(&g, "row")
+        .into_grammar().unwrap();
+    let parser = treeficator(grammar).unwrap();
+
     let trees = parser(["b", "1"].iter()).unwrap();
     check_trees(&trees, vec![
         concat!(
@@ -179,7 +195,10 @@ fn grouping_tagged() {
     let g = r#"
         row := ("a" | "b") @x ("0" | "1") @y;
     "#;
-    let parser = ParserBuilder::default().treeficator(&g, "row");
+    let grammar = EbnfGrammarParser::new(&g, "row")
+        .into_grammar().unwrap();
+    let parser = treeficator(grammar).unwrap();
+
     let trees = parser(["b", "1"].iter()).unwrap();
     check_trees(&trees, vec![
         concat!(
@@ -205,7 +224,10 @@ fn mixed() {
     let g = r#"
         row := "a" [ "b" ] ("0" | "1") [ "c" ];
     "#;
-    let parser = ParserBuilder::default().treeficator(&g, "row");
+    let grammar = EbnfGrammarParser::new(&g, "row")
+        .into_grammar().unwrap();
+    let parser = treeficator(grammar).unwrap();
+
     let trees = parser(["a", "0"].iter()).unwrap();
     check_trees(&trees, vec![
         concat!(
@@ -247,7 +269,11 @@ fn mixed_tagged() {
     let g = r#"
         row := "a" [ "b" ]@x ("0" | "1")@y [ "c" ]@z;
     "#;
-    let parser = ParserBuilder::default().treeficator(&g, "row");
+
+    let grammar = EbnfGrammarParser::new(&g, "row")
+        .into_grammar().unwrap();
+    let parser = treeficator(grammar).unwrap();
+
     let trees = parser(["a", "0"].iter()).unwrap();
     check_trees(&trees, vec![
         concat!(
@@ -291,9 +317,11 @@ fn plug_terminal() {
         expr := Number
               | expr "+" Number ;
     "#;
-    let parser = ParserBuilder::default()
+    let grammar = EbnfGrammarParser::new(&g, "expr")
         .plug_terminal("Number", |i| i8::from_str(i).is_ok())
-        .treeficator(&g, "expr");
+        .into_grammar().unwrap();
+
+    let parser = treeficator(grammar).unwrap();
 
     let trees = parser(["3", "+", "1"].iter()).unwrap();
     check_trees(&trees, vec![

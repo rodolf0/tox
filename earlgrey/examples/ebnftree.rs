@@ -16,7 +16,7 @@ fn tokenizer<I: Iterator<Item=char>>(input: I) -> Tokenizer<I> {
     Tokenizer(lexers::Scanner::new(input))
 }
 
-fn main() {
+fn main() -> Result<(), String>{
     let grammar = r#"
         expr   := expr ('+'|'-') term | term ;
         term   := term ('*'|'/') factor | factor ;
@@ -30,12 +30,14 @@ fn main() {
         collect::<Vec<String>>().join(" ");
 
     use std::str::FromStr;
-    let trificator = earlgrey::ParserBuilder::default()
+    let grammar = earlgrey::EbnfGrammarParser::new(grammar, "expr")
         .plug_terminal("num", |n| f64::from_str(n).is_ok())
-        .sexprificator(&grammar, "expr");
+        .into_grammar()?;
+    let parser = earlgrey::sexprificator(grammar)?;
 
-    match trificator(&mut tokenizer(input.chars())) {
-        Ok(trees) => for t in trees { println!("{}", t.print()); },
-        Err(e) => println!("{:?}", e)
+    for tree in parser(tokenizer(input.chars()))? {
+        println!("{}", tree.print());
     }
+
+    Ok(())
 }

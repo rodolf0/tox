@@ -1,35 +1,20 @@
 [package]
 name = "earlgrey"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 license = "MIT"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "A library for parsing context-free grammars using Earley algorithm"
 repository = "https://github.com/rodolf0/tox/tree/master/earlgrey"
 readme = "README.md"
-keywords = ["parser", "earley", "cfg", "grammar", "ast"]
+keywords = ["parser", "earley", "grammar", "ast", "ebnf"]
 categories = ["parsing", "text-processing"]
 
-
 # The library crate has no dependencies. Optionals are for tools
-[dependencies]
-# TODO: shouldn't depend on lexers
+[dev-dependencies]
 lexers = { version = "0.1", path = "../lexers" }
-# lexers = { optional = true, version = "0.1", path = "../lexers" }
-rustyline = { optional = true, version = "14.0.0" }
+rustyline = { version = "14.0.0" }
 
 [features]
 # Allow building with 'debug' feature to de verbose printing of internal parsing state.
 debug = []
-# A special feature to list binary crate dependencies.
-# dependencies implicitly declare these features.
-# https://doc.rust-lang.org/cargo/reference/features.html#optional-dependencies
-tools = ["dep:rustyline"]
-
-# tools = ["dep:lexers", "dep:rustyline"]
-
-
-# Use "cargo build --features tools" to build these
-[[bin]]
-name = "arith"
-required-features = ["tools"]

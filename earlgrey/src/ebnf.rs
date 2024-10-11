@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use lexers::EbnfTokenizer;
+use super::ebnf_tokenizer::EbnfTokenizer;
 use crate::earley::{
     EarleyForest, EarleyParser, Grammar, GrammarBuilder
 };

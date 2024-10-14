@@ -21,16 +21,22 @@ impl Sexpr {
             Sexpr::Atom(ref lexeme) =>
                 *out += &format!("\u{2500} {}\n", lexeme),
             Sexpr::List(ref subn) => {
-                let (first, rest) = subn.split_first().unwrap();
-                let (last, rest) = rest.split_last().unwrap();
-                *out += &format!("\u{252c}");
-                first.print_helper(&format!("{}\u{2502}", indent), out);
-                for mid in rest {
-                    *out += &format!("{}\u{251c}", indent);
-                    mid.print_helper(&format!("{}\u{2502}", indent), out);
+                if let Some((first, rest)) = subn.split_first() {
+                    if let Some((last, rest)) = rest.split_last() {
+                        *out += &format!("\u{252c}");
+                        first.print_helper(&format!("{}\u{2502}", indent), out);
+                        for mid in rest {
+                            *out += &format!("{}\u{251c}", indent);
+                            mid.print_helper(&format!("{}\u{2502}", indent), out);
+                        }
+                        *out += &format!("{}\u{2570}", indent);
+                        last.print_helper(&format!("{} ", indent), out);
+                    } else {
+                        *out += "\u{2500} \u{03b5}\n";
+                    }
+                } else {
+                    *out += "\u{2500} \u{03b5}\n";
                 }
-                *out += &format!("{}\u{2570}", indent);
-                last.print_helper(&format!("{} ", indent), out);
             }
         }
     }

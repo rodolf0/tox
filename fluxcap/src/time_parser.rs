@@ -64,10 +64,10 @@ pub fn time_grammar() -> &'static str {
     "#
 }
 
-fn _parser_builder() -> abackus::ParserBuilder {
+fn _grammar() -> Result<earlgrey::Grammar, String> {
     use std::str::FromStr;
     use crate::constants::*;
-    abackus::ParserBuilder::default()
+    earlgrey::EbnfGrammarParser::new(time_grammar(), "time")
         .plug_terminal("ordinal", |d| ordinal(d).or_else(|| short_ordinal(d)).is_some())
         .plug_terminal("day_ordinal", |d| ordinal(d).or_else(|| short_ordinal(d)).is_some())
         .plug_terminal("weekday", |d| weekday(d).is_some())
@@ -77,16 +77,20 @@ fn _parser_builder() -> abackus::ParserBuilder {
                        { year > 999 && year < 2200 } else { false })
         .plug_terminal("small_int", |u| if let Ok(u) = usize::from_str(u)
                        { u < 100 } else { false })
+        .into_grammar()
 }
 
 pub fn time_parser() -> earlgrey::EarleyParser {
-    _parser_builder()
-        .into_parser("time", time_grammar())
+    earlgrey::EarleyParser::new(
+        _grammar()
         .unwrap_or_else(|e| panic!("TimeMachine grammar BUG: {:?}", e))
+    )
 }
 
-pub fn debug_time_expression(time: &str) -> Result<Vec<abackus::Sexpr>, String> {
-    let tokenizer = lexers::DelimTokenizer::new(time.chars(), ", ", true);
-    let sexpr_writer = _parser_builder().sexprificator(time_grammar(), "time");
-    sexpr_writer(tokenizer)
+pub fn debug_time_expression(time: &str) -> Result<Vec<earlgrey::Sexpr>, String> {
+    let parser = earlgrey::sexpr_parser(
+        _grammar()
+        .unwrap_or_else(|e| panic!("TimeMachine grammar BUG: {:?}", e))
+    )?;
+    parser(time.split(&[' ', ','][..]).filter(|w| !w.is_empty()))
 }

@@ -8,7 +8,7 @@ mod ebnf;
 pub use ebnf::EbnfGrammarParser;
 
 mod parsers;
-pub use parsers::{sexpr_parser, ast_parser};
+pub use parsers::{sexpr_parser, Sexpr};
 
 #[cfg(test)]
 mod ebnf_test;

@@ -341,7 +341,7 @@ impl<'a> TimeMachine<'a> {
     }
 
     pub fn eval(&self, time: &str) -> Result<Vec<TimeEl>, String> {
-        let mut tokenizer = lexers::DelimTokenizer::new(time.chars(), ", ", true);
+        let mut tokenizer = time.split(&[' ', ','][..]).filter(|w| !w.is_empty());
 
         let state = self
             .parser

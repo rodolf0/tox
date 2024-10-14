@@ -9,14 +9,6 @@ pub enum Sexpr {
     List(Vec<Sexpr>),
 }
 
-#[derive(Debug,Clone,PartialEq)]
-pub enum Tree {
-    // ("[+-]", "+")
-    Leaf(String, String),
-    // ("E -> E [+-] E", [...])
-    Node(String, Vec<Tree>),
-}
-
 impl Sexpr {
     pub fn print(&self) -> String {
         let mut out = String::new();
@@ -42,22 +34,6 @@ impl Sexpr {
             }
         }
     }
-}
-
-pub fn ast_parser<InputIter>(grammar: Grammar)
-    -> Result<impl Fn(InputIter) -> Result<Vec<Tree>, String>, String>
-        where InputIter: Iterator, InputIter::Item: AsRef<str> + std::fmt::Debug
-{
-    let mut tree_builder = EarleyForest::new(
-        |sym, tok| Tree::Leaf(sym.to_string(), tok.to_string()));
-
-    for rule in grammar.rules.iter().map(|r| r.to_string()) {
-        tree_builder.action(
-            &rule.clone(), move |nodes| Tree::Node(rule.clone(), nodes));
-    }
-
-    let parser = EarleyParser::new(grammar);
-    Ok(move |tokenizer| tree_builder.eval_all(&parser.parse(tokenizer)?))
 }
 
 

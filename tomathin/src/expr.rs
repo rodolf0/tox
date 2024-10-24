@@ -23,41 +23,38 @@ impl Expr {
 // Plus[b, Times[3, b]] b + 3 b -> b (4)
 // Plus[b, Times[3, Plus[b, a]]] ... should expand, or factorize ?
 
-pub fn evaluate(expr: Expr) -> Result<Expr, String> {
+pub fn evaluate(expr: &Expr) -> Result<Expr, String> {
     match expr {
-        Expr::Expr(head, mut args) => match head.as_ref() {
+        Expr::Expr(head, args) => match head.as_ref() {
             "List" => {
                 let mut evaled = Vec::new();
                 for r in args.into_iter().map(|e| evaluate(e)) {
                     evaled.push(r?);
                 }
-                Ok(Expr::Expr(head, evaled))
+                Ok(Expr::Expr(head.clone(), evaled))
             }
             "Rule" => {
-                if args.len() != 2 {
-                    Err("Rule must have 2 arguments".to_string())
+                if let [lhs, rhs] = &args[..] {
+                    Ok(Expr::Expr(head.clone(), vec![lhs.clone(), evaluate(rhs)?]))
                 } else {
-                    let lhs = args.remove(0);
-                    let rhs = evaluate(args.remove(0))?;
-                    Ok(Expr::Expr(head, vec![lhs, rhs]))
+                    Err(format!("Rule must have 2 arguments. {:?}", args))
                 }
             }
             "ReplaceAll" => {
-                if args.len() != 2 {
-                    Err("ReplaceAll must have 2 arguments".to_string())
+                if let [expr, rules] = &args[..] {
+                    replace_all(expr, &check_rules(rules)?)
                 } else {
-                    let rules = check_rules(args.remove(1))?;
-                    replace_all(args.remove(0), &rules)
+                    Err(format!("ReplaceAll must have 2 arguments. {:?}", args))
                 }
             }
             other => panic!("{} head not implemented", other),
         },
         // Nothing specific on atomic expressions
-        _ => Ok(expr),
+        _ => Ok(expr.clone()),
     }
 }
 
-fn check_rules(rules: Expr) -> Result<Vec<(Expr, Expr)>, String> {
+fn check_rules(rules: &Expr) -> Result<Vec<(Expr, Expr)>, String> {
     // Evaluate rules and check they're Rule or List[Rule]
     match evaluate(rules)? {
         Expr::Expr(h, mut args) if h == "Rule" => {
@@ -90,7 +87,7 @@ fn check_rules(rules: Expr) -> Result<Vec<(Expr, Expr)>, String> {
 
 // ReplaceAll[x, Rule[x, 3]]
 // ReplaceAll[List[1, 2, 3], Rule[List, FindRoot]]
-fn replace_all(expr: Expr, rules: &[(Expr, Expr)]) -> Result<Expr, String> {
+fn replace_all(expr: &Expr, rules: &[(Expr, Expr)]) -> Result<Expr, String> {
     match expr {
         // for each sub-expression apply the replacement
         Expr::Expr(head, args) => {
@@ -100,7 +97,7 @@ fn replace_all(expr: Expr, rules: &[(Expr, Expr)]) -> Result<Expr, String> {
                 replaced.push(r?);
             }
             // Check replacing the while re-written expression
-            let mut replaced = Expr::Expr(head, replaced);
+            let mut replaced = Expr::Expr(head.clone(), replaced);
             for (lhs, rhs) in rules {
                 if replaced == *lhs {
                     replaced = rhs.clone();
@@ -123,13 +120,11 @@ fn replace_all(expr: Expr, rules: &[(Expr, Expr)]) -> Result<Expr, String> {
         }
         atom => {
             for (lhs, rhs) in rules {
-                if atom == *lhs {
+                if atom == lhs {
                     return Ok(rhs.clone());
                 }
             }
-            Ok(atom) // no replacement
+            Ok(atom.clone()) // no replacement
         }
     }
 }
-
-// FullForm can parse a string into an Expr

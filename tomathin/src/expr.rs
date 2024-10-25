@@ -23,88 +23,82 @@ impl Expr {
 // Plus[b, Times[3, b]] b + 3 b -> b (4)
 // Plus[b, Times[3, Plus[b, a]]] ... should expand, or factorize ?
 
-pub fn evaluate(expr: &Expr) -> Result<Expr, String> {
+pub fn evaluate(expr: Expr) -> Result<Expr, String> {
     match expr {
         Expr::Expr(head, args) => match head.as_ref() {
             "List" => {
-                let mut evaled = Vec::new();
-                for r in args.into_iter().map(|e| evaluate(e)) {
-                    evaled.push(r?);
-                }
-                Ok(Expr::Expr(head.clone(), evaled))
+                let evaled_args = args
+                    .into_iter()
+                    .map(|a| evaluate(a))
+                    .collect::<Result<_, _>>()?;
+                Ok(Expr::Expr(head, evaled_args))
             }
             "Rule" => {
-                if let [lhs, rhs] = &args[..] {
-                    Ok(Expr::Expr(head.clone(), vec![lhs.clone(), evaluate(rhs)?]))
-                } else {
-                    Err(format!("Rule must have 2 arguments. {:?}", args))
-                }
+                let [lhs, rhs]: [Expr; 2] = args
+                    .try_into()
+                    .map_err(|e| format!("Rule must have 2 arguments. {:?}", e))?;
+                Ok(Expr::Expr(head, vec![lhs, evaluate(rhs)?]))
             }
             "ReplaceAll" => {
-                if let [expr, rules] = &args[..] {
-                    replace_all(expr, &check_rules(rules)?)
-                } else {
-                    Err(format!("ReplaceAll must have 2 arguments. {:?}", args))
-                }
+                let [expr, rules]: [Expr; 2] = args
+                    .try_into()
+                    .map_err(|e| format!("ReplaceAll must have 2 arguments. {:?}", e))?;
+                replace_all(expr, eval_rules(rules)?.as_slice())
             }
             other => panic!("{} head not implemented", other),
         },
         // Nothing specific on atomic expressions
-        _ => Ok(expr.clone()),
+        _ => Ok(expr),
     }
 }
 
-fn check_rules(rules: &Expr) -> Result<Vec<(Expr, Expr)>, String> {
-    // Evaluate rules and check they're Rule or List[Rule]
+fn eval_rules(rules: Expr) -> Result<Vec<(Expr, Expr)>, String> {
+    // Evaluate rules and check they result in Rule or List[Rule]
     match evaluate(rules)? {
-        Expr::Expr(h, mut args) if h == "Rule" => {
-            let lhs = args.remove(0);
-            let rhs = args.remove(0);
+        Expr::Expr(head, args) if head == "Rule" => {
+            let [lhs, rhs]: [Expr; 2] = args
+                .try_into()
+                .map_err(|e| format!("Rule must have 2 arguments. {:?}", e))?;
             Ok(vec![(lhs, rhs)])
         }
-        Expr::Expr(h, args) if h == "List" => {
-            let mut rules = Vec::new();
-            for arg in args {
-                match arg {
-                    Expr::Expr(head, mut args) if head == "Rule" => {
-                        let lhs = args.remove(0);
-                        let rhs = args.remove(0);
-                        rules.push((lhs, rhs));
-                    }
-                    _ => {
-                        return Err("ReplaceAll rules should be List[Rule]".to_string());
-                    }
+        Expr::Expr(h, args) if h == "List" => args
+            .into_iter()
+            .map(|rule| match rule {
+                Expr::Expr(head, args) if head == "Rule" => {
+                    let [lhs, rhs]: [Expr; 2] = args
+                        .try_into()
+                        .map_err(|e| format!("Rule must have 2 arguments. {:?}", e))?;
+                    Ok((lhs, rhs))
                 }
-            }
-            Ok(rules)
-        }
-        other => Err(format!(
-            "ReplaceAll rules should be Rule or List[Rule]. Found '{:?}'",
-            other
-        )),
+                other => Err(format!("Expected all args to be Rule: {:?}", other)),
+            })
+            .collect(),
+        other => Err(format!("ReplaceAll unexpected arg: '{:?}'", other)),
     }
 }
 
 // ReplaceAll[x, Rule[x, 3]]
 // ReplaceAll[List[1, 2, 3], Rule[List, FindRoot]]
-fn replace_all(expr: &Expr, rules: &[(Expr, Expr)]) -> Result<Expr, String> {
+fn replace_all(expr: Expr, rules: &[(Expr, Expr)]) -> Result<Expr, String> {
     match expr {
         // for each sub-expression apply the replacement
         Expr::Expr(head, args) => {
-            let mut replaced = Vec::new();
-            // First execute replace_all on subexpressions
-            for r in args.into_iter().map(|a| replace_all(a, rules)) {
-                replaced.push(r?);
-            }
-            // Check replacing the while re-written expression
-            let mut replaced = Expr::Expr(head.clone(), replaced);
-            for (lhs, rhs) in rules {
-                if replaced == *lhs {
-                    replaced = rhs.clone();
-                }
-            }
-            // Match rules against head
-            match replaced {
+            // First execute replace_all on subexpressions.
+            let replaced_expr = Expr::Expr(
+                head,
+                args.into_iter()
+                    .map(|a| replace_all(a, rules))
+                    .collect::<Result<_, _>>()?,
+            );
+            // Check if update expression matches a replacement too.
+            let replaced_expr = rules
+                .iter()
+                .filter(|(lhs, _)| replaced_expr == *lhs)
+                .next()
+                .map(|(_, rhs)| rhs.clone())
+                .unwrap_or(replaced_expr);
+            // Check if a rule is a head re-write
+            Ok(match replaced_expr {
                 Expr::Expr(head, args) => {
                     for r in rules {
                         if let (Expr::Symbol(lhs), Expr::Symbol(rhs)) = r {
@@ -113,18 +107,16 @@ fn replace_all(expr: &Expr, rules: &[(Expr, Expr)]) -> Result<Expr, String> {
                             }
                         }
                     }
-                    Ok(Expr::Expr(head, args))
+                    Expr::Expr(head, args)
                 }
-                other => Ok(other),
-            }
+                expr => expr,
+            })
         }
-        atom => {
-            for (lhs, rhs) in rules {
-                if atom == lhs {
-                    return Ok(rhs.clone());
-                }
-            }
-            Ok(atom.clone()) // no replacement
-        }
+        atom => Ok(rules
+            .iter()
+            .filter(|(lhs, _)| atom == *lhs)
+            .next()
+            .map(|(_, rhs)| rhs.clone())
+            .unwrap_or(atom)),
     }
 }

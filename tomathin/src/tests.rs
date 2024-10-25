@@ -40,7 +40,7 @@ fn xx2() {
     let x = crate::parser::parser().unwrap();
     let out = convert(x(tok).unwrap().remove(0));
     println!("\n\n{:?}", out);
-    let out2 = crate::evaluate(&out);
+    let out2 = crate::evaluate(out);
     println!("\n\n{:?}", out2);
     assert_eq!(out2, Ok(crate::Expr::Number(4.0)));
 }
@@ -58,6 +58,6 @@ fn xx3() {
     let x = crate::parser::parser().unwrap();
     let out = convert(x(tok).unwrap().remove(0));
     println!("\n\n{:?}", out);
-    let out2 = crate::evaluate(&out);
+    let out2 = crate::evaluate(out);
     println!("\n\n{:?}", out2);
 }

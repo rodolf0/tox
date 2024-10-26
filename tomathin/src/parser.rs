@@ -1,5 +1,3 @@
-#![deny(warnings)]
-
 // https://reference.wolfram.com/language/tutorial/Expressions.html
 // https://reference.wolfram.com/language/tutorial/OperatorInputForms.html
 // https://reference.wolfram.com/language/tutorial/InputSyntax.html
@@ -26,6 +24,31 @@ pub enum T {
     Nop,
 }
 
+#[derive(PartialEq, Clone, Debug)]
+pub enum Expr {
+    Expr(String, Vec<Expr>),
+    Symbol(String),
+    Number(f64),
+    Bool(bool),
+    String(String),
+}
+
+fn convert(t: T) -> Expr {
+    match t {
+        T::Expr(h, args) => {
+            let mut cargs = Vec::new();
+            for a in args {
+                cargs.push(convert(a));
+            }
+            Expr::Expr(h, cargs)
+        }
+        T::Symbol(x) => Expr::Symbol(x),
+        T::String(s) => Expr::String(s),
+        T::Number(n) => Expr::Number(n),
+        other => panic!("Bug: convert failed on '{:?}'", other),
+    }
+}
+
 // use to destructure T enum into a specific alternative
 macro_rules! pull {
     ($p:path, $e:expr) => {
@@ -36,7 +59,7 @@ macro_rules! pull {
     };
 }
 
-pub fn parser<InputIter>() -> Result<impl Fn(InputIter) -> Result<Vec<T>, String>, String>
+pub fn parser<InputIter>() -> Result<impl Fn(InputIter) -> Result<Expr, String>, String>
 where
     InputIter: Iterator,
     InputIter::Item: AsRef<str> + std::fmt::Debug,
@@ -99,7 +122,11 @@ where
     evaler.action("arg -> number", |mut args| T::Arg(Box::new(args.remove(0))));
 
     let parser = earlgrey::EarleyParser::new(grammar);
-    Ok(move |input| evaler.eval_all(&parser.parse(input)?))
+    Ok(move |input| {
+        let mut trees = evaler.eval_all(&parser.parse(input)?)?;
+        assert_eq!(trees.len(), 1, "Bug: Ambiguous grammar.");
+        Ok(convert(trees.remove(0)))
+    })
 }
 
 #[cfg(test)]

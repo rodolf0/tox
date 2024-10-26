@@ -1,29 +1,10 @@
-use crate::Expr;
-
-fn convert(t: crate::parser::T) -> crate::Expr {
-    use crate::parser::T;
-    use crate::Expr;
-    match t {
-        T::Expr(h, args) => {
-            let mut cargs = Vec::new();
-            for a in args {
-                cargs.push(convert(a));
-            }
-            Expr::Expr(h, cargs)
-        }
-        T::Symbol(x) => Expr::Symbol(x),
-        T::String(s) => Expr::String(s),
-        T::Number(n) => Expr::Number(n),
-        other => panic!("convert failed on '{:?}'", other),
-    }
-}
+use crate::expr::evaluate;
+use crate::parser::Expr;
 
 fn parse_expr(input: &str) -> Expr {
     let parser = crate::parser::parser().unwrap();
     let tok = crate::tokenizer::Tokenizer::new(input.chars());
-    let mut parse_out = parser(tok).unwrap();
-    assert_eq!(parse_out.len(), 1);
-    convert(parse_out.remove(0))
+    parser(tok).unwrap()
 }
 
 #[test]
@@ -56,7 +37,7 @@ fn replace_all() -> Result<(), String> {
     // Test ReplaceAll with single simple Rule
     let rep_1rule = parse_expr(r#"ReplaceAll[Plus[x, Times[2, x]], Rule[x, 3]]"#);
     assert_eq!(
-        crate::evaluate(rep_1rule)?,
+        evaluate(rep_1rule)?,
         Expr::Expr(
             "Plus".to_string(),
             vec![
@@ -75,7 +56,7 @@ fn replace_all() -> Result<(), String> {
             List[Rule[Times[2, x], 3], Rule[Plus[x, 3], 4]]
         ]"#,
     );
-    assert_eq!(crate::evaluate(rep_rule_list)?, Expr::Number(4.0));
+    assert_eq!(evaluate(rep_rule_list)?, Expr::Number(4.0));
 
     // Test ReplaceAll with rule head replacement
     let rep_rule_head = parse_expr(
@@ -85,7 +66,7 @@ fn replace_all() -> Result<(), String> {
         ]"#,
     );
     assert_eq!(
-        crate::evaluate(rep_rule_head)?,
+        evaluate(rep_rule_head)?,
         Expr::Expr(
             "Times".to_string(),
             vec![Expr::Symbol("x".to_string()), Expr::Number(3.0),]

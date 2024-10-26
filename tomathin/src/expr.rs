@@ -1,11 +1,4 @@
-#[derive(PartialEq, Clone, Debug)]
-pub enum Expr {
-    Expr(String, Vec<Expr>),
-    Symbol(String),
-    Number(f64),
-    Bool(bool),
-    String(String),
-}
+use crate::parser::Expr;
 
 impl Expr {
     pub fn head(&self) -> &str {

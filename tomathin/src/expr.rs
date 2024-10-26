@@ -19,10 +19,6 @@ impl Expr {
     }
 }
 
-// Plus[a, Times[3, a, b]] a + 3 a b -> a (3 + b)
-// Plus[b, Times[3, b]] b + 3 b -> b (4)
-// Plus[b, Times[3, Plus[b, a]]] ... should expand, or factorize ?
-
 pub fn evaluate(expr: Expr) -> Result<Expr, String> {
     match expr {
         Expr::Expr(head, args) => match head.as_ref() {

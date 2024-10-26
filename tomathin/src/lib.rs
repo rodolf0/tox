@@ -1,7 +1,8 @@
+mod tokenizer;
+
 mod expr;
 pub use expr::{evaluate, Expr};
 mod parser;
-mod tokenizer;
 pub use parser::parser;
 
 mod findroot;

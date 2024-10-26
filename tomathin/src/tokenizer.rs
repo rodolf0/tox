@@ -17,7 +17,7 @@ impl<I: Iterator<Item = char>> Tokenizer<I> {
         }
         match self.input.next() {
             // Various single char tokens.
-            Some(x) if "[]{}(),".contains(x) => Ok(Some(x.to_string())),
+            Some(x) if "[]{}(),+-*/^!".contains(x) => Ok(Some(x.to_string())),
             // Assignment operator.
             Some(':') => match self.input.next() {
                 Some('=') => Ok(Some(":=".to_string())),
@@ -156,5 +156,82 @@ mod tests {
         for (idx, token) in Tokenizer::new(input.chars()).enumerate() {
             assert_eq!(token, expected[idx]);
         }
+    }
+
+    #[test]
+    fn parse_combinations() {
+        let surrounds = vec![("[", "]"), ("{", "}"), ("(", ")"), ("", "")];
+        let infix_ops = vec![",", ":=", "+", "-", "*", "/", "^", " "];
+        let postfix_ops = vec!["!", ""];
+        let prefix_ops = vec!["-", "!", ""];
+        let tokens = vec!["1", "0.23", "0.23e+4", "'str1'", "Symbol2", ""];
+        let heads = vec!["", "Sum"];
+
+        // "# comment\n",
+        let mut combos = 0;
+        for head in &heads {
+            for (open, close) in &surrounds {
+                for pfx1 in &prefix_ops {
+                    for pfx2 in &prefix_ops {
+                        for pfx3 in &prefix_ops {
+                            for post1 in &postfix_ops {
+                                for post2 in &postfix_ops {
+                                    for post3 in &postfix_ops {
+                                        for op in &infix_ops {
+                                            for token_pairs in tokens.windows(2) {
+                                                if let &[lhs, rhs] = token_pairs {
+                                                    if *open == "" && *pfx2 == "" {
+                                                        continue;
+                                                    }
+                                                    let expr = format!(
+                                                        "{}{}{}{}{}{}{}{}{}{}{}{}",
+                                                        pfx1,
+                                                        head,
+                                                        open,
+                                                        pfx2,
+                                                        lhs,
+                                                        post1,
+                                                        op,
+                                                        pfx3,
+                                                        rhs,
+                                                        post2,
+                                                        close,
+                                                        post3
+                                                    );
+                                                    let mut expect = vec![pfx1, head, open, pfx2];
+                                                    if lhs == "'str1'" {
+                                                        expect.extend([&"'", &"str1", &"'"]);
+                                                    } else {
+                                                        expect.push(&lhs);
+                                                    }
+                                                    expect.extend([post1, op, pfx3]);
+                                                    if rhs == "'str1'" {
+                                                        expect.extend([&"'", &"str1", &"'"]);
+                                                    } else {
+                                                        expect.push(&rhs);
+                                                    }
+                                                    expect.extend([post2, close, post3]);
+                                                    let expect: Vec<_> = expect
+                                                        .into_iter()
+                                                        .filter(|s| !s.trim().is_empty())
+                                                        .map(|s| s.to_string())
+                                                        .collect();
+
+                                                    let tokenized: Vec<_> =
+                                                        Tokenizer::new(expr.chars()).collect();
+                                                    assert_eq!(tokenized, expect);
+                                                    combos += 1;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        println!("Combos: {}", combos);
     }
 }

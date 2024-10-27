@@ -7,7 +7,7 @@ fn grammar_str() -> &'static str {
     # full form grammar
     expr      := head '[' arglist ']' ;
     arglist   := arglist ',' arg | arg ;
-    bracketed := '(' arglist ')' | '{' arglist '}' | '[' arglist ']' ;
+    bracketed := '(' arglist ')' | '{' arglist '}' ;
     arg       := expr | bracketed | '"' string '"' | symbol | number ;
     "#
 }
@@ -16,6 +16,7 @@ fn grammar_str() -> &'static str {
 pub enum T {
     Expr(String, Vec<T>),
     Head(String),
+    List(Vec<T>),
     Arglist(Vec<T>),
     Arg(Box<T>),
     Number(f64),
@@ -35,13 +36,11 @@ pub enum Expr {
 
 fn convert(t: T) -> Expr {
     match t {
-        T::Expr(h, args) => {
-            let mut cargs = Vec::new();
-            for a in args {
-                cargs.push(convert(a));
-            }
-            Expr::Expr(h, cargs)
-        }
+        T::Expr(h, args) => Expr::Expr(h, args.into_iter().map(|a| convert(a)).collect()),
+        T::List(l) => Expr::Expr(
+            "List".to_string(),
+            l.into_iter().map(|i| convert(i)).collect(),
+        ),
         T::Symbol(x) => Expr::Symbol(x),
         T::String(s) => Expr::String(s),
         T::Number(n) => Expr::Number(n),
@@ -94,38 +93,45 @@ where
         _ => T::Nop,
     });
     evaler.action("expr -> head [ arglist ]", |mut args| {
-        let arglist = pull!(T::Arglist, args.remove(2));
-        let head = pull!(T::Head, args.remove(0));
+        let arglist = pull!(T::Arglist, args.swap_remove(2));
+        let head = pull!(T::Head, args.swap_remove(0));
         T::Expr(head, arglist)
     });
     evaler.action("arglist -> arglist , arg", |mut args| {
-        let arg = pull!(T::Arg, args.remove(2));
-        let mut arglist = pull!(T::Arglist, args.remove(0));
+        let arg = pull!(T::Arg, args.swap_remove(2));
+        let mut arglist = pull!(T::Arglist, args.swap_remove(0));
         arglist.push(*arg);
         T::Arglist(arglist)
     });
     evaler.action("arglist -> arg", |mut args| {
-        let arg = pull!(T::Arg, args.remove(0));
+        let arg = pull!(T::Arg, args.swap_remove(0));
         T::Arglist(vec![*arg])
     });
-    evaler.action("bracketed -> ( arglist )", |mut args| args.remove(1));
-    evaler.action("bracketed -> { arglist }", |mut args| args.remove(1));
-    evaler.action("bracketed -> [ arglist ]", |mut args| args.remove(1));
-    evaler.action("arg -> expr", |mut args| T::Arg(Box::new(args.remove(0))));
+    evaler.action("bracketed -> ( arglist )", |mut args| args.swap_remove(1));
+    evaler.action("bracketed -> { arglist }", |mut args| {
+        T::List(pull!(T::Arglist, args.swap_remove(1)))
+    });
+    evaler.action("arg -> expr", |mut args| {
+        T::Arg(Box::new(args.swap_remove(0)))
+    });
     evaler.action("arg -> bracketed", |mut args| {
-        T::Arg(Box::new(args.remove(0)))
+        T::Arg(Box::new(args.swap_remove(0)))
     });
     evaler.action("arg -> \" string \"", |mut args| {
-        T::Arg(Box::new(args.remove(1)))
+        T::Arg(Box::new(args.swap_remove(1)))
     });
-    evaler.action("arg -> symbol", |mut args| T::Arg(Box::new(args.remove(0))));
-    evaler.action("arg -> number", |mut args| T::Arg(Box::new(args.remove(0))));
+    evaler.action("arg -> symbol", |mut args| {
+        T::Arg(Box::new(args.swap_remove(0)))
+    });
+    evaler.action("arg -> number", |mut args| {
+        T::Arg(Box::new(args.swap_remove(0)))
+    });
 
     let parser = earlgrey::EarleyParser::new(grammar);
     Ok(move |input| {
         let mut trees = evaler.eval_all(&parser.parse(input)?)?;
         assert_eq!(trees.len(), 1, "Bug: Ambiguous grammar.");
-        Ok(convert(trees.remove(0)))
+        Ok(convert(trees.swap_remove(0)))
     })
 }
 
@@ -133,17 +139,25 @@ where
 mod tests {
     use super::*;
     #[test]
-    fn test_x() {
-        // let input = [
-        //     "FindRoot", "[", "75", "/", "(", "r", "+", "1", ")", "+", "75", "/", "(", "r", "+",
-        //     "1", ")", "^", "2", "==", "0", ",", "{", "r", "=", "2", "}", "]",
-        // ];
-        // FindRooot[Sum[Divide[75, Sum[Var[r], 1]], Divide[75, Pow[Sum[Var[r], 1], 2]]]]
-        let input = [
-            "FindRoot", "[", "75", "/", "(", "r", "+", "1", ")", "+", "75", "/", "(", "r", "+",
-            "1", ")", "^", "2", "]",
+    fn parse_basic_input() -> Result<(), String> {
+        let parser = parser()?;
+        let tokenized_input = [
+            "FindRoot", "[", "Plus", "[", "x", ",", "2", "]", ",", "{", "x", ",", "2", "}", "]",
         ];
-        let p = parser().unwrap();
-        println!("{:?}", p(input.into_iter()).unwrap());
+        let expected = Expr::Expr(
+            "FindRoot".to_string(),
+            vec![
+                Expr::Expr(
+                    "Plus".to_string(),
+                    vec![Expr::Symbol("x".to_string()), Expr::Number(2.0)],
+                ),
+                Expr::Expr(
+                    "List".to_string(),
+                    vec![Expr::Symbol("x".to_string()), Expr::Number(2.0)],
+                ),
+            ],
+        );
+        assert_eq!(parser(tokenized_input.into_iter())?, expected);
+        Ok(())
     }
 }

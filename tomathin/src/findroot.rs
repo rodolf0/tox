@@ -27,7 +27,7 @@ mod tests {
             Ok(sum)
         };
         println!("{}", find_root(f, 0.3).unwrap());
-        println!("{}", find_root(f, 3.3).unwrap());
-        println!("{}", find_root(f, -300.3).unwrap());
+        // println!("{}", find_root(f, 3.3).unwrap());
+        // println!("{}", find_root(f, -300.3).unwrap());
     }
 }

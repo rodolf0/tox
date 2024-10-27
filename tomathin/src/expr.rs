@@ -1,17 +1,5 @@
 use crate::parser::Expr;
 
-impl Expr {
-    pub fn head(&self) -> &str {
-        match self {
-            Expr::Expr(head, _) => head,
-            Expr::Symbol(_) => "Symbol",
-            Expr::Number(_) => "Number",
-            Expr::Bool(_) => "Bool",
-            Expr::String(_) => "String",
-        }
-    }
-}
-
 pub fn evaluate(expr: Expr) -> Result<Expr, String> {
     match expr {
         Expr::Expr(head, args) => match head.as_ref() {

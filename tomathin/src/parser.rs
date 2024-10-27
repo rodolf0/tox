@@ -2,6 +2,8 @@
 // https://reference.wolfram.com/language/tutorial/OperatorInputForms.html
 // https://reference.wolfram.com/language/tutorial/InputSyntax.html
 
+use crate::tokenizer;
+
 fn grammar_str() -> &'static str {
     r#"
     # full form grammar
@@ -58,11 +60,7 @@ macro_rules! pull {
     };
 }
 
-pub fn parser<InputIter>() -> Result<impl Fn(InputIter) -> Result<Expr, String>, String>
-where
-    InputIter: Iterator,
-    InputIter::Item: AsRef<str> + std::fmt::Debug,
-{
+pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
     let grammar = earlgrey::EbnfGrammarParser::new(grammar_str(), "expr")
         .plug_terminal("head", |h| {
             [
@@ -128,36 +126,10 @@ where
     });
 
     let parser = earlgrey::EarleyParser::new(grammar);
-    Ok(move |input| {
-        let mut trees = evaler.eval_all(&parser.parse(input)?)?;
+    Ok(move |input: &str| {
+        let tokenizer = tokenizer::Tokenizer::new(input.chars());
+        let mut trees = evaler.eval_all(&parser.parse(tokenizer)?)?;
         assert_eq!(trees.len(), 1, "Bug: Ambiguous grammar.");
         Ok(convert(trees.swap_remove(0)))
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn parse_basic_input() -> Result<(), String> {
-        let parser = parser()?;
-        let tokenized_input = [
-            "FindRoot", "[", "Plus", "[", "x", ",", "2", "]", ",", "{", "x", ",", "2", "}", "]",
-        ];
-        let expected = Expr::Expr(
-            "FindRoot".to_string(),
-            vec![
-                Expr::Expr(
-                    "Plus".to_string(),
-                    vec![Expr::Symbol("x".to_string()), Expr::Number(2.0)],
-                ),
-                Expr::Expr(
-                    "List".to_string(),
-                    vec![Expr::Symbol("x".to_string()), Expr::Number(2.0)],
-                ),
-            ],
-        );
-        assert_eq!(parser(tokenized_input.into_iter())?, expected);
-        Ok(())
-    }
 }

@@ -1,15 +1,9 @@
 use crate::expr::evaluate;
-use crate::parser::Expr;
-
-fn parse_expr(input: &str) -> Expr {
-    let parser = crate::parser::parser().unwrap();
-    let tok = crate::tokenizer::Tokenizer::new(input.chars());
-    parser(tok).unwrap()
-}
+use crate::parser::{parser, Expr};
 
 #[test]
-fn basic_expr_parsing() {
-    let parsed = parse_expr(r#"FindRoot[Sum[360, Sum[a, b]], List["1, 2, 3"]]"#);
+fn parse_basic_expr() -> Result<(), String> {
+    let input = r#"FindRoot[Sum[360, Sum[a, b]], List["1, 2, 3"], {x, 2}]"#;
     let expected = Expr::Expr(
         "FindRoot".to_string(),
         vec![
@@ -27,15 +21,21 @@ fn basic_expr_parsing() {
                 "List".to_string(),
                 vec![Expr::String("1, 2, 3".to_string())],
             ),
+            Expr::Expr(
+                "List".to_string(),
+                vec![Expr::Symbol("x".to_string()), Expr::Number(2.0)],
+            ),
         ],
     );
-    assert_eq!(parsed, expected);
+    assert_eq!(parser()?(input)?, expected);
+    Ok(())
 }
 
 #[test]
 fn replace_all() -> Result<(), String> {
+    let p = parser()?;
     // Test ReplaceAll with single simple Rule
-    let rep_1rule = parse_expr(r#"ReplaceAll[Plus[x, Times[2, x]], Rule[x, 3]]"#);
+    let rep_1rule = p(r#"ReplaceAll[Plus[x, Times[2, x]], Rule[x, 3]]"#)?;
     assert_eq!(
         evaluate(rep_1rule)?,
         Expr::Expr(
@@ -50,21 +50,17 @@ fn replace_all() -> Result<(), String> {
         )
     );
     // Test ReplaceAll with a List[Rule]
-    let rep_rule_list = parse_expr(
-        r#"ReplaceAll[
+    let rep_rule_list = p(r#"ReplaceAll[
             Plus[x, Times[2, x]],
             List[Rule[Times[2, x], 3], Rule[Plus[x, 3], 4]]
-        ]"#,
-    );
+        ]"#)?;
     assert_eq!(evaluate(rep_rule_list)?, Expr::Number(4.0));
 
     // Test ReplaceAll with rule head replacement
-    let rep_rule_head = parse_expr(
-        r#"ReplaceAll[
+    let rep_rule_head = p(r#"ReplaceAll[
             Plus[x, Times[2, x]],
             List[Rule[Times[2, x], 3], Rule[Plus, Times]]
-        ]"#,
-    );
+        ]"#)?;
     assert_eq!(
         evaluate(rep_rule_head)?,
         Expr::Expr(
@@ -72,6 +68,5 @@ fn replace_all() -> Result<(), String> {
             vec![Expr::Symbol("x".to_string()), Expr::Number(3.0),]
         )
     );
-
     Ok(())
 }

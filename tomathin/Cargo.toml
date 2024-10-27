@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 earlgrey = { version = "0.4", path = "../earlgrey" }
+rustyline = { version = "14.0.0" }

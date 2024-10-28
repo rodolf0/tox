@@ -22,6 +22,52 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                     .map_err(|e| format!("ReplaceAll must have 2 arguments. {:?}", e))?;
                 replace_all(expr, eval_rules(rules)?.as_slice())
             }
+            "Plus" => {
+                let mut numeric: f64 = 0.0;
+                let mut others = Vec::new();
+                for a in args {
+                    match a {
+                        Expr::Number(n) => numeric += n,
+                        other => {
+                            let maybe_n = evaluate(other)?;
+                            if let Expr::Number(n) = maybe_n {
+                                numeric += n;
+                            } else {
+                                others.push(maybe_n);
+                            }
+                        }
+                    }
+                }
+                others.push(Expr::Number(numeric));
+                if others.len() == 1 {
+                    Ok(others.swap_remove(0))
+                } else {
+                    Ok(Expr::Expr(head, others))
+                }
+            }
+            "Times" => {
+                let mut numeric: f64 = 1.0;
+                let mut others = Vec::new();
+                for a in args {
+                    match a {
+                        Expr::Number(n) => numeric *= n,
+                        other => {
+                            let maybe_n = evaluate(other)?;
+                            if let Expr::Number(n) = maybe_n {
+                                numeric *= n;
+                            } else {
+                                others.push(maybe_n);
+                            }
+                        }
+                    }
+                }
+                others.push(Expr::Number(numeric));
+                if others.len() == 1 {
+                    Ok(others.swap_remove(0))
+                } else {
+                    Ok(Expr::Expr(head, others))
+                }
+            }
             other => panic!("{} head not implemented", other),
         },
         // Nothing specific on atomic expressions

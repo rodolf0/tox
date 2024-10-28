@@ -2,28 +2,34 @@
 // https://reference.wolfram.com/language/tutorial/OperatorInputForms.html
 // https://reference.wolfram.com/language/tutorial/InputSyntax.html
 
-use crate::tokenizer;
-
 fn grammar_str() -> &'static str {
     r#"
-    # full form grammar
-    expr      := head '[' arglist ']' ;
-    arglist   := arglist ',' arg | arg ;
-    bracketed := '(' arglist ')' | '{' arglist '}' ;
-    arg       := expr | bracketed | '"' string '"' | symbol | number ;
+    atom := '"' string '"'
+         | symbol
+         | number
+         | '(' arglist ')'
+         ;
+
+    arglist := arglist ',' atom | atom ;
+
+    expr := head '[' arglist ']'
+         | '{' arglist '}'
+         ;
+
+    expr := expr ('+'|'-') @opsum arith_sum | arith_sum ;
+    arith_sum := arith_sum ('*'|'/'|'%') @opmul arith_mul | arith_mul ;
+    arith_mul := '-' arith_mul | arith_pow '^' arith_mul | arith_pow ;
+    arith_pow := atom | arith_pow '!' ;
     "#
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum T {
     Expr(String, Vec<T>),
-    Head(String),
-    List(Vec<T>),
     Arglist(Vec<T>),
-    Arg(Box<T>),
-    Number(f64),
-    Symbol(String),
     String(String),
+    Symbol(String),
+    Number(f64),
     Nop,
 }
 
@@ -39,10 +45,6 @@ pub enum Expr {
 fn convert(t: T) -> Expr {
     match t {
         T::Expr(h, args) => Expr::Expr(h, args.into_iter().map(|a| convert(a)).collect()),
-        T::List(l) => Expr::Expr(
-            "List".to_string(),
-            l.into_iter().map(|i| convert(i)).collect(),
-        ),
         T::Symbol(x) => Expr::Symbol(x),
         T::String(s) => Expr::String(s),
         T::Number(n) => Expr::Number(n),
@@ -84,52 +86,103 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         .plug_terminal("number", |n| n.parse::<f64>().is_ok())
         .into_grammar()?;
     let mut evaler = earlgrey::EarleyForest::new(|terminal, lexeme| match terminal {
-        "head" => T::Head(lexeme.to_string()),
+        "head" => T::Symbol(lexeme.to_string()),
         "symbol" => T::Symbol(lexeme.to_string()),
         "number" => T::Number(lexeme.parse::<f64>().unwrap()),
         "string" => T::String(lexeme.to_string()),
+        "^" => T::Symbol("^".to_string()), // TODO
+        "!" => T::Symbol("!".to_string()), // TODO
+        "%" => T::Symbol("%".to_string()), // TODO
         _ => T::Nop,
     });
-    evaler.action("expr -> head [ arglist ]", |mut args| {
-        let arglist = pull!(T::Arglist, args.swap_remove(2));
-        let head = pull!(T::Head, args.swap_remove(0));
-        T::Expr(head, arglist)
+
+    evaler.action("atom -> \" string \"", |mut args| {
+        assert!(matches!(args[1], T::String(_)));
+        args.swap_remove(1)
     });
-    evaler.action("arglist -> arglist , arg", |mut args| {
-        let arg = pull!(T::Arg, args.swap_remove(2));
+    evaler.action("atom -> symbol", |mut args| {
+        assert!(matches!(args[0], T::Symbol(_)));
+        args.swap_remove(0)
+    });
+    evaler.action("atom -> number", |mut args| {
+        assert!(matches!(args[0], T::Number(_)));
+        args.swap_remove(0)
+    });
+    evaler.action("atom -> ( arglist )", |mut args| {
+        assert!(matches!(args[1], T::Arglist(_)));
+        args.swap_remove(1)
+    });
+
+    evaler.action("arglist -> atom", |mut args| {
+        // Don't check type could be any
+        T::Arglist(vec![args.swap_remove(0)])
+    });
+    evaler.action("arglist -> arglist , atom", |mut args| {
+        let expr = args.swap_remove(2); // Don't check type could be any
         let mut arglist = pull!(T::Arglist, args.swap_remove(0));
-        arglist.push(*arg);
+        arglist.push(expr);
         T::Arglist(arglist)
     });
-    evaler.action("arglist -> arg", |mut args| {
-        let arg = pull!(T::Arg, args.swap_remove(0));
-        T::Arglist(vec![*arg])
+
+    evaler.action("expr -> head [ arglist ]", |mut args| {
+        let arglist = pull!(T::Arglist, args.swap_remove(2));
+        let head = pull!(T::Symbol, args.swap_remove(0));
+        T::Expr(head, arglist)
     });
-    evaler.action("bracketed -> ( arglist )", |mut args| args.swap_remove(1));
-    evaler.action("bracketed -> { arglist }", |mut args| {
-        T::List(pull!(T::Arglist, args.swap_remove(1)))
+    evaler.action("expr -> { arglist }", |mut args| {
+        let arglist = pull!(T::Arglist, args.swap_remove(1));
+        T::Expr("List".to_string(), arglist)
     });
-    evaler.action("arg -> expr", |mut args| {
-        T::Arg(Box::new(args.swap_remove(0)))
-    });
-    evaler.action("arg -> bracketed", |mut args| {
-        T::Arg(Box::new(args.swap_remove(0)))
-    });
-    evaler.action("arg -> \" string \"", |mut args| {
-        T::Arg(Box::new(args.swap_remove(1)))
-    });
-    evaler.action("arg -> symbol", |mut args| {
-        T::Arg(Box::new(args.swap_remove(0)))
-    });
-    evaler.action("arg -> number", |mut args| {
-        T::Arg(Box::new(args.swap_remove(0)))
-    });
+
+    fn math_bin_op(reduce: bool) -> impl Fn(Vec<T>) -> T {
+        move |mut args: Vec<T>| {
+            let rhs = args.swap_remove(2);
+            let op = pull!(T::Symbol, args.swap_remove(1));
+            let lhs = args.swap_remove(0);
+
+            let mut new_args = Vec::new();
+            match lhs {
+                T::Expr(h, a) if h == op && reduce => new_args.extend(a),
+                other => new_args.push(other),
+            }
+            match rhs {
+                T::Expr(h, a) if h == op && reduce => new_args.extend(a),
+                other => new_args.push(other),
+            }
+            T::Expr(op, new_args)
+        }
+    }
+
+    evaler.action("expr -> expr @opsum arith_sum", math_bin_op(true));
+    evaler.action("expr -> arith_sum", |mut args| args.swap_remove(0));
+
+    evaler.action("arith_sum -> arith_sum @opmul arith_mul", math_bin_op(true));
+    evaler.action("arith_sum -> arith_mul", |mut args| args.swap_remove(0));
+
+    evaler.action("arith_mul -> - arith_mul", |_| todo!());
+    evaler.action("arith_mul -> arith_pow ^ arith_mul", math_bin_op(false));
+    evaler.action("arith_mul -> arith_pow", |mut args| args.swap_remove(0));
+
+    evaler.action("arith_pow -> arith_pow !", |mut args| todo!());
+    evaler.action("arith_pow -> atom", |mut args| args.swap_remove(0));
+
+    // TODO: collaps all these names to @binop ?
+    evaler.action("@opsum -> +", |_| T::Symbol("Plus".to_string()));
+    evaler.action("@opsum -> -", |_| T::Symbol("Minus".to_string()));
+    evaler.action("@opmul -> *", |_| T::Symbol("Times".to_string()));
+    evaler.action("@opmul -> /", |_| T::Symbol("Divide".to_string()));
+    evaler.action("@opmul -> %", |_| T::Symbol("Mod".to_string()));
 
     let parser = earlgrey::EarleyParser::new(grammar);
     Ok(move |input: &str| {
-        let tokenizer = tokenizer::Tokenizer::new(input.chars());
+        let tokenizer = crate::tokenizer::Tokenizer::new(input.chars());
         let mut trees = evaler.eval_all(&parser.parse(tokenizer)?)?;
-        assert_eq!(trees.len(), 1, "Bug: Ambiguous grammar.");
+        if trees.len() > 1 && !trees.windows(2).all(|w| w[0] == w[1]) {
+            for t in &trees {
+                eprintln!("{:?}", t);
+            }
+            panic!("Bug: Amaiguous grammar ^^");
+        }
         Ok(convert(trees.swap_remove(0)))
     })
 }

@@ -70,3 +70,27 @@ fn replace_all() -> Result<(), String> {
     );
     Ok(())
 }
+
+#[test]
+fn arith_ops() -> Result<(), String> {
+    let p = parser()?;
+
+    let plus1 = p(r#"1 + 2"#)?;
+    assert_eq!(evaluate(plus1)?, Expr::Number(3.0));
+
+    let plus2 = p(r#"1 + 2 - 3"#)?;
+    eprintln!("{:?}", plus2);
+
+    let plus3 = p(r#"1 - 2 + 3"#)?;
+    eprintln!("{:?}", plus3);
+
+    let times1 = p(r#"1 + 2 * 3"#)?;
+    eprintln!("{:?}", times1);
+    assert_eq!(evaluate(times1)?, Expr::Number(7.0));
+
+    eprintln!("\n");
+    eprintln!("pow {:?}", p(r#"1 ^ 2 ^ 3"#)?);
+    eprintln!("sum {:?}", p(r#"1 + 2 + 3"#)?);
+
+    Ok(())
+}

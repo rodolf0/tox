@@ -232,6 +232,6 @@ mod tests {
                 }
             }
         }
-        eprintln!("Combos: {}", combos);
+        println!("Combos: {}", combos);
     }
 }

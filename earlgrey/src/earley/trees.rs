@@ -76,7 +76,8 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
            .swap_remove(0))
     }
 
-    fn walker_all(&self, root: &Rc<Span>) -> Result<Vec<Vec<ASTNode>>, String> {
+    fn walker_all(&self, root: &Rc<Span>, level: u16) -> Result<Vec<Vec<ASTNode>>, String> {
+        assert!(level < 100, "Bottomless grammar, stack blew up");
         let source = root.sources();
         if source.len() == 0 {
             return Ok(vec![self.reduce(root, Vec::new())?]);
@@ -86,9 +87,9 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
             match backpointer {
                 SpanSource::Completion(source, trigger) => {
                     // collect left-side-tree of each node
-                    for args in self.walker_all(source)? {
+                    for args in self.walker_all(source, level + 1)? {
                         // collect right-side-tree of each node
-                        for trig in self.walker_all(trigger)? {
+                        for trig in self.walker_all(trigger, level + 1)? {
                             let mut args = args.clone();
                             args.extend(trig);
                             trees.push(self.reduce(root, args)?);
@@ -96,7 +97,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
                     }
                 }
                 SpanSource::Scan(source, trigger) => {
-                    for mut args in self.walker_all(source)? {
+                    for mut args in self.walker_all(source, level + 1)? {
                         let symbol = source.next_symbol()
                             .expect("BUG: missing scan trigger symbol").name();
                         args.push((self.terminal_parser)(symbol, trigger));
@@ -113,7 +114,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
         let mut trees = Vec::new();
         for root in &ptrees.0 {
             trees.extend(
-                self.walker_all(root)?.into_iter()
+                self.walker_all(root, 0)?.into_iter()
                     .map(|mut treevec| treevec.swap_remove(0)));
         }
         Ok(trees)

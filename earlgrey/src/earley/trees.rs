@@ -76,7 +76,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
            .swap_remove(0))
     }
 
-    fn walker_all(&self, root: &Rc<Span>, level: u16) -> Result<Vec<Vec<ASTNode>>, String> {
+    fn walker_all(&self, root: &Rc<Span>, level: u16, mut explored: Vec<SpanSource>) -> Result<Vec<Vec<ASTNode>>, String> {
         assert!(level < 100, "Bottomless grammar, stack blew up");
         let source = root.sources();
         if source.len() == 0 {
@@ -84,12 +84,17 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
         }
         let mut trees = Vec::new();
         for backpointer in source.iter() {
+            // Track backpointers we've already explored to avoid looping
+            if explored.iter().find(|i| *i == backpointer).is_some() {
+                continue;
+            }
+            explored.push(backpointer.clone());
             match backpointer {
                 SpanSource::Completion(source, trigger) => {
                     // collect left-side-tree of each node
-                    for args in self.walker_all(source, level + 1)? {
+                    for args in self.walker_all(source, level + 1, explored.clone())? {
                         // collect right-side-tree of each node
-                        for trig in self.walker_all(trigger, level + 1)? {
+                        for trig in self.walker_all(trigger, level + 1, explored.clone())? {
                             let mut args = args.clone();
                             args.extend(trig);
                             trees.push(self.reduce(root, args)?);
@@ -97,7 +102,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
                     }
                 }
                 SpanSource::Scan(source, trigger) => {
-                    for mut args in self.walker_all(source, level + 1)? {
+                    for mut args in self.walker_all(source, level + 1, explored.clone())? {
                         let symbol = source.next_symbol()
                             .expect("BUG: missing scan trigger symbol").name();
                         args.push((self.terminal_parser)(symbol, trigger));
@@ -114,7 +119,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
         let mut trees = Vec::new();
         for root in &ptrees.0 {
             trees.extend(
-                self.walker_all(root, 0)?.into_iter()
+                self.walker_all(root, 0, Vec::new())?.into_iter()
                     .map(|mut treevec| treevec.swap_remove(0)));
         }
         Ok(trees)

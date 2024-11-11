@@ -208,10 +208,7 @@ fn earley_corner_case() {
 }
 
 #[test]
-#[should_panic]
 fn earley_bottomless() {
-    // You can extract some tree from a Circular grammars that has
-    // an escape, but there are infinitely many trees. So this fails.
     // E -> A ; A -> E | n
     let grammar = GrammarBuilder::default()
         .nonterm("E")
@@ -224,8 +221,13 @@ fn earley_bottomless() {
         .expect("Bad grammar");
     let p = EarleyParser::new(grammar.clone());
     let pout = p.parse("n".split_whitespace()).unwrap();
+
+    let expected_trees = vec![
+        r#"Node("E -> A", [Node("A -> n", [Leaf("n", "n")])])"#,
+    ];
     let evaler = tree_evaler(grammar);
-    evaler.eval_all_recursive(&pout).unwrap();
+    check_trees(&evaler.eval_all_recursive(&pout).unwrap(), expected_trees.clone());
+    // TODO: check_trees(&evaler.eval_all(&pout).unwrap(), expected_trees.clone());
 }
 
 #[test]

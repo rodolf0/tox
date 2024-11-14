@@ -1,0 +1,15 @@
+[workspace]
+
+members = [
+    "earlgrey",
+    "fluxcap",
+    "kronos",
+    "lexers",
+    "lisp",
+    "lox",
+    "shunting",
+    "tomathin",
+    "unidades",
+]
+
+resolver = "2"

@@ -45,6 +45,27 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                     Ok(Expr::Expr(head, others))
                 }
             }
+            "Minus" | "Power" => {
+                let [lhs_expr, rhs_expr]: [Expr; 2] = args
+                    .try_into()
+                    .map_err(|e| format!("{} expects 2 arguments {:?}", head, e))?;
+                let lhs = match lhs_expr {
+                    Expr::Number(_) => lhs_expr,
+                    other => evaluate(other)?,
+                };
+                let rhs = match rhs_expr {
+                    Expr::Number(_) => rhs_expr,
+                    other => evaluate(other)?,
+                };
+                Ok(match (lhs, rhs) {
+                    (Expr::Number(lhs), Expr::Number(rhs)) => match head.as_ref() {
+                        "Minus" => Expr::Number(lhs - rhs),
+                        "Power" => Expr::Number(lhs.powf(rhs)),
+                        _ => panic!("BUG: {} op not implemented", head),
+                    },
+                    (lhs, rhs) => Expr::Expr(head, vec![lhs, rhs]),
+                })
+            }
             "Times" => {
                 let mut numeric: f64 = 1.0;
                 let mut others = Vec::new();

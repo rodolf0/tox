@@ -21,6 +21,7 @@ fn main() -> Result<(), String> {
             Ok(line) => match parser(line.as_str()) {
                 Err(e) => println!("Parse err: {:?}", e),
                 Ok(expr) => {
+                    let expr = tomathin::evaluate(expr)?;
                     let _ = rl.add_history_entry(&line);
                     println!("{:?}", expr);
                 }

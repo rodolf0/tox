@@ -80,5 +80,6 @@ fn arith_ops() -> Result<(), String> {
     assert_eq!(evaluate(p(r#"1 + 2 * 3"#)?)?, Expr::Number(7.0));
     assert_eq!(evaluate(p(r#"2 ^ 2 ^ 3"#)?)?, Expr::Number(256.0));
     assert_eq!(evaluate(p(r#"1 + 2 ^ 3"#)?)?, Expr::Number(9.0));
+    assert_eq!(evaluate(p(r#"3 / 2 / 4"#)?)?, Expr::Number(0.375));
     Ok(())
 }

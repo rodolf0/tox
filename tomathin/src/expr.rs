@@ -1,8 +1,9 @@
+use crate::findroot;
 use crate::parser::Expr;
 
 pub fn evaluate(expr: Expr) -> Result<Expr, String> {
     match expr {
-        Expr::Expr(head, args) => match head.as_ref() {
+        Expr::Expr(head, mut args) => match head.as_ref() {
             "List" => {
                 let evaled_args = args
                     .into_iter()
@@ -45,7 +46,7 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                     Ok(Expr::Expr(head, others))
                 }
             }
-            "Minus" | "Power" => {
+            "Minus" | "Power" | "Divide" => {
                 let [lhs_expr, rhs_expr]: [Expr; 2] = args
                     .try_into()
                     .map_err(|e| format!("{} expects 2 arguments {:?}", head, e))?;
@@ -61,6 +62,7 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                     (Expr::Number(lhs), Expr::Number(rhs)) => match head.as_ref() {
                         "Minus" => Expr::Number(lhs - rhs),
                         "Power" => Expr::Number(lhs.powf(rhs)),
+                        "Divide" => Expr::Number(lhs / rhs),
                         _ => panic!("BUG: {} op not implemented", head),
                     },
                     (lhs, rhs) => Expr::Expr(head, vec![lhs, rhs]),
@@ -88,6 +90,24 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                 } else {
                     Ok(Expr::Expr(head, others))
                 }
+            }
+            "FindRoot" => {
+                let Expr::Number(x0) = evaluate(args.swap_remove(1))? else {
+                    return Err("FindRoot requires x0 to be a number".to_string());
+                };
+                let fexpr = evaluate(args.swap_remove(0))?;
+                let f = |x: f64| match evaluate(replace_all(
+                    fexpr.clone(),
+                    &[(Expr::Symbol("x".to_string()), Expr::Number(x))],
+                )?)? {
+                    Expr::Number(x1) => Ok(x1),
+                    other => Err(format!(
+                        "FindRoot expr evaluation didn't return Number: {:?}",
+                        other
+                    )),
+                };
+                let root = findroot::find_root(f, x0)?;
+                Ok(Expr::Number(root))
             }
             other => panic!("{} head not implemented", other),
         },

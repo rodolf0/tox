@@ -70,11 +70,13 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
                 "List",
                 "Plus",
                 "Minus",
+                "Times",
+                "Divide",
+                "Power",
                 "ReplaceAll",
                 "Rule",
                 "Set",
                 "Sum",
-                "Times",
             ]
             .contains(&h)
         })
@@ -93,7 +95,6 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         "string" => T::String(lexeme.to_string()),
         "^" => T::Symbol("Power".to_string()),
         "!" => T::Symbol("!".to_string()), // TODO
-        "%" => T::Symbol("%".to_string()), // TODO
         _ => T::Nop,
     });
 
@@ -114,10 +115,7 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         );
         args.swap_remove(0)
     });
-    evaler.action("expr -> arith", |mut args| {
-        // TODO: assert
-        args.swap_remove(0)
-    });
+    evaler.action("expr -> arith", |mut args| args.swap_remove(0));
 
     evaler.action("atom -> \" string \"", |mut args| {
         assert!(matches!(args[1], T::String(_)));
@@ -143,40 +141,38 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         T::Arglist(arglist)
     });
 
-    fn math_bin_op(reduce: bool) -> impl Fn(Vec<T>) -> T {
-        move |mut args: Vec<T>| {
-            let rhs = args.swap_remove(2);
-            let op = pull!(T::Symbol, args.swap_remove(1));
-            let lhs = args.swap_remove(0);
-
-            let mut new_args = Vec::new();
-            match lhs {
-                T::Expr(h, a) if h == op && reduce => new_args.extend(a),
-                other => new_args.push(other),
-            }
-            match rhs {
-                T::Expr(h, a) if h == op && reduce => new_args.extend(a),
-                other => new_args.push(other),
-            }
-            T::Expr(op, new_args)
+    fn math_bin_op(mut args: Vec<T>) -> T {
+        assert_eq!(args.len(), 3);
+        let rhs = args.swap_remove(2);
+        let op = pull!(T::Symbol, args.swap_remove(1));
+        let lhs = args.swap_remove(0);
+        let reduce = op == "+" || op == "*";
+        let mut new_args = Vec::new();
+        match lhs {
+            T::Expr(h, a) if h == op && reduce => new_args.extend(a),
+            other => new_args.push(other),
         }
+        match rhs {
+            T::Expr(h, a) if h == op && reduce => new_args.extend(a),
+            other => new_args.push(other),
+        }
+        T::Expr(op, new_args)
     }
 
-    evaler.action("arith -> arith @opsum arith_mul", math_bin_op(true));
+    evaler.action("arith -> arith @opsum arith_mul", math_bin_op);
     evaler.action("arith -> arith_mul", |mut args| args.swap_remove(0));
 
-    evaler.action("arith_mul -> arith_mul @opmul arith_pow", math_bin_op(true));
+    evaler.action("arith_mul -> arith_mul @opmul arith_pow", math_bin_op);
     evaler.action("arith_mul -> arith_pow", |mut args| args.swap_remove(0));
 
     evaler.action("arith_pow -> - arith_pow", |_| todo!());
-    evaler.action("arith_pow -> arith_fac ^ arith_pow", math_bin_op(false));
+    evaler.action("arith_pow -> arith_fac ^ arith_pow", math_bin_op);
     evaler.action("arith_pow -> arith_fac", |mut args| args.swap_remove(0));
 
     evaler.action("arith_fac -> arith_fac !", |mut args| todo!());
     evaler.action("arith_fac -> ( expr )", |mut args| args.swap_remove(1));
     evaler.action("arith_fac -> atom", |mut args| args.swap_remove(0));
 
-    // TODO: collaps all these names to @binop ?
     evaler.action("@opsum -> +", |_| T::Symbol("Plus".to_string()));
     evaler.action("@opsum -> -", |_| T::Symbol("Minus".to_string()));
     evaler.action("@opmul -> *", |_| T::Symbol("Times".to_string()));
@@ -187,13 +183,15 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
     Ok(move |input: &str| {
         let tokenizer = crate::tokenizer::Tokenizer::new(input.chars());
         let mut trees = evaler.eval_all_recursive(&parser.parse(tokenizer)?)?;
-        eprintln!("Number of trees: {}", trees.len());
         if trees.len() > 1 {
-            // && !trees.windows(2).all(|w| w[0] == w[1]) {
             for t in &trees {
-                eprintln!("treeeee -- {:?}", t);
+                eprintln!("{:?}", t);
             }
-            //panic!("Bug: Amaiguous grammar ^^");
+            assert!(
+                trees.windows(2).all(|w| w[0] == w[1]),
+                "Bug: Amaiguous grammar"
+            );
+            panic!("Bug: Amaiguous grammar (2)");
         }
         Ok(convert(trees.swap_remove(0)))
     })

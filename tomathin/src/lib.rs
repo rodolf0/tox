@@ -3,6 +3,7 @@
 mod tokenizer;
 
 mod expr;
+pub use expr::evaluate;
 mod parser;
 pub use parser::parser;
 

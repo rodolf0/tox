@@ -4,9 +4,8 @@
 
 fn grammar_str() -> &'static str {
     r#"
-    expr := head '[' arglist ']'
+    expr := arith
          | '{' arglist '}'
-         | arith
          ;
 
     arglist := arglist ',' expr | expr ;
@@ -14,11 +13,12 @@ fn grammar_str() -> &'static str {
     arith := arith ('+'|'-') @opsum arith_mul | arith_mul ;
     arith_mul := arith_mul ('*'|'/'|'%') @opmul arith_pow | arith_pow ;
     arith_pow := '-' arith_pow | arith_fac '^' arith_pow | arith_fac ;
-    arith_fac := arith_fac '!' | '(' expr ')' | atom ;
+    arith_fac := arith_fac '!' | '(' arith ')' | atom ;
 
     atom := '"' string '"'
          | symbol
          | number
+         | head '[' arglist ']'
          ;
     "#
 }
@@ -66,17 +66,18 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
     let grammar = earlgrey::EbnfGrammarParser::new(grammar_str(), "expr")
         .plug_terminal("head", |h| {
             [
-                "FindRoot",
-                "List",
-                "Plus",
-                "Minus",
-                "Times",
                 "Divide",
+                "FindRoot",
+                "Hold",
+                "List",
+                "Minus",
+                "Plus",
                 "Power",
                 "ReplaceAll",
                 "Rule",
                 "Set",
                 "Sum",
+                "Times",
             ]
             .contains(&h)
         })
@@ -98,22 +99,9 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         _ => T::Nop,
     });
 
-    evaler.action("expr -> head [ arglist ]", |mut args| {
-        let arglist = pull!(T::Arglist, args.swap_remove(2));
-        let head = pull!(T::Symbol, args.swap_remove(0));
-        T::Expr(head, arglist)
-    });
     evaler.action("expr -> { arglist }", |mut args| {
         let arglist = pull!(T::Arglist, args.swap_remove(1));
         T::Expr("List".to_string(), arglist)
-    });
-    evaler.action("expr -> atom", |mut args| {
-        assert!(
-            matches!(args[0], T::String(_))
-                || matches!(args[0], T::Symbol(_))
-                || matches!(args[0], T::Number(_))
-        );
-        args.swap_remove(0)
     });
     evaler.action("expr -> arith", |mut args| args.swap_remove(0));
 
@@ -128,6 +116,11 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
     evaler.action("atom -> number", |mut args| {
         assert!(matches!(args[0], T::Number(_)));
         args.swap_remove(0)
+    });
+    evaler.action("atom -> head [ arglist ]", |mut args| {
+        let arglist = pull!(T::Arglist, args.swap_remove(2));
+        let head = pull!(T::Symbol, args.swap_remove(0));
+        T::Expr(head, arglist)
     });
 
     evaler.action("arglist -> expr", |mut args| {

@@ -4,6 +4,10 @@ use crate::parser::Expr;
 pub fn evaluate(expr: Expr) -> Result<Expr, String> {
     match expr {
         Expr::Expr(head, mut args) => match head.as_ref() {
+            "Hold" => match args.pop() {
+                Some(inner) if args.is_empty() => Ok(inner),
+                first => Err(format!("Hold expects single arg. {:?} {:?}", first, args)),
+            },
             "List" => {
                 let evaled_args = args
                     .into_iter()
@@ -21,7 +25,7 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                 let [expr, rules]: [Expr; 2] = args
                     .try_into()
                     .map_err(|e| format!("ReplaceAll must have 2 arguments. {:?}", e))?;
-                replace_all(expr, eval_rules(rules)?.as_slice())
+                evaluate(replace_all(expr, eval_rules(rules)?.as_slice())?)
             }
             "Plus" => {
                 let mut numeric: f64 = 0.0;

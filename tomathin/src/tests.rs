@@ -35,9 +35,9 @@ fn parse_basic_expr() -> Result<(), String> {
 fn replace_all() -> Result<(), String> {
     let p = parser()?;
     // Test ReplaceAll with single simple Rule
-    let rep_1rule = p(r#"ReplaceAll[Plus[x, Times[2, x]], Rule[x, 3]]"#)?;
+    let rep_1rule = p(r#"ReplaceAll[Hold[Plus[x, Times[2, x]]], Rule[x, 3]]"#)?;
     assert_eq!(
-        evaluate(rep_1rule)?,
+        evaluate(rep_1rule.clone())?,
         Expr::Expr(
             "Plus".to_string(),
             vec![
@@ -49,6 +49,7 @@ fn replace_all() -> Result<(), String> {
             ]
         )
     );
+    assert_eq!(evaluate(evaluate(rep_1rule)?)?, Expr::Number(9.0));
     // Test ReplaceAll with a List[Rule]
     let rep_rule_list = p(r#"ReplaceAll[
             Plus[x, Times[2, x]],

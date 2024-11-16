@@ -7,7 +7,7 @@ fn main() -> Result<(), String> {
         let input = std::env::args().skip(1).collect::<Vec<String>>().join(" ");
         match parser(input.as_str()) {
             Err(e) => println!("Parse err: {:?}", e),
-            Ok(expr) => println!("{:?}", expr),
+            Ok(expr) => println!("{:?}", tomathin::evaluate(expr)?),
         }
         return Ok(());
     }

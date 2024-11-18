@@ -79,13 +79,17 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                 })
             }
             "FindRoot" => {
-                let Expr::Number(x0) = evaluate(args.swap_remove(1))? else {
-                    return Err("FindRoot requires x0 to be a number".to_string());
+                let Some(Expr::Expr(list_head, var_args)) = args.get(1) else {
+                    return Err(format!("FindRoot unexpected arg1: {:?}", args.get(1)));
+                };
+                let (x, x0) = match (list_head, var_args.as_slice()) {
+                    (h, [Expr::Symbol(x), Expr::Number(x0)]) if h == "List" => (x.clone(), *x0),
+                    other => return Err(format!("FindRoot unexpected arg1: {:?}", other)),
                 };
                 let fexpr = evaluate(args.swap_remove(0))?;
-                let f = |x: f64| match evaluate(replace_all(
+                let f = |xi: f64| match evaluate(replace_all(
                     fexpr.clone(),
-                    &[(Expr::Symbol("x".to_string()), Expr::Number(x))],
+                    &[(Expr::Symbol(x.clone()), Expr::Number(xi))],
                 )?)? {
                     Expr::Number(x1) => Ok(x1),
                     other => Err(format!(

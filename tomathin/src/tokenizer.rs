@@ -16,8 +16,24 @@ impl<I: Iterator<Item = char>> Tokenizer<I> {
             return Ok(Some(self.buff.remove(0)));
         }
         match self.input.next() {
+            // ReplaceAll operator, or Division
+            Some('/') => match self.input.peek() {
+                Some('.') => {
+                    self.input.next();
+                    Ok(Some("/.".to_string()))
+                }
+                _ => Ok(Some("/".to_string())),
+            },
+            // Rule operator, or Minus
+            Some('-') => match self.input.peek() {
+                Some('>') => {
+                    self.input.next();
+                    Ok(Some("->".to_string()))
+                }
+                _ => Ok(Some("-".to_string())),
+            },
             // Various single char tokens.
-            Some(x) if "[]{}(),+-*/^!".contains(x) => Ok(Some(x.to_string())),
+            Some(x) if "[]{}(),+*^!".contains(x) => Ok(Some(x.to_string())),
             // Assignment operator.
             Some(':') => match self.input.next() {
                 Some('=') => Ok(Some(":=".to_string())),
@@ -161,7 +177,7 @@ mod tests {
     #[test]
     fn parse_combinations() {
         let surrounds = vec![("[", "]"), ("{", "}"), ("(", ")"), ("", "")];
-        let infix_ops = vec![",", ":=", "+", "-", "*", "/", "^", " "];
+        let infix_ops = vec![",", ":=", "+", "-", "*", "/", "^", "/.", "->", " "];
         let postfix_ops = vec!["!", ""];
         let prefix_ops = vec!["-", "!", ""];
         let tokens = vec!["1", "0.23", "0.23e+4", "'str1'", "Symbol2", ""];

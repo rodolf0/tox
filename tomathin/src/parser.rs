@@ -4,21 +4,24 @@
 
 fn grammar_str() -> &'static str {
     r#"
-    expr := arith
-         | '{' arglist '}'
-         ;
-
     arglist := arglist ',' expr | expr ;
+
+    expr := replace_all ;
+
+    replace_all := replace_all '/.' rule | rule ;
+
+    rule := arith '->' rule | arith ;
 
     arith := arith ('+'|'-') @opsum arith_mul | arith_mul ;
     arith_mul := arith_mul ('*'|'/'|'%') @opmul arith_pow | arith_pow ;
     arith_pow := '-' arith_pow | arith_fac '^' arith_pow | arith_fac ;
-    arith_fac := arith_fac '!' | '(' arith ')' | atom ;
+    arith_fac := arith_fac '!' | '(' expr ')' | atom ;
 
     atom := '"' string '"'
          | symbol
          | number
          | head '[' arglist ']'
+         | '{' arglist '}'
          ;
     "#
 }
@@ -67,6 +70,7 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         .plug_terminal("head", |h| {
             [
                 "Divide",
+                "Evaluate",
                 "FindRoot",
                 "Hold",
                 "List",
@@ -99,11 +103,26 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         _ => T::Nop,
     });
 
-    evaler.action("expr -> { arglist }", |mut args| {
+    evaler.action("atom -> { arglist }", |mut args| {
         let arglist = pull!(T::Arglist, args.swap_remove(1));
         T::Expr("List".to_string(), arglist)
     });
-    evaler.action("expr -> arith", |mut args| args.swap_remove(0));
+
+    evaler.action("expr -> replace_all", |mut args| args.swap_remove(0));
+
+    evaler.action("replace_all -> rule", |mut args| args.swap_remove(0));
+    evaler.action("replace_all -> replace_all /. rule", |mut args| {
+        let rhs = args.swap_remove(2);
+        let lhs = args.swap_remove(0);
+        T::Expr("ReplaceAll".to_string(), vec![lhs, rhs])
+    });
+
+    evaler.action("rule -> arith", |mut args| args.swap_remove(0));
+    evaler.action("rule -> arith -> rule", |mut args| {
+        let rhs = args.swap_remove(2);
+        let lhs = args.swap_remove(0);
+        T::Expr("Rule".to_string(), vec![lhs, rhs])
+    });
 
     evaler.action("atom -> \" string \"", |mut args| {
         assert!(matches!(args[1], T::String(_)));
@@ -162,7 +181,7 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
     evaler.action("arith_pow -> arith_fac ^ arith_pow", math_bin_op);
     evaler.action("arith_pow -> arith_fac", |mut args| args.swap_remove(0));
 
-    evaler.action("arith_fac -> arith_fac !", |mut args| todo!());
+    evaler.action("arith_fac -> arith_fac !", |_| todo!());
     evaler.action("arith_fac -> ( expr )", |mut args| args.swap_remove(1));
     evaler.action("arith_fac -> atom", |mut args| args.swap_remove(0));
 

@@ -4,10 +4,25 @@ use crate::parser::Expr;
 pub fn evaluate(expr: Expr) -> Result<Expr, String> {
     match expr {
         Expr::Expr(head, mut args) => match head.as_ref() {
-            "Hold" => match args.pop() {
-                Some(inner) if args.is_empty() => Ok(inner),
-                first => Err(format!("Hold expects single arg. {:?} {:?}", first, args)),
-            },
+            "Hold" => {
+                if args.len() != 1 {
+                    Err(format!("Hold expects single arg. {:?}", args))
+                } else {
+                    Ok(Expr::Expr(head, args))
+                }
+            }
+            "Evaluate" => {
+                if args.len() != 1 {
+                    Err(format!("Hold expects single arg. {:?}", args))
+                } else {
+                    let rules = vec![(
+                        Expr::Symbol("Hold".to_string()),
+                        Expr::Symbol("Evaluate".to_string()),
+                    )];
+                    // TODO: this is a bit of a hack, should replace only heads
+                    evaluate(replace_all(args.swap_remove(0), &rules)?)
+                }
+            }
             "List" => {
                 let evaled_args = args
                     .into_iter()
@@ -21,33 +36,24 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                     .map_err(|e| format!("Rule must have 2 arguments. {:?}", e))?;
                 Ok(Expr::Expr(head, vec![lhs, evaluate(rhs)?]))
             }
-            "ReplaceAll" => {
-                let [expr, rules]: [Expr; 2] = args
-                    .try_into()
-                    .map_err(|e| format!("ReplaceAll must have 2 arguments. {:?}", e))?;
-                evaluate(replace_all(expr, eval_rules(rules)?.as_slice())?)
-            }
-            "Plus" => {
-                let mut numeric: f64 = 0.0;
-                let mut others = Vec::new();
-                for a in args {
-                    match a {
-                        Expr::Number(n) => numeric += n,
-                        other => {
-                            let maybe_n = evaluate(other)?;
-                            if let Expr::Number(n) = maybe_n {
-                                numeric += n;
-                            } else {
-                                others.push(maybe_n);
-                            }
-                        }
+            "ReplaceAll" => eval_replace_all(Expr::Expr(head, args)),
+            "Plus" | "Times" => {
+                let mut numeric: Option<f64> = None;
+                let mut new_args = Vec::new();
+                for arg in args {
+                    match evaluate(arg)? {
+                        Expr::Number(n) if head == "Plus" => *numeric.get_or_insert(0.0) += n,
+                        Expr::Number(n) if head == "Times" => *numeric.get_or_insert(1.0) *= n,
+                        o => new_args.push(o),
                     }
                 }
-                others.push(Expr::Number(numeric));
-                if others.len() == 1 {
-                    Ok(others.swap_remove(0))
+                if numeric.is_some_and(|n| n != 0.0) || new_args.len() == 0 {
+                    new_args.insert(0, Expr::Number(*numeric.get_or_insert(0.0)));
+                }
+                if new_args.len() == 1 {
+                    Ok(new_args.swap_remove(0))
                 } else {
-                    Ok(Expr::Expr(head, others))
+                    Ok(Expr::Expr(head, new_args))
                 }
             }
             "Minus" | "Power" | "Divide" => {
@@ -72,29 +78,6 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                     (lhs, rhs) => Expr::Expr(head, vec![lhs, rhs]),
                 })
             }
-            "Times" => {
-                let mut numeric: f64 = 1.0;
-                let mut others = Vec::new();
-                for a in args {
-                    match a {
-                        Expr::Number(n) => numeric *= n,
-                        other => {
-                            let maybe_n = evaluate(other)?;
-                            if let Expr::Number(n) = maybe_n {
-                                numeric *= n;
-                            } else {
-                                others.push(maybe_n);
-                            }
-                        }
-                    }
-                }
-                others.push(Expr::Number(numeric));
-                if others.len() == 1 {
-                    Ok(others.swap_remove(0))
-                } else {
-                    Ok(Expr::Expr(head, others))
-                }
-            }
             "FindRoot" => {
                 let Expr::Number(x0) = evaluate(args.swap_remove(1))? else {
                     return Err("FindRoot requires x0 to be a number".to_string());
@@ -117,6 +100,23 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
         },
         // Nothing specific on atomic expressions
         _ => Ok(expr),
+    }
+}
+
+pub fn eval_replace_all(expr: Expr) -> Result<Expr, String> {
+    // Eval of replace_all is outside of eval because evaluation of expr is deferred
+    match expr {
+        Expr::Expr(head, args) if head == "ReplaceAll" => {
+            let [expr, rules]: [Expr; 2] = args
+                .try_into()
+                .map_err(|e| format!("ReplaceAll must have 2 arguments. {:?}", e))?;
+            evaluate(replace_all(
+                // Nested evaluation of replace_all without eval of expr
+                eval_replace_all(expr)?,
+                eval_rules(rules)?.as_slice(),
+            )?)
+        }
+        other => Ok(other),
     }
 }
 

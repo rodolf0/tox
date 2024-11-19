@@ -133,5 +133,36 @@ fn arith_ops() -> Result<(), String> {
     assert_eq!(evaluate(p(r#"2 ^ 2 ^ 3"#)?)?, Expr::Number(256.0));
     assert_eq!(evaluate(p(r#"1 + 2 ^ 3"#)?)?, Expr::Number(9.0));
     assert_eq!(evaluate(p(r#"3 / 2 / 4"#)?)?, Expr::Number(0.375));
+    assert_eq!(evaluate(p(r#"-3"#)?)?, Expr::Number(-3.0));
+    assert_eq!(evaluate(p(r#"--3"#)?)?, Expr::Number(3.0));
+    assert_eq!(evaluate(p(r#"4--3"#)?)?, Expr::Number(7.0));
+    Ok(())
+}
+
+#[test]
+fn sum_expr() -> Result<(), String> {
+    let p = parser()?;
+    assert_eq!(evaluate(p(r#"Sum[x^2, {x, 3}]"#)?)?, Expr::Number(14.0));
+    assert_eq!(evaluate(p(r#"Sum[x^2, {x, 2, 4}]"#)?)?, Expr::Number(29.0));
+    assert_eq!(
+        evaluate(p(r#"Sum[x^i, {i, 4}]"#)?)?,
+        Expr::Expr(
+            "Sum".to_string(),
+            vec![
+                Expr::Expr(
+                    "Power".to_string(),
+                    vec![Expr::Symbol("x".to_string()), Expr::Symbol("i".to_string()),]
+                ),
+                Expr::Expr(
+                    "List".to_string(),
+                    vec![Expr::Symbol("i".to_string()), Expr::Number(4.0)]
+                )
+            ]
+        )
+    );
+    assert_eq!(
+        evaluate(p(r#"ReplaceAll[Sum[x^i, {i, 4}], x -> 2]"#)?)?,
+        Expr::Number(1.0 + 2.0 + 4.0 + 8.0 + 16.0)
+    );
     Ok(())
 }

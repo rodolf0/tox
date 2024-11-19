@@ -177,7 +177,12 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
     evaler.action("arith_mul -> arith_mul @opmul arith_pow", math_bin_op);
     evaler.action("arith_mul -> arith_pow", |mut args| args.swap_remove(0));
 
-    evaler.action("arith_pow -> - arith_pow", |_| todo!());
+    evaler.action("arith_pow -> - arith_pow", |mut args| {
+        match args.swap_remove(1) {
+            T::Number(n) => T::Number(-n),
+            other => T::Expr("Times".to_string(), vec![T::Number(-1.0), other]),
+        }
+    });
     evaler.action("arith_pow -> arith_fac ^ arith_pow", math_bin_op);
     evaler.action("arith_pow -> arith_fac", |mut args| args.swap_remove(0));
 

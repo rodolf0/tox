@@ -6,7 +6,9 @@ fn grammar_str() -> &'static str {
     r#"
     arglist := arglist ',' expr | expr ;
 
-    expr := replace_all ;
+    expr := set_delayed ;
+
+    set_delayed := replace_all ':=' set_delayed | replace_all ;
 
     replace_all := replace_all '/.' rule | rule ;
 
@@ -108,7 +110,14 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         T::Expr("List".to_string(), arglist)
     });
 
-    evaler.action("expr -> replace_all", |mut args| args.swap_remove(0));
+    evaler.action("expr -> set_delayed", |mut args| args.swap_remove(0));
+
+    evaler.action("set_delayed -> replace_all", |mut args| args.swap_remove(0));
+    evaler.action("set_delayed -> replace_all := set_delayed", |mut args| {
+        let rhs = args.swap_remove(2);
+        let lhs = args.swap_remove(0);
+        T::Expr("SetDelayed".to_string(), vec![lhs, rhs])
+    });
 
     evaler.action("replace_all -> rule", |mut args| args.swap_remove(0));
     evaler.action("replace_all -> replace_all /. rule", |mut args| {

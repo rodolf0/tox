@@ -166,3 +166,19 @@ fn sum_expr() -> Result<(), String> {
     );
     Ok(())
 }
+
+#[test]
+fn set_delayed() -> Result<(), String> {
+    // TODO: the way we're handling global scope for variables is insane
+    let p = parser()?;
+    assert_eq!(evaluate(p(r#"xxxx := 1"#)?)?, Expr::Number(1.0));
+    assert_eq!(
+        evaluate(p(r#"ffff := xxxx + 1"#)?)?,
+        Expr::Expr(
+            "Plus".to_string(),
+            vec![Expr::Symbol("xxxx".to_string()), Expr::Number(1.0)]
+        )
+    );
+    assert_eq!(evaluate(p(r#"ffff"#)?)?, Expr::Number(2.0));
+    Ok(())
+}

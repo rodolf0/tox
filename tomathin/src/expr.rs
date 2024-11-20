@@ -1,6 +1,21 @@
 use crate::findroot;
 use crate::parser::Expr;
 
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+
+static GLOBAL_SCOPE: OnceLock<Mutex<HashMap<String, Expr>>> = OnceLock::new();
+
+fn global_lookup(sym: &str) -> Option<Expr> {
+    let m = GLOBAL_SCOPE.get_or_init(|| Mutex::new(HashMap::new()));
+    m.lock().unwrap().get(sym).cloned()
+}
+
+fn global_set(sym: String, expr: Expr) {
+    let m = GLOBAL_SCOPE.get_or_init(|| Mutex::new(HashMap::new()));
+    m.lock().unwrap().insert(sym, expr);
+}
+
 pub fn evaluate(expr: Expr) -> Result<Expr, String> {
     match expr {
         Expr::Expr(head, mut args) => match head.as_ref() {
@@ -136,9 +151,22 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                 }
                 Ok(Expr::Number(sum))
             }
+            "SetDelayed" => {
+                let [lhs, rhs]: [Expr; 2] = args
+                    .try_into()
+                    .map_err(|e| format!("SetDelayed must have 2 arguments. {:?}", e))?;
+                let Expr::Symbol(sym) = lhs else {
+                    return Err(format!("SetDelayed lhs must be a symbol. {:?}", lhs));
+                };
+                global_set(sym, rhs.clone());
+                Ok(rhs)
+            }
             other => panic!("{} head not implemented", other),
         },
-        // Nothing specific on atomic expressions
+        Expr::Symbol(ref sym) => match global_lookup(sym) {
+            Some(expr_lookup) => Ok(evaluate(expr_lookup)?),
+            None => Ok(expr),
+        },
         _ => Ok(expr),
     }
 }

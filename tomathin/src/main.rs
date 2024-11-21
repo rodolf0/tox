@@ -14,6 +14,7 @@ fn main() -> Result<(), String> {
 
     use rustyline::error::ReadlineError;
     let mut rl = rustyline::DefaultEditor::new().map_err(|e| e.to_string())?;
+    let mut ctx = tomathin::Context::new();
     loop {
         match rl.readline("~> ") {
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => return Ok(()),
@@ -21,7 +22,7 @@ fn main() -> Result<(), String> {
             Ok(line) => match parser(line.as_str()) {
                 Err(e) => println!("Parse err: {:?}", e),
                 Ok(expr) => {
-                    let expr = tomathin::evaluate(expr)?;
+                    let expr = tomathin::eval_with_ctx(expr, &mut ctx)?;
                     let _ = rl.add_history_entry(&line);
                     println!("{:?}", expr);
                 }

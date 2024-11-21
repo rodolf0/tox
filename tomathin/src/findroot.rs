@@ -1,8 +1,8 @@
 pub fn find_root(f: impl Fn(f64) -> Result<f64, String>, x0: f64) -> Result<f64, String> {
     let h = 1.0e-5;
-    let tolerance = 1.0e-8;
+    let tolerance = 1.0e-12;
     let mut x = x0;
-    for _ in 1..100 {
+    for _ in 0..100 {
         let fx = f(x)?;
         if fx.abs() < tolerance {
             return Ok(x);
@@ -27,7 +27,5 @@ mod tests {
             Ok(sum)
         };
         println!("{}", find_root(f, 0.3).unwrap());
-        // println!("{}", find_root(f, 3.3).unwrap());
-        // println!("{}", find_root(f, -300.3).unwrap());
     }
 }

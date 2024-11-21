@@ -1,22 +1,12 @@
+use crate::context::Context;
 use crate::findroot;
 use crate::parser::Expr;
 
-use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
-
-static GLOBAL_SCOPE: OnceLock<Mutex<HashMap<String, Expr>>> = OnceLock::new();
-
-fn global_lookup(sym: &str) -> Option<Expr> {
-    let m = GLOBAL_SCOPE.get_or_init(|| Mutex::new(HashMap::new()));
-    m.lock().unwrap().get(sym).cloned()
-}
-
-fn global_set(sym: String, expr: Expr) {
-    let m = GLOBAL_SCOPE.get_or_init(|| Mutex::new(HashMap::new()));
-    m.lock().unwrap().insert(sym, expr);
-}
-
 pub fn evaluate(expr: Expr) -> Result<Expr, String> {
+    eval_with_ctx(expr, &mut Context::new())
+}
+
+pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
     match expr {
         Expr::Expr(head, mut args) => match head.as_ref() {
             "Hold" => {
@@ -35,13 +25,13 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                         Expr::Symbol("Evaluate".to_string()),
                     )];
                     // TODO: this is a bit of a hack, should replace only heads
-                    evaluate(replace_all(args.swap_remove(0), &rules)?)
+                    eval_with_ctx(replace_all(args.swap_remove(0), &rules)?, ctx)
                 }
             }
             "List" => {
                 let evaled_args = args
                     .into_iter()
-                    .map(|a| evaluate(a))
+                    .map(|a| eval_with_ctx(a, ctx))
                     .collect::<Result<_, _>>()?;
                 Ok(Expr::Expr(head, evaled_args))
             }
@@ -49,14 +39,14 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                 let [lhs, rhs]: [Expr; 2] = args
                     .try_into()
                     .map_err(|e| format!("Rule must have 2 arguments. {:?}", e))?;
-                Ok(Expr::Expr(head, vec![lhs, evaluate(rhs)?]))
+                Ok(Expr::Expr(head, vec![lhs, eval_with_ctx(rhs, ctx)?]))
             }
-            "ReplaceAll" => eval_replace_all(Expr::Expr(head, args)),
+            "ReplaceAll" => eval_replace_all(Expr::Expr(head, args), ctx),
             "Plus" | "Times" => {
                 let mut numeric: Option<f64> = None;
                 let mut new_args = Vec::new();
                 for arg in args {
-                    match evaluate(arg)? {
+                    match eval_with_ctx(arg, ctx)? {
                         Expr::Number(n) if head == "Plus" => *numeric.get_or_insert(0.0) += n,
                         Expr::Number(n) if head == "Times" => *numeric.get_or_insert(1.0) *= n,
                         o => new_args.push(o),
@@ -77,11 +67,11 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                     .map_err(|e| format!("{} expects 2 arguments {:?}", head, e))?;
                 let lhs = match lhs_expr {
                     Expr::Number(_) => lhs_expr,
-                    other => evaluate(other)?,
+                    other => eval_with_ctx(other, ctx)?,
                 };
                 let rhs = match rhs_expr {
                     Expr::Number(_) => rhs_expr,
-                    other => evaluate(other)?,
+                    other => eval_with_ctx(other, ctx)?,
                 };
                 Ok(match (lhs, rhs) {
                     (Expr::Number(lhs), Expr::Number(rhs)) => match head.as_ref() {
@@ -101,7 +91,8 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                     (h, [Expr::Symbol(x), Expr::Number(x0)]) if h == "List" => (x.clone(), *x0),
                     other => return Err(format!("FindRoot unexpected arg1: {:?}", other)),
                 };
-                let fexpr = evaluate(args.swap_remove(0))?;
+                let fexpr = eval_with_ctx(args.swap_remove(0), ctx)?;
+                // NOTE: not super performant because of iteration of replace + eval
                 let f = |xi: f64| match evaluate(replace_all(
                     fexpr.clone(),
                     &[(Expr::Symbol(x.clone()), Expr::Number(xi))],
@@ -130,10 +121,13 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                     other => return Err(format!("Sum unexpected arg1: {:?}", other)),
                 };
                 let sum_expr = args.swap_remove(0);
-                let Expr::Number(mut sum) = evaluate(replace_all(
-                    sum_expr.clone(),
-                    &[(Expr::Symbol(x.clone()), Expr::Number(x0 as f64))],
-                )?)?
+                let Expr::Number(mut sum) = eval_with_ctx(
+                    replace_all(
+                        sum_expr.clone(),
+                        &[(Expr::Symbol(x.clone()), Expr::Number(x0 as f64))],
+                    )?,
+                    ctx,
+                )?
                 else {
                     return Ok(Expr::Expr(
                         "Sum".to_string(),
@@ -141,10 +135,13 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                     ));
                 };
                 for xi in (x0 + 1)..=xn {
-                    sum += match evaluate(replace_all(
-                        sum_expr.clone(),
-                        &[(Expr::Symbol(x.clone()), Expr::Number(xi as f64))],
-                    )?)? {
+                    sum += match eval_with_ctx(
+                        replace_all(
+                            sum_expr.clone(),
+                            &[(Expr::Symbol(x.clone()), Expr::Number(xi as f64))],
+                        )?,
+                        ctx,
+                    )? {
                         Expr::Number(s) => s,
                         other => panic!("BUG: Non-Number should have exited earlier: {:?}", other),
                     };
@@ -158,39 +155,42 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
                 let Expr::Symbol(sym) = lhs else {
                     return Err(format!("SetDelayed lhs must be a symbol. {:?}", lhs));
                 };
-                global_set(sym, rhs.clone());
+                ctx.set(sym, rhs.clone());
                 Ok(rhs)
             }
             other => panic!("{} head not implemented", other),
         },
-        Expr::Symbol(ref sym) => match global_lookup(sym) {
-            Some(expr_lookup) => Ok(evaluate(expr_lookup)?),
+        Expr::Symbol(ref sym) => match ctx.get(sym) {
+            Some(expr_lookup) => Ok(eval_with_ctx(expr_lookup, ctx)?),
             None => Ok(expr),
         },
         _ => Ok(expr),
     }
 }
 
-pub fn eval_replace_all(expr: Expr) -> Result<Expr, String> {
+pub fn eval_replace_all(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
     // Eval of replace_all is outside of eval because evaluation of expr is deferred
     match expr {
         Expr::Expr(head, args) if head == "ReplaceAll" => {
             let [expr, rules]: [Expr; 2] = args
                 .try_into()
                 .map_err(|e| format!("ReplaceAll must have 2 arguments. {:?}", e))?;
-            evaluate(replace_all(
-                // Nested evaluation of replace_all without eval of expr
-                eval_replace_all(expr)?,
-                eval_rules(rules)?.as_slice(),
-            )?)
+            eval_with_ctx(
+                replace_all(
+                    // Nested evaluation of replace_all without eval of expr
+                    eval_replace_all(expr, ctx)?,
+                    eval_rules(rules, ctx)?.as_slice(),
+                )?,
+                ctx,
+            )
         }
         other => Ok(other),
     }
 }
 
-fn eval_rules(rules: Expr) -> Result<Vec<(Expr, Expr)>, String> {
-    // Evaluate rules and check they result in Rule or List[Rule]
-    match evaluate(rules)? {
+fn eval_rules(rules: Expr, ctx: &mut Context) -> Result<Vec<(Expr, Expr)>, String> {
+    // eval_with_ctx rules and check they result in Rule or List[Rule]
+    match eval_with_ctx(rules, ctx)? {
         Expr::Expr(head, args) if head == "Rule" => {
             let [lhs, rhs]: [Expr; 2] = args
                 .try_into()

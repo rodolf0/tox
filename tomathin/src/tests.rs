@@ -1,4 +1,5 @@
-use crate::expr::evaluate;
+use crate::context::Context;
+use crate::expr::{eval_with_ctx, evaluate};
 use crate::parser::{parser, Expr};
 
 #[test]
@@ -169,16 +170,19 @@ fn sum_expr() -> Result<(), String> {
 
 #[test]
 fn set_delayed() -> Result<(), String> {
-    // TODO: the way we're handling global scope for variables is insane
+    let mut ctx = Context::new();
     let p = parser()?;
-    assert_eq!(evaluate(p(r#"xxxx := 1"#)?)?, Expr::Number(1.0));
     assert_eq!(
-        evaluate(p(r#"ffff := xxxx + 1"#)?)?,
+        eval_with_ctx(p(r#"xxxx := 1"#)?, &mut ctx)?,
+        Expr::Number(1.0)
+    );
+    assert_eq!(
+        eval_with_ctx(p(r#"ffff := xxxx + 1"#)?, &mut ctx)?,
         Expr::Expr(
             "Plus".to_string(),
             vec![Expr::Symbol("xxxx".to_string()), Expr::Number(1.0)]
         )
     );
-    assert_eq!(evaluate(p(r#"ffff"#)?)?, Expr::Number(2.0));
+    assert_eq!(eval_with_ctx(p(r#"ffff"#)?, &mut ctx)?, Expr::Number(2.0));
     Ok(())
 }

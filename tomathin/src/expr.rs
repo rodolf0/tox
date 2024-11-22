@@ -158,6 +158,16 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                 ctx.set(sym, rhs.clone());
                 Ok(rhs)
             }
+            "Gamma" => {
+                if args.len() != 1 {
+                    Err(format!("Gamma expects single arg. {:?}", args))
+                } else {
+                    match eval_with_ctx(args.swap_remove(0), ctx)? {
+                        Expr::Number(n) => Ok(Expr::Number(crate::gamma(1.0 + n))),
+                        other => Ok(Expr::Expr(head, vec![other])),
+                    }
+                }
+            }
             other => panic!("{} head not implemented", other),
         },
         Expr::Symbol(ref sym) => match ctx.get(sym) {

@@ -195,7 +195,15 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
     evaler.action("arith_pow -> arith_fac ^ arith_pow", math_bin_op);
     evaler.action("arith_pow -> arith_fac", |mut args| args.swap_remove(0));
 
-    evaler.action("arith_fac -> arith_fac !", |_| todo!());
+    evaler.action("arith_fac -> arith_fac !", |mut args| {
+        match args.swap_remove(0) {
+            T::Number(n) => T::Number(crate::gamma(1.0 + n)),
+            other => T::Expr(
+                "Gamma".to_string(),
+                vec![T::Expr("Plus".to_string(), vec![T::Number(1.0), other])],
+            ),
+        }
+    });
     evaler.action("arith_fac -> ( expr )", |mut args| args.swap_remove(1));
     evaler.action("arith_fac -> atom", |mut args| args.swap_remove(0));
 

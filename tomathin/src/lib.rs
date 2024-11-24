@@ -19,5 +19,7 @@ fn gamma(x: f64) -> f64 {
 
 mod findroot;
 
+mod matrix;
+
 #[cfg(test)]
 mod tests;

@@ -1,5 +1,7 @@
 use std::ops::{Index, IndexMut, Range};
 
+// TODO: Matrix::data -> Cow<'a, [f64]>, col and row strides. Matrix becomes the view
+
 #[derive(Debug, Clone)]
 pub struct Matrix {
     data: Vec<f64>,
@@ -133,8 +135,53 @@ fn dot<'a>(a: impl IntoIterator<Item = &'a f64>, b: impl IntoIterator<Item = &'a
         .sum::<f64>()
 }
 
+fn outer<'a>(a: &[f64], b: &[f64]) -> Matrix {
+    Matrix {
+        data: (0..a.len())
+            .flat_map(|r| (0..b.len()).map(move |c| a[r] * b[c]))
+            .collect(),
+        rows: a.len(),
+        cols: b.len(),
+    }
+}
+
 fn norm<'a>(a: impl IntoIterator<Item = &'a f64>) -> f64 {
     a.into_iter().map(|a| a * a).sum::<f64>().sqrt()
+}
+
+// fn matmap<'a, ReduceFn>(a: &Matrix, b: &Matrix, reduce: ReduceFn) -> Matrix
+// where
+//     ReduceFn: Fn(Iterator<Item = &'a f64>, Iterator<Item = &'a f64>) -> f64,
+// {
+//     Matrix {
+//         data: (0..a.rows)
+//             .flat_map(|ra| {
+//                 (0..b.cols).map(move |cb| reduce(a.row(ra).into_iter(), &b.col(cb).into_iter()))
+//             })
+//             .collect(),
+//         rows: a.rows,
+//         cols: b.cols,
+//     }
+// }
+
+fn transpose(a: Matrix) -> Matrix {
+    Matrix {
+        data: (0..a.cols)
+            .flat_map(|c| a.col(c).into_iter().cloned().collect::<Vec<_>>())
+            .collect(),
+        rows: a.cols,
+        cols: a.rows,
+    }
+}
+
+fn matmul(a: &Matrix, b: &Matrix) -> Matrix {
+    Matrix {
+        data: (0..a.rows)
+            .flat_map(|ra| (0..b.cols).map(move |cb| dot(&a.row(ra), &b.col(cb))))
+            .collect(),
+        rows: a.rows,
+        cols: b.cols,
+    }
 }
 
 // Column-space of m describes a space
@@ -158,10 +205,22 @@ pub fn gram_schmidt_orthonorm(mut m: Matrix) -> Matrix {
     m
 }
 
+// A householder reflection finds 'v' reflection hyper-plane (perpendicular vector)
+// so that // vector 'x' when reflected over 'v' is colinear with standard basis e1.
+// Find 'v' so that x - 2 * proj-v(x) == ||x|| * e1
+pub fn householder_reflector(x: &[f64]) -> Vec<f64> {
+    let mut v = x.to_owned();
+    // of possible reflections (signum) choose the largest v to minimize error.
+    v[0] = x[0] + x[0].signum() * x.iter().map(|xi| xi * xi).sum::<f64>().sqrt();
+    let norm_v = v.iter().map(|vi| vi * vi).sum::<f64>().sqrt();
+    v.iter().map(|vi| vi / norm_v).collect()
+}
+
 pub fn nsolve(a: Matrix, b: Vec<f64>) -> Vec<f64> {
     // orthogonalize a via gram schmidt
     let a = &a;
     let q = &gram_schmidt_orthonorm(a.clone());
+    // let r = matmul(&transpose(q.clone()), a);
     let r = Matrix {
         data: (0..a.rows)
             .flat_map(|r| {
@@ -196,6 +255,15 @@ pub fn nsolve(a: Matrix, b: Vec<f64>) -> Vec<f64> {
         x[n] = (c[n] - dot(&r.row(n).range(n + 1..r.cols), &x[n + 1..])) / r[(n, n)];
     }
     x
+}
+
+pub fn eigen_values(a: Matrix) {
+    let mut a = a.clone();
+    for _ in 0..100 {
+        let q = gram_schmidt_orthonorm(a.clone());
+        let r = matmul(&a, &q);
+        a = matmul(&r, &q);
+    }
 }
 
 #[cfg(test)]
@@ -314,5 +382,50 @@ mod tests {
             vec![2.0, 5.0, 3.0, 8.0, 7.0],
         );
         println!("{:?}", x);
+    }
+
+    #[test]
+    fn test_householder() {
+        let x = vec![4.0, 1.0, -2.0, 2.0];
+        let v = householder_reflector(&x);
+        println!("v = {:?}", v);
+
+        let udotv = dot(&v, &x);
+        println!("udotv = {:?}", udotv);
+        let hx: Vec<_> = x
+            .iter()
+            .zip(&v)
+            .map(|(xi, vi)| xi - 2.0 * vi * udotv)
+            .collect();
+        println!("hx = {:?}", hx);
+
+        let vtv = dot(&v, &v);
+        println!("vtv = {:?}", vtv);
+
+        let o = outer(&v, &v);
+        println!("o = {:?}", o);
+
+        let oo = &o;
+        let h = Matrix {
+            data: (0..o.rows)
+                .flat_map(|r| {
+                    (0..o.cols).map(move |c| {
+                        let eye = if r == c { 1.0 } else { 0.0 };
+                        eye - 2.0 * oo[(r, c)] // / vtv
+                    })
+                })
+                .collect(),
+            rows: o.rows,
+            cols: o.cols,
+        };
+        println!("h = {:?}", h);
+        let col1 = vec![
+            dot(&h.row(0), &x),
+            dot(&h.row(1), &x),
+            dot(&h.row(2), &x),
+            dot(&h.row(3), &x),
+        ];
+        println!("a1 = {:?}", col1);
+        approx_eq(&col1, &vec![-norm(&x), 0.0, 0.0, 0.0]);
     }
 }

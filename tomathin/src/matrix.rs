@@ -23,18 +23,24 @@ impl<'a> Tensor<'a> {
     }
 
     pub fn col(&self, col: usize) -> Tensor {
-        Tensor {
-            // offset data view to column
-            data: Cow::Borrowed(&self.data),
-            shape: (self.shape.0, 1), // rows x 1
-            stride: self.stride,
-            offset: (0, col),
-        }
+        self.get(0..self.shape.0, col..col + 1)
+    }
+
+    pub fn row(&self, row: usize) -> Tensor {
+        self.get(row..row + 1, 0..self.shape.1)
     }
 }
 
 impl<'a> Tensor<'a> {
     pub fn get(&self, row: Range<usize>, col: Range<usize>) -> Tensor {
+        assert!(
+            row.end <= self.shape.0 && col.end <= self.shape.1,
+            "Out of range row={}/{}, col={}/{}",
+            row.end,
+            self.shape.0,
+            col.end,
+            self.shape.1
+        );
         Tensor {
             data: Cow::Borrowed(&self.data),
             shape: (row.end - row.start, col.end - col.start),
@@ -45,20 +51,7 @@ impl<'a> Tensor<'a> {
 
     pub fn to_owned(&self) -> Tensor {
         Tensor {
-            data: Cow::Owned(
-                (0..self.shape.0)
-                    .flat_map(|r| {
-                        self.data
-                            .iter()
-                            .skip(
-                                (self.offset.0 + r) * self.stride.0 + self.offset.1 * self.stride.1,
-                            )
-                            .step_by(self.stride.1)
-                            .take(self.shape.1)
-                    })
-                    .cloned()
-                    .collect(),
-            ),
+            data: Cow::Owned(self.into_iter().cloned().collect()),
             offset: (0, 0),
             shape: self.shape,
             stride: (self.shape.1, 1),
@@ -75,12 +68,27 @@ impl<'a> Tensor<'a> {
     }
 }
 
-impl Index<(usize, usize)> for Matrix {
+impl<'a> Index<(usize, usize)> for Tensor<'a> {
     type Output = f64;
 
     fn index(&self, (row, col): (usize, usize)) -> &Self::Output {
-        let idx = (self.offset.0 + row) * self.stride.0 + (self.offset.1 + col) * self.stride.1);
-        self.data[idx]
+        let idx = (self.offset.0 + row) * self.stride.0 + (self.offset.1 + col) * self.stride.1;
+        &self.data[idx]
+    }
+}
+
+impl<'a> IntoIterator for &'a Tensor<'a> {
+    type Item = &'a f64;
+    type IntoIter = Box<dyn Iterator<Item = &'a f64> + 'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Box::new((0..self.shape.0).flat_map(|r| {
+            self.data
+                .iter()
+                .skip((self.offset.0 + r) * self.stride.0 + self.offset.1 * self.stride.1)
+                .step_by(self.stride.1)
+                .take(self.shape.1)
+        }))
     }
 }
 
@@ -134,6 +142,12 @@ mod tests2 {
                 .data,
             [-1.0, 10.0, 3.0, -1.0],
         );
+        // indexing
+        assert_eq!(
+            m.get(1..4, 1..4).transpose().get(0..2, 1..3).transpose()[(1, 0)],
+            3.0
+        );
+        assert_eq!(m.get(1..4, 1..4).transpose()[(1, 0)], -4.0);
     }
 }
 

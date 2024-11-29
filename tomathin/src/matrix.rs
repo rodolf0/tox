@@ -1,6 +1,141 @@
+use std::borrow::Cow;
 use std::ops::{Index, IndexMut, Range};
 
-// TODO: Matrix::data -> Cow<'a, [f64]>, col and row strides. Matrix becomes the view
+#[derive(Debug, Clone)]
+pub struct Tensor<'a> {
+    data: Cow<'a, [f64]>,
+    shape: (usize, usize),  // rows, cols
+    stride: (usize, usize), // move between rows, cols
+    offset: (usize, usize),
+}
+
+impl<'a> Tensor<'a> {
+    pub fn from_rows(rows: Vec<Vec<f64>>) -> Self {
+        assert!(rows.len() != 0 && rows[0].len() != 0, "Empty rows or cols");
+        let n_rows = rows.len();
+        let n_cols = rows[0].len();
+        Tensor {
+            data: Cow::from(rows.into_iter().flat_map(|v| v).collect::<Vec<_>>()),
+            shape: (n_rows, n_cols),
+            stride: (n_cols, 1),
+            offset: (0, 0),
+        }
+    }
+
+    pub fn col(&self, col: usize) -> Tensor {
+        Tensor {
+            // offset data view to column
+            data: Cow::Borrowed(&self.data),
+            shape: (self.shape.0, 1), // rows x 1
+            stride: self.stride,
+            offset: (0, col),
+        }
+    }
+}
+
+impl<'a> Tensor<'a> {
+    pub fn get(&self, row: Range<usize>, col: Range<usize>) -> Tensor {
+        Tensor {
+            data: Cow::Borrowed(&self.data),
+            shape: (row.end - row.start, col.end - col.start),
+            stride: self.stride,
+            offset: (self.offset.0 + row.start, self.offset.1 + col.start),
+        }
+    }
+
+    pub fn to_owned(&self) -> Tensor {
+        Tensor {
+            data: Cow::Owned(
+                (0..self.shape.0)
+                    .flat_map(|r| {
+                        self.data
+                            .iter()
+                            .skip(
+                                (self.offset.0 + r) * self.stride.0 + self.offset.1 * self.stride.1,
+                            )
+                            .step_by(self.stride.1)
+                            .take(self.shape.1)
+                    })
+                    .cloned()
+                    .collect(),
+            ),
+            offset: (0, 0),
+            shape: self.shape,
+            stride: (self.shape.1, 1),
+        }
+    }
+
+    pub fn transpose(&self) -> Tensor {
+        Tensor {
+            data: Cow::Borrowed(&self.data),
+            shape: (self.shape.1, self.shape.0),
+            stride: (self.stride.1, self.stride.0),
+            offset: (self.offset.1, self.offset.0),
+        }
+    }
+}
+
+impl Index<(usize, usize)> for Matrix {
+    type Output = f64;
+
+    fn index(&self, (row, col): (usize, usize)) -> &Self::Output {
+        let idx = (self.offset.0 + row) * self.stride.0 + (self.offset.1 + col) * self.stride.1);
+        self.data[idx]
+    }
+}
+
+#[cfg(test)]
+mod tests2 {
+    use super::*;
+
+    #[test]
+    fn test_tensor() {
+        let m = Tensor::from_rows(vec![
+            vec![10.0, -1.0, 3.0, 0.0],
+            vec![-1.0, 11.0, -4.0, 3.0],
+            vec![2.0, -1.0, 10.0, -1.0],
+            vec![0.0, 3.0, -1.0, 8.0],
+        ]);
+        // index basic ranges
+        assert_eq!(*m.col(2).to_owned().data, [3.0, -4.0, 10.0, -1.0]);
+        assert_eq!(*m.get(1..2, 0..4).to_owned().data, [-1.0, 11.0, -4.0, 3.0]);
+        assert_eq!(
+            *m.get(1..3, 1..4).to_owned().data,
+            [11.0, -4.0, 3.0, -1.0, 10.0, -1.0]
+        );
+        assert_eq!(
+            *m.get(0..2, 1..4).to_owned().data,
+            [-1.0, 3.0, 0.0, 11.0, -4.0, 3.0]
+        );
+        // index after index
+        assert_eq!(
+            *m.get(1..3, 1..4).get(1..2, 1..3).to_owned().data,
+            [10.0, -1.0],
+        );
+        // transpose
+        assert_eq!(
+            *m.get(1..3, 1..4).transpose().to_owned().data,
+            [11.0, -1.0, -4.0, 10.0, 3.0, -1.0],
+        );
+        assert_eq!(
+            *m.get(1..4, 1..4)
+                .transpose()
+                .get(0..2, 1..3)
+                .to_owned()
+                .data,
+            [-1.0, 3.0, 10.0, -1.0],
+        );
+        assert_eq!(
+            *m.get(1..4, 1..4)
+                .transpose()
+                .get(0..2, 1..3)
+                .transpose()
+                .to_owned()
+                .data,
+            [-1.0, 10.0, 3.0, -1.0],
+        );
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Matrix {

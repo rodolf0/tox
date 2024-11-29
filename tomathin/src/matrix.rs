@@ -77,6 +77,13 @@ impl<'a> Index<(usize, usize)> for Tensor<'a> {
     }
 }
 
+impl<'a> IndexMut<(usize, usize)> for Tensor<'a> {
+    fn index_mut(&mut self, (row, col): (usize, usize)) -> &mut Self::Output {
+        let idx = (self.offset.0 + row) * self.stride.0 + (self.offset.1 + col) * self.stride.1;
+        &mut self.data.to_mut()[idx]
+    }
+}
+
 impl<'a> IntoIterator for &'a Tensor<'a> {
     type Item = &'a f64;
     type IntoIter = Box<dyn Iterator<Item = &'a f64> + 'a>;
@@ -272,7 +279,7 @@ impl<'a> MatrixView<'a> {
     }
 }
 
-fn proj(v: &Vec<f64>, u: MatrixView) -> Vec<f64> {
+fn proj(v: &Vec<f64>, u: Tensor) -> Vec<f64> {
     let scale = dot(v, &u) / dot(&u, &u);
     u.into_iter().map(|ui| ui * scale).collect()
 }
@@ -323,13 +330,16 @@ fn transpose(a: Matrix) -> Matrix {
     }
 }
 
-fn matmul(a: &Matrix, b: &Matrix) -> Matrix {
-    Matrix {
-        data: (0..a.rows)
-            .flat_map(|ra| (0..b.cols).map(move |cb| dot(&a.row(ra), &b.col(cb))))
-            .collect(),
-        rows: a.rows,
-        cols: b.cols,
+fn matmul<'a>(a: &Tensor, b: &Tensor) -> Tensor<'a> {
+    Tensor {
+        data: Cow::Owned(
+            (0..a.shape.0)
+                .flat_map(|ra| (0..b.shape.1).map(move |cb| dot(&a.row(ra), &b.col(cb))))
+                .collect(),
+        ),
+        shape: (a.shape.0, b.shape.1),
+        stride: (b.shape.1, 1),
+        offset: (0, 0),
     }
 }
 
@@ -337,17 +347,20 @@ fn matmul(a: &Matrix, b: &Matrix) -> Matrix {
 // When just care about column-space (collection vectors)
 // Get a set of vectors that span the same space. I don't really care directions just the space they span, so I'll orthogonalize
 // Modified gram Schmidt for better numerical stability
-pub fn gram_schmidt_orthonorm(mut m: Matrix) -> Matrix {
-    for k in 0..m.cols {
+pub fn gram_schmidt_orthonorm(mut m: Tensor) -> Tensor {
+    for k in 0..m.shape.1 {
         // take col-k vector remove components shared with other bases
-        let uk = (0..k).fold(m.col(k).vec(), |uk, j| {
-            uk.iter()
-                .zip(proj(&uk, m.col(j)).into_iter())
-                .map(|(u, vp)| u - vp)
-                .collect()
-        });
+        let uk = (0..k).fold(
+            m.col(k).into_iter().cloned().collect::<Vec<_>>(),
+            |uk, j| {
+                uk.iter()
+                    .zip(&proj(&uk, m.col(j)))
+                    .map(|(u, vp)| u - vp)
+                    .collect()
+            },
+        );
         // normalize vector
-        for r in 0..m.rows {
+        for r in 0..m.shape.0 {
             m[(r, k)] = uk[r] / dot(&uk, &uk).sqrt();
         }
     }
@@ -365,54 +378,29 @@ pub fn householder_reflector(x: &[f64]) -> Vec<f64> {
     v.iter().map(|vi| vi / norm_v).collect()
 }
 
-pub fn nsolve(a: Matrix, b: Vec<f64>) -> Vec<f64> {
+pub fn nsolve(a: Tensor, b: Vec<f64>) -> Vec<f64> {
     // orthogonalize a via gram schmidt
-    let a = &a;
-    let q = &gram_schmidt_orthonorm(a.clone());
-    // let r = matmul(&transpose(q.clone()), a);
-    let r = Matrix {
-        data: (0..a.rows)
-            .flat_map(|r| {
-                (0..a.cols).map(move |c| {
-                    if c >= r {
-                        dot(&a.col(c), &q.col(r))
-                    } else {
-                        0.0
-                    }
-                })
-            })
-            .collect(),
-        cols: a.cols,
-        rows: a.rows,
-    };
-    let c: Vec<_> = (0..q.rows).map(|r| dot(&q.col(r), &b)).collect();
+    let q = gram_schmidt_orthonorm(a.clone());
+    let q_t = q.transpose();
+    let r = matmul(&q_t, &a);
+    let c: Vec<_> = (0..q_t.shape.0).map(|r| dot(&q_t.row(r), &b)).collect();
     // we'll have as many unknowns as a as columns
     // if the system is under-determined though some will be left at 0 (c isn't that large)
-    let mut x = vec![0.0; a.cols];
-    let xsize = std::cmp::min(a.cols, a.rows);
+    let mut x = vec![0.0; a.shape.1];
+    let xsize = std::cmp::min(a.shape.0, a.shape.1);
 
-    // r00 r01 r02 r03  x0  c0
-    //   0 r11 r12 r13  x1  c1
-    //   0   0 r22 r23  x2  c2
-    //   0   0   0 r33  x3  c3
-
+    // r11 r12 r13  x1  c1
+    //   0 r22 r23  x2  c2
+    //   0   0 r33  x3  c3
+    //
     // r33 * x3 = c3                         => x3 = c3 / r33
     // r22 * x2 + r23 * x3 = c2              => x2 = (c2 - r23 * x3) / r22
     // r11 * x1 + r12 * x2 + r13 * x3 = c1   => x1 = (c1 - r12 * x2 - r13 * x3) / r11
 
     for n in (0..xsize).rev() {
-        x[n] = (c[n] - dot(&r.row(n).range(n + 1..r.cols), &x[n + 1..])) / r[(n, n)];
+        x[n] = (c[n] - dot(&r.get(n..n + 1, n + 1..r.shape.1), &x[n + 1..])) / r[(n, n)];
     }
     x
-}
-
-pub fn eigen_values(a: Matrix) {
-    let mut a = a.clone();
-    for _ in 0..100 {
-        let q = gram_schmidt_orthonorm(a.clone());
-        let r = matmul(&a, &q);
-        a = matmul(&r, &q);
-    }
 }
 
 #[cfg(test)]
@@ -434,44 +422,17 @@ mod tests {
     }
 
     #[test]
-    fn test_matrix() {
-        let m = Matrix::from_rows(vec![
-            vec![10.0, -1.0, 2.0, 0.0],
-            vec![-1.0, 11.0, -4.0, 3.0],
-            vec![2.0, -1.0, 10.0, -1.0],
-            vec![0.0, 3.0, -1.0, 8.0],
-        ]);
-        println!("{:?}", m);
-        let c2 = m.col(2);
-        println!("{:?} {:?} {:?} {:?}", c2[0], c2[1], c2[2], c2[3]);
-
-        let r2 = m.row(2);
-        println!("{:?} {:?} {:?} {:?}", r2[0], r2[1], r2[2], r2[3]);
-
-        println!("dot: {:?}", dot(&c2, &r2));
-
-        let onm = gram_schmidt_orthonorm(m);
-        println!("gs: {:?}", onm);
-        for i in 0..onm.cols {
-            println!("norm {}={}", i, norm(&onm.col(i)));
-            for j in 0..onm.cols {
-                println!("dot {}*{}: {}", i, j, dot(&onm.col(i), &onm.col(j)));
-            }
-        }
-    }
-
-    #[test]
     fn test_orthonorm() {
-        let m = Matrix::from_rows(vec![
+        let m = Tensor::from_rows(vec![
             vec![-1.0, 11.0, -1.0],
             vec![2.0, -20.0, 2.0],
             vec![0.0, 3.0, -1.0],
         ]);
         let onm = gram_schmidt_orthonorm(m);
         println!("gs: {:?}", onm);
-        for i in 0..onm.cols {
+        for i in 0..onm.shape.1 {
             println!("norm {}={}", i, norm(&onm.col(i)));
-            for j in 0..onm.cols {
+            for j in 0..onm.shape.1 {
                 println!("dot {}*{}: {}", i, j, dot(&onm.col(i), &onm.col(j)));
             }
         }
@@ -480,13 +441,13 @@ mod tests {
     #[test]
     fn test_nsolve() {
         let x = nsolve(
-            Matrix::from_rows(vec![vec![16.0, 3.0], vec![7.0, -11.0]]),
+            Tensor::from_rows(vec![vec![16.0, 3.0], vec![7.0, -11.0]]),
             vec![11.0, 13.0],
         );
         approx_eq(&x, &vec![160.0 / 197.0, -131.0 / 197.0]);
 
         let x = nsolve(
-            Matrix::from_rows(vec![
+            Tensor::from_rows(vec![
                 vec![10.0, -1.0, 2.0, 0.0],
                 vec![-1.0, 11.0, -1.0, 3.0],
                 vec![2.0, -1.0, 10.0, -1.0],
@@ -497,7 +458,7 @@ mod tests {
         approx_eq(&x, &vec![1.0, 2.0, -1.0, 1.0]);
 
         let x = nsolve(
-            Matrix::from_rows(vec![
+            Tensor::from_rows(vec![
                 vec![10.0, -1.0, 2.0, 0.0],
                 vec![-1.0, 11.0, -1.0, 3.0],
                 vec![2.0, -1.0, 10.0, -1.0],
@@ -507,26 +468,28 @@ mod tests {
         println!("{:?}", x);
 
         let x = nsolve(
-            Matrix::from_rows(vec![vec![0.2, 1.1], vec![2.2, 0.1]]),
+            Tensor::from_rows(vec![vec![0.2, 1.1], vec![2.2, 0.1]]),
             vec![2.78, 0.89],
         );
         approx_eq(&x, &vec![0.29208333333336917, 2.47416666666666]);
 
         let x = nsolve(
-            Matrix {
-                data: vec![1.0, 2.0, 3.0, 4.0, 5.0],
-                cols: 1,
-                rows: 5,
+            Tensor {
+                data: Cow::Owned(vec![1.0, 2.0, 3.0, 4.0, 5.0]),
+                shape: (5, 1),
+                stride: (1, 1),
+                offset: (0, 0),
             },
             vec![2.0, 5.0, 3.0, 8.0, 7.0],
         );
         println!("{:?}", x);
 
         let x = nsolve(
-            Matrix {
-                data: vec![1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 4.0, 1.0, 5.0, 1.0],
-                cols: 2,
-                rows: 5,
+            Tensor {
+                data: Cow::Owned(vec![1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 4.0, 1.0, 5.0, 1.0]),
+                shape: (5, 2),
+                stride: (2, 1),
+                offset: (0, 0),
             },
             vec![2.0, 5.0, 3.0, 8.0, 7.0],
         );

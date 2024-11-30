@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::ops::{Index, IndexMut, Range};
+use std::ops::{Index, IndexMut, Mul, Range, Sub};
 
 #[derive(Debug, Clone)]
 pub struct Matrix<'a> {
@@ -28,6 +28,19 @@ impl<'a> Matrix<'a> {
 
     pub fn row(&self, row: usize) -> Matrix {
         self.get(row..row + 1, 0..self.shape.1)
+    }
+
+    pub fn eye(n: usize) -> Matrix<'a> {
+        Matrix {
+            data: Cow::from(
+                (0..n * n)
+                    .map(|i| if i % (n + 1) == 0 { 1.0 } else { 0.0 })
+                    .collect::<Vec<_>>(),
+            ),
+            shape: (n, n),
+            stride: (n, 1),
+            offset: (0, 0),
+        }
     }
 }
 
@@ -99,6 +112,34 @@ impl<'a> IntoIterator for &'a Matrix<'a> {
     }
 }
 
+impl<'a> Mul<Matrix<'_>> for Matrix<'a> {
+    type Output = Matrix<'a>;
+
+    fn mul(self, rhs: Matrix) -> Matrix<'a> {
+        matmul(&self, &rhs)
+    }
+}
+
+impl<'a> Sub<Matrix<'_>> for Matrix<'a> {
+    type Output = Matrix<'a>;
+
+    fn sub(self, rhs: Matrix) -> Matrix<'a> {
+        assert_eq!(self.shape, rhs.shape, "Can't Sub matrix of different size");
+        Matrix {
+            data: Cow::Owned(
+                self.data
+                    .iter()
+                    .zip(&*rhs.data)
+                    .map(|(l, r)| l - r)
+                    .collect(),
+            ),
+            shape: (self.shape.0, rhs.shape.1),
+            stride: (rhs.shape.1, 1),
+            offset: (0, 0),
+        }
+    }
+}
+
 fn proj(v: &Vec<f64>, u: Matrix) -> Vec<f64> {
     let scale = dot(v, &u) / dot(&u, &u);
     u.into_iter().map(|ui| ui * scale).collect()
@@ -129,6 +170,11 @@ fn norm<'a>(a: impl IntoIterator<Item = &'a f64>) -> f64 {
 }
 
 fn matmul<'a>(a: &Matrix, b: &Matrix) -> Matrix<'a> {
+    assert_eq!(
+        a.shape.1, b.shape.0,
+        "Matrix inproperly sized for matmul {}-{}",
+        a.shape.1, b.shape.0
+    );
     Matrix {
         data: Cow::Owned(
             (0..a.shape.0)
@@ -166,20 +212,65 @@ pub fn gram_schmidt_orthonorm(mut m: Matrix) -> Matrix {
 }
 
 // A householder reflection finds 'v' reflection hyper-plane (perpendicular vector)
-// so that // vector 'x' when reflected over 'v' is colinear with standard basis e1.
+// so that vector 'x' when reflected over 'v' is colinear with standard basis e1.
 // Find 'v' so that x - 2 * proj-v(x) == ||x|| * e1
-pub fn householder_reflector(x: &[f64]) -> Vec<f64> {
-    let mut v = x.to_owned();
-    // of possible reflections (signum) choose the largest v to minimize error.
-    v[0] = x[0] + x[0].signum() * x.iter().map(|xi| xi * xi).sum::<f64>().sqrt();
+pub fn householder_reflector<'a>(x: impl IntoIterator<Item = &'a f64>) -> Vec<f64> {
+    let mut v: Vec<_> = x.into_iter().cloned().collect();
+    // of possible reflections (signum) choose the largest ||v|| to minimize error.
+    v[0] = v[0] + v[0].signum() * v.iter().map(|xi| xi * xi).sum::<f64>().sqrt();
+    println!("u = {:?}", v);
     let norm_v = v.iter().map(|vi| vi * vi).sum::<f64>().sqrt();
     v.iter().map(|vi| vi / norm_v).collect()
 }
 
+pub fn qr_decompose<'b>(a: &Matrix) -> (Matrix<'b>, Matrix<'b>) {
+    // Decompose Amxn -> Qmxm Rmxn
+    // for underdeterined systems (infinite solutions) cap r's cols
+    let r_cols = std::cmp::min(a.shape.0, a.shape.1);
+    let mut r = a.get(0..a.shape.0, 0..r_cols).to_owned();
+    let q_size = a.shape.0; // Q is always square.
+    let mut q = Matrix::eye(q_size);
+    // Apply reflactors to a for each column to derive r
+    for c in 0..r.shape.1 {
+        let rj = r.get(c..r.shape.0, c..c + 1); // column vector from diagonal to bottom
+        let v = householder_reflector(&rj);
+
+        // Apply the reflector to the A sub-matrices resulting in R
+        for j in c..r.shape.1 {
+            let vdotr = dot(&v, &r.get(c..r.shape.0, j..j + 1));
+            // modify r in place iterating from diagonal to end of row
+            for i in c..r.shape.0 {
+                r[(i, j)] = r[(i, j)] - 2.0 * v[i - c] * vdotr;
+            }
+        }
+        println!("r = {:?}", r);
+
+        // Q should be formed by applying Hi in reverse order.
+        // Since Q is symetric orthogonal. Q.t = Qk ... Q2 Q1, Q = Q1 Q2 ... Qk
+        // We can build Q in the forward pass and return its transpose
+        for j in 0..q.shape.1 {
+            let vdotq = dot(&v, &q.get(c..q.shape.0, j..j + 1));
+            // modify q in place iterating from diagonal to end of row
+            for i in c..q.shape.0 {
+                q[(i, j)] = q[(i, j)] - 2.0 * v[i - c] * vdotq;
+            }
+        }
+        println!("q = {:?}", q);
+    }
+    (q.transpose().to_owned(), r)
+}
+
 pub fn nsolve(a: Matrix, b: Vec<f64>) -> Vec<f64> {
     // orthogonalize a via gram schmidt
-    let q_t = gram_schmidt_orthonorm(a.to_owned()).transpose().to_owned();
-    let r = matmul(&q_t, &a);
+    // let q_t = gram_schmidt_orthonorm(a.to_owned()).transpose().to_owned();
+    // let r = matmul(&q_t, &a);
+    let (q, r) = qr_decompose(&a);
+    println!("A = {:?}", a);
+    println!("Q = {:?}", q);
+    println!("R = {:?}", r);
+    println!("Q R = {:?}", matmul(&q, &r));
+    println!("Q Q.t= {:?}", matmul(&q, &q.transpose()));
+    let q_t = q.transpose();
     let c: Vec<_> = (0..q_t.shape.0).map(|r| dot(&q_t.row(r), &b)).collect();
     // we'll have as many unknowns as a as columns
     // if the system is under-determined though some will be left at 0 (c isn't that large)
@@ -287,6 +378,21 @@ mod tests {
                 println!("dot {}*{}: {}", i, j, dot(&onm.col(i), &onm.col(j)));
             }
         }
+    }
+
+    #[test]
+    fn test_qr_decompose() {
+        let a = Matrix::from_rows(vec![
+            vec![12.0, -51.0, 4.0],
+            vec![6.0, 167.0, -68.0],
+            vec![-4.0, 24.0, -41.0],
+        ]);
+        let (q, r) = qr_decompose(&a);
+        println!("A = {:?}", a);
+        println!("Q = {:?}", q);
+        println!("R = {:?}", r);
+        println!("Q R = {:?}", matmul(&q, &r));
+        println!("Q Q.t= {:?}", matmul(&q, &q.transpose()));
     }
 
     #[test]

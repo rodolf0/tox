@@ -1,21 +1,21 @@
-use std::borrow::Cow;
 use std::ops::{Index, IndexMut, Mul, Range, Sub};
+use std::rc::Rc;
 
 #[derive(Debug, Clone)]
-pub struct Matrix<'a> {
-    data: Cow<'a, [f64]>,
+pub struct Matrix {
+    data: Rc<[f64]>,
     shape: (usize, usize),  // rows, cols
     stride: (usize, usize), // move between rows, cols
     offset: (usize, usize),
 }
 
-impl<'a> Matrix<'a> {
+impl<'a> Matrix {
     pub fn from_rows(rows: Vec<Vec<f64>>) -> Self {
         assert!(rows.len() != 0 && rows[0].len() != 0, "Empty rows or cols");
         let n_rows = rows.len();
         let n_cols = rows[0].len();
         Matrix {
-            data: Cow::from(rows.into_iter().flat_map(|v| v).collect::<Vec<_>>()),
+            data: Rc::from_iter(rows.into_iter().flat_map(|v| v)),
             shape: (n_rows, n_cols),
             stride: (n_cols, 1),
             offset: (0, 0),
@@ -30,13 +30,9 @@ impl<'a> Matrix<'a> {
         self.get(row..row + 1, 0..self.shape.1)
     }
 
-    pub fn eye(n: usize) -> Matrix<'a> {
+    pub fn eye(n: usize) -> Matrix {
         Matrix {
-            data: Cow::from(
-                (0..n * n)
-                    .map(|i| if i % (n + 1) == 0 { 1.0 } else { 0.0 })
-                    .collect::<Vec<_>>(),
-            ),
+            data: Rc::from_iter((0..n * n).map(|i| if i % (n + 1) == 0 { 1.0 } else { 0.0 })),
             shape: (n, n),
             stride: (n, 1),
             offset: (0, 0),
@@ -44,7 +40,7 @@ impl<'a> Matrix<'a> {
     }
 }
 
-impl<'a> Matrix<'a> {
+impl Matrix {
     pub fn get(&self, row: Range<usize>, col: Range<usize>) -> Matrix {
         assert!(
             row.end <= self.shape.0 && col.end <= self.shape.1,
@@ -55,16 +51,19 @@ impl<'a> Matrix<'a> {
             self.shape.1
         );
         Matrix {
-            data: Cow::Borrowed(&self.data),
+            data: self.data.clone(),
             shape: (row.end - row.start, col.end - col.start),
             stride: self.stride,
             offset: (self.offset.0 + row.start, self.offset.1 + col.start),
         }
     }
 
-    pub fn to_owned<'b>(&'a self) -> Matrix<'b> {
+    pub fn coalesce(self) -> Matrix {
+        if self.offset == (0, 0) && self.stride == (self.shape.1, 1) {
+            return self;
+        }
         Matrix {
-            data: Cow::Owned(self.into_iter().cloned().collect()),
+            data: Rc::from_iter(self.into_iter().cloned()),
             offset: (0, 0),
             shape: self.shape,
             stride: (self.shape.1, 1),
@@ -73,7 +72,7 @@ impl<'a> Matrix<'a> {
 
     pub fn transpose(&self) -> Matrix {
         Matrix {
-            data: Cow::Borrowed(&self.data),
+            data: self.data.clone(),
             shape: (self.shape.1, self.shape.0),
             stride: (self.stride.1, self.stride.0),
             offset: (self.offset.1, self.offset.0),
@@ -81,7 +80,7 @@ impl<'a> Matrix<'a> {
     }
 }
 
-impl<'a> Index<(usize, usize)> for Matrix<'a> {
+impl Index<(usize, usize)> for Matrix {
     type Output = f64;
 
     fn index(&self, (row, col): (usize, usize)) -> &Self::Output {
@@ -90,14 +89,14 @@ impl<'a> Index<(usize, usize)> for Matrix<'a> {
     }
 }
 
-impl<'a> IndexMut<(usize, usize)> for Matrix<'a> {
+impl<'a> IndexMut<(usize, usize)> for Matrix {
     fn index_mut(&mut self, (row, col): (usize, usize)) -> &mut Self::Output {
         let idx = (self.offset.0 + row) * self.stride.0 + (self.offset.1 + col) * self.stride.1;
-        &mut self.data.to_mut()[idx]
+        Rc::make_mut(&mut self.data).index_mut(idx)
     }
 }
 
-impl<'a> IntoIterator for &'a Matrix<'a> {
+impl<'a> IntoIterator for &'a Matrix {
     type Item = &'a f64;
     type IntoIter = Box<dyn Iterator<Item = &'a f64> + 'a>;
 
@@ -112,27 +111,21 @@ impl<'a> IntoIterator for &'a Matrix<'a> {
     }
 }
 
-impl<'a> Mul<Matrix<'_>> for Matrix<'a> {
-    type Output = Matrix<'a>;
+impl Mul<Matrix> for Matrix {
+    type Output = Matrix;
 
-    fn mul(self, rhs: Matrix) -> Matrix<'a> {
+    fn mul(self, rhs: Matrix) -> Matrix {
         matmul(&self, &rhs)
     }
 }
 
-impl<'a> Sub<Matrix<'_>> for Matrix<'a> {
-    type Output = Matrix<'a>;
+impl Sub<Matrix> for Matrix {
+    type Output = Matrix;
 
-    fn sub(self, rhs: Matrix) -> Matrix<'a> {
+    fn sub(self, rhs: Matrix) -> Matrix {
         assert_eq!(self.shape, rhs.shape, "Can't Sub matrix of different size");
         Matrix {
-            data: Cow::Owned(
-                self.data
-                    .iter()
-                    .zip(&*rhs.data)
-                    .map(|(l, r)| l - r)
-                    .collect(),
-            ),
+            data: Rc::from_iter(self.data.iter().zip(&*rhs.data).map(|(l, r)| l - r)),
             shape: (self.shape.0, rhs.shape.1),
             stride: (rhs.shape.1, 1),
             offset: (0, 0),
@@ -152,13 +145,9 @@ fn dot<'a>(a: impl IntoIterator<Item = &'a f64>, b: impl IntoIterator<Item = &'a
         .sum::<f64>()
 }
 
-fn outer<'a>(a: &[f64], b: &[f64]) -> Matrix<'a> {
+fn outer<'a>(a: &[f64], b: &[f64]) -> Matrix {
     Matrix {
-        data: Cow::Owned(
-            (0..a.len())
-                .flat_map(|r| (0..b.len()).map(move |c| a[r] * b[c]))
-                .collect(),
-        ),
+        data: Rc::from_iter((0..a.len()).flat_map(|r| (0..b.len()).map(move |c| a[r] * b[c]))),
         shape: (a.len(), b.len()),
         stride: (b.len(), 1),
         offset: (0, 0),
@@ -169,17 +158,15 @@ fn norm<'a>(a: impl IntoIterator<Item = &'a f64>) -> f64 {
     a.into_iter().map(|a| a * a).sum::<f64>().sqrt()
 }
 
-fn matmul<'a>(a: &Matrix, b: &Matrix) -> Matrix<'a> {
+fn matmul<'a>(a: &Matrix, b: &Matrix) -> Matrix {
     assert_eq!(
         a.shape.1, b.shape.0,
         "Matrix inproperly sized for matmul {}-{}",
         a.shape.1, b.shape.0
     );
     Matrix {
-        data: Cow::Owned(
-            (0..a.shape.0)
-                .flat_map(|ra| (0..b.shape.1).map(move |cb| dot(&a.row(ra), &b.col(cb))))
-                .collect(),
+        data: Rc::from_iter(
+            (0..a.shape.0).flat_map(|ra| (0..b.shape.1).map(move |cb| dot(&a.row(ra), &b.col(cb)))),
         ),
         shape: (a.shape.0, b.shape.1),
         stride: (b.shape.1, 1),
@@ -191,7 +178,8 @@ fn matmul<'a>(a: &Matrix, b: &Matrix) -> Matrix<'a> {
 // When just care about column-space (collection vectors)
 // Get a set of vectors that span the same space. I don't really care directions just the space they span, so I'll orthogonalize
 // Modified gram Schmidt for better numerical stability
-pub fn gram_schmidt_orthonorm(mut m: Matrix) -> Matrix {
+pub fn gram_schmidt_orthonorm(a: &Matrix) -> Matrix {
+    let mut m = a.clone();
     for k in 0..m.shape.1 {
         // take col-k vector remove components shared with other bases
         let uk = (0..k).fold(
@@ -218,16 +206,15 @@ pub fn householder_reflector<'a>(x: impl IntoIterator<Item = &'a f64>) -> Vec<f6
     let mut v: Vec<_> = x.into_iter().cloned().collect();
     // of possible reflections (signum) choose the largest ||v|| to minimize error.
     v[0] = v[0] + v[0].signum() * v.iter().map(|xi| xi * xi).sum::<f64>().sqrt();
-    println!("u = {:?}", v);
     let norm_v = v.iter().map(|vi| vi * vi).sum::<f64>().sqrt();
     v.iter().map(|vi| vi / norm_v).collect()
 }
 
-pub fn qr_decompose<'b>(a: &Matrix) -> (Matrix<'b>, Matrix<'b>) {
+pub fn qr_decompose(a: &Matrix) -> (Matrix, Matrix) {
     // Decompose Amxn -> Qmxm Rmxn
     // for underdeterined systems (infinite solutions) cap r's cols
     let r_cols = std::cmp::min(a.shape.0, a.shape.1);
-    let mut r = a.get(0..a.shape.0, 0..r_cols).to_owned();
+    let mut r = a.get(0..a.shape.0, 0..r_cols);
     let q_size = a.shape.0; // Q is always square.
     let mut q = Matrix::eye(q_size);
     // Apply reflactors to a for each column to derive r
@@ -243,8 +230,6 @@ pub fn qr_decompose<'b>(a: &Matrix) -> (Matrix<'b>, Matrix<'b>) {
                 r[(i, j)] = r[(i, j)] - 2.0 * v[i - c] * vdotr;
             }
         }
-        println!("r = {:?}", r);
-
         // Q should be formed by applying Hi in reverse order.
         // Since Q is symetric orthogonal. Q.t = Qk ... Q2 Q1, Q = Q1 Q2 ... Qk
         // We can build Q in the forward pass and return its transpose
@@ -255,21 +240,15 @@ pub fn qr_decompose<'b>(a: &Matrix) -> (Matrix<'b>, Matrix<'b>) {
                 q[(i, j)] = q[(i, j)] - 2.0 * v[i - c] * vdotq;
             }
         }
-        println!("q = {:?}", q);
     }
-    (q.transpose().to_owned(), r)
+    (q.transpose(), r)
 }
 
 pub fn nsolve(a: Matrix, b: Vec<f64>) -> Vec<f64> {
     // orthogonalize a via gram schmidt
-    // let q_t = gram_schmidt_orthonorm(a.to_owned()).transpose().to_owned();
+    // let q_t = gram_schmidt_orthonorm(&a).transpose();
     // let r = matmul(&q_t, &a);
     let (q, r) = qr_decompose(&a);
-    println!("A = {:?}", a);
-    println!("Q = {:?}", q);
-    println!("R = {:?}", r);
-    println!("Q R = {:?}", matmul(&q, &r));
-    println!("Q Q.t= {:?}", matmul(&q, &q.transpose()));
     let q_t = q.transpose();
     let c: Vec<_> = (0..q_t.shape.0).map(|r| dot(&q_t.row(r), &b)).collect();
     // we'll have as many unknowns as a as columns
@@ -318,31 +297,31 @@ mod tests {
             vec![0.0, 3.0, -1.0, 8.0],
         ]);
         // index basic ranges
-        assert_eq!(*m.col(2).to_owned().data, [3.0, -4.0, 10.0, -1.0]);
-        assert_eq!(*m.get(1..2, 0..4).to_owned().data, [-1.0, 11.0, -4.0, 3.0]);
+        assert_eq!(*m.col(2).coalesce().data, [3.0, -4.0, 10.0, -1.0]);
+        assert_eq!(*m.get(1..2, 0..4).coalesce().data, [-1.0, 11.0, -4.0, 3.0]);
         assert_eq!(
-            *m.get(1..3, 1..4).to_owned().data,
+            *m.get(1..3, 1..4).coalesce().data,
             [11.0, -4.0, 3.0, -1.0, 10.0, -1.0]
         );
         assert_eq!(
-            *m.get(0..2, 1..4).to_owned().data,
+            *m.get(0..2, 1..4).coalesce().data,
             [-1.0, 3.0, 0.0, 11.0, -4.0, 3.0]
         );
         // index after index
         assert_eq!(
-            *m.get(1..3, 1..4).get(1..2, 1..3).to_owned().data,
+            *m.get(1..3, 1..4).get(1..2, 1..3).coalesce().data,
             [10.0, -1.0],
         );
         // transpose
         assert_eq!(
-            *m.get(1..3, 1..4).transpose().to_owned().data,
+            *m.get(1..3, 1..4).transpose().coalesce().data,
             [11.0, -1.0, -4.0, 10.0, 3.0, -1.0],
         );
         assert_eq!(
             *m.get(1..4, 1..4)
                 .transpose()
                 .get(0..2, 1..3)
-                .to_owned()
+                .coalesce()
                 .data,
             [-1.0, 3.0, 10.0, -1.0],
         );
@@ -351,7 +330,7 @@ mod tests {
                 .transpose()
                 .get(0..2, 1..3)
                 .transpose()
-                .to_owned()
+                .coalesce()
                 .data,
             [-1.0, 10.0, 3.0, -1.0],
         );
@@ -370,7 +349,7 @@ mod tests {
             vec![2.0, -20.0, 2.0],
             vec![0.0, 3.0, -1.0],
         ]);
-        let onm = gram_schmidt_orthonorm(m);
+        let onm = gram_schmidt_orthonorm(&m);
         println!("gs: {:?}", onm);
         for i in 0..onm.shape.1 {
             println!("norm {}={}", i, norm(&onm.col(i)));
@@ -432,7 +411,7 @@ mod tests {
 
         let x = nsolve(
             Matrix {
-                data: Cow::Owned(vec![1.0, 2.0, 3.0, 4.0, 5.0]),
+                data: Rc::from([1.0, 2.0, 3.0, 4.0, 5.0]),
                 shape: (5, 1),
                 stride: (1, 1),
                 offset: (0, 0),
@@ -443,7 +422,7 @@ mod tests {
 
         let x = nsolve(
             Matrix {
-                data: Cow::Owned(vec![1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 4.0, 1.0, 5.0, 1.0]),
+                data: Rc::from([1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 4.0, 1.0, 5.0, 1.0]),
                 shape: (5, 2),
                 stride: (2, 1),
                 offset: (0, 0),
@@ -457,35 +436,26 @@ mod tests {
     fn test_householder() {
         let x = vec![4.0, 1.0, -2.0, 2.0];
         let v = householder_reflector(&x);
-        println!("v = {:?}", v);
 
-        let udotv = dot(&v, &x);
-        println!("udotv = {:?}", udotv);
+        let vdotx = dot(&v, &x);
         let hx: Vec<_> = x
             .iter()
             .zip(&v)
-            .map(|(xi, vi)| xi - 2.0 * vi * udotv)
+            .map(|(xi, vi)| xi - 2.0 * vi * vdotx)
             .collect();
         println!("hx = {:?}", hx);
-
-        let vtv = dot(&v, &v);
-        println!("vtv = {:?}", vtv);
 
         let o = outer(&v, &v);
         println!("o = {:?}", o);
 
         let oo = &o;
         let h = Matrix {
-            data: Cow::Owned(
-                (0..o.shape.0)
-                    .flat_map(|r| {
-                        (0..o.shape.1).map(move |c| {
-                            let eye = if r == c { 1.0 } else { 0.0 };
-                            eye - 2.0 * oo[(r, c)] // / vtv
-                        })
-                    })
-                    .collect(),
-            ),
+            data: Rc::from_iter((0..o.shape.0).flat_map(|r| {
+                (0..o.shape.1).map(move |c| {
+                    let eye = if r == c { 1.0 } else { 0.0 };
+                    eye - 2.0 * oo[(r, c)]
+                })
+            })),
             shape: o.shape,
             stride: o.stride,
             offset: (0, 0),

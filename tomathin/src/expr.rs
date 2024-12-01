@@ -1,6 +1,62 @@
+use core::fmt;
+
 use crate::context::Context;
 use crate::findroot;
 use crate::parser::Expr;
+
+// Lowest number is highest precedence
+fn precedence(e: &Expr) -> usize {
+    match e {
+        Expr::Number(_) => 0,
+        Expr::Symbol(_) => 1,
+        Expr::Expr(head, _) => match head.as_ref() {
+            "List" => 10,
+            "Power" => 50,
+            "Divide" => 60,
+            "Times" => 65,
+            "Plus" => 70,
+            "Minus" => 75,
+            _ => todo!(),
+        },
+        _ => todo!(),
+    }
+}
+
+fn join_args(e: &Expr, sep: &str) -> String {
+    let parent_p = precedence(e);
+    let Expr::Expr(_, args) = e else {
+        panic!("BUG: Tried to join_args for non Expr: {:?}", e);
+    };
+    args.iter()
+        .map(|a| {
+            if parent_p < precedence(a) {
+                format!("({})", a.to_string())
+            } else {
+                a.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(sep)
+}
+
+impl fmt::Display for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match self {
+            Expr::Symbol(s) => write!(f, "{}", s),
+            Expr::Number(n) => write!(f, "{}", n),
+            Expr::Expr(head, _) => match head.as_ref() {
+                "Plus" => write!(f, "{}", join_args(self, " + ")),
+                "Times" => write!(f, "{}", join_args(self, " * ")),
+                "Minus" => write!(f, "{}", join_args(self, " - ")),
+                "Divide" => write!(f, "{}", join_args(self, " / ")),
+                "Power" => write!(f, "{}", join_args(self, " ^ ")),
+                "List" => write!(f, "{{{}}}", join_args(self, ", ")),
+                _ => write!(f, "{:?}", self),
+            },
+            _ => write!(f, "{:?}", self),
+        }
+    }
+}
 
 pub fn evaluate(expr: Expr) -> Result<Expr, String> {
     eval_with_ctx(expr, &mut Context::new())

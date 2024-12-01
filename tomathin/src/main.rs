@@ -7,7 +7,7 @@ fn main() -> Result<(), String> {
         let input = std::env::args().skip(1).collect::<Vec<String>>().join(" ");
         match parser(input.as_str()) {
             Err(e) => println!("Parse err: {:?}", e),
-            Ok(expr) => println!("{:?}", tomathin::evaluate(expr)?),
+            Ok(expr) => println!("{}", tomathin::evaluate(expr)?),
         }
         return Ok(());
     }
@@ -24,7 +24,7 @@ fn main() -> Result<(), String> {
                 Ok(expr) => {
                     let expr = tomathin::eval_with_ctx(expr, &mut ctx)?;
                     let _ = rl.add_history_entry(&line);
-                    println!("{:?}", expr);
+                    println!("{}", expr);
                 }
             },
         }

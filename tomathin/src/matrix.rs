@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ops::{Index, IndexMut, Mul, Range, Sub};
 use std::rc::Rc;
 
@@ -22,12 +23,32 @@ impl<'a> Matrix {
         }
     }
 
-    pub fn col(&self, col: usize) -> Matrix {
-        self.get(0..self.shape.0, col..col + 1)
+    pub fn col(&self, col: usize) -> Cow<'_, [f64]> {
+        // Moving between rows needs to be contiguous in memory
+        if self.stride.0 == 1 {
+            let idx = self.offset.0 * self.stride.0 + (self.offset.1 + col) * self.stride.1;
+            return Cow::Borrowed(&self.data[idx..idx + self.shape.0]);
+        }
+        Cow::Owned(
+            self.get(0..self.shape.0, col..col + 1)
+                .into_iter()
+                .cloned()
+                .collect(),
+        )
     }
 
-    pub fn row(&self, row: usize) -> Matrix {
-        self.get(row..row + 1, 0..self.shape.1)
+    pub fn row(&self, row: usize) -> Cow<'_, [f64]> {
+        // Moving between columns needs to be contiguous in memory
+        if self.stride.1 == 1 {
+            let idx = (self.offset.0 + row) * self.stride.0 + self.offset.1 * self.stride.1;
+            return Cow::Borrowed(&self.data[idx..idx + self.shape.1]);
+        }
+        Cow::Owned(
+            self.get(row..row + 1, 0..self.shape.1)
+                .into_iter()
+                .cloned()
+                .collect(),
+        )
     }
 
     pub fn eye(n: usize) -> Matrix {
@@ -133,16 +154,13 @@ impl Sub<Matrix> for Matrix {
     }
 }
 
-fn proj(v: &Vec<f64>, u: Matrix) -> Vec<f64> {
-    let scale = dot(v, &u) / dot(&u, &u);
+fn project(v: &[f64], u: &[f64]) -> Vec<f64> {
+    let scale = dot(v, u) / dot(u, u);
     u.into_iter().map(|ui| ui * scale).collect()
 }
 
-fn dot<'a>(a: impl IntoIterator<Item = &'a f64>, b: impl IntoIterator<Item = &'a f64>) -> f64 {
-    a.into_iter()
-        .zip(b.into_iter())
-        .map(|(ai, bi)| ai * bi)
-        .sum::<f64>()
+fn dot(a: &[f64], b: &[f64]) -> f64 {
+    a.iter().zip(b.iter()).map(|(ai, bi)| ai * bi).sum::<f64>()
 }
 
 fn outer<'a>(a: &[f64], b: &[f64]) -> Matrix {
@@ -154,8 +172,8 @@ fn outer<'a>(a: &[f64], b: &[f64]) -> Matrix {
     }
 }
 
-fn norm<'a>(a: impl IntoIterator<Item = &'a f64>) -> f64 {
-    a.into_iter().map(|a| a * a).sum::<f64>().sqrt()
+fn norm<'a>(a: &[f64]) -> f64 {
+    a.iter().map(|a| a * a).sum::<f64>().sqrt()
 }
 
 fn matmul<'a>(a: &Matrix, b: &Matrix) -> Matrix {
@@ -166,7 +184,8 @@ fn matmul<'a>(a: &Matrix, b: &Matrix) -> Matrix {
     );
     Matrix {
         data: Rc::from_iter(
-            (0..a.shape.0).flat_map(|ra| (0..b.shape.1).map(move |cb| dot(&a.row(ra), &b.col(cb)))),
+            (0..a.shape.0)
+                .flat_map(|ra| (0..b.shape.1).map(move |cb| dot(&*a.row(ra), &*b.col(cb)))),
         ),
         shape: (a.shape.0, b.shape.1),
         stride: (b.shape.1, 1),
@@ -174,9 +193,8 @@ fn matmul<'a>(a: &Matrix, b: &Matrix) -> Matrix {
     }
 }
 
-// Column-space of m describes a space
-// When just care about column-space (collection vectors)
-// Get a set of vectors that span the same space. I don't really care directions just the space they span, so I'll orthogonalize
+// Column-space of m describes a span of space.
+// Orthogonalization will span the same space but with orthogonal vectors.
 // Modified gram Schmidt for better numerical stability
 pub fn gram_schmidt_orthonorm(a: &Matrix) -> Matrix {
     let mut m = a.clone();
@@ -186,7 +204,7 @@ pub fn gram_schmidt_orthonorm(a: &Matrix) -> Matrix {
             m.col(k).into_iter().cloned().collect::<Vec<_>>(),
             |uk, j| {
                 uk.iter()
-                    .zip(&proj(&uk, m.col(j)))
+                    .zip(&project(&uk, &m.col(j)))
                     .map(|(u, vp)| u - vp)
                     .collect()
             },
@@ -202,8 +220,8 @@ pub fn gram_schmidt_orthonorm(a: &Matrix) -> Matrix {
 // A householder reflection finds 'v' reflection hyper-plane (perpendicular vector)
 // so that vector 'x' when reflected over 'v' is colinear with standard basis e1.
 // Find 'v' so that x - 2 * proj-v(x) == ||x|| * e1
-pub fn householder_reflector<'a>(x: impl IntoIterator<Item = &'a f64>) -> Vec<f64> {
-    let mut v: Vec<_> = x.into_iter().cloned().collect();
+pub fn householder_reflector<'a>(x: &[f64]) -> Vec<f64> {
+    let mut v: Vec<_> = x.iter().cloned().collect();
     // of possible reflections (signum) choose the largest ||v|| to minimize error.
     v[0] = v[0] + v[0].signum() * v.iter().map(|xi| xi * xi).sum::<f64>().sqrt();
     let norm_v = v.iter().map(|vi| vi * vi).sum::<f64>().sqrt();
@@ -219,12 +237,13 @@ pub fn qr_decompose(a: &Matrix) -> (Matrix, Matrix) {
     let mut q = Matrix::eye(q_size);
     // Apply reflactors to a for each column to derive r
     for c in 0..r.shape.1 {
-        let rj = r.get(c..r.shape.0, c..c + 1); // column vector from diagonal to bottom
-        let v = householder_reflector(&rj);
+        let rj = &r.col(c)[c..]; // column vector from diagonal to bottom
+        let v = householder_reflector(rj);
 
         // Apply the reflector to the A sub-matrices resulting in R
         for j in c..r.shape.1 {
-            let vdotr = dot(&v, &r.get(c..r.shape.0, j..j + 1));
+            // let vdotr = dot(&v, &r.get(c..r.shape.0, j..j + 1));
+            let vdotr = dot(&v, &r.col(j)[c..]);
             // modify r in place iterating from diagonal to end of row
             for i in c..r.shape.0 {
                 r[(i, j)] = r[(i, j)] - 2.0 * v[i - c] * vdotr;
@@ -234,7 +253,7 @@ pub fn qr_decompose(a: &Matrix) -> (Matrix, Matrix) {
         // Since Q is symetric orthogonal. Q.t = Qk ... Q2 Q1, Q = Q1 Q2 ... Qk
         // We can build Q in the forward pass and return its transpose
         for j in 0..q.shape.1 {
-            let vdotq = dot(&v, &q.get(c..q.shape.0, j..j + 1));
+            let vdotq = dot(&v, &q.col(j)[c..]);
             // modify q in place iterating from diagonal to end of row
             for i in c..q.shape.0 {
                 q[(i, j)] = q[(i, j)] - 2.0 * v[i - c] * vdotq;
@@ -250,7 +269,7 @@ pub fn nsolve(a: Matrix, b: Vec<f64>) -> Vec<f64> {
     // let r = matmul(&q_t, &a);
     let (q, r) = qr_decompose(&a);
     let q_t = q.transpose();
-    let c: Vec<_> = (0..q_t.shape.0).map(|r| dot(&q_t.row(r), &b)).collect();
+    let c: Vec<_> = (0..q_t.shape.0).map(|r| dot(&*q_t.row(r), &b)).collect();
     // we'll have as many unknowns as a as columns
     // if the system is under-determined though some will be left at 0 (c isn't that large)
     let mut x = vec![0.0; a.shape.1];
@@ -265,7 +284,7 @@ pub fn nsolve(a: Matrix, b: Vec<f64>) -> Vec<f64> {
     // r11 * x1 + r12 * x2 + r13 * x3 = c1   => x1 = (c1 - r12 * x2 - r13 * x3) / r11
 
     for n in (0..xsize).rev() {
-        x[n] = (c[n] - dot(&r.get(n..n + 1, n + 1..r.shape.1), &x[n + 1..])) / r[(n, n)];
+        x[n] = (c[n] - dot(&r.row(n)[n + 1..], &x[n + 1..])) / r[(n, n)];
     }
     x
 }
@@ -289,6 +308,28 @@ mod tests {
     }
 
     #[test]
+    fn test_matrix_slices() {
+        let m = Matrix::from_rows(vec![
+            vec![10.0, -1.0, 3.0, 0.0],
+            vec![-1.0, 11.0, -4.0, 3.0],
+            vec![2.0, -1.0, 10.0, -1.0],
+            vec![0.0, 3.0, -1.0, 8.0],
+        ]);
+        let row2 = m.row(2);
+        assert_eq!(*row2, [2.0, -1.0, 10.0, -1.0]);
+        unsafe {
+            assert_eq!(m.data.as_ptr().add(8), row2.as_ptr());
+        }
+        let m_t = m.transpose();
+        let col2 = m_t.row(2);
+        assert_eq!(*col2, [3.0, -4.0, 10.0, -1.0]);
+        unsafe {
+            let m_end_bound = m.data.as_ptr().add(m.data.len());
+            assert!(!(col2.as_ptr() >= m.data.as_ptr() && col2.as_ptr() <= m_end_bound))
+        }
+    }
+
+    #[test]
     fn test_tensor() {
         let m = Matrix::from_rows(vec![
             vec![10.0, -1.0, 3.0, 0.0],
@@ -297,7 +338,7 @@ mod tests {
             vec![0.0, 3.0, -1.0, 8.0],
         ]);
         // index basic ranges
-        assert_eq!(*m.col(2).coalesce().data, [3.0, -4.0, 10.0, -1.0]);
+        assert_eq!(*m.col(2), [3.0, -4.0, 10.0, -1.0]);
         assert_eq!(*m.get(1..2, 0..4).coalesce().data, [-1.0, 11.0, -4.0, 3.0]);
         assert_eq!(
             *m.get(1..3, 1..4).coalesce().data,
@@ -352,9 +393,9 @@ mod tests {
         let onm = gram_schmidt_orthonorm(&m);
         println!("gs: {:?}", onm);
         for i in 0..onm.shape.1 {
-            println!("norm {}={}", i, norm(&onm.col(i)));
+            println!("norm {}={}", i, norm(&*onm.col(i)));
             for j in 0..onm.shape.1 {
-                println!("dot {}*{}: {}", i, j, dot(&onm.col(i), &onm.col(j)));
+                println!("dot {}*{}: {}", i, j, dot(&*onm.col(i), &*onm.col(j)));
             }
         }
     }
@@ -462,10 +503,10 @@ mod tests {
         };
         println!("h = {:?}", h);
         let col1 = vec![
-            dot(&h.row(0), &x),
-            dot(&h.row(1), &x),
-            dot(&h.row(2), &x),
-            dot(&h.row(3), &x),
+            dot(&*h.row(0), &x),
+            dot(&*h.row(1), &x),
+            dot(&*h.row(2), &x),
+            dot(&*h.row(3), &x),
         ];
         println!("a1 = {:?}", col1);
         approx_eq(&col1, &vec![-norm(&x), 0.0, 0.0, 0.0]);

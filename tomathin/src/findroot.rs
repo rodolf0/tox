@@ -1,3 +1,5 @@
+use crate::matrix::{dot_product, qr_decompose, Matrix};
+
 pub fn find_root(f: impl Fn(f64) -> Result<f64, String>, x0: f64) -> Result<f64, String> {
     let h = 1.0e-5;
     let tolerance = 1.0e-12;
@@ -113,6 +115,34 @@ pub fn find_root_vec(
     Err("Didn't converge".to_string())
 }
 
+pub fn nsolve(a: Matrix, b: Vec<f64>) -> Vec<f64> {
+    // orthogonalize a via gram schmidt
+    // let q_t = gram_schmidt_orthonorm(&a).transpose();
+    // let r = matmul(&q_t, &a);
+    let (q, r) = qr_decompose(&a);
+    let q_t = q.transpose();
+    let c: Vec<_> = (0..q_t.num_rows())
+        .map(|r| dot_product(&*q_t.row(r), &b))
+        .collect();
+    // we'll have as many unknowns as a as columns
+    // if the system is under-determined though some will be left at 0 (c isn't that large)
+    let mut x = vec![0.0; a.num_cols()];
+    let xsize = std::cmp::min(a.num_rows(), a.num_cols());
+
+    // r11 r12 r13  x1  c1
+    //   0 r22 r23  x2  c2
+    //   0   0 r33  x3  c3
+    //
+    // r33 * x3 = c3                         => x3 = c3 / r33
+    // r22 * x2 + r23 * x3 = c2              => x2 = (c2 - r23 * x3) / r22
+    // r11 * x1 + r12 * x2 + r13 * x3 = c1   => x1 = (c1 - r12 * x2 - r13 * x3) / r11
+
+    for n in (0..xsize).rev() {
+        x[n] = (c[n] - dot_product(&r.row(n)[n + 1..], &x[n + 1..])) / r[(n, n)];
+    }
+    x
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -172,5 +202,53 @@ mod tests {
         ];
         let x = find_root_vec(f, vec![0.1, 1.1]).unwrap();
         approx_eq(&x, &vec![1.9318516525782186, 0.5176380902051412]);
+    }
+
+    #[test]
+    fn test_nsolve() {
+        let x = nsolve(
+            Matrix::from_rows(vec![vec![16.0, 3.0], vec![7.0, -11.0]]),
+            vec![11.0, 13.0],
+        );
+        approx_eq(&x, &vec![160.0 / 197.0, -131.0 / 197.0]);
+
+        let x = nsolve(
+            Matrix::from_rows(vec![
+                vec![10.0, -1.0, 2.0, 0.0],
+                vec![-1.0, 11.0, -1.0, 3.0],
+                vec![2.0, -1.0, 10.0, -1.0],
+                vec![0.0, 3.0, -1.0, 8.0],
+            ]),
+            vec![6.0, 25.0, -11.0, 15.0],
+        );
+        approx_eq(&x, &vec![1.0, 2.0, -1.0, 1.0]);
+
+        let x = nsolve(
+            Matrix::from_rows(vec![
+                vec![10.0, -1.0, 2.0, 0.0],
+                vec![-1.0, 11.0, -1.0, 3.0],
+                vec![2.0, -1.0, 10.0, -1.0],
+            ]),
+            vec![6.0, 25.0, -11.0],
+        );
+        println!("{:?}", x);
+
+        let x = nsolve(
+            Matrix::from_rows(vec![vec![0.2, 1.1], vec![2.2, 0.1]]),
+            vec![2.78, 0.89],
+        );
+        approx_eq(&x, &vec![0.29208333333336917, 2.47416666666666]);
+
+        let x = nsolve(
+            Matrix::from_iter([1.0, 2.0, 3.0, 4.0, 5.0], 5, 1),
+            vec![2.0, 5.0, 3.0, 8.0, 7.0],
+        );
+        println!("{:?}", x);
+
+        let x = nsolve(
+            Matrix::from_iter([1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 4.0, 1.0, 5.0, 1.0], 5, 2),
+            vec![2.0, 5.0, 3.0, 8.0, 7.0],
+        );
+        println!("{:?}", x);
     }
 }

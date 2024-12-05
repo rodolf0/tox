@@ -1,4 +1,4 @@
-// #![deny(warnings)]
+#![deny(warnings)]
 
 mod tokenizer;
 
@@ -18,8 +18,10 @@ fn gamma(x: f64) -> f64 {
 }
 
 mod findroot;
+pub use findroot::{find_root, find_root_vec, gauss_seidel, nsolve};
 
 mod matrix;
+pub use matrix::{dot_product, gram_schmidt_orthonorm, outer_product, qr_decompose};
 
 #[cfg(test)]
 mod tests;

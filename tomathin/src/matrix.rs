@@ -11,16 +11,27 @@ pub struct Matrix {
 }
 
 impl<'a> Matrix {
-    pub fn from_rows(rows: Vec<Vec<f64>>) -> Self {
-        assert!(rows.len() != 0 && rows[0].len() != 0, "Empty rows or cols");
-        let n_rows = rows.len();
-        let n_cols = rows[0].len();
+    pub fn from_rows(data: Vec<Vec<f64>>) -> Self {
+        assert!(data.len() != 0 && data[0].len() != 0, "Empty rows or cols");
+        let (rows, cols) = (data.len(), data[0].len());
+        Matrix::from_iter(data.into_iter().flat_map(|v| v), rows, cols)
+    }
+
+    pub fn from_iter(data: impl IntoIterator<Item = f64>, rows: usize, cols: usize) -> Self {
         Matrix {
-            data: Rc::from_iter(rows.into_iter().flat_map(|v| v)),
-            shape: (n_rows, n_cols),
-            stride: (n_cols, 1),
+            data: Rc::from_iter(data),
+            shape: (rows, cols),
+            stride: (cols, 1),
             offset: (0, 0),
         }
+    }
+
+    pub fn num_rows(&self) -> usize {
+        self.shape.0
+    }
+
+    pub fn num_cols(&self) -> usize {
+        self.shape.1
     }
 
     pub fn col(&self, col: usize) -> Cow<'_, [f64]> {
@@ -155,25 +166,21 @@ impl Sub<Matrix> for Matrix {
 }
 
 fn project(v: &[f64], u: &[f64]) -> Vec<f64> {
-    let scale = dot(v, u) / dot(u, u);
+    let scale = dot_product(v, u) / dot_product(u, u);
     u.into_iter().map(|ui| ui * scale).collect()
 }
 
-fn dot(a: &[f64], b: &[f64]) -> f64 {
+pub fn dot_product(a: &[f64], b: &[f64]) -> f64 {
     a.iter().zip(b.iter()).map(|(ai, bi)| ai * bi).sum::<f64>()
 }
 
-fn outer<'a>(a: &[f64], b: &[f64]) -> Matrix {
+pub fn outer_product<'a>(a: &[f64], b: &[f64]) -> Matrix {
     Matrix {
         data: Rc::from_iter((0..a.len()).flat_map(|r| (0..b.len()).map(move |c| a[r] * b[c]))),
         shape: (a.len(), b.len()),
         stride: (b.len(), 1),
         offset: (0, 0),
     }
-}
-
-fn norm<'a>(a: &[f64]) -> f64 {
-    a.iter().map(|a| a * a).sum::<f64>().sqrt()
 }
 
 fn matmul<'a>(a: &Matrix, b: &Matrix) -> Matrix {
@@ -185,7 +192,7 @@ fn matmul<'a>(a: &Matrix, b: &Matrix) -> Matrix {
     Matrix {
         data: Rc::from_iter(
             (0..a.shape.0)
-                .flat_map(|ra| (0..b.shape.1).map(move |cb| dot(&*a.row(ra), &*b.col(cb)))),
+                .flat_map(|ra| (0..b.shape.1).map(move |cb| dot_product(&*a.row(ra), &*b.col(cb)))),
         ),
         shape: (a.shape.0, b.shape.1),
         stride: (b.shape.1, 1),
@@ -211,7 +218,7 @@ pub fn gram_schmidt_orthonorm(a: &Matrix) -> Matrix {
         );
         // normalize vector
         for r in 0..m.shape.0 {
-            m[(r, k)] = uk[r] / dot(&uk, &uk).sqrt();
+            m[(r, k)] = uk[r] / dot_product(&uk, &uk).sqrt();
         }
     }
     m
@@ -220,7 +227,7 @@ pub fn gram_schmidt_orthonorm(a: &Matrix) -> Matrix {
 // A householder reflection finds 'v' reflection hyper-plane (perpendicular vector)
 // so that vector 'x' when reflected over 'v' is colinear with standard basis e1.
 // Find 'v' so that x - 2 * proj-v(x) == ||x|| * e1
-pub fn householder_reflector<'a>(x: &[f64]) -> Vec<f64> {
+fn householder_reflector<'a>(x: &[f64]) -> Vec<f64> {
     let mut v: Vec<_> = x.iter().cloned().collect();
     // of possible reflections (signum) choose the largest ||v|| to minimize error.
     v[0] = v[0] + v[0].signum() * v.iter().map(|xi| xi * xi).sum::<f64>().sqrt();
@@ -242,8 +249,8 @@ pub fn qr_decompose(a: &Matrix) -> (Matrix, Matrix) {
 
         // Apply the reflector to the A sub-matrices resulting in R
         for j in c..r.shape.1 {
-            // let vdotr = dot(&v, &r.get(c..r.shape.0, j..j + 1));
-            let vdotr = dot(&v, &r.col(j)[c..]);
+            // let vdotr = dot_product(&v, &r.get(c..r.shape.0, j..j + 1));
+            let vdotr = dot_product(&v, &r.col(j)[c..]);
             // modify r in place iterating from diagonal to end of row
             for i in c..r.shape.0 {
                 r[(i, j)] = r[(i, j)] - 2.0 * v[i - c] * vdotr;
@@ -253,7 +260,7 @@ pub fn qr_decompose(a: &Matrix) -> (Matrix, Matrix) {
         // Since Q is symetric orthogonal. Q.t = Qk ... Q2 Q1, Q = Q1 Q2 ... Qk
         // We can build Q in the forward pass and return its transpose
         for j in 0..q.shape.1 {
-            let vdotq = dot(&v, &q.col(j)[c..]);
+            let vdotq = dot_product(&v, &q.col(j)[c..]);
             // modify q in place iterating from diagonal to end of row
             for i in c..q.shape.0 {
                 q[(i, j)] = q[(i, j)] - 2.0 * v[i - c] * vdotq;
@@ -263,35 +270,13 @@ pub fn qr_decompose(a: &Matrix) -> (Matrix, Matrix) {
     (q.transpose(), r)
 }
 
-pub fn nsolve(a: Matrix, b: Vec<f64>) -> Vec<f64> {
-    // orthogonalize a via gram schmidt
-    // let q_t = gram_schmidt_orthonorm(&a).transpose();
-    // let r = matmul(&q_t, &a);
-    let (q, r) = qr_decompose(&a);
-    let q_t = q.transpose();
-    let c: Vec<_> = (0..q_t.shape.0).map(|r| dot(&*q_t.row(r), &b)).collect();
-    // we'll have as many unknowns as a as columns
-    // if the system is under-determined though some will be left at 0 (c isn't that large)
-    let mut x = vec![0.0; a.shape.1];
-    let xsize = std::cmp::min(a.shape.0, a.shape.1);
-
-    // r11 r12 r13  x1  c1
-    //   0 r22 r23  x2  c2
-    //   0   0 r33  x3  c3
-    //
-    // r33 * x3 = c3                         => x3 = c3 / r33
-    // r22 * x2 + r23 * x3 = c2              => x2 = (c2 - r23 * x3) / r22
-    // r11 * x1 + r12 * x2 + r13 * x3 = c1   => x1 = (c1 - r12 * x2 - r13 * x3) / r11
-
-    for n in (0..xsize).rev() {
-        x[n] = (c[n] - dot(&r.row(n)[n + 1..], &x[n + 1..])) / r[(n, n)];
-    }
-    x
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn norm<'a>(a: &[f64]) -> f64 {
+        a.iter().map(|a| a * a).sum::<f64>().sqrt()
+    }
 
     fn approx_eq(a: &Vec<f64>, b: &Vec<f64>) {
         let e = 1.0e-9;
@@ -395,7 +380,12 @@ mod tests {
         for i in 0..onm.shape.1 {
             println!("norm {}={}", i, norm(&*onm.col(i)));
             for j in 0..onm.shape.1 {
-                println!("dot {}*{}: {}", i, j, dot(&*onm.col(i), &*onm.col(j)));
+                println!(
+                    "dot_product {}*{}: {}",
+                    i,
+                    j,
+                    dot_product(&*onm.col(i), &*onm.col(j))
+                );
             }
         }
     }
@@ -416,69 +406,11 @@ mod tests {
     }
 
     #[test]
-    fn test_nsolve() {
-        let x = nsolve(
-            Matrix::from_rows(vec![vec![16.0, 3.0], vec![7.0, -11.0]]),
-            vec![11.0, 13.0],
-        );
-        approx_eq(&x, &vec![160.0 / 197.0, -131.0 / 197.0]);
-
-        let x = nsolve(
-            Matrix::from_rows(vec![
-                vec![10.0, -1.0, 2.0, 0.0],
-                vec![-1.0, 11.0, -1.0, 3.0],
-                vec![2.0, -1.0, 10.0, -1.0],
-                vec![0.0, 3.0, -1.0, 8.0],
-            ]),
-            vec![6.0, 25.0, -11.0, 15.0],
-        );
-        approx_eq(&x, &vec![1.0, 2.0, -1.0, 1.0]);
-
-        let x = nsolve(
-            Matrix::from_rows(vec![
-                vec![10.0, -1.0, 2.0, 0.0],
-                vec![-1.0, 11.0, -1.0, 3.0],
-                vec![2.0, -1.0, 10.0, -1.0],
-            ]),
-            vec![6.0, 25.0, -11.0],
-        );
-        println!("{:?}", x);
-
-        let x = nsolve(
-            Matrix::from_rows(vec![vec![0.2, 1.1], vec![2.2, 0.1]]),
-            vec![2.78, 0.89],
-        );
-        approx_eq(&x, &vec![0.29208333333336917, 2.47416666666666]);
-
-        let x = nsolve(
-            Matrix {
-                data: Rc::from([1.0, 2.0, 3.0, 4.0, 5.0]),
-                shape: (5, 1),
-                stride: (1, 1),
-                offset: (0, 0),
-            },
-            vec![2.0, 5.0, 3.0, 8.0, 7.0],
-        );
-        println!("{:?}", x);
-
-        let x = nsolve(
-            Matrix {
-                data: Rc::from([1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 4.0, 1.0, 5.0, 1.0]),
-                shape: (5, 2),
-                stride: (2, 1),
-                offset: (0, 0),
-            },
-            vec![2.0, 5.0, 3.0, 8.0, 7.0],
-        );
-        println!("{:?}", x);
-    }
-
-    #[test]
     fn test_householder() {
         let x = vec![4.0, 1.0, -2.0, 2.0];
         let v = householder_reflector(&x);
 
-        let vdotx = dot(&v, &x);
+        let vdotx = dot_product(&v, &x);
         let hx: Vec<_> = x
             .iter()
             .zip(&v)
@@ -486,7 +418,7 @@ mod tests {
             .collect();
         println!("hx = {:?}", hx);
 
-        let o = outer(&v, &v);
+        let o = outer_product(&v, &v);
         println!("o = {:?}", o);
 
         let oo = &o;
@@ -503,10 +435,10 @@ mod tests {
         };
         println!("h = {:?}", h);
         let col1 = vec![
-            dot(&*h.row(0), &x),
-            dot(&*h.row(1), &x),
-            dot(&*h.row(2), &x),
-            dot(&*h.row(3), &x),
+            dot_product(&*h.row(0), &x),
+            dot_product(&*h.row(1), &x),
+            dot_product(&*h.row(2), &x),
+            dot_product(&*h.row(3), &x),
         ];
         println!("a1 = {:?}", col1);
         approx_eq(&col1, &vec![-norm(&x), 0.0, 0.0, 0.0]);

@@ -167,7 +167,7 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         let rhs = args.swap_remove(2);
         let op = pull!(T::Symbol, args.swap_remove(1));
         let lhs = args.swap_remove(0);
-        let reduce = op == "+" || op == "*";
+        let reduce = op == "Plus" || op == "Times";
         let mut new_args = Vec::new();
         match lhs {
             T::Expr(h, a) if h == op && reduce => new_args.extend(a),

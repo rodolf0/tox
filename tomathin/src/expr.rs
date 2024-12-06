@@ -99,6 +99,7 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
             }
             "ReplaceAll" => eval_replace_all(Expr::Expr(head, args), ctx),
             "Plus" | "Times" => {
+                // Flatten operations that are commutative and associative
                 let mut numeric: Option<f64> = None;
                 let mut new_args = Vec::new();
                 for arg in args {

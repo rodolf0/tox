@@ -39,6 +39,7 @@ impl<I: Iterator<Item = char>> Tokenizer<I> {
                 Some('=') => Ok(Some(":=".to_string())),
                 _ => Err("Incomplete := operator".to_string()),
             },
+            Some('=') => Ok(Some("=".to_string())),
             // Tokenize Strings checking for escapes.
             Some(open) if open == '"' || open == '\'' => {
                 self.buff.push(open.to_string());
@@ -71,7 +72,7 @@ impl<I: Iterator<Item = char>> Tokenizer<I> {
                         return self.next_result();
                     }
                 }
-                Err("Unfinished comment missing EOL".to_string())
+                self.next_result() // EOF
             }
             // Tokenize variable names
             Some(x) if x.is_ascii_alphabetic() || x == '_' => {

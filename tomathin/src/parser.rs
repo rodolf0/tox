@@ -6,9 +6,9 @@ fn grammar_str() -> &'static str {
     r#"
     arglist := arglist ',' expr | expr ;
 
-    expr := set_delayed ;
+    expr := set ;
 
-    set_delayed := replace_all ':=' set_delayed | replace_all ;
+    set := replace_all (':='|'=') @opset set | replace_all ;
 
     replace_all := replace_all '/.' rule | rule ;
 
@@ -110,14 +110,17 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         T::Expr("List".to_string(), arglist)
     });
 
-    evaler.action("expr -> set_delayed", |mut args| args.swap_remove(0));
+    evaler.action("expr -> set", |mut args| args.swap_remove(0));
 
-    evaler.action("set_delayed -> replace_all", |mut args| args.swap_remove(0));
-    evaler.action("set_delayed -> replace_all := set_delayed", |mut args| {
+    evaler.action("set -> replace_all", |mut args| args.swap_remove(0));
+    evaler.action("set -> replace_all @opset set", |mut args| {
         let rhs = args.swap_remove(2);
+        let op = pull!(T::Symbol, args.swap_remove(1));
         let lhs = args.swap_remove(0);
-        T::Expr("SetDelayed".to_string(), vec![lhs, rhs])
+        T::Expr(op, vec![lhs, rhs])
     });
+    evaler.action("@opset -> :=", |_| T::Symbol("SetDelayed".to_string()));
+    evaler.action("@opset -> =", |_| T::Symbol("Set".to_string()));
 
     evaler.action("replace_all -> rule", |mut args| args.swap_remove(0));
     evaler.action("replace_all -> replace_all /. rule", |mut args| {

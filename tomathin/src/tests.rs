@@ -172,17 +172,18 @@ fn sum_expr() -> Result<(), String> {
 fn set_delayed() -> Result<(), String> {
     let mut ctx = Context::new();
     let p = parser()?;
+    assert_eq!(eval_with_ctx(p(r#"x := 1"#)?, &mut ctx)?, Expr::Number(1.0));
     assert_eq!(
-        eval_with_ctx(p(r#"xxxx := 1"#)?, &mut ctx)?,
-        Expr::Number(1.0)
-    );
-    assert_eq!(
-        eval_with_ctx(p(r#"ffff := xxxx + 1"#)?, &mut ctx)?,
+        eval_with_ctx(p(r#"f := x + 1"#)?, &mut ctx)?,
         Expr::Expr(
             "Plus".to_string(),
-            vec![Expr::Symbol("xxxx".to_string()), Expr::Number(1.0)]
+            vec![Expr::Symbol("x".to_string()), Expr::Number(1.0)]
         )
     );
-    assert_eq!(eval_with_ctx(p(r#"ffff"#)?, &mut ctx)?, Expr::Number(2.0));
+    assert_eq!(
+        eval_with_ctx(p(r#"g = x + 1"#)?, &mut ctx)?,
+        Expr::Number(2.0)
+    );
+    assert_eq!(eval_with_ctx(p(r#"f"#)?, &mut ctx)?, Expr::Number(2.0));
     Ok(())
 }

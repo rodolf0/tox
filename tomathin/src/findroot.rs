@@ -10,6 +10,11 @@ pub fn find_root(f: impl Fn(f64) -> Result<f64, String>, x0: f64) -> Result<f64,
             return Ok(x);
         }
         let f_central_diff = (f(x + h)? - f(x - h)?) / 2.0 / h;
+        // Nudge x a bit if stuck at an extema (f'(x) is 0)
+        if f_central_diff.abs() < 1.0e-10 {
+            x += 1.0e-3;
+            continue;
+        }
         x = x - fx / f_central_diff;
     }
     Err("Didn't converge".to_string())

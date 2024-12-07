@@ -16,9 +16,9 @@ fn precedence(e: &Expr) -> usize {
             "Times" => 65,
             "Plus" => 70,
             "Minus" => 75,
-            _ => todo!(),
+            _ => 1000,
         },
-        _ => todo!(),
+        _ => 1000,
     }
 }
 
@@ -51,7 +51,7 @@ impl fmt::Display for Expr {
                 "Divide" => write!(f, "{}", join_args(self, " / ")),
                 "Power" => write!(f, "{}", join_args(self, " ^ ")),
                 "List" => write!(f, "{{{}}}", join_args(self, ", ")),
-                _ => write!(f, "{:?}", self),
+                _ => write!(f, "{}[{}]", head, join_args(self, ", ")),
             },
             _ => write!(f, "{:?}", self),
         }
@@ -205,12 +205,17 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                 }
                 Ok(Expr::Number(sum))
             }
-            "SetDelayed" => {
+            "SetDelayed" | "Set" => {
                 let [lhs, rhs]: [Expr; 2] = args
                     .try_into()
-                    .map_err(|e| format!("SetDelayed must have 2 arguments. {:?}", e))?;
+                    .map_err(|e| format!("Set(Delayed) must have 2 arguments. {:?}", e))?;
                 let Expr::Symbol(sym) = lhs else {
-                    return Err(format!("SetDelayed lhs must be a symbol. {:?}", lhs));
+                    return Err(format!("Set(Delayed) lhs must be a symbol. {:?}", lhs));
+                };
+                let rhs = if head == "Set" {
+                    eval_with_ctx(rhs, ctx)?
+                } else {
+                    rhs
                 };
                 ctx.set(sym, rhs.clone());
                 Ok(rhs)

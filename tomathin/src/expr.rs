@@ -10,7 +10,6 @@ fn precedence(e: &Expr) -> usize {
         Expr::Number(_) => 0,
         Expr::Symbol(_) => 1,
         Expr::Expr(head, _) => match head.as_ref() {
-            "List" => 10,
             "Power" => 50,
             "Divide" => 60,
             "Times" => 65,
@@ -58,6 +57,37 @@ impl fmt::Display for Expr {
     }
 }
 
+fn distribute_op(lhs: Expr, rhs: Expr, op: &str, over: &str) -> Expr {
+    match lhs {
+        Expr::Expr(h, lhs) if h == over => match rhs {
+            Expr::Expr(h, rhs) if h == over => Expr::Expr(
+                over.to_string(),
+                lhs.iter()
+                    .flat_map(|lhsi| {
+                        rhs.iter()
+                            .map(|rhsi| distribute_op(lhsi.clone(), rhsi.clone(), op, over))
+                    })
+                    .collect(),
+            ),
+            rhs => Expr::Expr(
+                over.to_string(),
+                lhs.into_iter()
+                    .map(|lhsi| distribute_op(lhsi, rhs.clone(), op, over))
+                    .collect(),
+            ),
+        },
+        lhs => match rhs {
+            Expr::Expr(h, rhs) if h == over => Expr::Expr(
+                over.to_string(),
+                rhs.into_iter()
+                    .map(|rhsi| distribute_op(lhs.clone(), rhsi, op, over))
+                    .collect(),
+            ),
+            rhs => Expr::Expr(op.to_string(), vec![lhs, rhs]),
+        },
+    }
+}
+
 pub fn evaluate(expr: Expr) -> Result<Expr, String> {
     eval_with_ctx(expr, &mut Context::new())
 }
@@ -98,19 +128,53 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                 Ok(Expr::Expr(head, vec![lhs, eval_with_ctx(rhs, ctx)?]))
             }
             "ReplaceAll" => eval_replace_all(Expr::Expr(head, args), ctx),
-            "Plus" | "Times" => {
+            "Plus" => {
                 // Flatten operations that are commutative and associative
                 let mut numeric: Option<f64> = None;
                 let mut new_args = Vec::new();
                 for arg in args {
                     match eval_with_ctx(arg, ctx)? {
-                        Expr::Number(n) if head == "Plus" => *numeric.get_or_insert(0.0) += n,
-                        Expr::Number(n) if head == "Times" => *numeric.get_or_insert(1.0) *= n,
+                        Expr::Number(n) => *numeric.get_or_insert(0.0) += n,
                         o => new_args.push(o),
                     }
                 }
                 if numeric.is_some_and(|n| n != 0.0) || new_args.len() == 0 {
                     new_args.insert(0, Expr::Number(*numeric.get_or_insert(0.0)));
+                }
+                if new_args.len() == 1 {
+                    Ok(new_args.swap_remove(0))
+                } else {
+                    Ok(Expr::Expr(head, new_args))
+                }
+            }
+            "Times" => {
+                // distribute over List
+                // 3 * {a ,b} => {3 * a, 3 * b}
+                // {a, b} * 3 => {3 * a, 3 * b}
+                // {a, b} * {x, y} => {a * x, a * y, b * x, b * y}
+                // 3 * x => 3 * x
+                // 3 * x * {a, b} => {3 * x * a, 3 * x * b}
+                // 3 * {4, 5} => {12, 15}
+
+                let mut new_args = vec![args.remove(0)];
+                for arg in args {
+                    match eval_with_ctx(arg, ctx)? {
+                        rhs @ Expr::Number(rhsn) => {
+                            new_args = new_args
+                                .into_iter()
+                                .map(|argi| match argi {
+                                    Expr::Number(lhs) => Expr::Number(lhs * rhsn),
+                                    lhs => distribute_op(lhs, rhs.clone(), "Times", "List"),
+                                })
+                                .collect();
+                        }
+                        rhs => {
+                            new_args = new_args
+                                .into_iter()
+                                .map(|lhsi| distribute_op(lhsi, rhs.clone(), "Times", "List"))
+                                .collect();
+                        }
+                    }
                 }
                 if new_args.len() == 1 {
                     Ok(new_args.swap_remove(0))

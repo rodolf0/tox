@@ -12,7 +12,7 @@ impl<I: Iterator<Item = char>> EbnfTokenizer<I> {
     }
 
     fn next_result(&mut self) -> Result<Option<String>, String> {
-        if self.buff.len() > 0 {
+        if !self.buff.is_empty() {
             return Ok(Some(self.buff.remove(0)));
         }
         match self.input.next() {

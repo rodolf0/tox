@@ -94,7 +94,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
         let mut trees = Vec::new();
         for backpointer in source.iter() {
             // Track backpointers we've already explored to avoid looping
-            if explored.iter().find(|i| *i == backpointer).is_some() {
+            if explored.iter().any(|i| i == backpointer) {
                 continue;
             }
             explored.push(backpointer.clone());

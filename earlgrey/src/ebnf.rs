@@ -271,7 +271,7 @@ impl EbnfGrammarParser {
     // Plug-in functions that parse Terminals before we build the grammar
     pub fn plug_terminal(mut self, name: &str, pred: impl Fn(&str) -> bool + 'static) -> Self {
         debug!("Adding terminal {:?}", name);
-        self.grammar_builder.terminal_try(&name, pred);
+        self.grammar_builder.terminal_try(name, pred);
         self
     }
 

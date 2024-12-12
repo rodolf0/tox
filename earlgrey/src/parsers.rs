@@ -22,7 +22,7 @@ impl Sexpr {
             Sexpr::List(ref subn) => {
                 if let Some((first, rest)) = subn.split_first() {
                     if let Some((last, rest)) = rest.split_last() {
-                        *out += &format!("\u{252c}");
+                        *out += "\u{252c}";
                         first.print_helper(&format!("{}\u{2502}", indent), out);
                         for mid in rest {
                             *out += &format!("{}\u{251c}", indent);

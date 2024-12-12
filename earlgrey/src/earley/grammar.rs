@@ -48,7 +48,10 @@ impl PartialEq for Symbol {
         match (self, other) {
             (Symbol::Term(s, m1), Symbol::Term(o, m2)) => {
                 s == o
-                    && std::ptr::addr_eq(&m1 as *const dyn Fn(&str) -> bool, &m2 as *const dyn Fn(&str) -> bool)
+                    && std::ptr::addr_eq(
+                        &m1 as *const dyn Fn(&str) -> bool,
+                        &m2 as *const dyn Fn(&str) -> bool,
+                    )
             }
             (Symbol::NonTerm(s), Symbol::NonTerm(o)) => s == o,
             _ => false,
@@ -85,7 +88,8 @@ impl Rule {
 
 impl fmt::Display for Rule {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(f,
+        write!(
+            f,
             "{} -> {}",
             self.head,
             self.spec

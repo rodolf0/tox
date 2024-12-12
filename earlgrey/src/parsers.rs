@@ -1,9 +1,9 @@
 #![deny(warnings)]
 
-use crate::earley::{EarleyParser, EarleyForest, Grammar};
+use crate::earley::{EarleyForest, EarleyParser, Grammar};
 use std::fmt::Debug;
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub enum Sexpr {
     Atom(String),
     List(Vec<Sexpr>),
@@ -18,8 +18,7 @@ impl Sexpr {
 
     fn print_helper(&self, indent: &str, out: &mut String) {
         match *self {
-            Sexpr::Atom(ref lexeme) =>
-                *out += &format!("\u{2500} {}\n", lexeme),
+            Sexpr::Atom(ref lexeme) => *out += &format!("\u{2500} {}\n", lexeme),
             Sexpr::List(ref subn) => {
                 if let Some((first, rest)) = subn.split_first() {
                     if let Some((last, rest)) = rest.split_last() {
@@ -42,20 +41,20 @@ impl Sexpr {
     }
 }
 
-
-pub fn sexpr_parser<InputIter>(grammar: Grammar)
-    -> Result<impl Fn(InputIter) -> Result<Vec<Sexpr>, String>, String>
-        where InputIter: Iterator, InputIter::Item: AsRef<str> + std::fmt::Debug
+pub fn sexpr_parser<InputIter>(
+    grammar: Grammar,
+) -> Result<impl Fn(InputIter) -> Result<Vec<Sexpr>, String>, String>
+where
+    InputIter: Iterator,
+    InputIter::Item: AsRef<str> + std::fmt::Debug,
 {
-    let mut tree_builder = EarleyForest::new(
-        |_, tok| Sexpr::Atom(tok.to_string()));
+    let mut tree_builder = EarleyForest::new(|_, tok| Sexpr::Atom(tok.to_string()));
 
     for rule in &grammar.rules {
-        tree_builder.action(&rule.to_string(),
-            move |mut nodes| match nodes.len() {
-                1 => nodes.swap_remove(0),
-                _ => Sexpr::List(nodes),
-            });
+        tree_builder.action(&rule.to_string(), move |mut nodes| match nodes.len() {
+            1 => nodes.swap_remove(0),
+            _ => Sexpr::List(nodes),
+        });
     }
 
     let parser = EarleyParser::new(grammar);

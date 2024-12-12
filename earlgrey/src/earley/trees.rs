@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
-use super::spans::{Span, SpanSource};
 use super::parser::ParseTrees;
+use super::spans::{Span, SpanSource};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -14,9 +14,10 @@ pub struct EarleyForest<'a, ASTNode: Clone> {
 
 impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     pub fn new(terminal_parser: impl Fn(&str, &str) -> ASTNode + 'a) -> Self {
-        EarleyForest{
+        EarleyForest {
             actions: HashMap::new(),
-            terminal_parser: Box::new(terminal_parser)}
+            terminal_parser: Box::new(terminal_parser),
+        }
     }
 
     // Register semantic actions to act when rules are matched
@@ -25,18 +26,18 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     }
 }
 
-
 impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
-    fn reduce(&self, root: &Rc<Span>, args: Vec<ASTNode>)
-            -> Result<Vec<ASTNode>, String> {
+    fn reduce(&self, root: &Rc<Span>, args: Vec<ASTNode>) -> Result<Vec<ASTNode>, String> {
         // If span is not complete, reduce is a noop passthrough
-        if !root.complete() { return Ok(args) }
+        if !root.complete() {
+            return Ok(args);
+        }
         // Lookup semantic action to apply based on rule name
         let rulename = root.rule.to_string();
         match self.actions.get(&rulename) {
             None => Err(format!("Missing Action: {}", rulename)),
             Some(action) => {
-                if cfg!(feature="debug") {
+                if cfg!(feature = "debug") {
                     eprintln!("Reduction: {}", rulename);
                 }
                 Ok(vec![action(args)])
@@ -57,13 +58,15 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
             Some(SpanSource::Completion(source, trigger)) => {
                 args.extend(self.walker(source)?);
                 args.extend(self.walker(trigger)?);
-            },
+            }
             Some(SpanSource::Scan(source, trigger)) => {
-                let symbol = source.next_symbol()
-                    .expect("BUG: missing scan trigger symbol").name();
+                let symbol = source
+                    .next_symbol()
+                    .expect("BUG: missing scan trigger symbol")
+                    .name();
                 args.extend(self.walker(source)?);
                 args.push((self.terminal_parser)(symbol, trigger));
-            },
+            }
             None => (),
         }
         self.reduce(root, args)
@@ -72,11 +75,17 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     // for non-ambiguous grammars this retreieves the only possible parse
     pub fn eval_recursive(&self, ptrees: &ParseTrees) -> Result<ASTNode, String> {
         // walker will always return a Vec of size 1 because root.complete
-        Ok(self.walker(ptrees.0.first().expect("BUG: ParseTrees empty"))?
-           .swap_remove(0))
+        Ok(self
+            .walker(ptrees.0.first().expect("BUG: ParseTrees empty"))?
+            .swap_remove(0))
     }
 
-    fn walker_all(&self, root: &Rc<Span>, level: u16, mut explored: Vec<SpanSource>) -> Result<Vec<Vec<ASTNode>>, String> {
+    fn walker_all(
+        &self,
+        root: &Rc<Span>,
+        level: u16,
+        mut explored: Vec<SpanSource>,
+    ) -> Result<Vec<Vec<ASTNode>>, String> {
         assert!(level < 100, "Bottomless grammar, stack blew up");
         let source = root.sources();
         if source.len() == 0 {
@@ -103,8 +112,10 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
                 }
                 SpanSource::Scan(source, trigger) => {
                     for mut args in self.walker_all(source, level + 1, explored.clone())? {
-                        let symbol = source.next_symbol()
-                            .expect("BUG: missing scan trigger symbol").name();
+                        let symbol = source
+                            .next_symbol()
+                            .expect("BUG: missing scan trigger symbol")
+                            .name();
                         args.push((self.terminal_parser)(symbol, trigger));
                         trees.push(self.reduce(root, args)?);
                     }
@@ -119,18 +130,19 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
         let mut trees = Vec::new();
         for root in &ptrees.0 {
             trees.extend(
-                self.walker_all(root, 0, Vec::new())?.into_iter()
-                    .map(|mut treevec| treevec.swap_remove(0)));
+                self.walker_all(root, 0, Vec::new())?
+                    .into_iter()
+                    .map(|mut treevec| treevec.swap_remove(0)),
+            );
         }
         Ok(trees)
     }
 }
 
-
 struct ForestIterator {
-    // A stack of (span, current-source-idx). 
+    // A stack of (span, current-source-idx).
     // Each time the iterator is advanced we advance the source-idx for the top span.
-    // When that span exhausted all sources, we pop the top span. This results in a 
+    // When that span exhausted all sources, we pop the top span. This results in a
     // reset if it ever comes back from a different path. At the same time advance
     // the new top-of-stack span. If this one is exhausted, then rinse, repeat.
     source_idx: Vec<(Rc<Span>, usize)>,
@@ -163,7 +175,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     ## N -> [0-9]
     ## "1 + 2"
 
-                 S -> S + N. 
+                 S -> S + N.
                     /  \
                    /    \
               S +.N     N -> [0-9].
@@ -180,7 +192,11 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
                       /   \
                   .[0-9]   "1"
     */
-    fn eval_one(&self, root: Rc<Span>, mut selector: impl FnMut(&Rc<Span>) -> usize) -> Result<ASTNode, String> {
+    fn eval_one(
+        &self,
+        root: Rc<Span>,
+        mut selector: impl FnMut(&Rc<Span>) -> usize,
+    ) -> Result<ASTNode, String> {
         let mut args = Vec::new();
         let mut completions = Vec::new();
         let mut spans = vec![root];
@@ -194,31 +210,43 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
             // (Reachable) Spans with no sources mean we've unwound to the
             // begining of a production/rule. Apply the rule reducing args.
             if cursor.sources().len() == 0 {
-                let completed_rule = &completions.pop().expect("BUG: span rule never completed").rule;
+                let completed_rule = &completions
+                    .pop()
+                    .expect("BUG: span rule never completed")
+                    .rule;
                 assert_eq!(&cursor.rule, completed_rule);
                 // Get input AST nodes for this reduction. Stored reversed.
                 let num_rule_slots = completed_rule.spec.len();
-                let rule_args = args.split_off(args.len() - num_rule_slots).into_iter().rev().collect();
+                let rule_args = args
+                    .split_off(args.len() - num_rule_slots)
+                    .into_iter()
+                    .rev()
+                    .collect();
                 // Apply the reduction.
                 let rulename = completed_rule.to_string();
-                let action = self.actions.get(&rulename).ok_or(format!("Missing Action: {}", rulename))?;
+                let action = self
+                    .actions
+                    .get(&rulename)
+                    .ok_or(format!("Missing Action: {}", rulename))?;
                 args.push(action(rule_args));
             } else {
                 let span_source_idx = selector(&cursor);
                 // Walk the chart following span sources (back-pointers) of the tree.
                 match &cursor.sources()[span_source_idx] {
-                    // Completion sources -> Walk the chart. 
+                    // Completion sources -> Walk the chart.
                     SpanSource::Completion(source, trigger) => {
                         spans.push(source.clone());
                         spans.push(trigger.clone());
-                    },
+                    }
                     // Scan sources -> lift scanned tokens into AST nodes.
                     SpanSource::Scan(source, trigger) => {
-                        let symbol = source.next_symbol()
-                            .expect("BUG: missing scan trigger symbol").name();
+                        let symbol = source
+                            .next_symbol()
+                            .expect("BUG: missing scan trigger symbol")
+                            .name();
                         args.push((self.terminal_parser)(symbol, trigger));
                         spans.push(source.clone());
-                    },
+                    }
                 }
             }
         }
@@ -234,7 +262,9 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     pub fn eval_all(&self, ptrees: &ParseTrees) -> Result<Vec<ASTNode>, String> {
         let mut results = Vec::new();
         for root in &ptrees.0 {
-            let mut fi = ForestIterator{source_idx: Vec::new()};
+            let mut fi = ForestIterator {
+                source_idx: Vec::new(),
+            };
             let mut iterator_has_more_items = true;
             while iterator_has_more_items {
                 results.push(self.eval_one(root.clone(), |s| fi.source_index(s))?);

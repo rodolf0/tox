@@ -1,100 +1,104 @@
 #![deny(warnings)]
 
 use super::ebnf_tokenizer::EbnfTokenizer;
-use crate::earley::{
-    EarleyForest, EarleyParser, Grammar, GrammarBuilder
-};
+use crate::earley::{EarleyForest, EarleyParser, Grammar, GrammarBuilder};
 use std::cell::RefCell;
 
 macro_rules! debug {
     ($($args:tt)*) => (if cfg!(feature="debug") { eprintln!($($args)*); })
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 enum G {
     VariantList(Vec<Vec<String>>),
     Variant(Vec<String>),
     Atom(String),
-    Nop
+    Nop,
 }
 
 // use to destructure G enum into a specific alternative
 macro_rules! pull {
-    ($p:path, $e:expr) => (match $e {
-        $p(value) => value,
-        n => panic!("Bad pull match={:?}", n)
-    })
+    ($p:path, $e:expr) => {
+        match $e {
+            $p(value) => value,
+            n => panic!("Bad pull match={:?}", n),
+        }
+    };
 }
 
 // https://en.wikipedia.org/wiki/Extended_Backus%E2%80%93Naur_form
 fn ebnf_grammar() -> Grammar {
     GrammarBuilder::default()
-      .terminal("<Id>", move |s|
-                s.chars().enumerate().all(|(i, c)|
-                    i == 0 && c.is_alphabetic() ||
-                    i > 0 && (c.is_alphanumeric() || c == '_')))
-      .terminal("<Chars>", move |s| s.chars().all(|c| !c.is_control()))
-      .terminal("@<Tag>", move |s|
-                s.chars().enumerate().all(|(i, c)|
-                    i == 0 && c == '@' ||
-                    i == 1 && c.is_alphabetic() ||
-                    i > 1 && (c.is_alphanumeric() || c == '_')))
-      .terminal(":=", |s| s == ":=")
-      .terminal(";", |s| s == ";")
-      .terminal("[", |s| s == "[")
-      .terminal("]", |s| s == "]")
-      .terminal("{", |s| s == "{")
-      .terminal("}", |s| s == "}")
-      .terminal("(", |s| s == "(")
-      .terminal(")", |s| s == ")")
-      .terminal("|", |s| s == "|")
-      .terminal("'", |s| s == "'")
-      .terminal("\"", |s| s == "\"")
-      .nonterm("<RuleList>")
-      .nonterm("<Rule>")
-      .nonterm("<VariantList>")
-      .nonterm("<Variant>")
-      .nonterm("<Atom>")
-      .rule("<RuleList>", &["<RuleList>", "<Rule>"])
-      .rule("<RuleList>", &["<Rule>"])
-      .rule("<Rule>", &["<Id>", ":=", "<VariantList>", ";"])
-      .rule("<VariantList>", &["<VariantList>", "|", "<Variant>"])
-      .rule("<VariantList>", &["<Variant>"])
-      .rule("<Variant>", &["<Variant>", "<Atom>"])
-      .rule("<Variant>", &["<Atom>"])
-      .rule("<Atom>", &["<Id>"])
-      .rule("<Atom>", &["'", "<Chars>", "'"])
-      .rule("<Atom>", &["\"", "<Chars>", "\""])
-      .rule("<Atom>", &["[", "<VariantList>", "]"])
-      .rule("<Atom>", &["{", "<VariantList>", "}"])
-      .rule("<Atom>", &["(", "<VariantList>", ")"])
-      .rule("<Atom>", &["[", "<VariantList>", "]", "@<Tag>"])
-      .rule("<Atom>", &["{", "<VariantList>", "}", "@<Tag>"])
-      .rule("<Atom>", &["(", "<VariantList>", ")", "@<Tag>"])
-      .into_grammar("<RuleList>")
-      .expect("Bad EBNF Grammar")
+        .terminal("<Id>", move |s| {
+            s.chars().enumerate().all(|(i, c)| {
+                i == 0 && c.is_alphabetic() || i > 0 && (c.is_alphanumeric() || c == '_')
+            })
+        })
+        .terminal("<Chars>", move |s| s.chars().all(|c| !c.is_control()))
+        .terminal("@<Tag>", move |s| {
+            s.chars().enumerate().all(|(i, c)| {
+                i == 0 && c == '@'
+                    || i == 1 && c.is_alphabetic()
+                    || i > 1 && (c.is_alphanumeric() || c == '_')
+            })
+        })
+        .terminal(":=", |s| s == ":=")
+        .terminal(";", |s| s == ";")
+        .terminal("[", |s| s == "[")
+        .terminal("]", |s| s == "]")
+        .terminal("{", |s| s == "{")
+        .terminal("}", |s| s == "}")
+        .terminal("(", |s| s == "(")
+        .terminal(")", |s| s == ")")
+        .terminal("|", |s| s == "|")
+        .terminal("'", |s| s == "'")
+        .terminal("\"", |s| s == "\"")
+        .nonterm("<RuleList>")
+        .nonterm("<Rule>")
+        .nonterm("<VariantList>")
+        .nonterm("<Variant>")
+        .nonterm("<Atom>")
+        .rule("<RuleList>", &["<RuleList>", "<Rule>"])
+        .rule("<RuleList>", &["<Rule>"])
+        .rule("<Rule>", &["<Id>", ":=", "<VariantList>", ";"])
+        .rule("<VariantList>", &["<VariantList>", "|", "<Variant>"])
+        .rule("<VariantList>", &["<Variant>"])
+        .rule("<Variant>", &["<Variant>", "<Atom>"])
+        .rule("<Variant>", &["<Atom>"])
+        .rule("<Atom>", &["<Id>"])
+        .rule("<Atom>", &["'", "<Chars>", "'"])
+        .rule("<Atom>", &["\"", "<Chars>", "\""])
+        .rule("<Atom>", &["[", "<VariantList>", "]"])
+        .rule("<Atom>", &["{", "<VariantList>", "}"])
+        .rule("<Atom>", &["(", "<VariantList>", ")"])
+        .rule("<Atom>", &["[", "<VariantList>", "]", "@<Tag>"])
+        .rule("<Atom>", &["{", "<VariantList>", "}", "@<Tag>"])
+        .rule("<Atom>", &["(", "<VariantList>", ")", "@<Tag>"])
+        .into_grammar("<RuleList>")
+        .expect("Bad EBNF Grammar")
 }
 
 fn ebnf_terminal_parser(
-    user_grammar_builder: &RefCell<GrammarBuilder>
+    user_grammar_builder: &RefCell<GrammarBuilder>,
 ) -> impl Fn(&str, &str) -> G + '_ {
     move |symbol, token| {
         match symbol {
             "<Id>" => {
                 debug!("Adding non-term {:?}", token);
                 user_grammar_builder.borrow_mut().nonterm_try(token);
-            },
+            }
             "@<Tag>" => {
                 debug!("Adding non-term {:?}", token);
                 user_grammar_builder.borrow_mut().nonterm_try(token);
-            },
+            }
             "<Chars>" => {
                 debug!("Adding terminal {:?}", token);
                 let tok = token.to_string();
-                user_grammar_builder.borrow_mut()
+                user_grammar_builder
+                    .borrow_mut()
                     .terminal_try(token, move |s| s == tok);
-            },
-            _ => ()
+            }
+            _ => (),
         }
         G::Atom(token.to_string())
     }
@@ -121,7 +125,7 @@ fn ebnf_variantlist_action(ev: &mut EarleyForest<'_, G>) {
     });
     ev.action("<VariantList> -> <Variant>", |mut n| {
         let part = pull!(G::Variant, n.remove(0));
-        G::VariantList(vec!(part))
+        G::VariantList(vec![part])
     });
 }
 
@@ -132,7 +136,7 @@ fn ebnf_variant_action(ev: &mut EarleyForest<'_, G>) {
         G::Variant(part)
     });
     ev.action("<Variant> -> <Atom>", |mut n| {
-        G::Variant(vec!(pull!(G::Atom, n.remove(0))))
+        G::Variant(vec![pull!(G::Atom, n.remove(0))])
     });
 }
 
@@ -145,7 +149,10 @@ fn ebnf_grouping_action<'a>(ev: &mut EarleyForest<'a, G>, gb: &'a RefCell<Gramma
         let body = pull!(G::VariantList, n.remove(1));
         for rule in body {
             debug!("Adding rule {:?} -> {:?}", aux, rule);
-            t_gb.rule_try(&aux, &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>());
+            t_gb.rule_try(
+                &aux,
+                &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+            );
         }
         G::Atom(aux)
     });
@@ -157,7 +164,10 @@ fn ebnf_grouping_action<'a>(ev: &mut EarleyForest<'a, G>, gb: &'a RefCell<Gramma
         let body = pull!(G::VariantList, n.remove(1));
         for rule in body {
             debug!("Adding rule {:?} -> {:?}", aux, rule);
-            t_gb.rule_try(&aux, &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>());
+            t_gb.rule_try(
+                &aux,
+                &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+            );
         }
         G::Atom(aux)
     });
@@ -173,7 +183,10 @@ fn ebnf_optional_action<'a>(ev: &mut EarleyForest<'a, G>, gb: &'a RefCell<Gramma
         let body = pull!(G::VariantList, n.remove(1));
         for rule in body {
             debug!("Adding rule {:?} -> {:?}", aux, rule);
-            t_gb.rule_try(&aux, &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>());
+            t_gb.rule_try(
+                &aux,
+                &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+            );
             debug!("Adding rule {:?} -> []", aux);
             t_gb.rule_try(&aux, &[]);
         }
@@ -187,7 +200,10 @@ fn ebnf_optional_action<'a>(ev: &mut EarleyForest<'a, G>, gb: &'a RefCell<Gramma
         let body = pull!(G::VariantList, n.remove(1));
         for rule in body {
             debug!("Adding rule {:?} -> {:?}", aux, rule);
-            t_gb.rule_try(&aux, &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>());
+            t_gb.rule_try(
+                &aux,
+                &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+            );
             debug!("Adding rule {:?} -> []", aux);
             t_gb.rule_try(&aux, &[]);
         }
@@ -206,7 +222,10 @@ fn ebnf_repeat_action<'a>(ev: &mut EarleyForest<'a, G>, gb: &'a RefCell<GrammarB
         for mut rule in body {
             rule.push(aux.clone());
             debug!("Adding rule {:?} -> {:?}", aux, rule);
-            t_gb.rule_try(&aux, &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>());
+            t_gb.rule_try(
+                &aux,
+                &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+            );
             debug!("Adding rule {:?} -> []", aux);
             t_gb.rule_try(&aux, &[]);
         }
@@ -222,7 +241,10 @@ fn ebnf_repeat_action<'a>(ev: &mut EarleyForest<'a, G>, gb: &'a RefCell<GrammarB
         for mut rule in body {
             rule.push(aux.clone());
             debug!("Adding rule {:?} -> {:?}", aux, rule);
-            t_gb.rule_try(&aux, &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>());
+            t_gb.rule_try(
+                &aux,
+                &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+            );
             debug!("Adding rule {:?} -> []", aux);
             t_gb.rule_try(&aux, &[]);
         }
@@ -239,10 +261,10 @@ pub struct EbnfGrammarParser {
 impl EbnfGrammarParser {
     // Parse a user grammar into a builder where we can plug terminal matchers
     pub fn new(grammar: &str, start: &str) -> Self {
-        Self{
+        Self {
             start: start.to_string(),
             grammar: grammar.to_string(),
-            grammar_builder: GrammarBuilder::default()
+            grammar_builder: GrammarBuilder::default(),
         }
     }
 
@@ -260,9 +282,7 @@ impl EbnfGrammarParser {
         // is evaluating semantic actions, ie: at `eval_all` line.
         let grammar_builder = RefCell::new(self.grammar_builder);
         {
-            let mut user_semanter = EarleyForest::new(
-                ebnf_terminal_parser(&grammar_builder)
-            );
+            let mut user_semanter = EarleyForest::new(ebnf_terminal_parser(&grammar_builder));
             user_semanter.action("<RuleList> -> <RuleList> <Rule>", |_| G::Nop);
             user_semanter.action("<RuleList> -> <Rule>", |_| G::Nop);
             ebnf_rule_action(&mut user_semanter, &grammar_builder);
@@ -278,7 +298,7 @@ impl EbnfGrammarParser {
             // Create a parser for EBNF which we'll use to parse input grammar
             let parsed_user_grammar = EarleyParser::new(ebnf_grammar())
                 .parse(EbnfTokenizer::new(self.grammar.chars()))?;
-            // 
+            //
             if user_semanter.eval_all(&parsed_user_grammar)?.len() != 1 {
                 panic!("BUG: EBNF grammar shouldn't be ambiguous!");
             }

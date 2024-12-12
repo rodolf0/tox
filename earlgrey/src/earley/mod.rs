@@ -1,10 +1,10 @@
 #![deny(warnings)]
 
 mod grammar;
-pub use grammar::{GrammarBuilder, Grammar};
+pub use grammar::{Grammar, GrammarBuilder};
 
-mod spans; 
 mod parser;
+mod spans;
 pub use parser::EarleyParser;
 
 mod trees;

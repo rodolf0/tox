@@ -1,10 +1,10 @@
 #![deny(warnings)]
 
 mod earley;
-pub use earley::{EarleyParser, EarleyForest, Grammar, GrammarBuilder};
+pub use earley::{EarleyForest, EarleyParser, Grammar, GrammarBuilder};
 
-mod ebnf_tokenizer;
 mod ebnf;
+mod ebnf_tokenizer;
 pub use ebnf::EbnfGrammarParser;
 
 mod parsers;

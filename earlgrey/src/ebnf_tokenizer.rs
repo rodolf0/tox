@@ -1,11 +1,14 @@
-pub struct EbnfTokenizer<I: Iterator<Item=char>> {
+pub struct EbnfTokenizer<I: Iterator<Item = char>> {
     input: std::iter::Peekable<I>,
     buff: Vec<String>,
 }
 
-impl<I: Iterator<Item=char>> EbnfTokenizer<I> {
+impl<I: Iterator<Item = char>> EbnfTokenizer<I> {
     pub fn new(input: I) -> Self {
-        Self { input: input.peekable(), buff: Vec::new() }
+        Self {
+            input: input.peekable(),
+            buff: Vec::new(),
+        }
     }
 
     fn next_result(&mut self) -> Result<Option<String>, String> {
@@ -27,7 +30,7 @@ impl<I: Iterator<Item=char>> EbnfTokenizer<I> {
                 let mut escaped = false;
                 while let Some(ch) = self.input.next() {
                     // Swallow escape char '\' and prevent string closure
-                    if ! escaped && ch == '\\' {
+                    if !escaped && ch == '\\' {
                         escaped = true;
                         continue;
                     }
@@ -35,7 +38,7 @@ impl<I: Iterator<Item=char>> EbnfTokenizer<I> {
                         quoted_string.push('\\')
                     }
                     // Found close token. Check it wasn't escaped.
-                    if ! escaped && open == ch {
+                    if !escaped && open == ch {
                         self.buff.push(quoted_string);
                         self.buff.push(ch.to_string());
                         return self.next_result();
@@ -44,7 +47,7 @@ impl<I: Iterator<Item=char>> EbnfTokenizer<I> {
                     escaped = false;
                 }
                 Err("Unfinished string missing close quote".to_string())
-            },
+            }
             // Swallow comments until EOL.
             Some('#') => {
                 while let Some(nl) = self.input.next() {
@@ -53,35 +56,35 @@ impl<I: Iterator<Item=char>> EbnfTokenizer<I> {
                     }
                 }
                 Err("Unfinished comment missing EOL".to_string())
-            },
+            }
             // Tags (starts with '@') and identifiers.
             Some(x) if x.is_ascii_alphabetic() || x == '@' || x == '_' => {
                 let mut id = x.to_string();
                 while let Some(ch) = self.input.peek() {
-                    if ! ch.is_ascii_alphanumeric() && *ch != '_' {
+                    if !ch.is_ascii_alphanumeric() && *ch != '_' {
                         break;
                     }
                     id.push(self.input.next().unwrap());
                 }
                 Ok(Some(id))
-            },
+            }
             // Swallow whitespace.
             Some(x) if x.is_whitespace() => {
                 while let Some(ws) = self.input.peek() {
-                    if ! ws.is_whitespace() {
+                    if !ws.is_whitespace() {
                         break;
                     }
                     self.input.next(); // consume whitespace
                 }
                 self.next_result()
-            },
+            }
             Some(ch) => Err(format!("Unexpected char: {}", ch)),
             None => Ok(None),
         }
     }
 }
 
-impl<I: Iterator<Item=char>> Iterator for EbnfTokenizer<I> {
+impl<I: Iterator<Item = char>> Iterator for EbnfTokenizer<I> {
     type Item = String;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -89,8 +92,8 @@ impl<I: Iterator<Item=char>> Iterator for EbnfTokenizer<I> {
             Err(e) => {
                 eprintln!("EbnfTokenizer error: {}", e);
                 None
-            },
-            Ok(v) => v
+            }
+            Ok(v) => v,
         }
     }
 }
@@ -108,9 +111,27 @@ mod tests {
             "escapedstring\""
         "#;
         let expected = vec![
-            "\"", "hello", "\"", "world", "@tag", "|", "[", "foo", "]", ";",
-            "{", "x", "}", "a", ":=", "(", "y", ")", "\"", "escapedstring\\\"",
-            "\""
+            "\"",
+            "hello",
+            "\"",
+            "world",
+            "@tag",
+            "|",
+            "[",
+            "foo",
+            "]",
+            ";",
+            "{",
+            "x",
+            "}",
+            "a",
+            ":=",
+            "(",
+            "y",
+            ")",
+            "\"",
+            "escapedstring\\\"",
+            "\"",
         ];
         for (idx, token) in EbnfTokenizer::new(input.chars()).enumerate() {
             assert_eq!(token, expected[idx]);

@@ -1,10 +1,10 @@
 #![deny(warnings)]
 
 use super::ebnf::EbnfGrammarParser;
-use super::{Grammar, EarleyForest, EarleyParser};
+use super::{EarleyForest, EarleyParser, Grammar};
 use std::fmt;
 
-#[derive(Debug,Clone,PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Tree {
     // ("[+-]", "+")
     Leaf(String, String),
@@ -12,16 +12,18 @@ pub enum Tree {
     Node(String, Vec<Tree>),
 }
 
-pub fn ast_parser<InputIter>(grammar: Grammar)
-    -> Result<impl Fn(InputIter) -> Result<Vec<Tree>, String>, String>
-        where InputIter: Iterator, InputIter::Item: AsRef<str> + std::fmt::Debug
+pub fn ast_parser<InputIter>(
+    grammar: Grammar,
+) -> Result<impl Fn(InputIter) -> Result<Vec<Tree>, String>, String>
+where
+    InputIter: Iterator,
+    InputIter::Item: AsRef<str> + std::fmt::Debug,
 {
-    let mut tree_builder = EarleyForest::new(
-        |sym, tok| Tree::Leaf(sym.to_string(), tok.to_string()));
+    let mut tree_builder =
+        EarleyForest::new(|sym, tok| Tree::Leaf(sym.to_string(), tok.to_string()));
 
     for rule in grammar.rules.iter().map(|r| r.to_string()) {
-        tree_builder.action(
-            &rule.clone(), move |nodes| Tree::Node(rule.clone(), nodes));
+        tree_builder.action(&rule.clone(), move |nodes| Tree::Node(rule.clone(), nodes));
     }
 
     let parser = EarleyParser::new(grammar);
@@ -43,8 +45,7 @@ fn check_trees<T: fmt::Debug>(trees: &Vec<T>, expected: Vec<&str>) {
 #[test]
 fn minimal_parser() {
     let g = r#" Number := "0" ; "#;
-    let grammar = EbnfGrammarParser::new(&g, "Number")
-        .into_grammar().unwrap();
+    let grammar = EbnfGrammarParser::new(&g, "Number").into_grammar().unwrap();
     let parser = ast_parser(grammar).unwrap();
 
     let trees = parser(["0"].iter()).unwrap();
@@ -59,22 +60,23 @@ fn arith_parser() {
 
         Number := "0" | "1" | "2" | "3" ;
     "#;
-    let grammar = EbnfGrammarParser::new(&g, "expr")
-        .into_grammar().unwrap();
+    let grammar = EbnfGrammarParser::new(&g, "expr").into_grammar().unwrap();
     let parser = ast_parser(grammar).unwrap();
 
     let trees = parser("3 + 2 + 1".split_whitespace()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("expr -> expr + Number", ["#,
-                r#"Node("expr -> expr + Number", ["#,
-                    r#"Node("expr -> Number", ["#,
-                        r#"Node("Number -> 3", [Leaf("3", "3")])]), "#,
-                    r#"Leaf("+", "+"), "#,
-                    r#"Node("Number -> 2", [Leaf("2", "2")])]), "#,
-                r#"Leaf("+", "+"), "#,
-                r#"Node("Number -> 1", [Leaf("1", "1")])])"#)
-    ]);
+            r#"Node("expr -> expr + Number", ["#,
+            r#"Node("expr -> Number", ["#,
+            r#"Node("Number -> 3", [Leaf("3", "3")])]), "#,
+            r#"Leaf("+", "+"), "#,
+            r#"Node("Number -> 2", [Leaf("2", "2")])]), "#,
+            r#"Leaf("+", "+"), "#,
+            r#"Node("Number -> 1", [Leaf("1", "1")])])"#
+        )],
+    );
 }
 
 #[test]
@@ -83,23 +85,24 @@ fn repetition() {
         arg := b { "," b } ;
         b := "0" | "1" ;
     "#;
-    let grammar = EbnfGrammarParser::new(&g, "arg")
-        .into_grammar().unwrap();
+    let grammar = EbnfGrammarParser::new(&g, "arg").into_grammar().unwrap();
     let parser = ast_parser(grammar).unwrap();
 
     let trees = parser("1 , 0 , 1".split_whitespace()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("arg -> b <Uniq-4>", ["#,
-                r#"Node("b -> 1", [Leaf("1", "1")]), "#,
-                r#"Node("<Uniq-4> -> , b <Uniq-4>", ["#,
-                    r#"Leaf(",", ","), "#,
-                    r#"Node("b -> 0", [Leaf("0", "0")]), "#,
-                    r#"Node("<Uniq-4> -> , b <Uniq-4>", ["#,
-                        r#"Leaf(",", ","), "#,
-                        r#"Node("b -> 1", [Leaf("1", "1")]), "#,
-                        r#"Node("<Uniq-4> -> ", [])])])])"#)
-    ]);
+            r#"Node("b -> 1", [Leaf("1", "1")]), "#,
+            r#"Node("<Uniq-4> -> , b <Uniq-4>", ["#,
+            r#"Leaf(",", ","), "#,
+            r#"Node("b -> 0", [Leaf("0", "0")]), "#,
+            r#"Node("<Uniq-4> -> , b <Uniq-4>", ["#,
+            r#"Leaf(",", ","), "#,
+            r#"Node("b -> 1", [Leaf("1", "1")]), "#,
+            r#"Node("<Uniq-4> -> ", [])])])])"#
+        )],
+    );
 }
 
 #[test]
@@ -108,23 +111,24 @@ fn repetition_tagged() {
         arg := b { "," b } @x;
         b := "0" | "1" ;
     "#;
-    let grammar = EbnfGrammarParser::new(&g, "arg")
-        .into_grammar().unwrap();
+    let grammar = EbnfGrammarParser::new(&g, "arg").into_grammar().unwrap();
     let parser = ast_parser(grammar).unwrap();
 
     let trees = parser("1 , 0 , 1".split_whitespace()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("arg -> b @x", ["#,
-                r#"Node("b -> 1", [Leaf("1", "1")]), "#,
-                r#"Node("@x -> , b @x", ["#,
-                    r#"Leaf(",", ","), "#,
-                    r#"Node("b -> 0", [Leaf("0", "0")]), "#,
-                    r#"Node("@x -> , b @x", ["#,
-                        r#"Leaf(",", ","), "#,
-                        r#"Node("b -> 1", [Leaf("1", "1")]), "#,
-                        r#"Node("@x -> ", [])])])])"#)
-    ]);
+            r#"Node("b -> 1", [Leaf("1", "1")]), "#,
+            r#"Node("@x -> , b @x", ["#,
+            r#"Leaf(",", ","), "#,
+            r#"Node("b -> 0", [Leaf("0", "0")]), "#,
+            r#"Node("@x -> , b @x", ["#,
+            r#"Leaf(",", ","), "#,
+            r#"Node("b -> 1", [Leaf("1", "1")]), "#,
+            r#"Node("@x -> ", [])])])])"#
+        )],
+    );
 }
 
 #[test]
@@ -134,24 +138,29 @@ fn option() {
         d := "0" | "1" | "2";
     "#;
     let grammar = EbnfGrammarParser::new(&g, "complex")
-        .into_grammar().unwrap();
+        .into_grammar()
+        .unwrap();
     let parser = ast_parser(grammar).unwrap();
 
     let trees = parser(["1"].iter()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("complex -> d <Uniq-5>", ["#,
-                r#"Node("d -> 1", [Leaf("1", "1")]), "#,
-                r#"Node("<Uniq-5> -> ", [])])"#)
-    ]);
+            r#"Node("d -> 1", [Leaf("1", "1")]), "#,
+            r#"Node("<Uniq-5> -> ", [])])"#
+        )],
+    );
 
     let trees = parser(["2", "i"].iter()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("complex -> d <Uniq-5>", ["#,
-                r#"Node("d -> 2", [Leaf("2", "2")]), "#,
-                r#"Node("<Uniq-5> -> i", [Leaf("i", "i")])])"#)
-    ]);
+            r#"Node("d -> 2", [Leaf("2", "2")]), "#,
+            r#"Node("<Uniq-5> -> i", [Leaf("i", "i")])])"#
+        )],
+    );
 
     assert!(parser(["2", "i", "i"].iter()).is_err());
 }
@@ -163,24 +172,29 @@ fn option_tagged() {
         d := "0" | "1" | "2";
     "#;
     let grammar = EbnfGrammarParser::new(&g, "complex")
-        .into_grammar().unwrap();
+        .into_grammar()
+        .unwrap();
     let parser = ast_parser(grammar).unwrap();
 
     let trees = parser(["1"].iter()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("complex -> d @x", ["#,
-                r#"Node("d -> 1", [Leaf("1", "1")]), "#,
-                r#"Node("@x -> ", [])])"#)
-    ]);
+            r#"Node("d -> 1", [Leaf("1", "1")]), "#,
+            r#"Node("@x -> ", [])])"#
+        )],
+    );
 
     let trees = parser(["2", "i"].iter()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("complex -> d @x", ["#,
-                r#"Node("d -> 2", [Leaf("2", "2")]), "#,
-                r#"Node("@x -> i", [Leaf("i", "i")])])"#)
-    ]);
+            r#"Node("d -> 2", [Leaf("2", "2")]), "#,
+            r#"Node("@x -> i", [Leaf("i", "i")])])"#
+        )],
+    );
 
     assert!(parser(["2", "i", "i"].iter()).is_err());
 }
@@ -190,25 +204,28 @@ fn grouping() {
     let g = r#"
         row := ("a" | "b") ("0" | "1") ;
     "#;
-    let grammar = EbnfGrammarParser::new(&g, "row")
-        .into_grammar().unwrap();
+    let grammar = EbnfGrammarParser::new(&g, "row").into_grammar().unwrap();
     let parser = ast_parser(grammar).unwrap();
 
     let trees = parser(["b", "1"].iter()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("row -> <Uniq-5> <Uniq-2>", ["#,
-                r#"Node("<Uniq-5> -> b", [Leaf("b", "b")]), "#,
-                r#"Node("<Uniq-2> -> 1", [Leaf("1", "1")])])"#)
-    ]);
+            r#"Node("<Uniq-5> -> b", [Leaf("b", "b")]), "#,
+            r#"Node("<Uniq-2> -> 1", [Leaf("1", "1")])])"#
+        )],
+    );
 
     let trees = parser(["a", "0"].iter()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("row -> <Uniq-5> <Uniq-2>", ["#,
-                r#"Node("<Uniq-5> -> a", [Leaf("a", "a")]), "#,
-                r#"Node("<Uniq-2> -> 0", [Leaf("0", "0")])])"#)
-    ]);
+            r#"Node("<Uniq-5> -> a", [Leaf("a", "a")]), "#,
+            r#"Node("<Uniq-2> -> 0", [Leaf("0", "0")])])"#
+        )],
+    );
 
     assert!(parser(["a", "b"].iter()).is_err());
     assert!(parser(["0", "1"].iter()).is_err());
@@ -219,25 +236,28 @@ fn grouping_tagged() {
     let g = r#"
         row := ("a" | "b") @x ("0" | "1") @y;
     "#;
-    let grammar = EbnfGrammarParser::new(&g, "row")
-        .into_grammar().unwrap();
+    let grammar = EbnfGrammarParser::new(&g, "row").into_grammar().unwrap();
     let parser = ast_parser(grammar).unwrap();
 
     let trees = parser(["b", "1"].iter()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("row -> @x @y", ["#,
-                r#"Node("@x -> b", [Leaf("b", "b")]), "#,
-                r#"Node("@y -> 1", [Leaf("1", "1")])])"#)
-    ]);
+            r#"Node("@x -> b", [Leaf("b", "b")]), "#,
+            r#"Node("@y -> 1", [Leaf("1", "1")])])"#
+        )],
+    );
 
     let trees = parser(["a", "0"].iter()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("row -> @x @y", ["#,
-                r#"Node("@x -> a", [Leaf("a", "a")]), "#,
-                r#"Node("@y -> 0", [Leaf("0", "0")])])"#)
-    ]);
+            r#"Node("@x -> a", [Leaf("a", "a")]), "#,
+            r#"Node("@y -> 0", [Leaf("0", "0")])])"#
+        )],
+    );
 
     assert!(parser(["a", "b"].iter()).is_err());
     assert!(parser(["0", "1"].iter()).is_err());
@@ -248,39 +268,44 @@ fn mixed() {
     let g = r#"
         row := "a" [ "b" ] ("0" | "1") [ "c" ];
     "#;
-    let grammar = EbnfGrammarParser::new(&g, "row")
-        .into_grammar().unwrap();
+    let grammar = EbnfGrammarParser::new(&g, "row").into_grammar().unwrap();
     let parser = ast_parser(grammar).unwrap();
 
     let trees = parser(["a", "0"].iter()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("row -> a <Uniq-6> <Uniq-4> <Uniq-1>", ["#,
-                r#"Leaf("a", "a"), "#,
-                r#"Node("<Uniq-6> -> ", []), "#,
-                r#"Node("<Uniq-4> -> 0", [Leaf("0", "0")]), "#,
-                r#"Node("<Uniq-1> -> ", [])])"#)
-    ]);
+            r#"Leaf("a", "a"), "#,
+            r#"Node("<Uniq-6> -> ", []), "#,
+            r#"Node("<Uniq-4> -> 0", [Leaf("0", "0")]), "#,
+            r#"Node("<Uniq-1> -> ", [])])"#
+        )],
+    );
 
     let trees = parser(["a", "b", "1"].iter()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("row -> a <Uniq-6> <Uniq-4> <Uniq-1>", ["#,
-                r#"Leaf("a", "a"), "#,
-                r#"Node("<Uniq-6> -> b", [Leaf("b", "b")]), "#,
-                r#"Node("<Uniq-4> -> 1", [Leaf("1", "1")]), "#,
-                r#"Node("<Uniq-1> -> ", [])])"#)
-    ]);
+            r#"Leaf("a", "a"), "#,
+            r#"Node("<Uniq-6> -> b", [Leaf("b", "b")]), "#,
+            r#"Node("<Uniq-4> -> 1", [Leaf("1", "1")]), "#,
+            r#"Node("<Uniq-1> -> ", [])])"#
+        )],
+    );
 
     let trees = parser(["a", "1", "c"].iter()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("row -> a <Uniq-6> <Uniq-4> <Uniq-1>", ["#,
-                r#"Leaf("a", "a"), "#,
-                r#"Node("<Uniq-6> -> ", []), "#,
-                r#"Node("<Uniq-4> -> 1", [Leaf("1", "1")]), "#,
-                r#"Node("<Uniq-1> -> c", [Leaf("c", "c")])])"#)
-    ]);
+            r#"Leaf("a", "a"), "#,
+            r#"Node("<Uniq-6> -> ", []), "#,
+            r#"Node("<Uniq-4> -> 1", [Leaf("1", "1")]), "#,
+            r#"Node("<Uniq-1> -> c", [Leaf("c", "c")])])"#
+        )],
+    );
 
     assert!(parser(["a", "b"].iter()).is_err());
     assert!(parser(["0", "1"].iter()).is_err());
@@ -294,39 +319,44 @@ fn mixed_tagged() {
         row := "a" [ "b" ]@x ("0" | "1")@y [ "c" ]@z;
     "#;
 
-    let grammar = EbnfGrammarParser::new(&g, "row")
-        .into_grammar().unwrap();
+    let grammar = EbnfGrammarParser::new(&g, "row").into_grammar().unwrap();
     let parser = ast_parser(grammar).unwrap();
 
     let trees = parser(["a", "0"].iter()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("row -> a @x @y @z", ["#,
-                r#"Leaf("a", "a"), "#,
-                r#"Node("@x -> ", []), "#,
-                r#"Node("@y -> 0", [Leaf("0", "0")]), "#,
-                r#"Node("@z -> ", [])])"#)
-    ]);
+            r#"Leaf("a", "a"), "#,
+            r#"Node("@x -> ", []), "#,
+            r#"Node("@y -> 0", [Leaf("0", "0")]), "#,
+            r#"Node("@z -> ", [])])"#
+        )],
+    );
 
     let trees = parser(["a", "b", "1"].iter()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("row -> a @x @y @z", ["#,
-                r#"Leaf("a", "a"), "#,
-                r#"Node("@x -> b", [Leaf("b", "b")]), "#,
-                r#"Node("@y -> 1", [Leaf("1", "1")]), "#,
-                r#"Node("@z -> ", [])])"#)
-    ]);
+            r#"Leaf("a", "a"), "#,
+            r#"Node("@x -> b", [Leaf("b", "b")]), "#,
+            r#"Node("@y -> 1", [Leaf("1", "1")]), "#,
+            r#"Node("@z -> ", [])])"#
+        )],
+    );
 
     let trees = parser(["a", "1", "c"].iter()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("row -> a @x @y @z", ["#,
-                r#"Leaf("a", "a"), "#,
-                r#"Node("@x -> ", []), "#,
-                r#"Node("@y -> 1", [Leaf("1", "1")]), "#,
-                r#"Node("@z -> c", [Leaf("c", "c")])])"#)
-    ]);
+            r#"Leaf("a", "a"), "#,
+            r#"Node("@x -> ", []), "#,
+            r#"Node("@y -> 1", [Leaf("1", "1")]), "#,
+            r#"Node("@z -> c", [Leaf("c", "c")])])"#
+        )],
+    );
 
     assert!(parser(["a", "b"].iter()).is_err());
     assert!(parser(["0", "1"].iter()).is_err());
@@ -343,16 +373,19 @@ fn plug_terminal() {
     "#;
     let grammar = EbnfGrammarParser::new(&g, "expr")
         .plug_terminal("Number", |i| i8::from_str(i).is_ok())
-        .into_grammar().unwrap();
+        .into_grammar()
+        .unwrap();
 
     let parser = ast_parser(grammar).unwrap();
 
     let trees = parser(["3", "+", "1"].iter()).unwrap();
-    check_trees(&trees, vec![
-        concat!(
+    check_trees(
+        &trees,
+        vec![concat!(
             r#"Node("expr -> expr + Number", ["#,
-                r#"Node("expr -> Number", [Leaf("Number", "3")]), "#,
-                r#"Leaf("+", "+"), "#,
-                r#"Leaf("Number", "1")])"#)
-    ]);
+            r#"Node("expr -> Number", [Leaf("Number", "3")]), "#,
+            r#"Leaf("+", "+"), "#,
+            r#"Leaf("Number", "1")])"#
+        )],
+    );
 }

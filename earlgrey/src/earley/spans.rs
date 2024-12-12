@@ -1,11 +1,10 @@
 #![deny(warnings)]
 
 use super::grammar::{Rule, Symbol};
-use std::{cell, fmt, hash};
 use std::rc::Rc;
+use std::{cell, fmt, hash};
 
-
-#[derive(PartialEq,Eq,Hash,Debug,Clone)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum SpanSource {
     Completion(Rc<Span>, Rc<Span>),
     Scan(Rc<Span>, String),
@@ -13,10 +12,10 @@ pub enum SpanSource {
 
 /// An Span is a partially matched `Rule`. `dot` shows the match progress.
 pub struct Span {
-    pub rule: Rc<Rule>,  // LR0item (dotted rule)
-    pub dot: usize,      // dot position within the rule
-    pub start: usize,    // input stream position where item starts
-    pub end: usize,      // input stream position where item ends
+    pub rule: Rc<Rule>, // LR0item (dotted rule)
+    pub dot: usize,     // dot position within the rule
+    pub start: usize,   // input stream position where item starts
+    pub end: usize,     // input stream position where item ends
 
     // Need a RefCell to update existing Spans. A replacement with the union
     // of backpointers would invalidate other Spans already pointing to this one.
@@ -24,7 +23,6 @@ pub struct Span {
     /// backpointers leading to this item: (source-item, Scan/Completion)
     backpointers: cell::RefCell<Vec<SpanSource>>,
 }
-
 
 // Spans are deduped only by rule, dot, start, end (ie: not bp)
 // The intention is that 2 Spans are the same and can be merged ignoring bp.
@@ -39,10 +37,10 @@ impl hash::Hash for Span {
 
 impl PartialEq for Span {
     fn eq(&self, other: &Span) -> bool {
-        self.rule == other.rule &&
-        self.dot == other.dot &&
-        self.start == other.start &&
-        self.end == other.end
+        self.rule == other.rule
+            && self.dot == other.dot
+            && self.start == other.start
+            && self.end == other.end
     }
 }
 
@@ -51,14 +49,32 @@ impl Eq for Span {}
 impl Span {
     // Unwind backpointers recursively
     pub fn stringify(&self, nest: usize) -> String {
-        let pre = self.rule.spec.iter().take(self.dot)
-            .map(|s| s.name()).collect::<Vec<_>>().join(" ");
-        let post = self.rule.spec.iter().skip(self.dot)
-            .map(|s| s.name()).collect::<Vec<_>>().join(" ");
-        format!("({} - {}) {} -> {} \u{00b7} {} #bp: {}{}",
-               self.start, self.end, self.rule.head, pre, post,
-               self.backpointers.borrow().len(),
-               self.stringify_bp(nest + 1))
+        let pre = self
+            .rule
+            .spec
+            .iter()
+            .take(self.dot)
+            .map(|s| s.name())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let post = self
+            .rule
+            .spec
+            .iter()
+            .skip(self.dot)
+            .map(|s| s.name())
+            .collect::<Vec<_>>()
+            .join(" ");
+        format!(
+            "({} - {}) {} -> {} \u{00b7} {} #bp: {}{}",
+            self.start,
+            self.end,
+            self.rule.head,
+            pre,
+            post,
+            self.backpointers.borrow().len(),
+            self.stringify_bp(nest + 1)
+        )
     }
 
     fn stringify_bp(&self, nest: usize) -> String {
@@ -67,18 +83,28 @@ impl Span {
         for bp in self.backpointers.borrow().iter() {
             match bp {
                 SpanSource::Completion(a, b) => {
-                    out += format!("\n{}Complete(\n{}   {}, \n{}   {}\n{})",
+                    out += format!(
+                        "\n{}Complete(\n{}   {}, \n{}   {}\n{})",
                         pfx,
-                        pfx, a.stringify(nest + 1),
-                        pfx, b.stringify(nest + 1),
-                        pfx).as_str();
-                },
+                        pfx,
+                        a.stringify(nest + 1),
+                        pfx,
+                        b.stringify(nest + 1),
+                        pfx
+                    )
+                    .as_str();
+                }
                 SpanSource::Scan(a, b) => {
-                    out += format!("\n{}Scan(\n{}   {}, \n{}   {}\n{})",
+                    out += format!(
+                        "\n{}Scan(\n{}   {}, \n{}   {}\n{})",
                         pfx,
-                        pfx, a.stringify(nest + 1),
-                        pfx, b,
-                        pfx).as_str();
+                        pfx,
+                        a.stringify(nest + 1),
+                        pfx,
+                        b,
+                        pfx
+                    )
+                    .as_str();
                 }
             }
         }
@@ -88,13 +114,32 @@ impl Span {
 
 impl fmt::Debug for Span {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let pre = self.rule.spec.iter().take(self.dot)
-            .map(|s| s.name()).collect::<Vec<_>>().join(" ");
-        let post = self.rule.spec.iter().skip(self.dot)
-            .map(|s| s.name()).collect::<Vec<_>>().join(" ");
-        write!(f, "({} - {}) {} -> {} \u{00b7} {} #bp: {}",
-               self.start, self.end, self.rule.head, pre, post,
-               self.backpointers.borrow().len())
+        let pre = self
+            .rule
+            .spec
+            .iter()
+            .take(self.dot)
+            .map(|s| s.name())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let post = self
+            .rule
+            .spec
+            .iter()
+            .skip(self.dot)
+            .map(|s| s.name())
+            .collect::<Vec<_>>()
+            .join(" ");
+        write!(
+            f,
+            "({} - {}) {} -> {} \u{00b7} {} #bp: {}",
+            self.start,
+            self.end,
+            self.rule.head,
+            pre,
+            post,
+            self.backpointers.borrow().len()
+        )
     }
 }
 
@@ -123,14 +168,14 @@ impl Span {
         assert_eq!(*self, other, "Spans to merge should be Eq");
         let mut dest_bp = self.backpointers.borrow_mut();
         for bp in other.backpointers.into_inner() {
-            if ! dest_bp.contains(&bp) {
+            if !dest_bp.contains(&bp) {
                 dest_bp.push(bp);
             }
         }
     }
 
     pub fn new(rule: &Rc<Rule>, start: usize) -> Span {
-        Span{
+        Span {
             rule: rule.clone(),
             dot: 0,
             start,
@@ -144,7 +189,7 @@ impl Span {
             SpanSource::Completion(span, _) => span,
             SpanSource::Scan(span, _) => span,
         };
-        Span{
+        Span {
             rule: source.rule.clone(),
             dot: source.dot + 1,
             start: source.start,
@@ -158,9 +203,9 @@ impl Span {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-    use std::cell::RefCell;
     use super::*;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     fn terminal(name: &str, pred: impl Fn(&str) -> bool + 'static) -> Rc<Symbol> {
         Rc::new(Symbol::Term(name.to_string(), Box::new(pred)))
@@ -171,27 +216,43 @@ mod tests {
     }
 
     fn gen_rule1() -> Rc<Rule> {
-        fn testfn(o: &str) -> bool { o.len() == 1 && "+-".contains(o) }
+        fn testfn(o: &str) -> bool {
+            o.len() == 1 && "+-".contains(o)
+        }
         // S -> S +- d
-        Rc::new(Rule::new("S", &[
-            nonterm("S"),
-            terminal("+-", testfn),
-            terminal("d", |n| n.chars().all(|c| "123".contains(c))),
-        ]))
+        Rc::new(Rule::new(
+            "S",
+            &[
+                nonterm("S"),
+                terminal("+-", testfn),
+                terminal("d", |n| n.chars().all(|c| "123".contains(c))),
+            ],
+        ))
     }
 
     fn gen_rule2() -> Rc<Rule> {
-        fn testfn(o: &str) -> bool { o.len() == 1 && "*/".contains(o) }
+        fn testfn(o: &str) -> bool {
+            o.len() == 1 && "*/".contains(o)
+        }
         // S -> S */ d
-        Rc::new(Rule::new("S", &[
-            nonterm("S"),
-            terminal("*/", testfn),
-            terminal("d", |n| n.chars().all(|c| "123".contains(c))),
-        ]))
+        Rc::new(Rule::new(
+            "S",
+            &[
+                nonterm("S"),
+                terminal("*/", testfn),
+                terminal("d", |n| n.chars().all(|c| "123".contains(c))),
+            ],
+        ))
     }
 
     fn item(rule: Rc<Rule>, dot: usize, start: usize, end: usize) -> Span {
-        Span{rule, dot, start, end, backpointers: RefCell::new(Vec::new())}
+        Span {
+            rule,
+            dot,
+            start,
+            end,
+            backpointers: RefCell::new(Vec::new()),
+        }
     }
 
     #[test]
@@ -206,8 +267,14 @@ mod tests {
         assert!(!item(rule2.clone(), 2, 0, 5).complete());
         assert!(item(rule2.clone(), 3, 0, 4).complete());
         // Check next symbol
-        assert!(!item(rule1.clone(), 0, 0, 5).next_symbol().unwrap().is_terminal());
-        assert!(item(rule1.clone(), 2, 0, 5).next_symbol().unwrap().is_terminal());
+        assert!(!item(rule1.clone(), 0, 0, 5)
+            .next_symbol()
+            .unwrap()
+            .is_terminal());
+        assert!(item(rule1.clone(), 2, 0, 5)
+            .next_symbol()
+            .unwrap()
+            .is_terminal());
     }
 
     #[test]
@@ -243,7 +310,8 @@ mod tests {
         let rule2 = gen_rule2();
         let trigger = Rc::new(item(rule2.clone(), 0, 0, 3));
         // generate completion
-        let complete_based = Span::extend(SpanSource::Completion(source.clone(), trigger.clone()), 3);
+        let complete_based =
+            Span::extend(SpanSource::Completion(source.clone(), trigger.clone()), 3);
         assert_eq!(item(rule1.clone(), 1, 0, 3), complete_based);
         // Check completion item backpointers
         let src = complete_based.sources();
@@ -257,9 +325,10 @@ mod tests {
         let rule1 = gen_rule1();
         let source = Rc::new(item(rule1.clone(), 0, 0, 0));
         // rule3: S -> d
-        let rule3 = Rc::new(Rule::new("S", &[
-            terminal("d", |n| n.chars().all(|c| "123".contains(c))),
-        ]));
+        let rule3 = Rc::new(Rule::new(
+            "S",
+            &[terminal("d", |n| n.chars().all(|c| "123".contains(c)))],
+        ));
         // S -> d .
         let trigger1 = Rc::new(item(rule3, 1, 0, 1));
         // S -> S . + d

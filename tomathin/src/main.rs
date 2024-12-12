@@ -22,9 +22,11 @@ fn main() -> Result<(), String> {
             Ok(line) => match parser(line.as_str()) {
                 Err(e) => println!("Parse err: {:?}", e),
                 Ok(expr) => {
-                    let expr = tomathin::eval_with_ctx(expr, &mut ctx)?;
                     let _ = rl.add_history_entry(&line);
-                    println!("{}", expr);
+                    match tomathin::eval_with_ctx(expr, &mut ctx) {
+                        Err(e) => println!("Eval err: {:?}", e),
+                        Ok(expr) => println!("{}", expr),
+                    }
                 }
             },
         }

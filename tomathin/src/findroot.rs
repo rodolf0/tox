@@ -1,10 +1,11 @@
 use crate::matrix::{dot_product, qr_decompose, Matrix};
 
 pub fn find_root(f: impl Fn(f64) -> Result<f64, String>, x0: f64) -> Result<f64, String> {
-    let h = 1.0e-5;
-    let tolerance = 1.0e-12;
+    let esqrt = f64::EPSILON.sqrt();
+    let tolerance = 1.0e-9;
     let mut x = x0;
     for _ in 0..100 {
+        let h = esqrt * (x.abs() + 1.0); // keep h meaningful across scales
         let fx = f(x)?;
         if fx.abs() < tolerance {
             return Ok(x);
@@ -17,7 +18,7 @@ pub fn find_root(f: impl Fn(f64) -> Result<f64, String>, x0: f64) -> Result<f64,
         }
         x = x - fx / f_central_diff;
     }
-    Err("Didn't converge".to_string())
+    Err(format!("Didn't converge, x={}", x))
 }
 
 pub fn gauss_seidel(a: Vec<Vec<f64>>, b: Vec<f64>) -> Result<Vec<f64>, String> {

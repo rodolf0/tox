@@ -84,6 +84,9 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
                 "Set",
                 "Sum",
                 "Times",
+                "Sin",
+                "Cos",
+                "Exp",
             ]
             .contains(&h)
         })

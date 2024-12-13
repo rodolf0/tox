@@ -101,7 +101,8 @@ pub fn find_root_vec(
         }
 
         let b = f.iter().map(|fi| -fi(&x).unwrap()).collect();
-        let dx = gauss_seidel_impl(jacobian, b, 100, 1.0e-3)?;
+        // let dx = gauss_seidel_impl(jacobian, b, 100, 1.0e-3)?;
+        let dx = nsolve(Matrix::from_rows(jacobian), b);
 
         x = x
             .into_iter()
@@ -207,7 +208,18 @@ mod tests {
             |x: &Vec<f64>| Ok(x[0] * x[1] - 1.0),
         ];
         let x = find_root_vec(f, vec![0.1, 1.1]).unwrap();
-        approx_eq(&x, &vec![1.9318516525782186, 0.5176380902051412]);
+        approx_eq(&x, &vec![-1.9318516525782186, -0.5176380902051412]);
+    }
+
+    #[test]
+    fn test_find_root_vec2() {
+        let f = vec![|x: &Vec<f64>| Ok((x[0] - 2.0).exp() - x[1]), |x: &Vec<
+            f64,
+        >| {
+            Ok(x[1].powi(2) - x[0])
+        }];
+        let x = find_root_vec(f, vec![1.0, 1.0]).unwrap();
+        approx_eq(&x, &vec![0.0190260161037140, 0.137934825565243]);
     }
 
     #[test]

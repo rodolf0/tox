@@ -10,6 +10,7 @@ fn precedence(e: &Expr) -> usize {
         Expr::Number(_) => 0,
         Expr::Symbol(_) => 1,
         Expr::Expr(head, _) => match head.as_ref() {
+            "Sin" | "Cos" | "Exp" => 5,
             "Power" => 50,
             "Divide" => 60,
             "Times" => 65,
@@ -325,6 +326,18 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                     }
                 }
             }
+            "Sin" => match eval_with_ctx(args.swap_remove(0), ctx)? {
+                Expr::Number(n) => Ok(Expr::Number(n.sin())),
+                other => Ok(Expr::Expr(head, vec![other])),
+            },
+            "Cos" => match eval_with_ctx(args.swap_remove(0), ctx)? {
+                Expr::Number(n) => Ok(Expr::Number(n.cos())),
+                other => Ok(Expr::Expr(head, vec![other])),
+            },
+            "Exp" => match eval_with_ctx(args.swap_remove(0), ctx)? {
+                Expr::Number(n) => Ok(Expr::Number(n.exp())),
+                other => Ok(Expr::Expr(head, vec![other])),
+            },
             other => panic!("{} head not implemented", other),
         },
         Expr::Symbol(ref sym) => match ctx.get(sym) {

@@ -70,25 +70,9 @@ macro_rules! pull {
 pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
     let grammar = earlgrey::EbnfGrammarParser::new(grammar_str(), "expr")
         .plug_terminal("head", |h| {
-            [
-                "Divide",
-                "Evaluate",
-                "FindRoot",
-                "Hold",
-                "List",
-                "Minus",
-                "Plus",
-                "Power",
-                "ReplaceAll",
-                "Rule",
-                "Set",
-                "Sum",
-                "Times",
-                "Sin",
-                "Cos",
-                "Exp",
-            ]
-            .contains(&h)
+            h.chars().enumerate().all(|(i, c)| {
+                i == 0 && c.is_alphabetic() || i > 0 && (c.is_alphanumeric() || c == '_')
+            })
         })
         .plug_terminal("string", |_| true)
         .plug_terminal("symbol", |s| {

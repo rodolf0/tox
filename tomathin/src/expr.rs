@@ -338,7 +338,35 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                 Expr::Number(n) => Ok(Expr::Number(n.exp())),
                 other => Ok(Expr::Expr(head, vec![other])),
             },
-            other => panic!("{} head not implemented", other),
+            otherhead => match ctx.get(otherhead) {
+                Some(Expr::Expr(h, function_args)) if h == "Function" => {
+                    // Destructure Function[{params}, body]]
+                    let [params, body]: [Expr; 2] = function_args
+                        .try_into()
+                        .map_err(|e| format!("Function must have params and body. {:?}", e))?;
+                    // Evaluate function call inputs
+                    let evaled_args: Vec<_> = args
+                        .into_iter()
+                        .map(|ai| eval_with_ctx(ai, ctx))
+                        .collect::<Result<_, _>>()?;
+                    // Bind params to current values passed as args to this call
+                    let bindings: Vec<_> = match params {
+                        sym @ Expr::Symbol(_) => [sym].into_iter().zip(evaled_args).collect(),
+                        Expr::Expr(h, syms) if h == "List" => {
+                            if !syms.iter().all(|s| matches!(s, Expr::Symbol(_))) {
+                                return Err(format!("Function params must be symbols: {:?}", syms));
+                            }
+                            syms.into_iter().zip(evaled_args).collect()
+                        }
+                        other => {
+                            return Err(format!("Function params must be symbols: {}", other));
+                        }
+                    };
+                    // Replace instances of function parameters in the callable and evaluate function
+                    eval_with_ctx(replace_all(body, &bindings)?, ctx)
+                }
+                _ => Err(format!("{} head not implemented", otherhead)),
+            },
         },
         Expr::Symbol(ref sym) => match ctx.get(sym) {
             Some(expr_lookup) => Ok(eval_with_ctx(expr_lookup, ctx)?),

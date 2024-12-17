@@ -258,6 +258,7 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                     )),
                 };
                 let root = findroot::find_root(f, x0)?;
+                // let root = findroot::regula_falsi(f, (x0, x0 + 1.0))?;
                 Ok(Expr::Number(root))
             }
             "Sum" => {
@@ -443,7 +444,7 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                     // Replace instances of function parameters in the callable and evaluate function
                     eval_with_ctx(replace_all(body, &bindings)?, ctx)
                 }
-                _ => Err(format!("{} head not implemented", otherhead)),
+                _ => Ok(Expr::Expr(head, args)),
             },
         },
         Expr::Symbol(ref sym) => match ctx.get(sym) {

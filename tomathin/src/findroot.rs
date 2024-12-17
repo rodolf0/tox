@@ -21,6 +21,69 @@ pub fn find_root(f: impl Fn(f64) -> Result<f64, String>, x0: f64) -> Result<f64,
     Err(format!("Didn't converge, x={}", x))
 }
 
+pub fn regula_falsi(
+    f: impl Fn(f64) -> Result<f64, String>,
+    (mut a, mut b): (f64, f64),
+) -> Result<f64, String> {
+    let tolerance = 1.0e-9;
+    let (mut fa, mut fb) = (f(a)?, f(b)?);
+    let mut last_fx_sign = 0.0;
+    for _ in 0..1000 {
+        // NOTE: this update form instead of (b-a)/(fb-fa) avoids precision
+        // loss // as 'a' and 'b' become close. fa, fb are opposite signs.
+        let x = (a * fb - b * fa) / (fb - fa);
+        let fx = f(x)?;
+        if fx.abs() < tolerance {
+            return Ok(x);
+        }
+        if fa.signum() == fx.signum() {
+            (a, fa) = (x, fx);
+            // illinios variant: avoid endpoint stagnation
+            // The 1/2 factor is not arbitrary, guarantees superlinear convergence.
+            if fx.signum() == last_fx_sign {
+                fb /= 2.0;
+            }
+        } else {
+            (b, fb) = (x, fx);
+            // illinios variant: avoid endpoint stagnation
+            if fx.signum() == last_fx_sign {
+                fa /= 2.0;
+            }
+        }
+        last_fx_sign = fx.signum();
+    }
+    Err(format!("Didn't converge, x={}", a))
+}
+
+pub fn bisection(
+    f: impl Fn(f64) -> Result<f64, String>,
+    (mut a, mut b): (f64, f64),
+) -> Result<f64, String> {
+    let tolerance = 1.0e-9;
+    let (mut fa, mut fb) = (f(a)?, f(b)?);
+    if fa.signum() == fb.signum() {
+        return Err(format!(
+            "Bisection requires points with opposing image, fa*fb={}",
+            fa * fb
+        ));
+    }
+    for _ in 0..1000 {
+        let x = (a + b) / 2.0;
+        let fx = f(x)?;
+        if fx.abs() < tolerance {
+            return Ok(x);
+        }
+        if fx.signum() == fa.signum() {
+            (a, fa) = (x, fx);
+        } else if fx.signum() == fb.signum() {
+            (b, fb) = (x, fx);
+        } else {
+            break; // eg: NaN
+        }
+    }
+    Err(format!("Didn't converge, x={}", a))
+}
+
 pub fn gauss_seidel(a: Vec<Vec<f64>>, b: Vec<f64>) -> Result<Vec<f64>, String> {
     gauss_seidel_impl(a, b, 1000, 1.0e-12)
 }

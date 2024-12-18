@@ -145,13 +145,14 @@ pub fn find_root_vec(
     f: Vec<impl Fn(&Vec<f64>) -> Result<f64, String>>,
     x0: Vec<f64>,
 ) -> Result<Vec<f64>, String> {
-    let h = 1.0e-5;
+    let esqrt = f64::EPSILON.sqrt();
     let tolerance = 1.0e-12;
 
     let mut x = x0.clone();
     for _ in 0..100 {
         let mut jacobian = Vec::new();
         for r in 0..x.len() {
+            let h = esqrt * (x[r].abs() + 1.0); // keep h meaningful across scales
             let mut jacobian_r = Vec::new();
             let mut x_m_h = x.clone();
             let mut x_p_h = x.clone();

@@ -1,8 +1,60 @@
 use crate::matrix::{dot_product, qr_decompose, Matrix};
 
+pub fn explore_domain(
+    f: impl Fn(f64) -> Result<f64, String>,
+    (x0, xf): (f64, f64),
+    divs: usize,
+) -> Result<Vec<(f64, f64)>, String> {
+    _explore_domain(&f, (x0, xf), divs, 4, 10)
+}
+
+fn _explore_domain(
+    f: &impl Fn(f64) -> Result<f64, String>,
+    (a, b): (f64, f64),
+    divs: usize,
+    max_division_depth: usize,
+    nested_div_factor: usize,
+) -> Result<Vec<(f64, f64)>, String> {
+    // Sample the function at 100 points and check sign chnages hinting roots
+
+    if a >= b || divs < 2 {
+        return Err(format!("Empty explore interval {}-{}/{}", a, b, divs));
+    }
+
+    let dx = (b - a) / divs as f64;
+    let points = (0..=divs)
+        .map(|slot| {
+            let x = a + dx * slot as f64;
+            f(x).and_then(|fx| Ok((x, fx)))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut root_brackets = Vec::new();
+    for w in points.windows(2) {
+        let &[(x0, fx0), (x1, fx1)] = w else {
+            unreachable!()
+        };
+        if fx1.signum() != fx0.signum() {
+            root_brackets.push((x0, x1));
+        }
+    }
+
+    if root_brackets.is_empty() && max_division_depth > 0 {
+        _explore_domain(
+            f,
+            (a, b),
+            10 * divs,
+            max_division_depth - 1,
+            nested_div_factor,
+        )
+    } else {
+        Ok(root_brackets)
+    }
+}
+
 pub fn find_root(f: impl Fn(f64) -> Result<f64, String>, x0: f64) -> Result<f64, String> {
     let esqrt = f64::EPSILON.sqrt();
-    let tolerance = 1.0e-9;
+    let tolerance = 1.0e-12;
     let mut x = x0;
     for _ in 0..100 {
         let h = esqrt * (x.abs() + 1.0); // keep h meaningful across scales
@@ -25,7 +77,7 @@ pub fn regula_falsi(
     f: impl Fn(f64) -> Result<f64, String>,
     (mut a, mut b): (f64, f64),
 ) -> Result<f64, String> {
-    let tolerance = 1.0e-9;
+    let tolerance = 1.0e-12;
     let (mut fa, mut fb) = (f(a)?, f(b)?);
     let mut last_fx_sign = 0.0;
     for _ in 0..1000 {
@@ -33,6 +85,12 @@ pub fn regula_falsi(
         // loss // as 'a' and 'b' become close. fa, fb are opposite signs.
         let x = (a * fb - b * fa) / (fb - fa);
         let fx = f(x)?;
+        if x.is_nan() || fx.is_nan() {
+            return Err(format!(
+                "Didn't converge: a={}, fa={}, b={}, fb={}, x={}, fx={}",
+                a, fa, b, fb, x, fx
+            ));
+        }
         if fx.abs() < tolerance {
             return Ok(x);
         }
@@ -52,14 +110,14 @@ pub fn regula_falsi(
         }
         last_fx_sign = fx.signum();
     }
-    Err(format!("Didn't converge, x={}", a))
+    Err(format!("Didn't converge: Maxed iterations x={}", a))
 }
 
 pub fn bisection(
     f: impl Fn(f64) -> Result<f64, String>,
     (mut a, mut b): (f64, f64),
 ) -> Result<f64, String> {
-    let tolerance = 1.0e-9;
+    let tolerance = 1.0e-12;
     let (mut fa, mut fb) = (f(a)?, f(b)?);
     if fa.signum() == fb.signum() {
         return Err(format!(
@@ -332,5 +390,23 @@ mod tests {
             vec![2.0, 5.0, 3.0, 8.0, 7.0],
         );
         println!("{:?}", x);
+    }
+
+    #[test]
+    fn test_explore_domain() {
+        let f = |x: f64| {
+            let mut sum = -1000.0;
+            for i in 1..=5 {
+                sum += 100.0 / (1.0 + x).powi(i)
+            }
+            Ok(sum)
+        };
+        let brackets = explore_domain(f, (-1000.0, 1000.0), 10).unwrap();
+        assert_eq!(brackets.len(), 2);
+        let (x0, x1) = brackets[0];
+        assert!(regula_falsi(f, (x0, x1)).is_err());
+        let (x0, x1) = brackets[1];
+        let root = regula_falsi(f, (x0, x1)).unwrap();
+        approx_eq(&vec![root], &vec![-0.1940185201887317]);
     }
 }

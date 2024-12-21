@@ -1,8 +1,8 @@
 use core::fmt;
 
 use crate::context::Context;
-use crate::findroot;
 use crate::parser::Expr;
+use crate::{find_root_vec, findroot};
 
 // Lowest number is highest precedence
 fn precedence(e: &Expr) -> usize {
@@ -238,28 +238,93 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                 })
             }
             "FindRoot" => {
-                let Some(Expr::Expr(list_head, var_args)) = args.get(1) else {
-                    return Err(format!("FindRoot unexpected arg1: {:?}", args.get(1)));
+                // Evaluate and pull out list of functions to work on.
+                let fexpr: Vec<Expr> = match args.remove(0) {
+                    Expr::Expr(h, a) if h == "List" => a
+                        .into_iter()
+                        .map(|fi| eval_with_ctx(fi, ctx))
+                        .collect::<Result<_, _>>()?,
+                    expr => vec![eval_with_ctx(expr, ctx)?],
                 };
-                let (x, x0) = match (list_head, var_args.as_slice()) {
-                    (h, [Expr::Symbol(x), Expr::Number(x0)]) if h == "List" => (x.clone(), *x0),
-                    other => return Err(format!("FindRoot unexpected arg1: {:?}", other)),
+                // Pull out variables specs to find roots for.
+                let varspec: Vec<_> = match args.remove(0) {
+                    Expr::Expr(h, a) if h == "List" => a,
+                    other => return Err(format!("Unexpected var spec for FindRoot: {:?}", other)),
                 };
-                let fexpr = eval_with_ctx(args.swap_remove(0), ctx)?;
-                // NOTE: not super performant because of iteration of replace + eval
-                let f = |xi: f64| match evaluate(replace_all(
-                    fexpr.clone(),
-                    &[(Expr::Symbol(x.clone()), Expr::Number(xi))],
-                )?)? {
-                    Expr::Number(x1) => Ok(x1),
-                    other => Err(format!(
-                        "FindRoot expr evaluation didn't return Number: {:?}",
-                        other
-                    )),
+                let vars: Vec<(Expr, f64, Option<(f64, f64)>)> = match varspec.as_slice() {
+                    [v @ Expr::Symbol(_), Expr::Number(start)] => vec![(v.clone(), *start, None)],
+                    o if o
+                        .iter()
+                        .all(|s| matches!(s, Expr::Expr(h, _) if h == "List")) =>
+                    {
+                        o.into_iter()
+                            .map(|s| {
+                                let Expr::Expr(_, varspec) = s else {
+                                    unreachable!();
+                                };
+                                match varspec.as_slice() {
+                                    [v @ Expr::Symbol(_), Expr::Number(start)] => {
+                                        (v.clone(), *start, None)
+                                    }
+                                    _ => todo!(),
+                                }
+                            })
+                            .collect()
+                    }
+                    _ => todo!(),
                 };
-                let root = findroot::find_root(f, x0)?;
-                // let root = findroot::regula_falsi(f, (x0, x0 + 1.0))?;
-                Ok(Expr::Number(root))
+
+                if vars.len() != fexpr.len() {
+                    return Err(format!(
+                        "Need same number of functions as unknowns, {} vs {}",
+                        vars.len(),
+                        fexpr.len()
+                    ));
+                }
+
+                if fexpr.len() == 1 {
+                    let f = |xi: f64| match replace_all(
+                        fexpr[0].clone(),
+                        &[(vars[0].0.clone(), Expr::Number(xi))],
+                    )
+                    .and_then(|expr| evaluate(expr))
+                    {
+                        Ok(Expr::Number(x)) => Ok(x),
+                        err => Err(format!("FindRoot didn't return Number: {:?}", err)),
+                    };
+                    let x0 = vars[0].1;
+                    let roots = findroot::find_roots(f, x0)?;
+                    return Ok(Expr::Expr(
+                        "List".to_string(),
+                        roots.into_iter().map(|ri| Expr::Number(ri)).collect(),
+                    ));
+                }
+
+                let funcs: Vec<_> = fexpr
+                    .into_iter()
+                    .map(|f| {
+                        let vars = &vars;
+                        move |xi: &Vec<f64>| match replace_all(
+                            f.clone(),
+                            &vars
+                                .iter()
+                                .zip(xi)
+                                .map(|(var, val)| (var.0.clone(), Expr::Number(*val)))
+                                .collect::<Vec<_>>(),
+                        )
+                        .and_then(|expr| evaluate(expr))
+                        {
+                            Ok(Expr::Number(x)) => Ok(x),
+                            err => Err(format!("FindRoot didn't return Number: {:?}", err)),
+                        }
+                    })
+                    .collect();
+
+                let roots = find_root_vec(funcs, vars.iter().map(|vi| vi.1).collect())?;
+                Ok(Expr::Expr(
+                    "List".to_string(),
+                    roots.into_iter().map(|ri| Expr::Number(ri)).collect(),
+                ))
             }
             "Sum" => {
                 let Some(Expr::Expr(list_head, var_args)) = args.get(1) else {

@@ -1,5 +1,25 @@
 use crate::matrix::{dot_product, qr_decompose, Matrix};
 
+pub fn find_roots(
+    f: impl Fn(f64) -> Result<f64, String> + Clone,
+    x0: f64,
+) -> Result<Vec<f64>, String> {
+    let brackets = explore_domain(f.clone(), (x0 - 500.0, x0 + 500.0), 50)?;
+    let mayberoots: Vec<_> = brackets
+        .into_iter()
+        .map(|(start, end)| regula_falsi(f.clone(), (start, end)))
+        .collect();
+    if mayberoots.iter().all(|r| r.is_err()) {
+        let errors: Vec<_> = mayberoots
+            .iter()
+            .filter_map(|r| r.as_ref().err())
+            .cloned()
+            .collect();
+        return Err(errors.join("\n"));
+    }
+    Ok(mayberoots.into_iter().filter_map(|r| r.ok()).collect())
+}
+
 pub fn explore_domain(
     f: impl Fn(f64) -> Result<f64, String>,
     (x0, xf): (f64, f64),
@@ -52,7 +72,7 @@ fn _explore_domain(
     }
 }
 
-pub fn find_root(f: impl Fn(f64) -> Result<f64, String>, x0: f64) -> Result<f64, String> {
+pub fn newton_raphson(f: impl Fn(f64) -> Result<f64, String>, x0: f64) -> Result<f64, String> {
     let esqrt = f64::EPSILON.sqrt();
     let tolerance = 1.0e-12;
     let mut x = x0;
@@ -299,7 +319,7 @@ mod tests {
             }
             Ok(sum)
         };
-        println!("{}", find_root(f, 0.3).unwrap());
+        println!("{}", newton_raphson(f, 0.3).unwrap());
     }
 
     #[test]

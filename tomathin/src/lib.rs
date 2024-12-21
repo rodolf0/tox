@@ -19,7 +19,8 @@ fn gamma(x: f64) -> f64 {
 
 mod findroot;
 pub use findroot::{
-    bisection, explore_domain, find_root, find_root_vec, gauss_seidel, nsolve, regula_falsi,
+    bisection, explore_domain, find_root_vec, find_roots, gauss_seidel, newton_raphson, nsolve,
+    regula_falsi,
 };
 
 mod matrix;

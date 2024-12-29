@@ -253,6 +253,10 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                 };
                 let vars: Vec<(Expr, f64, Option<(f64, f64)>)> = match varspec.as_slice() {
                     [v @ Expr::Symbol(_), Expr::Number(start)] => vec![(v.clone(), *start, None)],
+                    [v @ Expr::Symbol(_), Expr::Number(start), Expr::Number(lo), Expr::Number(hi)] =>
+                    {
+                        vec![(v.clone(), *start, Some((*lo, *hi)))]
+                    }
                     o if o
                         .iter()
                         .all(|s| matches!(s, Expr::Expr(h, _) if h == "List")) =>
@@ -293,7 +297,11 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                         err => Err(format!("FindRoot didn't return Number: {:?}", err)),
                     };
                     let x0 = vars[0].1;
-                    let roots = findroot::find_roots(f, x0)?;
+                    let roots = if let Some((lo, hi)) = vars[0].2 {
+                        vec![findroot::regula_falsi(f, (lo, hi))?]
+                    } else {
+                        findroot::find_roots(f, x0)?
+                    };
                     return Ok(Expr::Expr(
                         "List".to_string(),
                         roots.into_iter().map(|ri| Expr::Number(ri)).collect(),

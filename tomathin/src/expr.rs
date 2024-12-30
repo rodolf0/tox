@@ -1,4 +1,6 @@
 use core::fmt;
+use rand::thread_rng;
+use rand_distr::{Distribution, Normal};
 
 use crate::context::Context;
 use crate::parser::Expr;
@@ -400,6 +402,23 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                         other => Ok(Expr::Expr(head, vec![other])),
                     }
                 }
+            }
+            "NormalDist" => {
+                let [mu, sigma]: [f64; 2] = args
+                    .into_iter()
+                    .map(|a| match eval_with_ctx(a, ctx) {
+                        Ok(Expr::Number(n)) => Ok(n),
+                        Ok(other) => Err(format!("NormalDist params must be number. {:?}", other)),
+                        Err(e) => Err(e),
+                    })
+                    .collect::<Result<Vec<_>, _>>()?
+                    .try_into()
+                    .map_err(|e| format!("NormalDist error: {:?}", e))?;
+                Ok(Expr::Number(
+                    Normal::new(mu, sigma)
+                        .map_err(|e| e.to_string())?
+                        .sample(&mut thread_rng()),
+                ))
             }
             "Sin" => match eval_with_ctx(args.swap_remove(0), ctx)? {
                 Expr::Number(n) => Ok(Expr::Number(n.sin())),

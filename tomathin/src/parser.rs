@@ -2,6 +2,8 @@
 // https://reference.wolfram.com/language/tutorial/OperatorInputForms.html
 // https://reference.wolfram.com/language/tutorial/InputSyntax.html
 
+use crate::expr::Expr;
+
 fn grammar_str() -> &'static str {
     r#"
     arglist := arglist ',' expr | expr ;
@@ -36,15 +38,6 @@ pub enum T {
     Symbol(String),
     Number(f64),
     Nop,
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum Expr {
-    Expr(String, Vec<Expr>),
-    Symbol(String),
-    Number(f64),
-    Bool(bool),
-    String(String),
 }
 
 fn convert(t: T) -> Expr {

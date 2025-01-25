@@ -1,6 +1,6 @@
 use crate::context::Context;
-use crate::expr::{eval_with_ctx, evaluate};
-use crate::parser::{parser, Expr};
+use crate::expr::{eval_with_ctx, evaluate, Expr};
+use crate::parser::parser;
 
 #[test]
 fn parse_basic_expr() -> Result<(), String> {

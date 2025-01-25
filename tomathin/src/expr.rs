@@ -3,8 +3,16 @@ use rand::thread_rng;
 use rand_distr::{Distribution, Normal};
 
 use crate::context::Context;
-use crate::parser::Expr;
 use crate::{find_root_vec, findroot};
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum Expr {
+    Expr(String, Vec<Expr>),
+    Symbol(String),
+    Number(f64),
+    Bool(bool),
+    String(String),
+}
 
 // Lowest number is highest precedence
 fn precedence(e: &Expr) -> usize {

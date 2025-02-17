@@ -1,17 +1,37 @@
 use core::fmt;
-use rand::thread_rng;
-use rand_distr::{Distribution, Normal};
+use rand_distr::Distribution;
+use std::rc::Rc;
 
 use crate::context::Context;
 use crate::{find_root_vec, findroot};
 
+#[derive(Debug, PartialEq)]
+pub enum Distr {
+    Normal(rand_distr::Normal<f64>),
+    Poisson(rand_distr::Poisson<f64>),
+}
+
+impl Distr {
+    fn sample(&self) -> f64 {
+        match self {
+            Distr::Normal(d) => d.sample(&mut rand::rng()),
+            Distr::Poisson(d) => d.sample(&mut rand::rng()),
+        }
+    }
+}
+
 #[derive(PartialEq, Clone, Debug)]
 pub enum Expr {
+    // TODO: Box<Expr> for Expr::Expr
     Expr(String, Vec<Expr>),
     Symbol(String),
     Number(f64),
     Bool(bool),
     String(String),
+    Distribution(Rc<Distr>),
+    // DateTime(DateTime<Utc>),
+    // Matrix(Matrix),
+    // Quantity(f64, Dimension),
 }
 
 // Lowest number is highest precedence
@@ -422,11 +442,9 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                     .collect::<Result<Vec<_>, _>>()?
                     .try_into()
                     .map_err(|e| format!("NormalDist error: {:?}", e))?;
-                Ok(Expr::Number(
-                    Normal::new(mu, sigma)
-                        .map_err(|e| e.to_string())?
-                        .sample(&mut thread_rng()),
-                ))
+                Ok(Expr::Distribution(Rc::new(Distr::Normal(
+                    rand_distr::Normal::new(mu, sigma).map_err(|e| e.to_string())?,
+                ))))
             }
             "Sin" => match eval_with_ctx(args.swap_remove(0), ctx)? {
                 Expr::Number(n) => Ok(Expr::Number(n.sin())),
@@ -551,6 +569,7 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
             Some(expr_lookup) => Ok(eval_with_ctx(expr_lookup, ctx)?),
             None => Ok(expr),
         },
+        Expr::Distribution(d) => Ok(Expr::Number(d.sample())),
         _ => Ok(expr),
     }
 }

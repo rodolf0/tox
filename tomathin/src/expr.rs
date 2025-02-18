@@ -22,7 +22,7 @@ impl Distr {
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Expr {
-    // TODO: Box<Expr> for Expr::Expr
+    // Expr2 { head: Box<Expr>, args: Vec<Expr> },
     Expr(String, Vec<Expr>),
     Symbol(String),
     Number(f64),

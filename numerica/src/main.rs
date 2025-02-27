@@ -1,20 +1,20 @@
-extern crate tomathin;
+extern crate numerica;
 
 fn main() -> Result<(), String> {
-    let parser = tomathin::parser()?;
+    let parser = numerica::parser()?;
 
     if std::env::args().len() > 1 {
         let input = std::env::args().skip(1).collect::<Vec<String>>().join(" ");
         match parser(input.as_str()) {
             Err(e) => println!("Parse err: {:?}", e),
-            Ok(expr) => println!("{}", tomathin::evaluate(expr)?),
+            Ok(expr) => println!("{}", numerica::evaluate(expr)?),
         }
         return Ok(());
     }
 
     use rustyline::error::ReadlineError;
     let mut rl = rustyline::DefaultEditor::new().map_err(|e| e.to_string())?;
-    let mut ctx = tomathin::Context::new();
+    let mut ctx = numerica::Context::new();
     loop {
         match rl.readline("~> ") {
             Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => return Ok(()),
@@ -23,7 +23,7 @@ fn main() -> Result<(), String> {
                 Err(e) => println!("Parse err: {:?}", e),
                 Ok(expr) => {
                     let _ = rl.add_history_entry(&line);
-                    match tomathin::eval_with_ctx(expr, &mut ctx) {
+                    match numerica::eval_with_ctx(expr, &mut ctx) {
                         Err(e) => println!("Eval err: {:?}", e),
                         Ok(expr) => println!("{}", expr),
                     }

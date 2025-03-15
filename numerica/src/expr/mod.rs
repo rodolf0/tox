@@ -1,7 +1,10 @@
-mod replace_all;
-use replace_all::{eval_replace_all, replace_all};
 mod find_root;
+mod replace_all;
+mod table;
+
 use find_root::eval_find_root;
+use replace_all::{eval_replace_all, replace_all};
+use table::eval_table;
 
 use core::fmt;
 use rand_distr::Distribution;
@@ -366,83 +369,7 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                 Expr::Number(n) => Ok(Expr::Number(n.exp())),
                 other => Ok(Expr::Expr(head, vec![other])),
             },
-            "Table" => {
-                // first arg is the expression that will be evaluated for each table element
-                let expr = args.remove(0);
-                // Figure out iteration dimensions
-                let idxs: Vec<(Expr, f64, f64, f64)> = args
-                    .into_iter()
-                    .map(|spec| eval_with_ctx(spec, ctx))
-                    .map(|spec| match spec {
-                        Ok(Expr::Expr(h, spec)) if h == "List" => match spec.as_slice() {
-                            [i, Expr::Number(imax)] => Ok((i.clone(), 1.0, *imax, 1.0)),
-                            [i, Expr::Number(imin), Expr::Number(imax)] => {
-                                Ok((i.clone(), *imin, *imax, 1.0))
-                            }
-                            [i, Expr::Number(imin), Expr::Number(imax), Expr::Number(di)] => {
-                                Ok((i.clone(), *imin, *imax, *di))
-                            }
-                            other => Err(format!("Table spec not supported. {:?}", other)),
-                        },
-                        other => Err(format!("Table spec not supported. {:?}", other)),
-                    })
-                    .collect::<Result<_, _>>()?;
-                // Function to step the cursor across all dimensions. Returns bumped dimension
-                fn cursor_step(
-                    spec: &[(Expr, f64, f64, f64)],
-                    cursor: Option<Vec<f64>>,
-                ) -> Option<(usize, Vec<f64>)> {
-                    // Init cursor
-                    let Some(mut cursor) = cursor else {
-                        return Some((0, spec.iter().map(|spec| spec.1).collect()));
-                    };
-                    // Increment cursor values, rippling carries as needed
-                    let mut idx = cursor.len() - 1;
-                    loop {
-                        cursor[idx] += spec[idx].3; // Add step size
-                        if cursor[idx] <= spec[idx].2 {
-                            return Some((idx, cursor)); // No carry needed
-                        }
-                        cursor[idx] = spec[idx].1; // Reset to min
-                        if idx == 0 {
-                            return None; // Done if we carried past first position
-                        }
-                        idx -= 1; // Move to next position
-                    }
-                }
-
-                // Generate the table
-                let mut cursor = None;
-                let mut table = Expr::Expr("List".to_string(), Vec::new());
-
-                while let Some((bumped_dim, c)) = cursor_step(&idxs, cursor) {
-                    let mut inserter = match table {
-                        Expr::Expr(_, ref mut a) => a,
-                        _ => panic!(),
-                    };
-                    for dim in 0..idxs.len() - 1 {
-                        if dim >= bumped_dim {
-                            inserter.push(Expr::Expr("List".to_string(), Vec::new()));
-                        }
-                        inserter = match inserter.last_mut().unwrap() {
-                            Expr::Expr(h, ref mut a) if h == "List" => a,
-                            _ => panic!(),
-                        };
-                    }
-
-                    let rexpr = replace_all(
-                        expr.clone(),
-                        &idxs
-                            .iter()
-                            .zip(&c)
-                            .map(|(spec, ci)| (spec.0.clone(), Expr::Number(*ci)))
-                            .collect::<Vec<_>>(),
-                    )?;
-                    inserter.push(eval_with_ctx(rexpr, ctx)?);
-                    cursor = Some(c); // get next iteration
-                }
-                Ok(table)
-            }
+            "Table" => eval_table(args, ctx),
             otherhead => match ctx.get(otherhead) {
                 Some(Expr::Expr(h, function_args)) if h == "Function" => {
                     // Destructure Function[{params}, body]]

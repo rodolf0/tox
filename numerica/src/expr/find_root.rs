@@ -1,5 +1,5 @@
 use super::replace_all::replace_all;
-use super::{eval_with_ctx, evaluate, Expr};
+use super::{eval_with_ctx, Expr};
 use crate::context::Context;
 use crate::{find_root_vec, findroot};
 
@@ -52,7 +52,7 @@ pub fn eval_find_root(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, St
     if fexpr.len() == 1 {
         let f =
             |xi: f64| match replace_all(fexpr[0].clone(), &[(vars[0].0.clone(), Expr::Number(xi))])
-                .and_then(|expr| evaluate(expr))
+                .and_then(|expr| eval_with_ctx(expr, &mut Context::new()))
             {
                 Ok(Expr::Number(x)) => Ok(x),
                 err => Err(format!("FindRoot didn't return Number: {:?}", err)),
@@ -81,7 +81,7 @@ pub fn eval_find_root(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, St
                     .map(|(var, val)| (var.0.clone(), Expr::Number(*val)))
                     .collect::<Vec<_>>(),
             )
-            .and_then(|expr| evaluate(expr))
+            .and_then(|expr| eval_with_ctx(expr, &mut Context::new()))
             {
                 Ok(Expr::Number(x)) => Ok(x),
                 err => Err(format!("FindRoot didn't return Number: {:?}", err)),

@@ -59,7 +59,7 @@ pub fn eval_table(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String
                 inserter.push(Expr::Expr("List".to_string(), Vec::new()));
             }
             inserter = match inserter.last_mut().unwrap() {
-                Expr::Expr(h, ref mut a) if h == "List" => a,
+                Expr::Expr(h, a) if h == "List" => a,
                 _ => panic!(),
             };
         }

@@ -11,7 +11,7 @@ pub use parser::parser;
 
 fn gamma(x: f64) -> f64 {
     #[link(name = "m")]
-    extern "C" {
+    unsafe extern "C" {
         fn tgamma(x: f64) -> f64;
     }
     unsafe { tgamma(x) }

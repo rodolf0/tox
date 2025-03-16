@@ -1,5 +1,5 @@
 use super::replace_all::replace_all;
-use super::{eval_with_ctx, Expr};
+use super::{Expr, eval_with_ctx};
 use crate::context::Context;
 
 pub fn eval_table(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
@@ -76,4 +76,81 @@ pub fn eval_table(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String
         cursor = Some(c); // get next iteration
     }
     Ok(table)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::expr::{Expr, evaluate};
+    use crate::parser::parser;
+
+    #[test]
+    fn table() -> Result<(), String> {
+        let p = parser()?;
+        assert_eq!(
+            evaluate(p(r#"Table[i, {i, 3}]"#)?)?,
+            Expr::Expr(
+                "List".to_string(),
+                vec![Expr::Number(1.0), Expr::Number(2.0), Expr::Number(3.0),]
+            )
+        );
+        assert_eq!(
+            evaluate(p(r#"Table[i+j, {i, 2}, {j, 3}]"#)?)?,
+            Expr::Expr(
+                "List".to_string(),
+                vec![
+                    Expr::Expr(
+                        "List".to_string(),
+                        vec![Expr::Number(2.0), Expr::Number(3.0), Expr::Number(4.0)]
+                    ),
+                    Expr::Expr(
+                        "List".to_string(),
+                        vec![Expr::Number(3.0), Expr::Number(4.0), Expr::Number(5.0)]
+                    ),
+                ]
+            )
+        );
+        assert_eq!(
+            evaluate(p(r#"Table[i+j+k, {i, 2}, {j, 2+1}, {k, 2}]"#)?)?,
+            Expr::Expr(
+                "List".to_string(),
+                vec![
+                    Expr::Expr(
+                        "List".to_string(),
+                        vec![
+                            Expr::Expr(
+                                "List".to_string(),
+                                vec![Expr::Number(3.0), Expr::Number(4.0)]
+                            ),
+                            Expr::Expr(
+                                "List".to_string(),
+                                vec![Expr::Number(4.0), Expr::Number(5.0)]
+                            ),
+                            Expr::Expr(
+                                "List".to_string(),
+                                vec![Expr::Number(5.0), Expr::Number(6.0)]
+                            ),
+                        ]
+                    ),
+                    Expr::Expr(
+                        "List".to_string(),
+                        vec![
+                            Expr::Expr(
+                                "List".to_string(),
+                                vec![Expr::Number(4.0), Expr::Number(5.0)]
+                            ),
+                            Expr::Expr(
+                                "List".to_string(),
+                                vec![Expr::Number(5.0), Expr::Number(6.0)]
+                            ),
+                            Expr::Expr(
+                                "List".to_string(),
+                                vec![Expr::Number(6.0), Expr::Number(7.0)]
+                            ),
+                        ]
+                    ),
+                ]
+            )
+        );
+        Ok(())
+    }
 }

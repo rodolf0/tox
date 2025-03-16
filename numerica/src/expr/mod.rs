@@ -1,9 +1,11 @@
+mod distribution;
 mod find_root;
 mod replace_all;
 mod sum;
 mod table;
 mod times;
 
+use distribution::{eval_normal_dist, Distr};
 use find_root::eval_find_root;
 use replace_all::{eval_replace_all, replace_all};
 use sum::eval_sum;
@@ -11,25 +13,9 @@ use table::eval_table;
 use times::eval_times;
 
 use core::fmt;
-use rand_distr::Distribution;
 use std::rc::Rc;
 
 use crate::context::Context;
-
-#[derive(Debug, PartialEq)]
-pub enum Distr {
-    Normal(rand_distr::Normal<f64>),
-    Poisson(rand_distr::Poisson<f64>),
-}
-
-impl Distr {
-    fn sample(&self) -> f64 {
-        match self {
-            Distr::Normal(d) => d.sample(&mut rand::rng()),
-            Distr::Poisson(d) => d.sample(&mut rand::rng()),
-        }
-    }
-}
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Expr {
@@ -209,21 +195,7 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                     }
                 }
             }
-            "NormalDist" => {
-                let [mu, sigma]: [f64; 2] = args
-                    .into_iter()
-                    .map(|a| match eval_with_ctx(a, ctx) {
-                        Ok(Expr::Number(n)) => Ok(n),
-                        Ok(other) => Err(format!("NormalDist params must be number. {:?}", other)),
-                        Err(e) => Err(e),
-                    })
-                    .collect::<Result<Vec<_>, _>>()?
-                    .try_into()
-                    .map_err(|e| format!("NormalDist error: {:?}", e))?;
-                Ok(Expr::Distribution(Rc::new(Distr::Normal(
-                    rand_distr::Normal::new(mu, sigma).map_err(|e| e.to_string())?,
-                ))))
-            }
+            "NormalDist" => eval_normal_dist(args, ctx),
             "Sin" => match eval_with_ctx(args.swap_remove(0), ctx)? {
                 Expr::Number(n) => Ok(Expr::Number(n.sin())),
                 other => Ok(Expr::Expr(head, vec![other])),

@@ -26,7 +26,7 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     }
 }
 
-impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
+impl<ASTNode: Clone> EarleyForest<'_, ASTNode> {
     fn reduce(&self, root: &Rc<Span>, args: Vec<ASTNode>) -> Result<Vec<ASTNode>, String> {
         // If span is not complete, reduce is a noop passthrough
         if !root.complete() {
@@ -169,7 +169,7 @@ impl ForestIterator {
     }
 }
 
-impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
+impl<ASTNode: Clone> EarleyForest<'_, ASTNode> {
     /*
     ## S -> S + N | N
     ## N -> [0-9]

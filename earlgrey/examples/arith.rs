@@ -57,7 +57,7 @@ fn tokenizer<I: Iterator<Item = char>>(input: I) -> Tokenizer<I> {
 
 fn gamma(x: f64) -> f64 {
     #[link(name = "m")]
-    extern "C" {
+    unsafe extern "C" {
         fn tgamma(x: f64) -> f64;
     }
     unsafe { tgamma(x) }

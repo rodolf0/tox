@@ -2,47 +2,44 @@ use super::replace_all::replace_all;
 use super::{Expr, eval_with_ctx};
 use crate::context::Context;
 
+// Parse iteration arguments, Eg: {var, 0, end} or {var, start, end}
+fn parse_sum_args(sum_args: &Expr) -> Result<(String, i32, i32), String> {
+    use super::Expr::*;
+    match sum_args {
+        Expr(head, args) if head == "List" => match args.as_slice() {
+            [Symbol(x), Number(xn)] => Ok((x.clone(), 0 as i32, *xn as i32)),
+            [Symbol(x), Number(x0), Number(xn)] => Ok((x.clone(), *x0 as i32, *xn as i32)),
+            other => Err(format!("Sum unexpected arg1: {:?}", other)),
+        },
+        other => Err(format!("Sum unexpected arg1: {:?}", other)),
+    }
+}
+
+// Replace the variable with a given value in the sum expression
+fn render_sum(sum: &Expr, var: &str, val: i32) -> Result<Expr, String> {
+    use super::Expr::*;
+    replace_all(
+        sum.clone(),
+        &[(Symbol(var.to_string()), Number(val as f64))],
+    )
+}
+
 pub fn eval_sum(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
-    let Some(Expr::Expr(list_head, var_args)) = args.get(1) else {
-        return Err(format!("Sum unexpected arg1: {:?}", args.get(1)));
-    };
-    if list_head != "List" {
-        return Err(format!("Sum arg1 must be a List: {:?}", list_head));
-    }
-    let (x, x0, xn) = match var_args.as_slice() {
-        [Expr::Symbol(x), Expr::Number(xn)] => (x.clone(), 0 as i32, *xn as i32),
-        [Expr::Symbol(x), Expr::Number(x0), Expr::Number(xn)] => {
-            (x.clone(), *x0 as i32, *xn as i32)
+    let sum_args = args.pop().ok_or("Sum missing args")?;
+    let sum_expr = args.pop().ok_or("Sum missing expr")?;
+    let (x, x0, xn) = parse_sum_args(&sum_args)?;
+    let sum = (x0..=xn).try_fold(0.0, |sum, xi| {
+        match render_sum(&sum_expr, &x, xi).and_then(|s| eval_with_ctx(s, ctx)) {
+            Ok(Expr::Number(n)) => Ok(sum + n),
+            Ok(other) => Err(Ok(other)),
+            Err(err) => Err(Err(err)),
         }
-        other => return Err(format!("Sum unexpected arg1: {:?}", other)),
-    };
-    let sum_expr = args.swap_remove(0);
-    let Expr::Number(mut sum) = eval_with_ctx(
-        replace_all(
-            sum_expr.clone(),
-            &[(Expr::Symbol(x.clone()), Expr::Number(x0 as f64))],
-        )?,
-        ctx,
-    )?
-    else {
-        return Ok(Expr::Expr(
-            "Sum".to_string(),
-            vec![sum_expr, args.swap_remove(0)],
-        ));
-    };
-    for xi in (x0 + 1)..=xn {
-        sum += match eval_with_ctx(
-            replace_all(
-                sum_expr.clone(),
-                &[(Expr::Symbol(x.clone()), Expr::Number(xi as f64))],
-            )?,
-            ctx,
-        )? {
-            Expr::Number(s) => s,
-            other => panic!("BUG: Non-Number should have exited earlier: {:?}", other),
-        };
+    });
+    match sum {
+        Ok(sum) => Ok(Expr::Number(sum)),
+        Err(Ok(_)) => Ok(Expr::Expr("Sum".to_string(), vec![sum_expr, sum_args])),
+        Err(Err(e)) => Err(e),
     }
-    Ok(Expr::Number(sum))
 }
 
 #[cfg(test)]

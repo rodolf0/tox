@@ -6,13 +6,11 @@ mod table;
 mod times;
 mod transcendental;
 
-use distribution::{eval_normal_dist, Distr};
+use distribution::{Distr, eval_normal_dist};
 use find_root::eval_find_root;
 use replace_all::{eval_replace_all, replace_all};
-use sum::eval_sum;
 use table::eval_table;
 use times::eval_times;
-use transcendental::{eval_cos, eval_exp, eval_gamma, eval_sin};
 
 use core::fmt;
 use std::rc::Rc;
@@ -171,7 +169,7 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                 })
             }
             "FindRoot" => eval_find_root(args, ctx),
-            "Sum" => eval_sum(args, ctx),
+            "Sum" => sum::eval_sum(args, ctx),
             "SetDelayed" | "Set" => {
                 let [lhs, rhs]: [Expr; 2] = args
                     .try_into()
@@ -187,11 +185,11 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                 ctx.set(sym, rhs.clone());
                 Ok(rhs)
             }
-            "Gamma" => eval_gamma(args, ctx),
             "NormalDist" => eval_normal_dist(args, ctx),
-            "Sin" => eval_sin(args, ctx),
-            "Cos" => eval_cos(args, ctx),
-            "Exp" => eval_exp(args, ctx),
+            "Gamma" => transcendental::eval_gamma(args, ctx),
+            "Sin" => transcendental::eval_sin(args, ctx),
+            "Cos" => transcendental::eval_cos(args, ctx),
+            "Exp" => transcendental::eval_exp(args, ctx),
             "Table" => eval_table(args, ctx),
             otherhead => match ctx.get(otherhead) {
                 Some(Expr::Expr(h, function_args)) if h == "Function" => {

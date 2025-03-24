@@ -147,17 +147,20 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
             }
             "Times" => eval_times(args, ctx),
             "Minus" | "Power" | "Divide" => {
-                let [lhs_expr, rhs_expr]: [Expr; 2] = args
-                    .try_into()
-                    .map_err(|e| format!("{} expects 2 arguments {:?}", head, e))?;
-                let lhs = match lhs_expr {
-                    Expr::Number(_) => lhs_expr,
-                    other => eval_with_ctx(other, ctx)?,
-                };
-                let rhs = match rhs_expr {
-                    Expr::Number(_) => rhs_expr,
-                    other => eval_with_ctx(other, ctx)?,
-                };
+                let rhs = args
+                    .pop()
+                    .ok_or("Sum missing args".to_string())
+                    .and_then(|expr| match expr {
+                        Expr::Number(_) => Ok(expr),
+                        other => eval_with_ctx(other, ctx),
+                    })?;
+                let lhs = args
+                    .pop()
+                    .ok_or("Sum missing args".to_string())
+                    .and_then(|expr| match expr {
+                        Expr::Number(_) => Ok(expr),
+                        other => eval_with_ctx(other, ctx),
+                    })?;
                 Ok(match (lhs, rhs) {
                     (Expr::Number(lhs), Expr::Number(rhs)) => match head.as_ref() {
                         "Minus" => Expr::Number(lhs - rhs),
@@ -185,8 +188,8 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                 ctx.set(sym, rhs.clone());
                 Ok(rhs)
             }
-            "NormalDist" => eval_normal_dist(args, ctx),
             "Gamma" => transcendental::eval_gamma(args, ctx),
+            "NormalDist" => eval_normal_dist(args, ctx),
             "Sin" => transcendental::eval_sin(args, ctx),
             "Cos" => transcendental::eval_cos(args, ctx),
             "Exp" => transcendental::eval_exp(args, ctx),

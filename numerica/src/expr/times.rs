@@ -1,4 +1,4 @@
-use super::{eval_with_ctx, Expr};
+use super::{Expr, eval_with_ctx};
 use crate::context::Context;
 
 fn distribute_op(lhs: Expr, rhs: Expr, op: &str, over: &str) -> Expr {
@@ -94,5 +94,448 @@ pub fn eval_times(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String
         Ok(new_args2.swap_remove(0))
     } else {
         Ok(Expr::Expr("Times".to_string(), new_args2))
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::expr::Expr;
+
+    #[test]
+    fn test_simple_multiplication() {
+        // test single arg
+        let args = vec![Expr::Number(3.0)];
+        let result = eval_times(args, &mut Context::new()).unwrap();
+        assert_eq!(result, Expr::Number(3.0));
+
+        // test numerics
+        let args = vec![Expr::Number(3.0), Expr::Number(4.0)];
+        let result = eval_times(args, &mut Context::new()).unwrap();
+        assert_eq!(result, Expr::Number(12.0));
+
+        // test identity
+        let args = vec![Expr::Number(1.0), Expr::Symbol("x".to_string())];
+        let result = eval_times(args, &mut Context::new()).unwrap();
+        assert_eq!(result, Expr::Symbol("x".to_string()));
+
+        // test rhs multiplication
+        let args = vec![Expr::Symbol("x".to_string()), Expr::Number(1.0)];
+        let result = eval_times(args, &mut Context::new()).unwrap();
+        assert_eq!(result, Expr::Symbol("x".to_string()));
+
+        // test symbol multiplication
+        let args = vec![Expr::Symbol("x".to_string()), Expr::Symbol("y".to_string())];
+        let result = eval_times(args, &mut Context::new()).unwrap();
+        assert_eq!(
+            result,
+            Expr::Expr(
+                "Times".to_string(),
+                vec![Expr::Symbol("x".to_string()), Expr::Symbol("y".to_string())]
+            )
+        );
+    }
+
+    #[test]
+    fn test_distribute_over_list() {
+        use crate::expr::Expr::*;
+        // distribution of number on LHS
+        let args = vec![
+            Number(2.0),
+            Expr("List".to_string(), vec![Number(3.0), Number(4.0)]),
+        ];
+        let result = eval_times(args, &mut Context::new()).unwrap();
+        assert_eq!(
+            result,
+            Expr("List".to_string(), vec![Number(6.0), Number(8.0)])
+        );
+
+        // distribution of sym on LHS
+        let args = vec![
+            Symbol("x".to_string()),
+            Expr("List".to_string(), vec![Number(3.0), Number(4.0)]),
+        ];
+        let result = eval_times(args, &mut Context::new()).unwrap();
+        assert_eq!(
+            result,
+            Expr(
+                "List".to_string(),
+                vec![
+                    Expr(
+                        "Times".to_string(),
+                        vec![Number(3.0), Symbol("x".to_string())]
+                    ),
+                    Expr(
+                        "Times".to_string(),
+                        vec![Number(4.0), Symbol("x".to_string())]
+                    )
+                ]
+            )
+        );
+
+        // distribution of sym on RHS
+        let args = vec![
+            Expr("List".to_string(), vec![Number(3.0), Number(4.0)]),
+            Symbol("x".to_string()),
+        ];
+        let result = eval_times(args, &mut Context::new()).unwrap();
+        assert_eq!(
+            result,
+            Expr(
+                "List".to_string(),
+                vec![
+                    Expr(
+                        "Times".to_string(),
+                        vec![Number(3.0), Symbol("x".to_string())]
+                    ),
+                    Expr(
+                        "Times".to_string(),
+                        vec![Number(4.0), Symbol("x".to_string())]
+                    )
+                ]
+            )
+        );
+    }
+
+    #[test]
+    fn test_list_times_list() {
+        use crate::expr::Expr::*;
+
+        // {1, 2} * {x, y}
+        let args = vec![
+            Expr("List".to_string(), vec![Number(1.0), Number(2.0)]),
+            Expr(
+                "List".to_string(),
+                vec![Symbol("x".to_string()), Symbol("y".to_string())],
+            ),
+        ];
+        let result = eval_times(args, &mut Context::new()).unwrap();
+        assert_eq!(
+            result,
+            Expr(
+                "List".to_string(),
+                vec![
+                    Symbol("x".to_string()),
+                    Symbol("y".to_string()),
+                    Expr(
+                        "Times".to_string(),
+                        vec![Number(2.0), Symbol("x".to_string())]
+                    ),
+                    Expr(
+                        "Times".to_string(),
+                        vec![Number(2.0), Symbol("y".to_string())]
+                    ),
+                ],
+            )
+        );
+
+        // {x, y} * {1, 2}
+        let args = vec![
+            Expr(
+                "List".to_string(),
+                vec![Symbol("x".to_string()), Symbol("y".to_string())],
+            ),
+            Expr("List".to_string(), vec![Number(1.0), Number(2.0)]),
+        ];
+        let result = eval_times(args, &mut Context::new()).unwrap();
+        assert_eq!(
+            result,
+            Expr(
+                "List".to_string(),
+                vec![
+                    Symbol("x".to_string()),
+                    Expr(
+                        "Times".to_string(),
+                        vec![Number(2.0), Symbol("x".to_string())]
+                    ),
+                    Symbol("y".to_string()),
+                    Expr(
+                        "Times".to_string(),
+                        vec![Number(2.0), Symbol("y".to_string())]
+                    ),
+                ],
+            )
+        );
+
+        // Check numeric lists
+        let args = vec![
+            Expr("List".to_string(), vec![Number(1.0), Number(2.0)]),
+            Expr("List".to_string(), vec![Number(3.0), Number(4.0)]),
+        ];
+        let result = eval_times(args, &mut Context::new()).unwrap();
+        assert_eq!(
+            result,
+            Expr(
+                "List".to_string(),
+                vec![Number(3.0), Number(4.0), Number(6.0), Number(8.0)]
+            )
+        );
+
+        // {x, y} * {w, z}
+        let args = vec![
+            Expr(
+                "List".to_string(),
+                vec![Symbol("x".to_string()), Symbol("y".to_string())],
+            ),
+            Expr(
+                "List".to_string(),
+                vec![Symbol("w".to_string()), Symbol("z".to_string())],
+            ),
+        ];
+        let result = eval_times(args, &mut Context::new()).unwrap();
+        assert_eq!(
+            result,
+            Expr(
+                "List".to_string(),
+                vec![
+                    Expr(
+                        "Times".to_string(),
+                        vec![Symbol("x".to_string()), Symbol("w".to_string())]
+                    ),
+                    Expr(
+                        "Times".to_string(),
+                        vec![Symbol("x".to_string()), Symbol("z".to_string())]
+                    ),
+                    Expr(
+                        "Times".to_string(),
+                        vec![Symbol("y".to_string()), Symbol("w".to_string())]
+                    ),
+                    Expr(
+                        "Times".to_string(),
+                        vec![Symbol("y".to_string()), Symbol("z".to_string())]
+                    ),
+                ],
+            )
+        );
+    }
+
+    #[test]
+    fn test_complex_distribution() {
+        use crate::expr::Expr::*;
+
+        // {x, y} * {w, z} * 3
+        let args = vec![
+            Expr(
+                "List".to_string(),
+                vec![Symbol("x".to_string()), Symbol("y".to_string())],
+            ),
+            Expr(
+                "List".to_string(),
+                vec![Symbol("w".to_string()), Symbol("z".to_string())],
+            ),
+            Number(3.0),
+        ];
+        let result = eval_times(args, &mut Context::new()).unwrap();
+        assert_eq!(
+            result,
+            Expr(
+                "List".to_string(),
+                vec![
+                    Expr(
+                        "Times".to_string(),
+                        vec![
+                            Number(3.0),
+                            Symbol("x".to_string()),
+                            Symbol("w".to_string())
+                        ]
+                    ),
+                    Expr(
+                        "Times".to_string(),
+                        vec![
+                            Number(3.0),
+                            Symbol("x".to_string()),
+                            Symbol("z".to_string())
+                        ]
+                    ),
+                    Expr(
+                        "Times".to_string(),
+                        vec![
+                            Number(3.0),
+                            Symbol("y".to_string()),
+                            Symbol("w".to_string())
+                        ]
+                    ),
+                    Expr(
+                        "Times".to_string(),
+                        vec![
+                            Number(3.0),
+                            Symbol("y".to_string()),
+                            Symbol("z".to_string())
+                        ]
+                    ),
+                ],
+            )
+        );
+
+        // 4 * {x, y} * {6, z} * 3
+        let args = vec![
+            Number(4.0),
+            Expr(
+                "List".to_string(),
+                vec![Symbol("x".to_string()), Symbol("y".to_string())],
+            ),
+            Expr(
+                "List".to_string(),
+                vec![Number(6.0), Symbol("z".to_string())],
+            ),
+            Number(3.0),
+        ];
+        let result = eval_times(args, &mut Context::new()).unwrap();
+        assert_eq!(
+            result,
+            Expr(
+                "List".to_string(),
+                vec![
+                    Expr(
+                        "Times".to_string(),
+                        vec![Number(72.0), Symbol("x".to_string())]
+                    ),
+                    Expr(
+                        "Times".to_string(),
+                        vec![
+                            Number(12.0),
+                            Symbol("x".to_string()),
+                            Symbol("z".to_string())
+                        ]
+                    ),
+                    Expr(
+                        "Times".to_string(),
+                        vec![Number(72.0), Symbol("y".to_string()),]
+                    ),
+                    Expr(
+                        "Times".to_string(),
+                        vec![
+                            Number(12.0),
+                            Symbol("y".to_string()),
+                            Symbol("z".to_string())
+                        ]
+                    ),
+                ],
+            )
+        );
+
+        // a * {x, y} * {w, z} * 3
+        let args = vec![
+            Symbol("a".to_string()),
+            Expr(
+                "List".to_string(),
+                vec![Symbol("x".to_string()), Symbol("y".to_string())],
+            ),
+            Expr(
+                "List".to_string(),
+                vec![Symbol("w".to_string()), Symbol("z".to_string())],
+            ),
+            Number(3.0),
+        ];
+        let result = eval_times(args, &mut Context::new()).unwrap();
+        assert_eq!(
+            result,
+            Expr(
+                "List".to_string(),
+                vec![
+                    Expr(
+                        "Times".to_string(),
+                        vec![
+                            Number(3.0),
+                            Symbol("a".to_string()),
+                            Symbol("x".to_string()),
+                            Symbol("w".to_string())
+                        ]
+                    ),
+                    Expr(
+                        "Times".to_string(),
+                        vec![
+                            Number(3.0),
+                            Symbol("a".to_string()),
+                            Symbol("x".to_string()),
+                            Symbol("z".to_string())
+                        ]
+                    ),
+                    Expr(
+                        "Times".to_string(),
+                        vec![
+                            Number(3.0),
+                            Symbol("a".to_string()),
+                            Symbol("y".to_string()),
+                            Symbol("w".to_string())
+                        ]
+                    ),
+                    Expr(
+                        "Times".to_string(),
+                        vec![
+                            Number(3.0),
+                            Symbol("a".to_string()),
+                            Symbol("y".to_string()),
+                            Symbol("z".to_string())
+                        ]
+                    ),
+                ],
+            )
+        );
+    }
+
+    #[test]
+    fn test_nested_distribution() {
+        use crate::expr::Expr::*;
+
+        // {x, {a, b}} * {w, z}
+        let args = vec![
+            Expr(
+                "List".to_string(),
+                vec![
+                    Symbol("x".to_string()),
+                    Expr(
+                        "List".to_string(),
+                        vec![Symbol("a".to_string()), Symbol("b".to_string())],
+                    ),
+                ],
+            ),
+            Expr(
+                "List".to_string(),
+                vec![Symbol("w".to_string()), Symbol("z".to_string())],
+            ),
+        ];
+        let result = eval_times(args, &mut Context::new()).unwrap();
+        assert_eq!(
+            result,
+            Expr(
+                "List".to_string(),
+                vec![
+                    Expr(
+                        "Times".to_string(),
+                        vec![Symbol("x".to_string()), Symbol("w".to_string())]
+                    ),
+                    Expr(
+                        "Times".to_string(),
+                        vec![Symbol("x".to_string()), Symbol("z".to_string())]
+                    ),
+                    Expr(
+                        "List".to_string(),
+                        vec![
+                            Expr(
+                                "Times".to_string(),
+                                vec![Symbol("a".to_string()), Symbol("w".to_string())]
+                            ),
+                            Expr(
+                                "Times".to_string(),
+                                vec![Symbol("b".to_string()), Symbol("w".to_string())]
+                            ),
+                        ],
+                    ),
+                    Expr(
+                        "List".to_string(),
+                        vec![
+                            Expr(
+                                "Times".to_string(),
+                                vec![Symbol("a".to_string()), Symbol("z".to_string())]
+                            ),
+                            Expr(
+                                "Times".to_string(),
+                                vec![Symbol("b".to_string()), Symbol("z".to_string())]
+                            ),
+                        ],
+                    )
+                ],
+            )
+        );
     }
 }

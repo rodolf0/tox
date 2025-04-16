@@ -112,13 +112,12 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                     eval_with_ctx(replace_all(args.swap_remove(0), &rules)?, ctx)
                 }
             }
-            "List" => {
-                let evaled_args = args
-                    .into_iter()
+            "List" => Ok(Expr::Expr(
+                head,
+                args.into_iter()
                     .map(|a| eval_with_ctx(a, ctx))
-                    .collect::<Result<_, _>>()?;
-                Ok(Expr::Expr(head, evaled_args))
-            }
+                    .collect::<Result<_, _>>()?,
+            )),
             "Rule" => {
                 let [lhs, rhs]: [Expr; 2] = args
                     .try_into()

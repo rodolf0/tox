@@ -24,9 +24,10 @@ fn render_sum(sum: &Expr, var: &str, val: i32) -> Result<Expr, String> {
     )
 }
 
-pub fn eval_sum(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
-    let sum_args = args.pop().ok_or("Sum missing args")?;
-    let sum_expr = args.pop().ok_or("Sum missing expr")?;
+pub fn eval_sum(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
+    let [sum_expr, sum_args]: [Expr; 2] = args
+        .try_into()
+        .map_err(|e| format!("Sum expected: {{expr, args}}. Got {:?}", e))?;
     let (x, x0, xn) = parse_sum_args(&sum_args)?;
     let sum = (x0..=xn).try_fold(0.0, |sum, xi| {
         match render_sum(&sum_expr, &x, xi).and_then(|s| eval_with_ctx(s, ctx)) {

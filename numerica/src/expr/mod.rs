@@ -92,25 +92,18 @@ pub fn evaluate(expr: Expr) -> Result<Expr, String> {
 
 pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
     match expr {
-        Expr::Expr(head, mut args) => match head.as_ref() {
-            "Hold" => {
-                if args.len() != 1 {
-                    Err(format!("Hold expects single arg. {:?}", args))
-                } else {
-                    Ok(Expr::Expr(head, args))
-                }
-            }
+        Expr::Expr(head, args) => match head.as_ref() {
+            "Hold" => Ok(Expr::Expr(head, args)),
             "Evaluate" => {
-                if args.len() != 1 {
-                    Err(format!("Hold expects single arg. {:?}", args))
-                } else {
-                    let rules = vec![(
-                        Expr::Symbol("Hold".to_string()),
-                        Expr::Symbol("Evaluate".to_string()),
-                    )];
-                    // TODO: this is a bit of a hack, should replace only heads
-                    eval_with_ctx(replace_all(args.swap_remove(0), &rules)?, ctx)
-                }
+                let [arg]: [Expr; 1] = args
+                    .try_into()
+                    .map_err(|e| format!("Evaluate expects single arg. {:?}", e))?;
+                let rules = vec![(
+                    Expr::Symbol("Hold".to_string()),
+                    Expr::Symbol("Evaluate".to_string()),
+                )];
+                // TODO: this is a bit of a hack, should replace only heads
+                eval_with_ctx(replace_all(arg, &rules)?, ctx)
             }
             "List" => Ok(Expr::Expr(
                 head,
@@ -146,20 +139,11 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
             }
             "Times" => eval_times(args, ctx),
             "Minus" | "Power" | "Divide" => {
-                let rhs = args
-                    .pop()
-                    .ok_or("Sum missing args".to_string())
-                    .and_then(|expr| match expr {
-                        Expr::Number(_) => Ok(expr),
-                        other => eval_with_ctx(other, ctx),
-                    })?;
-                let lhs = args
-                    .pop()
-                    .ok_or("Sum missing args".to_string())
-                    .and_then(|expr| match expr {
-                        Expr::Number(_) => Ok(expr),
-                        other => eval_with_ctx(other, ctx),
-                    })?;
+                let [lhs, rhs]: [Expr; 2] = args
+                    .try_into()
+                    .map_err(|e| format!("{} must have 2 arguments. {:?}", head, e))?;
+                let lhs = eval_with_ctx(lhs, ctx)?;
+                let rhs = eval_with_ctx(rhs, ctx)?;
                 Ok(match (lhs, rhs) {
                     (Expr::Number(lhs), Expr::Number(rhs)) => match head.as_ref() {
                         "Minus" => Expr::Number(lhs - rhs),
@@ -176,15 +160,12 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                 let [lhs, rhs]: [Expr; 2] = args
                     .try_into()
                     .map_err(|e| format!("Set(Delayed) must have 2 arguments. {:?}", e))?;
-                let Expr::Symbol(sym) = lhs else {
-                    return Err(format!("Set(Delayed) lhs must be a symbol. {:?}", lhs));
+                let (lhs, rhs) = match lhs {
+                    Expr::Symbol(lhs) if head == "Set" => (lhs, eval_with_ctx(rhs, ctx)?),
+                    Expr::Symbol(lhs) if head == "SetDelayed" => (lhs, rhs),
+                    _ => return Err(format!("Set(Delayed) lhs must be a symbol. {:?}", lhs)),
                 };
-                let rhs = if head == "Set" {
-                    eval_with_ctx(rhs, ctx)?
-                } else {
-                    rhs
-                };
-                ctx.set(sym, rhs.clone());
+                ctx.set(lhs, rhs.clone());
                 Ok(rhs)
             }
             "Gamma" => transcendental::eval_gamma(args, ctx),

@@ -80,21 +80,26 @@ pub fn eval_table(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String
 
 #[cfg(test)]
 mod tests {
-    use crate::expr::{Expr, evaluate};
+    use crate::context::Context;
+    use crate::expr::{Expr, eval_with_ctx};
     use crate::parser::parser;
+
+    fn eval(expr: Expr) -> Result<Expr, String> {
+        eval_with_ctx(expr, &mut Context::new())
+    }
 
     #[test]
     fn table() -> Result<(), String> {
         let p = parser()?;
         assert_eq!(
-            evaluate(p(r#"Table[i, {i, 3}]"#)?)?,
+            eval(p(r#"Table[i, {i, 3}]"#)?)?,
             Expr::Expr(
                 "List".to_string(),
                 vec![Expr::Number(1.0), Expr::Number(2.0), Expr::Number(3.0),]
             )
         );
         assert_eq!(
-            evaluate(p(r#"Table[i+j, {i, 2}, {j, 3}]"#)?)?,
+            eval(p(r#"Table[i+j, {i, 2}, {j, 3}]"#)?)?,
             Expr::Expr(
                 "List".to_string(),
                 vec![
@@ -110,7 +115,7 @@ mod tests {
             )
         );
         assert_eq!(
-            evaluate(p(r#"Table[i+j+k, {i, 2}, {j, 2+1}, {k, 2}]"#)?)?,
+            eval(p(r#"Table[i+j+k, {i, 2}, {j, 2+1}, {k, 2}]"#)?)?,
             Expr::Expr(
                 "List".to_string(),
                 vec![

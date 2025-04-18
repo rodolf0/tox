@@ -1,6 +1,10 @@
 use crate::context::Context;
-use crate::expr::{Expr, eval_with_ctx, evaluate};
+use crate::expr::{Expr, eval_with_ctx};
 use crate::parser::parser;
+
+fn eval(expr: Expr) -> Result<Expr, String> {
+    eval_with_ctx(expr, &mut Context::new())
+}
 
 #[test]
 fn parse_basic_expr() -> Result<(), String> {
@@ -35,16 +39,16 @@ fn parse_basic_expr() -> Result<(), String> {
 #[test]
 fn arith_ops() -> Result<(), String> {
     let p = parser()?;
-    assert_eq!(evaluate(p(r#"1 + 2"#)?)?, Expr::Number(3.0));
-    assert_eq!(evaluate(p(r#"1 + 2 - 3"#)?)?, Expr::Number(0.0));
-    assert_eq!(evaluate(p(r#"1 - 2 + 3"#)?)?, Expr::Number(2.0));
-    assert_eq!(evaluate(p(r#"1 + 2 * 3"#)?)?, Expr::Number(7.0));
-    assert_eq!(evaluate(p(r#"2 ^ 2 ^ 3"#)?)?, Expr::Number(256.0));
-    assert_eq!(evaluate(p(r#"1 + 2 ^ 3"#)?)?, Expr::Number(9.0));
-    assert_eq!(evaluate(p(r#"3 / 2 / 4"#)?)?, Expr::Number(0.375));
-    assert_eq!(evaluate(p(r#"-3"#)?)?, Expr::Number(-3.0));
-    assert_eq!(evaluate(p(r#"--3"#)?)?, Expr::Number(3.0));
-    assert_eq!(evaluate(p(r#"4--3"#)?)?, Expr::Number(7.0));
+    assert_eq!(eval(p(r#"1 + 2"#)?)?, Expr::Number(3.0));
+    assert_eq!(eval(p(r#"1 + 2 - 3"#)?)?, Expr::Number(0.0));
+    assert_eq!(eval(p(r#"1 - 2 + 3"#)?)?, Expr::Number(2.0));
+    assert_eq!(eval(p(r#"1 + 2 * 3"#)?)?, Expr::Number(7.0));
+    assert_eq!(eval(p(r#"2 ^ 2 ^ 3"#)?)?, Expr::Number(256.0));
+    assert_eq!(eval(p(r#"1 + 2 ^ 3"#)?)?, Expr::Number(9.0));
+    assert_eq!(eval(p(r#"3 / 2 / 4"#)?)?, Expr::Number(0.375));
+    assert_eq!(eval(p(r#"-3"#)?)?, Expr::Number(-3.0));
+    assert_eq!(eval(p(r#"--3"#)?)?, Expr::Number(3.0));
+    assert_eq!(eval(p(r#"4--3"#)?)?, Expr::Number(7.0));
     Ok(())
 }
 

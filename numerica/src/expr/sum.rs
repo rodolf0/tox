@@ -45,16 +45,21 @@ pub fn eval_sum(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::expr::{Expr, evaluate};
+    use crate::context::Context;
+    use crate::expr::{Expr, eval_with_ctx};
     use crate::parser::parser;
+
+    fn eval(expr: Expr) -> Result<Expr, String> {
+        eval_with_ctx(expr, &mut Context::new())
+    }
 
     #[test]
     fn sum_expr() -> Result<(), String> {
         let p = parser()?;
-        assert_eq!(evaluate(p(r#"Sum[x^2, {x, 3}]"#)?)?, Expr::Number(14.0));
-        assert_eq!(evaluate(p(r#"Sum[x^2, {x, 2, 4}]"#)?)?, Expr::Number(29.0));
+        assert_eq!(eval(p(r#"Sum[x^2, {x, 3}]"#)?)?, Expr::Number(14.0));
+        assert_eq!(eval(p(r#"Sum[x^2, {x, 2, 4}]"#)?)?, Expr::Number(29.0));
         assert_eq!(
-            evaluate(p(r#"Sum[x^i, {i, 4}]"#)?)?,
+            eval(p(r#"Sum[x^i, {i, 4}]"#)?)?,
             Expr::Expr(
                 "Sum".to_string(),
                 vec![
@@ -70,7 +75,7 @@ mod tests {
             )
         );
         assert_eq!(
-            evaluate(p(r#"ReplaceAll[Sum[x^i, {i, 4}], x -> 2]"#)?)?,
+            eval(p(r#"ReplaceAll[Sum[x^i, {i, 4}], x -> 2]"#)?)?,
             Expr::Number(1.0 + 2.0 + 4.0 + 8.0 + 16.0)
         );
         Ok(())

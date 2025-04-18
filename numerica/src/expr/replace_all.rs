@@ -92,8 +92,13 @@ fn eval_rules(rules: Expr, ctx: &mut Context) -> Result<Vec<(Expr, Expr)>, Strin
 
 #[cfg(test)]
 mod tests {
-    use crate::expr::{Expr, evaluate};
+    use crate::context::Context;
+    use crate::expr::{Expr, eval_with_ctx};
     use crate::parser::parser;
+
+    fn eval(expr: Expr) -> Result<Expr, String> {
+        eval_with_ctx(expr, &mut Context::new())
+    }
 
     #[test]
     fn replace_all() -> Result<(), String> {
@@ -102,7 +107,7 @@ mod tests {
         let expr1 = r#"ReplaceAll[Hold[Plus[x, Times[2, x]]], Rule[x, 3]]"#;
         let rep_1rule = p(expr1)?;
         assert_eq!(
-            evaluate(rep_1rule.clone())?,
+            eval(rep_1rule.clone())?,
             Expr::Expr(
                 "Hold".to_string(),
                 vec![Expr::Expr(
@@ -118,7 +123,7 @@ mod tests {
             )
         );
         assert_eq!(
-            evaluate(p(&format!("Evaluate[{}]", expr1))?)?,
+            eval(p(&format!("Evaluate[{}]", expr1))?)?,
             Expr::Number(9.0)
         );
         // Test ReplaceAll with a List[Rule]
@@ -126,7 +131,7 @@ mod tests {
                 Plus[x, Times[2, x]],
                 List[Rule[Times[2, x], 3], Rule[Plus[x, 3], 4]]
             ]"#)?;
-        assert_eq!(evaluate(rep_rule_list)?, Expr::Number(4.0));
+        assert_eq!(eval(rep_rule_list)?, Expr::Number(4.0));
 
         // Test ReplaceAll with rule head replacement
         let rep_rule_head = p(r#"ReplaceAll[
@@ -134,7 +139,7 @@ mod tests {
                 List[Rule[Times[2, x], 3], Rule[Plus, Times]]
             ]"#)?;
         assert_eq!(
-            evaluate(rep_rule_head)?,
+            eval(rep_rule_head)?,
             Expr::Expr(
                 "Times".to_string(),
                 vec![Expr::Number(3.0), Expr::Symbol("x".to_string())]
@@ -147,14 +152,14 @@ mod tests {
     fn rule_associativity() -> Result<(), String> {
         let p = parser()?;
         assert_eq!(
-            evaluate(p(r#"x /. x -> z -> 3"#)?)?,
+            eval(p(r#"x /. x -> z -> 3"#)?)?,
             Expr::Expr(
                 "Rule".to_string(),
                 vec![Expr::Symbol("z".to_string()), Expr::Number(3.0)]
             )
         );
         assert_eq!(
-            evaluate(p(r#"x /. z -> x -> 3"#)?)?,
+            eval(p(r#"x /. z -> x -> 3"#)?)?,
             Expr::Symbol("x".to_string())
         );
         Ok(())
@@ -164,21 +169,21 @@ mod tests {
     fn replace_ops() -> Result<(), String> {
         let p = parser()?;
         assert_eq!(
-            evaluate(p(r#"x + y /. x -> 2"#)?)?,
+            eval(p(r#"x + y /. x -> 2"#)?)?,
             Expr::Expr(
                 "Plus".to_string(),
                 vec![Expr::Number(2.0), Expr::Symbol("y".to_string())]
             )
         );
         assert_eq!(
-            evaluate(p(r#"x + y /. x -> z /. z -> 3"#)?)?,
+            eval(p(r#"x + y /. x -> z /. z -> 3"#)?)?,
             Expr::Expr(
                 "Plus".to_string(),
                 vec![Expr::Number(3.0), Expr::Symbol("y".to_string())]
             )
         );
         assert_eq!(
-            evaluate(p(r#"x + y /. z -> 3 /. x -> z"#)?)?,
+            eval(p(r#"x + y /. z -> 3 /. x -> z"#)?)?,
             Expr::Expr(
                 "Plus".to_string(),
                 vec![Expr::Symbol("z".to_string()), Expr::Symbol("y".to_string())]

@@ -86,11 +86,8 @@ impl fmt::Display for Expr {
     }
 }
 
-pub fn evaluate(expr: Expr) -> Result<Expr, String> {
-    eval_with_ctx(expr, &mut Context::new())
-}
-
 pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
+    dbg!(&expr);
     match expr {
         Expr::Expr(head, args) => match head.as_ref() {
             "Hold" => Ok(Expr::Expr(head, args)),
@@ -174,6 +171,8 @@ pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
             "Cos" => transcendental::eval_cos(args, ctx),
             "Exp" => transcendental::eval_exp(args, ctx),
             "Table" => eval_table(args, ctx),
+            "Function" => Ok(Expr::Expr(head, args)), // Unapplied function evalutes to self
+
             otherhead => match ctx.get(otherhead) {
                 Some(Expr::Expr(h, function_args)) if h == "Function" => {
                     // Destructure Function[{params}, body]]

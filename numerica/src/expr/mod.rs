@@ -87,7 +87,6 @@ impl fmt::Display for Expr {
 }
 
 pub fn eval_with_ctx(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
-    dbg!(&expr);
     match expr {
         Expr::Expr(head, args) => match head.as_ref() {
             "Hold" => Ok(Expr::Expr(head, args)),

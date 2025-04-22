@@ -1,5 +1,5 @@
 use super::replace_all::replace_all;
-use super::{Expr, eval_with_ctx};
+use super::{Expr, evaluate};
 use crate::context::Context;
 
 pub fn eval_table(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
@@ -8,9 +8,9 @@ pub fn eval_table(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String
     // Figure out iteration dimensions
     let idxs: Vec<(Expr, f64, f64, f64)> = args
         .into_iter()
-        .map(|spec| eval_with_ctx(spec, ctx))
+        .map(|spec| evaluate(spec, ctx))
         .map(|spec| match spec {
-            Ok(Expr::Expr(h, spec)) if h == "List" => match spec.as_slice() {
+            Ok(Expr::Head(h, spec)) if *h == Expr::Symbol("List".into()) => match spec.as_slice() {
                 [i, Expr::Number(imax)] => Ok((i.clone(), 1.0, *imax, 1.0)),
                 [i, Expr::Number(imin), Expr::Number(imax)] => Ok((i.clone(), *imin, *imax, 1.0)),
                 [i, Expr::Number(imin), Expr::Number(imax), Expr::Number(di)] => {
@@ -47,19 +47,22 @@ pub fn eval_table(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String
 
     // Generate the table
     let mut cursor = None;
-    let mut table = Expr::Expr("List".to_string(), Vec::new());
+    let mut table = Expr::Head(Box::new(Expr::Symbol("List".into())), Vec::new());
 
     while let Some((bumped_dim, c)) = cursor_step(&idxs, cursor) {
         let mut inserter = match table {
-            Expr::Expr(_, ref mut a) => a,
+            Expr::Head(_, ref mut a) => a,
             _ => panic!(),
         };
         for dim in 0..idxs.len() - 1 {
             if dim >= bumped_dim {
-                inserter.push(Expr::Expr("List".to_string(), Vec::new()));
+                inserter.push(Expr::Head(
+                    Box::new(Expr::Symbol("List".into())),
+                    Vec::new(),
+                ));
             }
             inserter = match inserter.last_mut().unwrap() {
-                Expr::Expr(h, a) if h == "List" => a,
+                Expr::Head(h, a) if **h == Expr::Symbol("List".into()) => a,
                 _ => panic!(),
             };
         }
@@ -72,7 +75,7 @@ pub fn eval_table(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String
                 .map(|(spec, ci)| (spec.0.clone(), Expr::Number(*ci)))
                 .collect::<Vec<_>>(),
         )?;
-        inserter.push(eval_with_ctx(rexpr, ctx)?);
+        inserter.push(evaluate(rexpr, ctx)?);
         cursor = Some(c); // get next iteration
     }
     Ok(table)
@@ -81,11 +84,11 @@ pub fn eval_table(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String
 #[cfg(test)]
 mod tests {
     use crate::context::Context;
-    use crate::expr::{Expr, eval_with_ctx};
+    use crate::expr::{Expr, evaluate};
     use crate::parser::parser;
 
     fn eval(expr: Expr) -> Result<Expr, String> {
-        eval_with_ctx(expr, &mut Context::new())
+        evaluate(expr, &mut Context::new())
     }
 
     #[test]
@@ -93,22 +96,22 @@ mod tests {
         let p = parser()?;
         assert_eq!(
             eval(p(r#"Table[i, {i, 3}]"#)?)?,
-            Expr::Expr(
-                "List".to_string(),
+            Expr::Head(
+                Box::new(Expr::Symbol("List".into())),
                 vec![Expr::Number(1.0), Expr::Number(2.0), Expr::Number(3.0),]
             )
         );
         assert_eq!(
             eval(p(r#"Table[i+j, {i, 2}, {j, 3}]"#)?)?,
-            Expr::Expr(
-                "List".to_string(),
+            Expr::Head(
+                Box::new(Expr::Symbol("List".into())),
                 vec![
-                    Expr::Expr(
-                        "List".to_string(),
+                    Expr::Head(
+                        Box::new(Expr::Symbol("List".into())),
                         vec![Expr::Number(2.0), Expr::Number(3.0), Expr::Number(4.0)]
                     ),
-                    Expr::Expr(
-                        "List".to_string(),
+                    Expr::Head(
+                        Box::new(Expr::Symbol("List".into())),
                         vec![Expr::Number(3.0), Expr::Number(4.0), Expr::Number(5.0)]
                     ),
                 ]
@@ -116,39 +119,39 @@ mod tests {
         );
         assert_eq!(
             eval(p(r#"Table[i+j+k, {i, 2}, {j, 2+1}, {k, 2}]"#)?)?,
-            Expr::Expr(
-                "List".to_string(),
+            Expr::Head(
+                Box::new(Expr::Symbol("List".into())),
                 vec![
-                    Expr::Expr(
-                        "List".to_string(),
+                    Expr::Head(
+                        Box::new(Expr::Symbol("List".into())),
                         vec![
-                            Expr::Expr(
-                                "List".to_string(),
+                            Expr::Head(
+                                Box::new(Expr::Symbol("List".into())),
                                 vec![Expr::Number(3.0), Expr::Number(4.0)]
                             ),
-                            Expr::Expr(
-                                "List".to_string(),
+                            Expr::Head(
+                                Box::new(Expr::Symbol("List".into())),
                                 vec![Expr::Number(4.0), Expr::Number(5.0)]
                             ),
-                            Expr::Expr(
-                                "List".to_string(),
+                            Expr::Head(
+                                Box::new(Expr::Symbol("List".into())),
                                 vec![Expr::Number(5.0), Expr::Number(6.0)]
                             ),
                         ]
                     ),
-                    Expr::Expr(
-                        "List".to_string(),
+                    Expr::Head(
+                        Box::new(Expr::Symbol("List".into())),
                         vec![
-                            Expr::Expr(
-                                "List".to_string(),
+                            Expr::Head(
+                                Box::new(Expr::Symbol("List".into())),
                                 vec![Expr::Number(4.0), Expr::Number(5.0)]
                             ),
-                            Expr::Expr(
-                                "List".to_string(),
+                            Expr::Head(
+                                Box::new(Expr::Symbol("List".into())),
                                 vec![Expr::Number(5.0), Expr::Number(6.0)]
                             ),
-                            Expr::Expr(
-                                "List".to_string(),
+                            Expr::Head(
+                                Box::new(Expr::Symbol("List".into())),
                                 vec![Expr::Number(6.0), Expr::Number(7.0)]
                             ),
                         ]

@@ -1,34 +1,45 @@
 use super::replace_all::replace_all;
-use super::{eval_with_ctx, Expr};
+use super::{Expr, evaluate};
 use crate::context::Context;
 use crate::{find_root_vec, findroot};
 
-pub fn eval_find_root(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
-    // Evaluate and pull out list of functions to work on.
-    let fexpr: Vec<Expr> = match args.remove(0) {
-        Expr::Expr(h, a) if h == "List" => a
-            .into_iter()
-            .map(|fi| eval_with_ctx(fi, ctx))
-            .collect::<Result<_, _>>()?,
-        expr => vec![eval_with_ctx(expr, ctx)?],
+pub fn eval_find_root(args: Vec<Expr>) -> Result<Expr, String> {
+    let [fexpr, varspec]: [Expr; 2] = args
+        .try_into()
+        .map_err(|e| format!("FindRoot must have 2 arguments. {:?}", e))?;
+
+    // Adapt to single or multiple functions
+    let fexpr = match fexpr {
+        Expr::Head(h, a) if *h == Expr::Symbol("List".into()) => a,
+        expr => vec![expr],
     };
+
     // Pull out variables specs to find roots for.
-    let varspec: Vec<_> = match args.remove(0) {
-        Expr::Expr(h, a) if h == "List" => a,
-        other => return Err(format!("Unexpected var spec for FindRoot: {:?}", other)),
+    let varspec: Vec<_> = match varspec {
+        Expr::Head(h, a) if *h == Expr::Symbol("List".into()) => a,
+        o => return Err(format!("Unexpected var spec for FindRoot: {:?}", o)),
     };
+
     let vars: Vec<(Expr, f64, Option<(f64, f64)>)> = match varspec.as_slice() {
         [v @ Expr::Symbol(_), Expr::Number(start)] => vec![(v.clone(), *start, None)],
-        [v @ Expr::Symbol(_), Expr::Number(start), Expr::Number(lo), Expr::Number(hi)] => {
+        [
+            v @ Expr::Symbol(_),
+            Expr::Number(start),
+            Expr::Number(lo),
+            Expr::Number(hi),
+        ] => {
             vec![(v.clone(), *start, Some((*lo, *hi)))]
         }
-        o if o
-            .iter()
-            .all(|s| matches!(s, Expr::Expr(h, _) if h == "List")) =>
+        // TODO: clean this up
+        vspec
+            if vspec
+                .iter()
+                .all(|s| matches!(s, Expr::Head(h, _) if **h == Expr::Symbol("List".into()))) =>
         {
-            o.into_iter()
+            vspec
+                .into_iter()
                 .map(|s| {
-                    let Expr::Expr(_, varspec) = s else {
+                    let Expr::Head(_, varspec) = s else {
                         unreachable!();
                     };
                     match varspec.as_slice() {
@@ -49,10 +60,11 @@ pub fn eval_find_root(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, St
         ));
     }
 
+    // TODO move this to aanother function
     if fexpr.len() == 1 {
         let f =
             |xi: f64| match replace_all(fexpr[0].clone(), &[(vars[0].0.clone(), Expr::Number(xi))])
-                .and_then(|expr| eval_with_ctx(expr, &mut Context::new()))
+                .and_then(|expr| evaluate(expr, &mut Context::new()))
             {
                 Ok(Expr::Number(x)) => Ok(x),
                 err => Err(format!("FindRoot didn't return Number: {:?}", err)),
@@ -63,8 +75,8 @@ pub fn eval_find_root(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, St
         } else {
             findroot::find_roots(f, x0)?
         };
-        return Ok(Expr::Expr(
-            "List".to_string(),
+        return Ok(Expr::Head(
+            Box::new(Expr::Symbol("List".into())),
             roots.into_iter().map(|ri| Expr::Number(ri)).collect(),
         ));
     }
@@ -81,7 +93,7 @@ pub fn eval_find_root(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, St
                     .map(|(var, val)| (var.0.clone(), Expr::Number(*val)))
                     .collect::<Vec<_>>(),
             )
-            .and_then(|expr| eval_with_ctx(expr, &mut Context::new()))
+            .and_then(|expr| evaluate(expr, &mut Context::new()))
             {
                 Ok(Expr::Number(x)) => Ok(x),
                 err => Err(format!("FindRoot didn't return Number: {:?}", err)),
@@ -90,8 +102,8 @@ pub fn eval_find_root(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, St
         .collect();
 
     let roots = find_root_vec(funcs, vars.iter().map(|vi| vi.1).collect())?;
-    Ok(Expr::Expr(
-        "List".to_string(),
+    Ok(Expr::Head(
+        Box::new(Expr::Symbol("List".into())),
         roots.into_iter().map(|ri| Expr::Number(ri)).collect(),
     ))
 }

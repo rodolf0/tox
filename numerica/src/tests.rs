@@ -1,9 +1,9 @@
 use crate::context::Context;
-use crate::expr::{Expr, eval_with_ctx};
+use crate::expr::{Expr, evaluate};
 use crate::parser::parser;
 
 fn eval(expr: Expr) -> Result<Expr, String> {
-    eval_with_ctx(expr, &mut Context::new())
+    evaluate(expr, &mut Context::new())
 }
 
 #[test]
@@ -26,18 +26,15 @@ fn arith_ops() -> Result<(), String> {
 fn set_delayed() -> Result<(), String> {
     let mut ctx = Context::new();
     let p = parser()?;
-    assert_eq!(eval_with_ctx(p(r#"x := 1"#)?, &mut ctx)?, Expr::Number(1.0));
+    assert_eq!(evaluate(p(r#"x := 1"#)?, &mut ctx)?, Expr::Number(1.0));
     assert_eq!(
-        eval_with_ctx(p(r#"f := x + 1"#)?, &mut ctx)?,
-        Expr::Expr(
-            "Plus".to_string(),
+        evaluate(p(r#"f := x + 1"#)?, &mut ctx)?,
+        Expr::Head(
+            Box::new(Expr::Symbol("Plus".into())),
             vec![Expr::Symbol("x".to_string()), Expr::Number(1.0)]
         )
     );
-    assert_eq!(
-        eval_with_ctx(p(r#"g = x + 1"#)?, &mut ctx)?,
-        Expr::Number(2.0)
-    );
-    assert_eq!(eval_with_ctx(p(r#"f"#)?, &mut ctx)?, Expr::Number(2.0));
+    assert_eq!(evaluate(p(r#"g = x + 1"#)?, &mut ctx)?, Expr::Number(2.0));
+    assert_eq!(evaluate(p(r#"f"#)?, &mut ctx)?, Expr::Number(2.0));
     Ok(())
 }

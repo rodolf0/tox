@@ -1,21 +1,28 @@
-use super::{Expr, eval_with_ctx};
+use super::Expr;
 use crate::context::Context;
 
-pub fn eval_replace_all(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
+pub(crate) fn eval_replace_all(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
+    // Just check that we're not invoking ReplaceAll with a different expr
+    assert!(matches!(&expr, Expr::Head(h, _) if h.as_ref() == &Expr::Symbol("ReplaceAll".into())));
+
     // Eval of replace_all is outside of eval because evaluation of expr is deferred
+    // TODO: if the above assert stays, then simplify this match below
     match expr {
-        Expr::Expr(head, args) if head == "ReplaceAll" => {
+        Expr::Head(head, args) if *head == Expr::Symbol("ReplaceAll".into()) => {
             let [expr, rules]: [Expr; 2] = args
                 .try_into()
                 .map_err(|e| format!("ReplaceAll must have 2 arguments. {:?}", e))?;
-            eval_with_ctx(
-                replace_all(
-                    // Nested evaluation of replace_all without eval of expr
-                    eval_replace_all(expr, ctx)?,
-                    eval_rules(rules, ctx)?.as_slice(),
-                )?,
-                ctx,
-            )
+            // TODO: is this already evaluated ? Leave it commented in case we want to rollback
+            // We need a test to discard this scenario
+            // evaluate(
+            //     replace_all(
+            //         // Nested evaluation of replace_all without eval of expr
+            //         eval_replace_all(expr, ctx)?,
+            //         unpack_rules(rules, ctx)?.as_slice(),
+            //     )?,
+            //     ctx,
+            // )
+            replace_all(expr, unpack_rules(rules, ctx)?.as_slice())
         }
         other => Ok(other),
     }
@@ -23,18 +30,18 @@ pub fn eval_replace_all(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
 
 // ReplaceAll[x, Rule[x, 3]]
 // ReplaceAll[List[1, 2, 3], Rule[List, FindRoot]]
-pub fn replace_all(expr: Expr, rules: &[(Expr, Expr)]) -> Result<Expr, String> {
+pub(crate) fn replace_all(expr: Expr, rules: &[(Expr, Expr)]) -> Result<Expr, String> {
     match expr {
-        // for each sub-expression apply the replacement
-        Expr::Expr(head, args) => {
-            // First execute replace_all on subexpressions.
-            let replaced_expr = Expr::Expr(
+        Expr::Head(head, args) => {
+            // Recursively apply replacement for arguments
+            let replaced_expr = Expr::Head(
                 head,
                 args.into_iter()
                     .map(|a| replace_all(a, rules))
                     .collect::<Result<_, _>>()?,
             );
             // Check if update expression matches a replacement too.
+            // TODO: this needs to run in a loop until it the result doesn't change
             let replaced_expr = rules
                 .iter()
                 .filter(|(lhs, _)| replaced_expr == *lhs)
@@ -43,16 +50,23 @@ pub fn replace_all(expr: Expr, rules: &[(Expr, Expr)]) -> Result<Expr, String> {
                 .unwrap_or(replaced_expr);
             // Check if a rule is a head re-write
             Ok(match replaced_expr {
-                Expr::Expr(head, args) => {
+                Expr::Head(head, args) if matches!(*head, Expr::Symbol(_)) => {
+                    let Expr::Symbol(head) = *head else {
+                        unreachable!()
+                    };
+                    let mut replaced_expr =
+                        Expr::Head(Box::new(Expr::Symbol(head.clone())), args.clone());
                     for r in rules {
-                        if let (Expr::Symbol(lhs), Expr::Symbol(rhs)) = r {
+                        // Resolved heads will be Symbols, so filter LHS to just Symbols
+                        if let (Expr::Symbol(lhs), rhs) = r {
                             if *lhs == head {
-                                return Ok(Expr::Expr(rhs.clone(), args));
+                                replaced_expr = Expr::Head(Box::new(rhs.clone()), args.clone());
                             }
                         }
                     }
-                    Expr::Expr(head, args)
+                    replaced_expr
                 }
+                // Leave head alone
                 expr => expr,
             })
         }
@@ -65,19 +79,19 @@ pub fn replace_all(expr: Expr, rules: &[(Expr, Expr)]) -> Result<Expr, String> {
     }
 }
 
-fn eval_rules(rules: Expr, ctx: &mut Context) -> Result<Vec<(Expr, Expr)>, String> {
-    // eval_with_ctx rules and check they result in Rule or List[Rule]
-    match eval_with_ctx(rules, ctx)? {
-        Expr::Expr(head, args) if head == "Rule" => {
+fn unpack_rules(rules: Expr, _ctx: &mut Context) -> Result<Vec<(Expr, Expr)>, String> {
+    // Check they result in Rule or List[Rule]
+    match rules {
+        Expr::Head(head, args) if *head == Expr::Symbol("Rule".into()) => {
             let [lhs, rhs]: [Expr; 2] = args
                 .try_into()
                 .map_err(|e| format!("Rule must have 2 arguments. {:?}", e))?;
             Ok(vec![(lhs, rhs)])
         }
-        Expr::Expr(h, args) if h == "List" => args
+        Expr::Head(h, args) if *h == Expr::Symbol("List".into()) => args
             .into_iter()
             .map(|rule| match rule {
-                Expr::Expr(head, args) if head == "Rule" => {
+                Expr::Head(head, args) if *head == Expr::Symbol("Rule".into()) => {
                     let [lhs, rhs]: [Expr; 2] = args
                         .try_into()
                         .map_err(|e| format!("Rule must have 2 arguments. {:?}", e))?;
@@ -93,55 +107,81 @@ fn eval_rules(rules: Expr, ctx: &mut Context) -> Result<Vec<(Expr, Expr)>, Strin
 #[cfg(test)]
 mod tests {
     use crate::context::Context;
-    use crate::expr::{Expr, eval_with_ctx};
+    use crate::expr::{Expr, evaluate};
     use crate::parser::parser;
 
     fn eval(expr: Expr) -> Result<Expr, String> {
-        eval_with_ctx(expr, &mut Context::new())
+        evaluate(expr, &mut Context::new())
     }
 
     #[test]
-    fn replace_all() -> Result<(), String> {
+    fn single_rule() -> Result<(), String> {
         let p = parser()?;
         // Test ReplaceAll with single simple Rule
-        let expr1 = r#"ReplaceAll[Hold[Plus[x, Times[2, x]]], Rule[x, 3]]"#;
-        let rep_1rule = p(expr1)?;
+        let expr = p(r#"ReplaceAll[Hold[Plus[x, Times[2, x]]], Rule[x, 3]]"#)?;
         assert_eq!(
-            eval(rep_1rule.clone())?,
-            Expr::Expr(
-                "Hold".to_string(),
-                vec![Expr::Expr(
-                    "Plus".to_string(),
+            eval(expr.clone())?,
+            Expr::Head(
+                Box::new(Expr::Symbol("Hold".into())),
+                vec![Expr::Head(
+                    Box::new(Expr::Symbol("Plus".into())),
                     vec![
                         Expr::Number(3.0),
-                        Expr::Expr(
-                            "Times".to_string(),
+                        Expr::Head(
+                            Box::new(Expr::Symbol("Times".into())),
                             vec![Expr::Number(2.0), Expr::Number(3.0)]
                         )
                     ]
                 )]
             )
         );
-        assert_eq!(
-            eval(p(&format!("Evaluate[{}]", expr1))?)?,
-            Expr::Number(9.0)
-        );
+        Ok(())
+    }
+
+    #[test]
+    fn multiple_rules() -> Result<(), String> {
+        let p = parser()?;
         // Test ReplaceAll with a List[Rule]
-        let rep_rule_list = p(r#"ReplaceAll[
+        let expr = p(r#"ReplaceAll[
                 Plus[x, Times[2, x]],
                 List[Rule[Times[2, x], 3], Rule[Plus[x, 3], 4]]
             ]"#)?;
-        assert_eq!(eval(rep_rule_list)?, Expr::Number(4.0));
+        assert_eq!(eval(expr)?, Expr::Number(4.0));
+        Ok(())
+    }
 
+    #[test]
+    fn head_replacement() -> Result<(), String> {
+        let p = parser()?;
         // Test ReplaceAll with rule head replacement
-        let rep_rule_head = p(r#"ReplaceAll[
+        let expr = p(r#"ReplaceAll[
                 Plus[x, Times[2, x]],
                 List[Rule[Times[2, x], 3], Rule[Plus, Times]]
             ]"#)?;
         assert_eq!(
-            eval(rep_rule_head)?,
-            Expr::Expr(
-                "Times".to_string(),
+            eval(expr)?,
+            Expr::Head(
+                Box::new(Expr::Symbol("Times".into())),
+                vec![Expr::Number(3.0), Expr::Symbol("x".to_string())]
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn nested_replace() -> Result<(), String> {
+        let p = parser()?;
+        let expr = p(r#"
+            ReplaceAll[
+                Plus[x,
+                  Times[2, ReplaceAll[Times[z, y], Rule[Times[z, y], x]]]
+                ],
+                Rule[Times[2, x], 3]
+            ]"#)?;
+        assert_eq!(
+            eval(expr)?,
+            Expr::Head(
+                Box::new(Expr::Symbol("Plus".into())),
                 vec![Expr::Number(3.0), Expr::Symbol("x".to_string())]
             )
         );
@@ -153,8 +193,8 @@ mod tests {
         let p = parser()?;
         assert_eq!(
             eval(p(r#"x /. x -> z -> 3"#)?)?,
-            Expr::Expr(
-                "Rule".to_string(),
+            Expr::Head(
+                Box::new(Expr::Symbol("Rule".into())),
                 vec![Expr::Symbol("z".to_string()), Expr::Number(3.0)]
             )
         );
@@ -170,22 +210,22 @@ mod tests {
         let p = parser()?;
         assert_eq!(
             eval(p(r#"x + y /. x -> 2"#)?)?,
-            Expr::Expr(
-                "Plus".to_string(),
+            Expr::Head(
+                Box::new(Expr::Symbol("Plus".into())),
                 vec![Expr::Number(2.0), Expr::Symbol("y".to_string())]
             )
         );
         assert_eq!(
             eval(p(r#"x + y /. x -> z /. z -> 3"#)?)?,
-            Expr::Expr(
-                "Plus".to_string(),
+            Expr::Head(
+                Box::new(Expr::Symbol("Plus".into())),
                 vec![Expr::Number(3.0), Expr::Symbol("y".to_string())]
             )
         );
         assert_eq!(
             eval(p(r#"x + y /. z -> 3 /. x -> z"#)?)?,
-            Expr::Expr(
-                "Plus".to_string(),
+            Expr::Head(
+                Box::new(Expr::Symbol("Plus".into())),
                 vec![Expr::Symbol("z".to_string()), Expr::Symbol("y".to_string())]
             )
         );

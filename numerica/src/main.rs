@@ -9,7 +9,7 @@ fn main() -> Result<(), String> {
             Err(e) => println!("Parse err: {:?}", e),
             Ok(expr) => println!(
                 "{}",
-                numerica::eval_with_ctx(expr, &mut numerica::Context::new())?
+                numerica::evaluate(expr, &mut numerica::Context::new())?
             ),
         }
         return Ok(());
@@ -26,7 +26,7 @@ fn main() -> Result<(), String> {
                 Err(e) => println!("Parse err: {:?}", e),
                 Ok(expr) => {
                     let _ = rl.add_history_entry(&line);
-                    match numerica::eval_with_ctx(expr, &mut ctx) {
+                    match numerica::evaluate(expr, &mut ctx) {
                         Err(e) => println!("Eval err: {:?}", e),
                         Ok(expr) => println!("{}", expr),
                     }

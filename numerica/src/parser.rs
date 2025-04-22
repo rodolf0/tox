@@ -56,9 +56,8 @@ macro_rules! pull {
 
 fn convert(t: T) -> Expr {
     match t {
-        // TODO: eventually change this to non String exclusive
-        T::Expr(h, args) => Expr::Expr(
-            pull!(T::Symbol, *h),
+        T::Expr(head, args) => Expr::Head(
+            Box::new(convert(*head)),
             args.into_iter().map(|a| convert(a)).collect(),
         ),
         T::Symbol(x) => Expr::Symbol(x),
@@ -231,32 +230,41 @@ mod tests {
     #[test]
     fn basic_expr() -> Result<(), std::string::String> {
         let input = r#"FindRoot[Sum[360, Sum[a, b]], List["1, 2, 3"], {x, 2}]"#;
-        let expected = Expr(
-            "FindRoot".into(),
+        let expected = Head(
+            Box::new(Symbol("FindRoot".into())),
             vec![
-                Expr(
-                    "Sum".into(),
+                Head(
+                    Box::new(Symbol("Sum".into())),
                     vec![
                         Number(360.0),
-                        Expr("Sum".into(), vec![Symbol("a".into()), Symbol("b".into())]),
+                        Head(
+                            Box::new(Symbol("Sum".into())),
+                            vec![Symbol("a".into()), Symbol("b".into())],
+                        ),
                     ],
                 ),
-                Expr("List".into(), vec![String("1, 2, 3".into())]),
-                Expr("List".into(), vec![Symbol("x".into()), Number(2.0)]),
+                Head(
+                    Box::new(Symbol("List".into())),
+                    vec![String("1, 2, 3".into())],
+                ),
+                Head(
+                    Box::new(Symbol("List".into())),
+                    vec![Symbol("x".into()), Number(2.0)],
+                ),
             ],
         );
         assert_eq!(parser()?(input)?, expected);
         Ok(())
     }
 
-    // #[test]
-    // fn recursive_expr() -> Result<(), std::string::String> {
-    //     let input = r#"f[x][y, z]"#;
-    //     let expected = Expr(
-    //         Expr("f".into(), vec![Symbol("x".into())]),
-    //         vec![Symbol("y".into()), Symbol("z".into())],
-    //     );
-    //     assert_eq!(parser()?(input)?, expected);
-    //     Ok(())
-    // }
+    #[test]
+    fn recursive_expr() -> Result<(), std::string::String> {
+        let input = r#"f[x][y, z]"#;
+        let expected = Head(
+            Box::new(Head(Box::new(Symbol("f".into())), vec![Symbol("x".into())])),
+            vec![Symbol("y".into()), Symbol("z".into())],
+        );
+        assert_eq!(parser()?(input)?, expected);
+        Ok(())
+    }
 }

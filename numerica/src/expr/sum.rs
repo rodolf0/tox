@@ -1,12 +1,12 @@
 use super::replace_all::replace_all;
-use super::{Expr, eval_with_ctx};
+use super::{Expr, evaluate};
 use crate::context::Context;
 
 // Parse iteration arguments, Eg: {var, 0, end} or {var, start, end}
 fn parse_sum_args(sum_args: &Expr) -> Result<(String, i32, i32), String> {
     use super::Expr::*;
     match sum_args {
-        Expr(head, args) if head == "List" => match args.as_slice() {
+        Head(h, args) if **h == Symbol("List".into()) => match args.as_slice() {
             [Symbol(x), Number(xn)] => Ok((x.clone(), 0 as i32, *xn as i32)),
             [Symbol(x), Number(x0), Number(xn)] => Ok((x.clone(), *x0 as i32, *xn as i32)),
             other => Err(format!("Sum unexpected arg1: {:?}", other)),
@@ -30,7 +30,7 @@ pub fn eval_sum(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
         .map_err(|e| format!("Sum expected: {{expr, args}}. Got {:?}", e))?;
     let (x, x0, xn) = parse_sum_args(&sum_args)?;
     let sum = (x0..=xn).try_fold(0.0, |sum, xi| {
-        match render_sum(&sum_expr, &x, xi).and_then(|s| eval_with_ctx(s, ctx)) {
+        match render_sum(&sum_expr, &x, xi).and_then(|s| evaluate(s, ctx)) {
             Ok(Expr::Number(n)) => Ok(sum + n),
             Ok(other) => Err(Ok(other)),
             Err(err) => Err(Err(err)),
@@ -38,7 +38,10 @@ pub fn eval_sum(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
     });
     match sum {
         Ok(sum) => Ok(Expr::Number(sum)),
-        Err(Ok(_)) => Ok(Expr::Expr("Sum".to_string(), vec![sum_expr, sum_args])),
+        Err(Ok(_)) => Ok(Expr::Head(
+            Box::new(Expr::Symbol("Sum".into())),
+            vec![sum_expr, sum_args],
+        )),
         Err(Err(e)) => Err(e),
     }
 }
@@ -46,11 +49,11 @@ pub fn eval_sum(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
 #[cfg(test)]
 mod tests {
     use crate::context::Context;
-    use crate::expr::{Expr, eval_with_ctx};
+    use crate::expr::{Expr, evaluate};
     use crate::parser::parser;
 
     fn eval(expr: Expr) -> Result<Expr, String> {
-        eval_with_ctx(expr, &mut Context::new())
+        evaluate(expr, &mut Context::new())
     }
 
     #[test]
@@ -60,15 +63,15 @@ mod tests {
         assert_eq!(eval(p(r#"Sum[x^2, {x, 2, 4}]"#)?)?, Expr::Number(29.0));
         assert_eq!(
             eval(p(r#"Sum[x^i, {i, 4}]"#)?)?,
-            Expr::Expr(
-                "Sum".to_string(),
+            Expr::Head(
+                Box::new(Expr::Symbol("Sum".into())),
                 vec![
-                    Expr::Expr(
-                        "Power".to_string(),
+                    Expr::Head(
+                        Box::new(Expr::Symbol("Power".into())),
                         vec![Expr::Symbol("x".to_string()), Expr::Symbol("i".to_string()),]
                     ),
-                    Expr::Expr(
-                        "List".to_string(),
+                    Expr::Head(
+                        Box::new(Expr::Symbol("List".into())),
                         vec![Expr::Symbol("i".to_string()), Expr::Number(4.0)]
                     )
                 ]

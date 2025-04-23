@@ -146,8 +146,6 @@ pub fn evaluate(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
             Some(value) => Ok(evaluate(value, ctx)?),
             None => Ok(expr),
         },
-        // TODO: should Distribution just return Ok(expr) like a primitive ?
-        Expr::Distribution(d) => Ok(Expr::Number(d.sample())),
         _ => Ok(expr), // Primitive values don't require further evaluation.
     }
 }

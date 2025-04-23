@@ -12,12 +12,12 @@ fn apply_op(args: Vec<Expr>, op_name: &str, op: fn(f64) -> f64) -> Result<Expr, 
                 .into_iter()
                 .map(|x| match x {
                     Expr::Number(n) => Expr::Number(op(n)),
-                    o => Expr::Head(Box::new(Expr::Symbol(op_name.into())), vec![o]),
+                    o => Expr::from_head(op_name, vec![o]),
                 })
                 .collect();
-            Ok(Expr::Head(Box::new(Expr::Symbol("List".into())), args))
+            Ok(Expr::from_head("List", args))
         }
-        o => Ok(Expr::Head(Box::new(Expr::Symbol(op_name.into())), vec![o])),
+        o => Ok(Expr::from_head(op_name, vec![o])),
     }
 }
 

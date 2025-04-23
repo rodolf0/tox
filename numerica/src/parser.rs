@@ -234,32 +234,24 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
 #[cfg(test)]
 mod tests {
     use super::parser;
+    use crate::expr::Expr;
     use crate::expr::Expr::*;
 
     #[test]
     fn basic_expr() -> Result<(), std::string::String> {
         let input = r#"FindRoot[Sum[360, Sum[a, b]], List["1, 2, 3"], {x, 2}]"#;
-        let expected = Head(
-            Box::new(Symbol("FindRoot".into())),
+        let expected = Expr::from_head(
+            "FindRoot",
             vec![
-                Head(
-                    Box::new(Symbol("Sum".into())),
+                Expr::from_head(
+                    "Sum",
                     vec![
                         Number(360.0),
-                        Head(
-                            Box::new(Symbol("Sum".into())),
-                            vec![Symbol("a".into()), Symbol("b".into())],
-                        ),
+                        Expr::from_head("Sum", vec![Symbol("a".into()), Symbol("b".into())]),
                     ],
                 ),
-                Head(
-                    Box::new(Symbol("List".into())),
-                    vec![String("1, 2, 3".into())],
-                ),
-                Head(
-                    Box::new(Symbol("List".into())),
-                    vec![Symbol("x".into()), Number(2.0)],
-                ),
+                Expr::from_head("List", vec![String("1, 2, 3".into())]),
+                Expr::from_head("List", vec![Symbol("x".into()), Number(2.0)]),
             ],
         );
         assert_eq!(parser()?(input)?, expected);
@@ -270,7 +262,7 @@ mod tests {
     fn recursive_expr() -> Result<(), std::string::String> {
         let input = r#"f[x][y, z]"#;
         let expected = Head(
-            Box::new(Head(Box::new(Symbol("f".into())), vec![Symbol("x".into())])),
+            Box::new(Expr::from_head("f", vec![Symbol("x".into())])),
             vec![Symbol("y".into()), Symbol("z".into())],
         );
         assert_eq!(parser()?(input)?, expected);

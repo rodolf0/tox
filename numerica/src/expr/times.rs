@@ -4,8 +4,8 @@ use crate::context::Context;
 fn distribute_op(lhs: Expr, rhs: Expr, op: &str, over: &str) -> Expr {
     match lhs {
         Expr::Head(h, lhs) if *h == Expr::Symbol(over.into()) => match rhs {
-            Expr::Head(h, rhs) if *h == Expr::Symbol(over.into()) => Expr::Head(
-                Box::new(Expr::Symbol(over.into())),
+            Expr::Head(h, rhs) if *h == Expr::Symbol(over.into()) => Expr::from_head(
+                over,
                 lhs.iter()
                     .flat_map(|lhsi| {
                         rhs.iter()
@@ -13,21 +13,21 @@ fn distribute_op(lhs: Expr, rhs: Expr, op: &str, over: &str) -> Expr {
                     })
                     .collect(),
             ),
-            rhs => Expr::Head(
-                Box::new(Expr::Symbol(over.into())),
+            rhs => Expr::from_head(
+                over,
                 lhs.into_iter()
                     .map(|lhsi| distribute_op(lhsi, rhs.clone(), op, over))
                     .collect(),
             ),
         },
         lhs => match rhs {
-            Expr::Head(h, rhs) if *h == Expr::Symbol(over.into()) => Expr::Head(
-                Box::new(Expr::Symbol(over.into())),
+            Expr::Head(h, rhs) if *h == Expr::Symbol(over.into()) => Expr::from_head(
+                over,
                 rhs.into_iter()
                     .map(|rhsi| distribute_op(lhs.clone(), rhsi, op, over))
                     .collect(),
             ),
-            rhs => Expr::Head(Box::new(Expr::Symbol(op.into())), vec![lhs, rhs]),
+            rhs => Expr::from_head(op, vec![lhs, rhs]),
         },
     }
 }
@@ -95,10 +95,7 @@ pub(crate) fn eval_times(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr,
     if new_args2.len() == 1 {
         Ok(new_args2.swap_remove(0))
     } else {
-        Ok(Expr::Head(
-            Box::new(Expr::Symbol("Times".into())),
-            new_args2,
-        ))
+        Ok(Expr::from_head("Times", new_args2))
     }
 }
 #[cfg(test)]
@@ -133,8 +130,8 @@ mod tests {
         let result = eval_times(args, &mut Context::new()).unwrap();
         assert_eq!(
             result,
-            Expr::Head(
-                Box::new(Expr::Symbol("Times".into())),
+            Expr::from_head(
+                "Times",
                 vec![Expr::Symbol("x".into()), Expr::Symbol("y".into())]
             )
         );
@@ -146,68 +143,44 @@ mod tests {
         // distribution of number on LHS
         let args = vec![
             Number(2.0),
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Number(3.0), Number(4.0)],
-            ),
+            Expr::from_head("List", vec![Number(3.0), Number(4.0)]),
         ];
         let result = eval_times(args, &mut Context::new()).unwrap();
         assert_eq!(
             result,
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Number(6.0), Number(8.0)]
-            )
+            Expr::from_head("List", vec![Number(6.0), Number(8.0)])
         );
 
         // distribution of sym on LHS
         let args = vec![
             Symbol("x".into()),
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Number(3.0), Number(4.0)],
-            ),
+            Expr::from_head("List", vec![Number(3.0), Number(4.0)]),
         ];
         let result = eval_times(args, &mut Context::new()).unwrap();
         assert_eq!(
             result,
-            Head(
-                Box::new(Expr::Symbol("List".into())),
+            Expr::from_head(
+                "List",
                 vec![
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
-                        vec![Number(3.0), Symbol("x".into())]
-                    ),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
-                        vec![Number(4.0), Symbol("x".into())]
-                    )
+                    Expr::from_head("Times", vec![Number(3.0), Symbol("x".into())]),
+                    Expr::from_head("Times", vec![Number(4.0), Symbol("x".into())])
                 ]
             )
         );
 
         // distribution of sym on RHS
         let args = vec![
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Number(3.0), Number(4.0)],
-            ),
+            Expr::from_head("List", vec![Number(3.0), Number(4.0)]),
             Symbol("x".into()),
         ];
         let result = eval_times(args, &mut Context::new()).unwrap();
         assert_eq!(
             result,
-            Head(
-                Box::new(Expr::Symbol("List".into())),
+            Expr::from_head(
+                "List",
                 vec![
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
-                        vec![Number(3.0), Symbol("x".into())]
-                    ),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
-                        vec![Number(4.0), Symbol("x".into())]
-                    )
+                    Expr::from_head("Times", vec![Number(3.0), Symbol("x".into())]),
+                    Expr::from_head("Times", vec![Number(4.0), Symbol("x".into())])
                 ]
             )
         );
@@ -219,119 +192,71 @@ mod tests {
 
         // {1, 2} * {x, y}
         let args = vec![
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Number(1.0), Number(2.0)],
-            ),
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Symbol("x".into()), Symbol("y".into())],
-            ),
+            Expr::from_head("List", vec![Number(1.0), Number(2.0)]),
+            Expr::from_head("List", vec![Symbol("x".into()), Symbol("y".into())]),
         ];
         let result = eval_times(args, &mut Context::new()).unwrap();
         assert_eq!(
             result,
-            Head(
-                Box::new(Expr::Symbol("List".into())),
+            Expr::from_head(
+                "List",
                 vec![
                     Symbol("x".into()),
                     Symbol("y".into()),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
-                        vec![Number(2.0), Symbol("x".into())]
-                    ),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
-                        vec![Number(2.0), Symbol("y".into())]
-                    ),
+                    Expr::from_head("Times", vec![Number(2.0), Symbol("x".into())]),
+                    Expr::from_head("Times", vec![Number(2.0), Symbol("y".into())]),
                 ],
             )
         );
 
         // {x, y} * {1, 2}
         let args = vec![
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Symbol("x".into()), Symbol("y".into())],
-            ),
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Number(1.0), Number(2.0)],
-            ),
+            Expr::from_head("List", vec![Symbol("x".into()), Symbol("y".into())]),
+            Expr::from_head("List", vec![Number(1.0), Number(2.0)]),
         ];
         let result = eval_times(args, &mut Context::new()).unwrap();
         assert_eq!(
             result,
-            Head(
-                Box::new(Expr::Symbol("List".into())),
+            Expr::from_head(
+                "List",
                 vec![
                     Symbol("x".into()),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
-                        vec![Number(2.0), Symbol("x".into())]
-                    ),
+                    Expr::from_head("Times", vec![Number(2.0), Symbol("x".into())]),
                     Symbol("y".into()),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
-                        vec![Number(2.0), Symbol("y".into())]
-                    ),
+                    Expr::from_head("Times", vec![Number(2.0), Symbol("y".into())]),
                 ],
             )
         );
 
         // Check numeric lists
         let args = vec![
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Number(1.0), Number(2.0)],
-            ),
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Number(3.0), Number(4.0)],
-            ),
+            Expr::from_head("List", vec![Number(1.0), Number(2.0)]),
+            Expr::from_head("List", vec![Number(3.0), Number(4.0)]),
         ];
         let result = eval_times(args, &mut Context::new()).unwrap();
         assert_eq!(
             result,
-            Head(
-                Box::new(Expr::Symbol("List".into())),
+            Expr::from_head(
+                "List",
                 vec![Number(3.0), Number(4.0), Number(6.0), Number(8.0)]
             )
         );
 
         // {x, y} * {w, z}
         let args = vec![
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Symbol("x".into()), Symbol("y".into())],
-            ),
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Symbol("w".into()), Symbol("z".into())],
-            ),
+            Expr::from_head("List", vec![Symbol("x".into()), Symbol("y".into())]),
+            Expr::from_head("List", vec![Symbol("w".into()), Symbol("z".into())]),
         ];
         let result = eval_times(args, &mut Context::new()).unwrap();
         assert_eq!(
             result,
-            Head(
-                Box::new(Expr::Symbol("List".into())),
+            Expr::from_head(
+                "List",
                 vec![
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
-                        vec![Symbol("x".into()), Symbol("w".into())]
-                    ),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
-                        vec![Symbol("x".into()), Symbol("z".into())]
-                    ),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
-                        vec![Symbol("y".into()), Symbol("w".into())]
-                    ),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
-                        vec![Symbol("y".into()), Symbol("z".into())]
-                    ),
+                    Expr::from_head("Times", vec![Symbol("x".into()), Symbol("w".into())]),
+                    Expr::from_head("Times", vec![Symbol("x".into()), Symbol("z".into())]),
+                    Expr::from_head("Times", vec![Symbol("y".into()), Symbol("w".into())]),
+                    Expr::from_head("Times", vec![Symbol("y".into()), Symbol("z".into())]),
                 ],
             )
         );
@@ -343,36 +268,30 @@ mod tests {
 
         // {x, y} * {w, z} * 3
         let args = vec![
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Symbol("x".into()), Symbol("y".into())],
-            ),
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Symbol("w".into()), Symbol("z".into())],
-            ),
+            Expr::from_head("List", vec![Symbol("x".into()), Symbol("y".into())]),
+            Expr::from_head("List", vec![Symbol("w".into()), Symbol("z".into())]),
             Number(3.0),
         ];
         let result = eval_times(args, &mut Context::new()).unwrap();
         assert_eq!(
             result,
-            Head(
-                Box::new(Expr::Symbol("List".into())),
+            Expr::from_head(
+                "List",
                 vec![
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
+                    Expr::from_head(
+                        "Times",
                         vec![Number(3.0), Symbol("x".into()), Symbol("w".into())]
                     ),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
+                    Expr::from_head(
+                        "Times",
                         vec![Number(3.0), Symbol("x".into()), Symbol("z".into())]
                     ),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
+                    Expr::from_head(
+                        "Times",
                         vec![Number(3.0), Symbol("y".into()), Symbol("w".into())]
                     ),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
+                    Expr::from_head(
+                        "Times",
                         vec![Number(3.0), Symbol("y".into()), Symbol("z".into())]
                     ),
                 ],
@@ -382,36 +301,24 @@ mod tests {
         // 4 * {x, y} * {6, z} * 3
         let args = vec![
             Number(4.0),
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Symbol("x".into()), Symbol("y".into())],
-            ),
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Number(6.0), Symbol("z".into())],
-            ),
+            Expr::from_head("List", vec![Symbol("x".into()), Symbol("y".into())]),
+            Expr::from_head("List", vec![Number(6.0), Symbol("z".into())]),
             Number(3.0),
         ];
         let result = eval_times(args, &mut Context::new()).unwrap();
         assert_eq!(
             result,
-            Head(
-                Box::new(Expr::Symbol("List".into())),
+            Expr::from_head(
+                "List",
                 vec![
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
-                        vec![Number(72.0), Symbol("x".into())]
-                    ),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
+                    Expr::from_head("Times", vec![Number(72.0), Symbol("x".into())]),
+                    Expr::from_head(
+                        "Times",
                         vec![Number(12.0), Symbol("x".into()), Symbol("z".into())]
                     ),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
-                        vec![Number(72.0), Symbol("y".into()),]
-                    ),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
+                    Expr::from_head("Times", vec![Number(72.0), Symbol("y".into()),]),
+                    Expr::from_head(
+                        "Times",
                         vec![Number(12.0), Symbol("y".into()), Symbol("z".into())]
                     ),
                 ],
@@ -421,24 +328,18 @@ mod tests {
         // a * {x, y} * {w, z} * 3
         let args = vec![
             Symbol("a".into()),
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Symbol("x".into()), Symbol("y".into())],
-            ),
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Symbol("w".into()), Symbol("z".into())],
-            ),
+            Expr::from_head("List", vec![Symbol("x".into()), Symbol("y".into())]),
+            Expr::from_head("List", vec![Symbol("w".into()), Symbol("z".into())]),
             Number(3.0),
         ];
         let result = eval_times(args, &mut Context::new()).unwrap();
         assert_eq!(
             result,
-            Head(
-                Box::new(Expr::Symbol("List".into())),
+            Expr::from_head(
+                "List",
                 vec![
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
+                    Expr::from_head(
+                        "Times",
                         vec![
                             Number(3.0),
                             Symbol("a".into()),
@@ -446,8 +347,8 @@ mod tests {
                             Symbol("w".into())
                         ]
                     ),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
+                    Expr::from_head(
+                        "Times",
                         vec![
                             Number(3.0),
                             Symbol("a".into()),
@@ -455,8 +356,8 @@ mod tests {
                             Symbol("z".into())
                         ]
                     ),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
+                    Expr::from_head(
+                        "Times",
                         vec![
                             Number(3.0),
                             Symbol("a".into()),
@@ -464,8 +365,8 @@ mod tests {
                             Symbol("w".into())
                         ]
                     ),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
+                    Expr::from_head(
+                        "Times",
                         vec![
                             Number(3.0),
                             Symbol("a".into()),
@@ -484,59 +385,35 @@ mod tests {
 
         // {x, {a, b}} * {w, z}
         let args = vec![
-            Head(
-                Box::new(Expr::Symbol("List".into())),
+            Expr::from_head(
+                "List",
                 vec![
                     Symbol("x".into()),
-                    Head(
-                        Box::new(Expr::Symbol("List".into())),
-                        vec![Symbol("a".into()), Symbol("b".into())],
-                    ),
+                    Expr::from_head("List", vec![Symbol("a".into()), Symbol("b".into())]),
                 ],
             ),
-            Head(
-                Box::new(Expr::Symbol("List".into())),
-                vec![Symbol("w".into()), Symbol("z".into())],
-            ),
+            Expr::from_head("List", vec![Symbol("w".into()), Symbol("z".into())]),
         ];
         let result = eval_times(args, &mut Context::new()).unwrap();
         assert_eq!(
             result,
-            Head(
-                Box::new(Expr::Symbol("List".into())),
+            Expr::from_head(
+                "List",
                 vec![
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
-                        vec![Symbol("x".into()), Symbol("w".into())]
-                    ),
-                    Head(
-                        Box::new(Expr::Symbol("Times".into())),
-                        vec![Symbol("x".into()), Symbol("z".into())]
-                    ),
-                    Head(
-                        Box::new(Expr::Symbol("List".into())),
+                    Expr::from_head("Times", vec![Symbol("x".into()), Symbol("w".into())]),
+                    Expr::from_head("Times", vec![Symbol("x".into()), Symbol("z".into())]),
+                    Expr::from_head(
+                        "List",
                         vec![
-                            Head(
-                                Box::new(Expr::Symbol("Times".into())),
-                                vec![Symbol("a".into()), Symbol("w".into())]
-                            ),
-                            Head(
-                                Box::new(Expr::Symbol("Times".into())),
-                                vec![Symbol("b".into()), Symbol("w".into())]
-                            ),
+                            Expr::from_head("Times", vec![Symbol("a".into()), Symbol("w".into())]),
+                            Expr::from_head("Times", vec![Symbol("b".into()), Symbol("w".into())]),
                         ],
                     ),
-                    Head(
-                        Box::new(Expr::Symbol("List".into())),
+                    Expr::from_head(
+                        "List",
                         vec![
-                            Head(
-                                Box::new(Expr::Symbol("Times".into())),
-                                vec![Symbol("a".into()), Symbol("z".into())]
-                            ),
-                            Head(
-                                Box::new(Expr::Symbol("Times".into())),
-                                vec![Symbol("b".into()), Symbol("z".into())]
-                            ),
+                            Expr::from_head("Times", vec![Symbol("a".into()), Symbol("z".into())]),
+                            Expr::from_head("Times", vec![Symbol("b".into()), Symbol("z".into())]),
                         ],
                     )
                 ],

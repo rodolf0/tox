@@ -35,10 +35,7 @@ pub fn eval_sum(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
     });
     match sum {
         Ok(sum) => Ok(Expr::Number(sum)),
-        Err(Ok(_)) => Ok(Expr::Head(
-            Box::new(Expr::Symbol("Sum".into())),
-            vec![sum_expr, sum_args],
-        )),
+        Err(Ok(_)) => Ok(Expr::from_head("Sum", vec![sum_expr, sum_args])),
         Err(Err(e)) => Err(e),
     }
 }
@@ -60,17 +57,14 @@ mod tests {
         assert_eq!(eval(p(r#"Sum[x^2, {x, 2, 4}]"#)?)?, Expr::Number(29.0));
         assert_eq!(
             eval(p(r#"Sum[x^i, {i, 4}]"#)?)?,
-            Expr::Head(
-                Box::new(Expr::Symbol("Sum".into())),
+            Expr::from_head(
+                "Sum",
                 vec![
-                    Expr::Head(
-                        Box::new(Expr::Symbol("Power".into())),
-                        vec![Expr::Symbol("x".into()), Expr::Symbol("i".into()),]
+                    Expr::from_head(
+                        "Power",
+                        vec![Expr::Symbol("x".into()), Expr::Symbol("i".into())]
                     ),
-                    Expr::Head(
-                        Box::new(Expr::Symbol("List".into())),
-                        vec![Expr::Symbol("i".into()), Expr::Number(4.0)]
-                    )
+                    Expr::from_head("List", vec![Expr::Symbol("i".into()), Expr::Number(4.0)])
                 ]
             )
         );

@@ -75,8 +75,8 @@ pub fn eval_find_root(args: Vec<Expr>) -> Result<Expr, String> {
         } else {
             findroot::find_roots(f, x0)?
         };
-        return Ok(Expr::Head(
-            Box::new(Expr::Symbol("List".into())),
+        return Ok(Expr::from_head(
+            "List",
             roots.into_iter().map(|ri| Expr::Number(ri)).collect(),
         ));
     }
@@ -102,8 +102,8 @@ pub fn eval_find_root(args: Vec<Expr>) -> Result<Expr, String> {
         .collect();
 
     let roots = find_root_vec(funcs, vars.iter().map(|vi| vi.1).collect())?;
-    Ok(Expr::Head(
-        Box::new(Expr::Symbol("List".into())),
+    Ok(Expr::from_head(
+        "List",
         roots.into_iter().map(|ri| Expr::Number(ri)).collect(),
     ))
 }

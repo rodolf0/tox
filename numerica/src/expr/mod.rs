@@ -29,7 +29,11 @@ pub enum Expr {
     // Quantity(f64, Dimension),
 }
 
-// TODO: need shortcut for Expr::Head(Box::new(head), args)
+impl Expr {
+    pub fn from_head(head: &str, args: Vec<Expr>) -> Self {
+        Expr::Head(Box::new(Expr::Symbol(head.into())), args)
+    }
+}
 
 // Lowest number is highest precedence
 fn precedence(e: &Expr) -> usize {

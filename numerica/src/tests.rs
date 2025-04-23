@@ -38,3 +38,24 @@ fn set_delayed() -> Result<(), String> {
     assert_eq!(evaluate(p(r#"f"#)?, &mut ctx)?, Expr::Number(2.0));
     Ok(())
 }
+
+#[test]
+fn composite_expr() -> Result<(), String> {
+    let p = parser()?;
+    assert_eq!(
+        evaluate(
+            p(r#"ReplaceAll[Times, Rule[Times, Plus]][3, 4]"#)?,
+            &mut Context::new()
+        )?,
+        Expr::Number(7.0)
+    );
+    Ok(())
+}
+
+#[test]
+fn empty_arglist() -> Result<(), String> {
+    let p = parser()?;
+    let rand_num = evaluate(p(r#"NormalDist[0, 2][]"#)?, &mut Context::new())?;
+    assert!(matches!(rand_num, Expr::Number(_)));
+    Ok(())
+}

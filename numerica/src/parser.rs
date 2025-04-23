@@ -24,12 +24,14 @@ fn grammar_str() -> &'static str {
     primary := atom
             | '(' expr ')'
             | primary '[' arglist ']'
+            | primary '[' ']'
             ;
 
     atom := '"' string '"'
          | symbol
          | number
          | '{' arglist '}'
+         | '{' '}'
          ;
     "#
 }
@@ -102,6 +104,9 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         let arglist = pull!(T::Arglist, args.swap_remove(1));
         T::Expr(Box::new(T::Symbol("List".into())), arglist)
     });
+    evaler.action("atom -> { }", |_| {
+        T::Expr(Box::new(T::Symbol("List".into())), vec![])
+    });
 
     evaler.action("primary -> atom", |mut args| args.swap_remove(0));
     evaler.action("primary -> ( expr )", |mut args| args.swap_remove(1));
@@ -109,6 +114,10 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         let arglist = pull!(T::Arglist, args.swap_remove(2));
         let head = args.swap_remove(0);
         T::Expr(Box::new(head), arglist)
+    });
+    evaler.action("primary -> primary [ ]", |mut args| {
+        let head = args.swap_remove(0);
+        T::Expr(Box::new(head), vec![])
     });
 
     evaler.action("expr -> set", |mut args| args.swap_remove(0));

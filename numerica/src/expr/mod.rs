@@ -202,16 +202,16 @@ pub fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, Str
                 Ok(rhs)
             }
             "Gamma" => transcendental::eval_gamma(args, ctx),
-            "NormalDist" => eval_normal_dist(args, ctx),
+            "NormalDist" => eval_normal_dist(args),
             "Sin" => transcendental::eval_sin(args, ctx),
             "Cos" => transcendental::eval_cos(args, ctx),
             "Exp" => transcendental::eval_exp(args, ctx),
             "Table" => eval_table(args, ctx),
             "Evaluate" => todo!("This should walk the expression and remove the Hold heads"),
-            _ => todo!(),
+            _ => Err(format!("Non-callable head {}", head)),
         },
-
-        _ => Err(format!("Non-callable head {:?}", head)),
+        Expr::Distribution(d) => Ok(Expr::Number(d.sample())),
+        _ => Err(format!("Non-callable head {}", head)),
     }
 }
 
@@ -262,11 +262,5 @@ pub fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, Str
 //                 _ => Ok(Expr::Expr(head, args)),
 //             },
 //         },
-//         Expr::Symbol(ref sym) => match ctx.get(sym) {
-//             Some(expr_lookup) => Ok(eval_with_ctx_deprecated(expr_lookup, ctx)?),
-//             None => Ok(expr),
-//         },
-//         Expr::Distribution(d) => Ok(Expr::Number(d.sample())),
-//         _ => Ok(expr),
 //     }
 // }

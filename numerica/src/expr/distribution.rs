@@ -1,5 +1,4 @@
-use super::{Expr, evaluate};
-use crate::context::Context;
+use super::Expr;
 use rand_distr::Distribution;
 use std::rc::Rc;
 
@@ -18,14 +17,12 @@ impl Distr {
     }
 }
 
-pub fn eval_normal_dist(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
+pub fn eval_normal_dist(args: Vec<Expr>) -> Result<Expr, String> {
     let [mu, sigma]: [f64; 2] = args
         .into_iter()
-        // TODO: remove call to evaluate since by the wrapper evaluate should have already done so
-        .map(|a| match evaluate(a, ctx) {
-            Ok(Expr::Number(n)) => Ok(n),
-            Ok(other) => Err(format!("NormalDist params must be number. {:?}", other)),
-            Err(e) => Err(e),
+        .map(|a| match a {
+            Expr::Number(n) => Ok(n),
+            other => Err(format!("NormalDist params must be number. {:?}", other)),
         })
         .collect::<Result<Vec<_>, _>>()?
         .try_into()

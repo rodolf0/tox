@@ -1,55 +1,38 @@
-use super::{Expr, evaluate};
-use crate::context::Context;
+use super::Expr;
 
-pub fn eval_gamma(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
+fn apply_op(args: Vec<Expr>, op_name: &str, op: fn(f64) -> f64) -> Result<Expr, String> {
     let [arg]: [Expr; 1] = args
         .try_into()
         .map_err(|e| format!("Expected single arg. {:?}", e))?;
-    // TODO: arg is already evaluated (same for all others)
-    match evaluate(arg, ctx)? {
-        Expr::Number(n) => Ok(Expr::Number(crate::gamma(1.0 + n))),
-        other => Ok(Expr::Head(
-            Box::new(Expr::Symbol("Gamma".into())),
-            vec![other],
-        )),
+    match arg {
+        Expr::Number(n) => Ok(Expr::Number(op(n))),
+        // Handle list of args, apply op to each
+        Expr::Head(h, a) if *h == Expr::Symbol("List".into()) => {
+            let args = a
+                .into_iter()
+                .map(|x| match x {
+                    Expr::Number(n) => Expr::Number(op(n)),
+                    o => Expr::Head(Box::new(Expr::Symbol(op_name.into())), vec![o]),
+                })
+                .collect();
+            Ok(Expr::Head(Box::new(Expr::Symbol("List".into())), args))
+        }
+        o => Ok(Expr::Head(Box::new(Expr::Symbol(op_name.into())), vec![o])),
     }
 }
 
-pub fn eval_sin(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
-    let [arg]: [Expr; 1] = args
-        .try_into()
-        .map_err(|e| format!("Expected single arg. {:?}", e))?;
-    match evaluate(arg, ctx)? {
-        Expr::Number(n) => Ok(Expr::Number(n.sin())),
-        other => Ok(Expr::Head(
-            Box::new(Expr::Symbol("Sin".into())),
-            vec![other],
-        )),
-    }
+pub(crate) fn eval_gamma(args: Vec<Expr>) -> Result<Expr, String> {
+    apply_op(args, "Gamma", |x| crate::gamma(1.0 + x))
 }
 
-pub fn eval_cos(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
-    let [arg]: [Expr; 1] = args
-        .try_into()
-        .map_err(|e| format!("Expected single arg. {:?}", e))?;
-    match evaluate(arg, ctx)? {
-        Expr::Number(n) => Ok(Expr::Number(n.cos())),
-        other => Ok(Expr::Head(
-            Box::new(Expr::Symbol("Cos".into())),
-            vec![other],
-        )),
-    }
+pub(crate) fn eval_sin(args: Vec<Expr>) -> Result<Expr, String> {
+    apply_op(args, "Sin", |x| x.sin())
 }
 
-pub fn eval_exp(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
-    let [arg]: [Expr; 1] = args
-        .try_into()
-        .map_err(|e| format!("Expected single arg. {:?}", e))?;
-    match evaluate(arg, ctx)? {
-        Expr::Number(n) => Ok(Expr::Number(n.exp())),
-        other => Ok(Expr::Head(
-            Box::new(Expr::Symbol("Exp".into())),
-            vec![other],
-        )),
-    }
+pub(crate) fn eval_cos(args: Vec<Expr>) -> Result<Expr, String> {
+    apply_op(args, "Cos", |x| x.cos())
+}
+
+pub(crate) fn eval_exp(args: Vec<Expr>) -> Result<Expr, String> {
+    apply_op(args, "Exp", |x| x.exp())
 }

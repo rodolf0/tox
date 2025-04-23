@@ -200,11 +200,11 @@ pub fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, Str
                 ctx.set(lhs, rhs.clone());
                 Ok(rhs)
             }
-            "Gamma" => transcendental::eval_gamma(args, ctx),
+            "Gamma" => transcendental::eval_gamma(args),
             "NormalDist" => eval_normal_dist(args),
-            "Sin" => transcendental::eval_sin(args, ctx),
-            "Cos" => transcendental::eval_cos(args, ctx),
-            "Exp" => transcendental::eval_exp(args, ctx),
+            "Sin" => transcendental::eval_sin(args),
+            "Cos" => transcendental::eval_cos(args),
+            "Exp" => transcendental::eval_exp(args),
             "Table" => eval_table(args, ctx),
             "Evaluate" => todo!("This should walk the expression and remove the Hold heads"),
             _ => Err(format!("Non-callable head {}", head)),

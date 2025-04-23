@@ -162,7 +162,7 @@ mod tests {
             eval(expr)?,
             Expr::Head(
                 Box::new(Expr::Symbol("Times".into())),
-                vec![Expr::Number(3.0), Expr::Symbol("x".to_string())]
+                vec![Expr::Number(3.0), Expr::Symbol("x".into())]
             )
         );
         Ok(())
@@ -182,7 +182,7 @@ mod tests {
             eval(expr)?,
             Expr::Head(
                 Box::new(Expr::Symbol("Plus".into())),
-                vec![Expr::Number(3.0), Expr::Symbol("x".to_string())]
+                vec![Expr::Number(3.0), Expr::Symbol("x".into())]
             )
         );
         Ok(())
@@ -195,13 +195,10 @@ mod tests {
             eval(p(r#"x /. x -> z -> 3"#)?)?,
             Expr::Head(
                 Box::new(Expr::Symbol("Rule".into())),
-                vec![Expr::Symbol("z".to_string()), Expr::Number(3.0)]
+                vec![Expr::Symbol("z".into()), Expr::Number(3.0)]
             )
         );
-        assert_eq!(
-            eval(p(r#"x /. z -> x -> 3"#)?)?,
-            Expr::Symbol("x".to_string())
-        );
+        assert_eq!(eval(p(r#"x /. z -> x -> 3"#)?)?, Expr::Symbol("x".into()));
         Ok(())
     }
 
@@ -212,21 +209,21 @@ mod tests {
             eval(p(r#"x + y /. x -> 2"#)?)?,
             Expr::Head(
                 Box::new(Expr::Symbol("Plus".into())),
-                vec![Expr::Number(2.0), Expr::Symbol("y".to_string())]
+                vec![Expr::Number(2.0), Expr::Symbol("y".into())]
             )
         );
         assert_eq!(
             eval(p(r#"x + y /. x -> z /. z -> 3"#)?)?,
             Expr::Head(
                 Box::new(Expr::Symbol("Plus".into())),
-                vec![Expr::Number(3.0), Expr::Symbol("y".to_string())]
+                vec![Expr::Number(3.0), Expr::Symbol("y".into())]
             )
         );
         assert_eq!(
             eval(p(r#"x + y /. z -> 3 /. x -> z"#)?)?,
             Expr::Head(
                 Box::new(Expr::Symbol("Plus".into())),
-                vec![Expr::Symbol("z".to_string()), Expr::Symbol("y".to_string())]
+                vec![Expr::Symbol("z".into()), Expr::Symbol("y".into())]
             )
         );
         Ok(())

@@ -31,7 +31,7 @@ fn set_delayed() -> Result<(), String> {
         evaluate(p(r#"f := x + 1"#)?, &mut ctx)?,
         Expr::Head(
             Box::new(Expr::Symbol("Plus".into())),
-            vec![Expr::Symbol("x".to_string()), Expr::Number(1.0)]
+            vec![Expr::Symbol("x".into()), Expr::Number(1.0)]
         )
     );
     assert_eq!(evaluate(p(r#"g = x + 1"#)?, &mut ctx)?, Expr::Number(2.0));

@@ -18,10 +18,7 @@ fn parse_sum_args(sum_args: &Expr) -> Result<(String, i32, i32), String> {
 // Replace the variable with a given value in the sum expression
 fn render_sum(sum: &Expr, var: &str, val: i32) -> Result<Expr, String> {
     use super::Expr::*;
-    replace_all(
-        sum.clone(),
-        &[(Symbol(var.to_string()), Number(val as f64))],
-    )
+    replace_all(sum.clone(), &[(Symbol(var.into()), Number(val as f64))])
 }
 
 pub fn eval_sum(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
@@ -68,11 +65,11 @@ mod tests {
                 vec![
                     Expr::Head(
                         Box::new(Expr::Symbol("Power".into())),
-                        vec![Expr::Symbol("x".to_string()), Expr::Symbol("i".to_string()),]
+                        vec![Expr::Symbol("x".into()), Expr::Symbol("i".into()),]
                     ),
                     Expr::Head(
                         Box::new(Expr::Symbol("List".into())),
-                        vec![Expr::Symbol("i".to_string()), Expr::Number(4.0)]
+                        vec![Expr::Symbol("i".into()), Expr::Number(4.0)]
                     )
                 ]
             )

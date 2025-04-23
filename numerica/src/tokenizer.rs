@@ -20,29 +20,29 @@ impl<I: Iterator<Item = char>> Tokenizer<I> {
             Some('/') => match self.input.peek() {
                 Some('.') => {
                     self.input.next();
-                    Ok(Some("/.".to_string()))
+                    Ok(Some("/.".into()))
                 }
-                _ => Ok(Some("/".to_string())),
+                _ => Ok(Some("/".into())),
             },
             // Rule operator, or Minus
             Some('-') => match self.input.peek() {
                 Some('>') => {
                     self.input.next();
-                    Ok(Some("->".to_string()))
+                    Ok(Some("->".into()))
                 }
-                _ => Ok(Some("-".to_string())),
+                _ => Ok(Some("-".into())),
             },
             // Various single char tokens.
-            Some(x) if "[]{}(),+*^!".contains(x) => Ok(Some(x.to_string())),
+            Some(x) if "[]{}(),+*^!".contains(x) => Ok(Some(x.into())),
             // Assignment operator.
             Some(':') => match self.input.next() {
-                Some('=') => Ok(Some(":=".to_string())),
-                _ => Err("Incomplete := operator".to_string()),
+                Some('=') => Ok(Some(":=".into())),
+                _ => Err("Incomplete := operator".into()),
             },
-            Some('=') => Ok(Some("=".to_string())),
+            Some('=') => Ok(Some("=".into())),
             // Tokenize Strings checking for escapes.
             Some(open) if open == '"' || open == '\'' => {
-                self.buff.push(open.to_string());
+                self.buff.push(open.into());
                 let mut quoted_string = String::new();
                 let mut escaped = false;
                 while let Some(ch) = self.input.next() {
@@ -57,13 +57,13 @@ impl<I: Iterator<Item = char>> Tokenizer<I> {
                     // Found close token. Check it wasn't escaped.
                     if !escaped && open == ch {
                         self.buff.push(quoted_string);
-                        self.buff.push(ch.to_string());
+                        self.buff.push(ch.into());
                         return self.next_result();
                     }
                     quoted_string.push(ch);
                     escaped = false;
                 }
-                Err("Unfinished string missing close quote".to_string())
+                Err("Unfinished string missing close quote".into())
             }
             // Swallow comments until EOL.
             Some('#') => {

@@ -65,7 +65,7 @@ fn join_args(e: &Expr, sep: &str) -> String {
     args.iter()
         .map(|a| {
             if parent_p < precedence(a) {
-                format!("({})", a.to_string())
+                format!("({})", a)
             } else {
                 a.to_string()
             }

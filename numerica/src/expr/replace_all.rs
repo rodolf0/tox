@@ -1,31 +1,11 @@
 use super::Expr;
 use crate::context::Context;
 
-pub(crate) fn eval_replace_all(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
-    // Just check that we're not invoking ReplaceAll with a different expr
-    assert!(matches!(&expr, Expr::Head(h, _) if h.as_ref() == &Expr::Symbol("ReplaceAll".into())));
-
-    // Eval of replace_all is outside of eval because evaluation of expr is deferred
-    // TODO: if the above assert stays, then simplify this match below
-    match expr {
-        Expr::Head(head, args) if *head == Expr::Symbol("ReplaceAll".into()) => {
-            let [expr, rules]: [Expr; 2] = args
-                .try_into()
-                .map_err(|e| format!("ReplaceAll must have 2 arguments. {:?}", e))?;
-            // TODO: is this already evaluated ? Leave it commented in case we want to rollback
-            // We need a test to discard this scenario
-            // evaluate(
-            //     replace_all(
-            //         // Nested evaluation of replace_all without eval of expr
-            //         eval_replace_all(expr, ctx)?,
-            //         unpack_rules(rules, ctx)?.as_slice(),
-            //     )?,
-            //     ctx,
-            // )
-            replace_all(expr, unpack_rules(rules, ctx)?.as_slice())
-        }
-        other => Ok(other),
-    }
+pub(crate) fn eval_replace_all(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
+    let [expr, rules]: [Expr; 2] = args
+        .try_into()
+        .map_err(|e| format!("ReplaceAll must have 2 arguments. {:?}", e))?;
+    replace_all(expr, unpack_rules(rules, ctx)?.as_slice())
 }
 
 // ReplaceAll[x, Rule[x, 3]]

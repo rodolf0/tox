@@ -8,7 +8,6 @@ mod transcendental;
 
 use distribution::{Distr, eval_normal_dist};
 use find_root::eval_find_root;
-use replace_all::eval_replace_all;
 use table::eval_table;
 use times::eval_times;
 
@@ -148,7 +147,7 @@ pub fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, Str
             "Rule" | "RuleDelayed" => Ok(Expr::Head(Box::new(head), args)),
             "ReplaceAll" => {
                 // ReplaceAll execution will do the rewrites.
-                let replaced = eval_replace_all(Expr::Head(Box::new(head), args), ctx)?;
+                let replaced = replace_all::eval_replace_all(args, ctx)?;
                 // However the result may furhter need an evaluation.
                 // Eg.  Sin[x] /. x -> 3  (* gives Sin[3] *) which we want a number for
                 // NOTE: this could live in evaluate. Calling it here is an exceptional case !

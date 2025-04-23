@@ -154,23 +154,27 @@ pub fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, Str
                 evaluate(replaced, ctx)
             }
             "Plus" => {
-                // Flatten operations that are commutative and associative
-                let mut numeric: Option<f64> = None;
-                let mut new_args = Vec::new();
-                for arg in args {
-                    // TODO: remove evaluate since it is already called in the wrapper evaluate
-                    match evaluate(arg, ctx)? {
-                        Expr::Number(n) => *numeric.get_or_insert(0.0) += n,
-                        o => new_args.push(o),
-                    }
+                let numeric: f64 = args
+                    .iter()
+                    .map(|arg| match arg {
+                        Expr::Number(n) => *n,
+                        _ => 0.0,
+                    })
+                    .sum();
+                let mut symbolic: Vec<Expr> = args
+                    .into_iter()
+                    .filter_map(|arg| match arg {
+                        Expr::Number(_) => None,
+                        o => Some(o),
+                    })
+                    .collect();
+                if numeric != 0.0 {
+                    symbolic.insert(0, Expr::Number(numeric));
                 }
-                if numeric.is_some_and(|n| n != 0.0) || new_args.len() == 0 {
-                    new_args.insert(0, Expr::Number(*numeric.get_or_insert(0.0)));
-                }
-                if new_args.len() == 1 {
-                    Ok(new_args.swap_remove(0))
+                if symbolic.len() == 1 {
+                    Ok(symbolic.swap_remove(0))
                 } else {
-                    Ok(Expr::Head(Box::new(head), new_args))
+                    Ok(Expr::Head(Box::new(head), symbolic))
                 }
             }
             "Times" => eval_times(args, ctx),

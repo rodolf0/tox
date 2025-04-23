@@ -88,6 +88,7 @@ mod tests {
         use crate::parser::parser;
         evaluate(parser()?(expr)?, &mut Context::new())
     }
+
     #[test]
     fn table() -> Result<(), String> {
         assert_eq!(

@@ -24,6 +24,7 @@ pub enum Expr {
     Bool(bool),
     String(String),
     Distribution(Rc<Distr>),
+    Function(Vec<String>, Box<Expr>),
     // DateTime(DateTime<Utc>),
     // Matrix(Matrix),
     // Quantity(f64, Dimension),
@@ -109,13 +110,7 @@ pub fn evaluate(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
             let head = evaluate(*head, ctx)?;
             // Evaluate arguments (unless holding)
             let args = match head {
-                Expr::Symbol(ref h) if h == "Rule" => {
-                    let [lhs, rhs]: [Expr; 2] = args
-                        .try_into()
-                        .map_err(|e| format!("Rule must have 2 arguments. {:?}", e))?;
-                    // Rule RHS is evaluated before being stored (as opposed to RuleDelayed)
-                    vec![lhs, evaluate(rhs, ctx)?]
-                }
+                Expr::Symbol(ref h) if h == "SetDelayed" => args, // skip eval of LHS, RHS
                 Expr::Symbol(ref h) if h == "Set" => {
                     let [lhs, rhs]: [Expr; 2] = args
                         .try_into()
@@ -123,7 +118,21 @@ pub fn evaluate(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                     // skip eval of LHS, but RHS should be evaluated
                     vec![lhs, evaluate(rhs, ctx)?]
                 }
-                Expr::Symbol(ref h) if h == "SetDelayed" => args, // skip eval of LHS, RHS
+                Expr::Symbol(ref h) if h == "Rule" => {
+                    let [lhs, rhs]: [Expr; 2] = args
+                        .try_into()
+                        .map_err(|e| format!("Rule must have 2 arguments. {:?}", e))?;
+                    // Rule RHS is evaluated before being stored (as opposed to RuleDelayed)
+                    vec![lhs, evaluate(rhs, ctx)?]
+                }
+                Expr::Symbol(ref h) if h == "Function" => {
+                    // TODO: allow for no-arg functions
+                    let [params, body]: [Expr; 2] = args
+                        .try_into()
+                        .map_err(|e| format!("Function must have 2 arguments. {:?}", e))?;
+                    // RHS (body) of Function is evaluated when defined
+                    vec![params, evaluate(body, ctx)?]
+                }
                 Expr::Symbol(ref h) if h == "Hold" => args,
                 _ => args
                     .into_iter()
@@ -137,6 +146,7 @@ pub fn evaluate(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
             Some(value) => Ok(evaluate(value, ctx)?),
             None => Ok(expr),
         },
+        // TODO: should Distribution just return Ok(expr) like a primitive ?
         Expr::Distribution(d) => Ok(Expr::Number(d.sample())),
         _ => Ok(expr), // Primitive values don't require further evaluation.
     }
@@ -158,6 +168,7 @@ pub fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, Str
                 evaluate(replaced, ctx)
             }
             "Plus" => {
+                // TODO: apply this reduction idea to other ops
                 let numeric: f64 = args
                     .iter()
                     .map(|arg| match arg {
@@ -214,60 +225,43 @@ pub fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, Str
             "Cos" => transcendental::eval_cos(args),
             "Exp" => transcendental::eval_exp(args),
             "Table" => eval_table(args, ctx),
+            "Function" => {
+                let [params, body]: [Expr; 2] = args
+                    .try_into()
+                    .map_err(|e| format!("Function must have params and body. {:?}", e))?;
+                let params = match params {
+                    Expr::Symbol(sym) => Ok(vec![sym]),
+                    Expr::Head(h, syms) if *h == Expr::Symbol("List".into()) => syms
+                        .into_iter()
+                        .map(|s| match s {
+                            Expr::Symbol(sym) => Ok(sym),
+                            _ => Err(format!("Function params must be symbols: {}", s)),
+                        })
+                        .collect(),
+                    o => Err(format!("Function params must be symbols: {}", o)),
+                }?;
+                Ok(Expr::Function(params, Box::new(body)))
+            }
             "Evaluate" => todo!("This should walk the expression and remove the Hold heads"),
             _ => Err(format!("Non-callable head {}", head)),
         },
         Expr::Distribution(d) => Ok(Expr::Number(d.sample())),
+        Expr::Function(params, body) => {
+            if params.len() != args.len() {
+                return Err(format!(
+                    "Function expected {} args but got {}",
+                    params.len(),
+                    args.len()
+                ));
+            }
+            // TODO: child context
+            let mut f_ctx = Context::new();
+            for (p, a) in params.into_iter().zip(args) {
+                f_ctx.set(p, a);
+            }
+            // or apply ?
+            evaluate(*body, &mut f_ctx)
+        }
         _ => Err(format!("Non-callable head {}", head)),
     }
 }
-
-// pub fn eval_with_ctx_deprecated(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
-//     dbg!(&expr);
-//     match expr {
-//         Expr::Expr(head, args) => match head.as_ref() {
-//             "Evaluate" => {
-//                 let [arg]: [Expr; 1] = args
-//                     .try_into()
-//                     .map_err(|e| format!("Evaluate expects single arg. {:?}", e))?;
-//                 let rules = vec![(
-//                     Expr::Symbol("Hold".to_string()),
-//                     Expr::Symbol("Evaluate".to_string()),
-//                 )];
-//                 // TODO: this is a bit of a hack, should replace only heads
-//                 eval_with_ctx_deprecated(replace_all(arg, &rules)?, ctx)
-//             }
-//             "Function" => Ok(Expr::Expr(head, args)), // Unapplied function evalutes to self
-
-//             otherhead => match ctx.get(otherhead) {
-//                 Some(Expr::Expr(h, function_args)) if h == "Function" => {
-//                     // Destructure Function[{params}, body]]
-//                     let [params, body]: [Expr; 2] = function_args
-//                         .try_into()
-//                         .map_err(|e| format!("Function must have params and body. {:?}", e))?;
-//                     // Evaluate function call inputs
-//                     let evaled_args: Vec<_> = args
-//                         .into_iter()
-//                         .map(|ai| eval_with_ctx_deprecated(ai, ctx))
-//                         .collect::<Result<_, _>>()?;
-//                     // Bind params to current values passed as args to this call
-//                     let bindings: Vec<_> = match params {
-//                         sym @ Expr::Symbol(_) => [sym].into_iter().zip(evaled_args).collect(),
-//                         Expr::Expr(h, syms) if h == "List" => {
-//                             if !syms.iter().all(|s| matches!(s, Expr::Symbol(_))) {
-//                                 return Err(format!("Function params must be symbols: {:?}", syms));
-//                             }
-//                             syms.into_iter().zip(evaled_args).collect()
-//                         }
-//                         other => {
-//                             return Err(format!("Function params must be symbols: {}", other));
-//                         }
-//                     };
-//                     // Replace instances of function parameters in the callable and evaluate function
-//                     eval_with_ctx_deprecated(replace_all(body, &bindings)?, ctx)
-//                 }
-//                 _ => Ok(Expr::Expr(head, args)),
-//             },
-//         },
-//     }
-// }

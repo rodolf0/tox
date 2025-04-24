@@ -9,14 +9,6 @@ pub use expr::evaluate;
 mod parser;
 pub use parser::parser;
 
-fn gamma(x: f64) -> f64 {
-    #[link(name = "m")]
-    unsafe extern "C" {
-        fn tgamma(x: f64) -> f64;
-    }
-    unsafe { tgamma(x) }
-}
-
 mod findroot;
 pub use findroot::{
     bisection, explore_domain, find_root_vec, find_roots, gauss_seidel, newton_raphson, nsolve,

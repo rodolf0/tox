@@ -194,16 +194,13 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
     evaler.action("arith_pow -> arith_fac", |mut args| args.swap_remove(0));
 
     evaler.action("arith_fac -> arith_fac !", |mut args| {
-        match args.swap_remove(0) {
-            T::Number(n) => T::Number(crate::gamma(1.0 + n)),
-            other => T::Expr(
-                Box::new(T::Symbol("Gamma".into())),
-                vec![T::Expr(
-                    Box::new(T::Symbol("Plus".into())),
-                    vec![T::Number(1.0), other],
-                )],
-            ),
-        }
+        T::Expr(
+            Box::new(T::Symbol("Gamma".into())),
+            vec![T::Expr(
+                Box::new(T::Symbol("Plus".into())),
+                vec![T::Number(1.0), args.swap_remove(0)],
+            )],
+        )
     });
     evaler.action("arith_fac -> primary", |mut args| args.swap_remove(0));
 

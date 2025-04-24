@@ -21,8 +21,16 @@ fn apply_op(args: Vec<Expr>, op_name: &str, op: fn(f64) -> f64) -> Result<Expr, 
     }
 }
 
+fn gamma(x: f64) -> f64 {
+    #[link(name = "m")]
+    unsafe extern "C" {
+        fn tgamma(x: f64) -> f64;
+    }
+    unsafe { tgamma(x) }
+}
+
 pub(crate) fn eval_gamma(args: Vec<Expr>) -> Result<Expr, String> {
-    apply_op(args, "Gamma", |x| crate::gamma(1.0 + x))
+    apply_op(args, "Gamma", gamma)
 }
 
 pub(crate) fn eval_sin(args: Vec<Expr>) -> Result<Expr, String> {

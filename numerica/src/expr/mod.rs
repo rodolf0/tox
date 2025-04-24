@@ -125,14 +125,8 @@ pub fn evaluate(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                     // Rule RHS is evaluated before being stored (as opposed to RuleDelayed)
                     vec![lhs, evaluate(rhs, ctx)?]
                 }
-                Expr::Symbol(ref h) if h == "Function" => {
-                    // TODO: allow for no-arg functions
-                    let [params, body]: [Expr; 2] = args
-                        .try_into()
-                        .map_err(|e| format!("Function must have 2 arguments. {:?}", e))?;
-                    // RHS (body) of Function is evaluated when defined
-                    vec![params, evaluate(body, ctx)?]
-                }
+                // Mathematica's Function has HoldAll attribute. Body is evaluated at runtime.
+                Expr::Symbol(ref h) if h == "Function" => args,
                 Expr::Symbol(ref h) if h == "Hold" => args,
                 _ => args
                     .into_iter()
@@ -143,7 +137,7 @@ pub fn evaluate(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
             apply(head, args, ctx)
         }
         Expr::Symbol(ref sym) => match ctx.get(sym) {
-            Some(value) => Ok(evaluate(value, ctx)?),
+            Some(value) => evaluate(value, ctx),
             None => Ok(expr),
         },
         _ => Ok(expr), // Primitive values don't require further evaluation.
@@ -252,12 +246,11 @@ pub fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, Str
                     args.len()
                 ));
             }
-            // TODO: child context
-            let mut f_ctx = Context::new();
+            // Create a new context scoped for the function call
+            let mut f_ctx = ctx.extend();
             for (p, a) in params.into_iter().zip(args) {
                 f_ctx.set(p, a);
             }
-            // or apply ?
             evaluate(*body, &mut f_ctx)
         }
         _ => Err(format!("Non-callable head {}", head)),

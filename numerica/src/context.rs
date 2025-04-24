@@ -3,19 +3,27 @@ use crate::expr::Expr;
 use std::collections::HashMap;
 
 pub struct Context {
-    c: HashMap<String, Expr>,
+    bindings: HashMap<String, Expr>,
 }
 
 impl Context {
     pub fn new() -> Self {
-        Self { c: HashMap::new() }
+        Self {
+            bindings: HashMap::new(),
+        }
+    }
+
+    pub fn extend(&self) -> Self {
+        Self {
+            bindings: self.bindings.clone(),
+        }
     }
 
     pub fn set(&mut self, sym: String, expr: Expr) {
-        self.c.insert(sym, expr);
+        self.bindings.insert(sym, expr);
     }
 
     pub fn get(&self, sym: &str) -> Option<Expr> {
-        self.c.get(sym).cloned()
+        self.bindings.get(sym).cloned()
     }
 }

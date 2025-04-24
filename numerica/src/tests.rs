@@ -70,8 +70,7 @@ fn functions() -> Result<(), String> {
             vec!["y".into()],
             Box::new(Expr::from_head(
                 "Times",
-                // Expect reversal of y * 2 because body is evaled
-                vec![Expr::Number(2.0), Expr::Symbol("y".into())]
+                vec![Expr::Symbol("y".into()), Expr::Number(2.0)]
             ))
         )
     );

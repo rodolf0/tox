@@ -2,7 +2,7 @@ use super::replace_all::replace_all;
 use super::{Expr, evaluate};
 use crate::context::Context;
 
-pub fn eval_table(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
+pub(crate) fn eval_table(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
     // first arg is the expression that will be evaluated for each table element
     let expr = args.remove(0);
     // Figure out iteration dimensions

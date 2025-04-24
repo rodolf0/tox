@@ -3,7 +3,7 @@ use super::{Expr, evaluate};
 use crate::context::Context;
 use crate::{find_root_vec, findroot};
 
-pub fn eval_find_root(args: Vec<Expr>) -> Result<Expr, String> {
+pub(crate) fn eval_find_root(args: Vec<Expr>) -> Result<Expr, String> {
     let [fexpr, varspec]: [Expr; 2] = args
         .try_into()
         .map_err(|e| format!("FindRoot must have 2 arguments. {:?}", e))?;

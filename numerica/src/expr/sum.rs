@@ -21,7 +21,7 @@ fn render_sum(sum: &Expr, var: &str, val: i32) -> Result<Expr, String> {
     replace_all(sum.clone(), &[(Symbol(var.into()), Number(val as f64))])
 }
 
-pub fn eval_sum(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
+pub(crate) fn eval_sum(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
     let [sum_expr, sum_args]: [Expr; 2] = args
         .try_into()
         .map_err(|e| format!("Sum expected: {{expr, args}}. Got {:?}", e))?;

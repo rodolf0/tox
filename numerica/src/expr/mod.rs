@@ -8,12 +8,6 @@ mod table;
 mod times;
 mod transcendental;
 
-// TODO: just reference the module instead of these 'use' statements
-use distribution::Distr;
-use find_root::eval_find_root;
-use table::eval_table;
-use times::eval_times;
-
 use core::fmt;
 use std::rc::Rc;
 
@@ -26,7 +20,7 @@ pub enum Expr {
     Number(f64),
     Bool(bool),
     String(String),
-    Distribution(Rc<Distr>),
+    Distribution(Rc<distribution::Distr>),
     Function(Vec<String>, Box<Expr>),
     // DateTime(DateTime<Utc>),
     // Matrix(Matrix),
@@ -189,7 +183,7 @@ fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String>
                     Ok(Expr::Head(Box::new(head), symbolic))
                 }
             }
-            "Times" => eval_times(args, ctx),
+            "Times" => times::eval_times(args, ctx),
             "Minus" | "Power" | "Divide" => {
                 let [lhs, rhs]: [Expr; 2] = args
                     .try_into()
@@ -204,7 +198,7 @@ fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String>
                     (lhs, rhs) => Expr::Head(Box::new(head), vec![lhs, rhs]),
                 })
             }
-            "FindRoot" => eval_find_root(args),
+            "FindRoot" => find_root::eval_find_root(args),
             "Sum" => sum::eval_sum(args, ctx),
             "SetDelayed" | "Set" => {
                 let [lhs, rhs]: [Expr; 2] = args
@@ -223,7 +217,7 @@ fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String>
             "Sin" => transcendental::eval_sin(args),
             "Cos" => transcendental::eval_cos(args),
             "Exp" => transcendental::eval_exp(args),
-            "Table" => eval_table(args, ctx),
+            "Table" => table::eval_table(args, ctx),
             "Function" => {
                 let [params, body]: [Expr; 2] = args
                     .try_into()

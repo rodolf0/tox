@@ -52,9 +52,9 @@ fn precedence(e: &Expr) -> usize {
                     "Power" => 50,
                     "Unsure" => 55,
                     "Divide" => 60,
-                    "Times" => 65,
+                    "Times" => 60,
                     "Plus" => 70,
-                    "Minus" => 75,
+                    "Minus" => 70,
                     _ => 1000,
                 }
             } else {
@@ -93,6 +93,7 @@ impl fmt::Display for Expr {
                 };
                 match head_name.as_ref() {
                     "Plus" => write!(f, "{}", join_args(self, " + ")),
+                    "Unsure" => write!(f, "{}", join_args(self, "~")),
                     "Times" => write!(f, "{}", join_args(self, " * ")),
                     "Minus" => write!(f, "{}", join_args(self, " - ")),
                     "Divide" => write!(f, "{}", join_args(self, " / ")),
@@ -217,6 +218,8 @@ fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String>
             }
             "Gamma" => transcendental::eval_gamma(args),
             "NormalDist" => distribution::eval_normal_dist(args),
+            "BetaDist" => distribution::eval_beta_dist(args),
+            "PoissonDist" => distribution::eval_poisson_dist(args),
             "Sin" => transcendental::eval_sin(args),
             "Cos" => transcendental::eval_cos(args),
             "Exp" => transcendental::eval_exp(args),

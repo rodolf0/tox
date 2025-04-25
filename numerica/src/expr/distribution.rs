@@ -7,6 +7,7 @@ use std::rc::Rc;
 pub enum Distr {
     Normal(rand_distr::Normal<f64>),
     Poisson(rand_distr::Poisson<f64>),
+    Beta(rand_distr::Beta<f64>),
 }
 
 impl Distr {
@@ -14,6 +15,7 @@ impl Distr {
         match self {
             Distr::Normal(d) => d.sample(&mut rand::rng()),
             Distr::Poisson(d) => d.sample(&mut rand::rng()),
+            Distr::Beta(d) => d.sample(&mut rand::rng()),
         }
     }
 }
@@ -30,6 +32,36 @@ pub(crate) fn eval_normal_dist(args: Vec<Expr>) -> Result<Expr, String> {
         .map_err(|e| format!("NormalDist error: {:?}", e))?;
     Ok(Expr::Distribution(Rc::new(Distr::Normal(
         rand_distr::Normal::new(mu, sigma).map_err(|e| e.to_string())?,
+    ))))
+}
+
+pub(crate) fn eval_beta_dist(args: Vec<Expr>) -> Result<Expr, String> {
+    let [alpha, beta]: [f64; 2] = args
+        .into_iter()
+        .map(|a| match a {
+            Expr::Number(n) => Ok(n),
+            other => Err(format!("BetaDist params must be number. {:?}", other)),
+        })
+        .collect::<Result<Vec<_>, _>>()?
+        .try_into()
+        .map_err(|e| format!("BetaDist error: {:?}", e))?;
+    Ok(Expr::Distribution(Rc::new(Distr::Beta(
+        rand_distr::Beta::new(alpha, beta).map_err(|e| e.to_string())?,
+    ))))
+}
+
+pub(crate) fn eval_poisson_dist(args: Vec<Expr>) -> Result<Expr, String> {
+    let [lambda]: [f64; 1] = args
+        .into_iter()
+        .map(|a| match a {
+            Expr::Number(n) => Ok(n),
+            other => Err(format!("PoissonDist params must be number. {:?}", other)),
+        })
+        .collect::<Result<Vec<_>, _>>()?
+        .try_into()
+        .map_err(|e| format!("PoissonDist error: {:?}", e))?;
+    Ok(Expr::Distribution(Rc::new(Distr::Poisson(
+        rand_distr::Poisson::new(lambda).map_err(|e| e.to_string())?,
     ))))
 }
 
@@ -88,26 +120,18 @@ pub(crate) fn eval_histogram(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr,
     // expr has already been evaluated, here we pick samples from nested
     // distributions and then re-evaluate expr with concrete values.
     let samples = (0..nsamples as u32)
-        .map(|_| crate::evaluate(sample_expr(&expr), ctx))
+        .map(|_| match crate::evaluate(sample_expr(&expr), ctx) {
+            Ok(Expr::Number(n)) => Ok(n),
+            o => Err(format!("Histogram samples must be numbers. Got {:?}", o)),
+        })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let mut max = f64::MIN;
-    let mut min = f64::MAX;
-    for sample in &samples {
-        match sample {
-            Expr::Number(n) => {
-                max = max.max(*n);
-                min = min.min(*n);
-            }
-            _ => return Err(format!("Histogram samples must be numbers.")),
-        }
-    }
+    let max = samples.iter().cloned().reduce(f64::max).unwrap_or(f64::MIN);
+    let min = samples.iter().cloned().reduce(f64::min).unwrap_or(f64::MAX);
+
     let bucket_width = (max - min) / nbuckets;
     let mut histogram = vec![0.0; nbuckets as usize];
     for sample in &samples {
-        let Expr::Number(sample) = sample else {
-            unreachable!()
-        };
         let idx = ((sample - min) / bucket_width) as usize;
         let idx = idx.min(histogram.len() - 1);
         histogram[idx] += 1.0;

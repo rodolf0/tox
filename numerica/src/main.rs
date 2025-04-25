@@ -12,7 +12,9 @@ fn main() -> Result<(), String> {
                 let mut ctx = numerica::Context::new();
                 let r = numerica::evaluate(expr, &mut ctx)?;
                 if numerica::is_stochastic(&r) {
-                    let _ = plot::plot_histogram(&r, &mut ctx);
+                    if let Err(_) = plot::plot_histogram(&r, &mut ctx) {
+                        println!("{}", r);
+                    }
                 } else {
                     println!("{}", r);
                 };
@@ -34,7 +36,17 @@ fn main() -> Result<(), String> {
                     let _ = rl.add_history_entry(&line);
                     match numerica::evaluate(expr, &mut ctx) {
                         Err(e) => println!("Eval err: {:?}", e),
-                        Ok(expr) => println!("{}", expr),
+                        Ok(expr) => {
+                            let mut ctx = numerica::Context::new();
+                            let r = numerica::evaluate(expr, &mut ctx)?;
+                            if numerica::is_stochastic(&r) {
+                                if let Err(_) = plot::plot_histogram(&r, &mut ctx) {
+                                    println!("{}", r);
+                                }
+                            } else {
+                                println!("{}", r);
+                            };
+                        }
                     }
                 }
             },

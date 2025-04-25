@@ -1,4 +1,6 @@
 mod distribution;
+pub use distribution::is_stochastic;
+
 mod find_root;
 mod replace_all;
 mod sum;
@@ -6,7 +8,8 @@ mod table;
 mod times;
 mod transcendental;
 
-use distribution::{Distr, eval_normal_dist};
+// TODO: just reference the module instead of these 'use' statements
+use distribution::Distr;
 use find_root::eval_find_root;
 use table::eval_table;
 use times::eval_times;
@@ -47,6 +50,7 @@ fn precedence(e: &Expr) -> usize {
                     "List" => 3,
                     "Sin" | "Cos" | "Exp" => 5,
                     "Power" => 50,
+                    "Unsure" => 55,
                     "Divide" => 60,
                     "Times" => 65,
                     "Plus" => 70,
@@ -146,7 +150,7 @@ pub fn evaluate(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
 
 // Execute callable application logic. At this point head has been pre-evaluated and
 // shouldn't need further evaluation (except maybe for some special case like ReplaceAll).
-pub fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
+fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
     match head {
         Expr::Symbol(ref head_sym) => match head_sym.as_str() {
             "Hold" | "List" => Ok(Expr::Head(Box::new(head), args)),
@@ -160,7 +164,7 @@ pub fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, Str
                 evaluate(replaced, ctx)
             }
             "Plus" => {
-                // TODO: apply this reduction idea to other ops
+                // TODO: apply this reduction idea to other ops. Merge this with Times code
                 let numeric: f64 = args
                     .iter()
                     .map(|arg| match arg {
@@ -212,7 +216,7 @@ pub fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, Str
                 Ok(rhs)
             }
             "Gamma" => transcendental::eval_gamma(args),
-            "NormalDist" => eval_normal_dist(args),
+            "NormalDist" => distribution::eval_normal_dist(args),
             "Sin" => transcendental::eval_sin(args),
             "Cos" => transcendental::eval_cos(args),
             "Exp" => transcendental::eval_exp(args),
@@ -234,7 +238,9 @@ pub fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, Str
                 }?;
                 Ok(Expr::Function(params, Box::new(body)))
             }
-            "Evaluate" => todo!("This should walk the expression and remove the Hold heads"),
+            "Unsure" => distribution::eval_unsure(args),
+            "Sample" => distribution::eval_sample(args, ctx),
+            "Histogram" => distribution::eval_histogram(args, ctx),
             _ => Err(format!("Non-callable head {}", head)),
         },
         Expr::Distribution(d) => Ok(Expr::Number(d.sample())),
@@ -251,6 +257,8 @@ pub fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, Str
             for (p, a) in params.into_iter().zip(args) {
                 f_ctx.set(p, a);
             }
+            // Body hasn't been evaluated yet. Now that we've got
+            // values for all parameters, we can evaluate the body.
             evaluate(*body, &mut f_ctx)
         }
         _ => Err(format!("Non-callable head {}", head)),

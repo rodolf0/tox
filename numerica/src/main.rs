@@ -1,4 +1,5 @@
 extern crate numerica;
+mod plot;
 
 fn main() -> Result<(), String> {
     let parser = numerica::parser()?;
@@ -7,10 +8,15 @@ fn main() -> Result<(), String> {
         let input = std::env::args().skip(1).collect::<Vec<String>>().join(" ");
         match parser(input.as_str()) {
             Err(e) => println!("Parse err: {:?}", e),
-            Ok(expr) => println!(
-                "{}",
-                numerica::evaluate(expr, &mut numerica::Context::new())?
-            ),
+            Ok(expr) => {
+                let mut ctx = numerica::Context::new();
+                let r = numerica::evaluate(expr, &mut ctx)?;
+                if numerica::is_stochastic(&r) {
+                    let _ = plot::plot_histogram(&r, &mut ctx);
+                } else {
+                    println!("{}", r);
+                };
+            }
         }
         return Ok(());
     }

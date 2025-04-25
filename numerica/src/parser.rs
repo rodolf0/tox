@@ -17,7 +17,11 @@ fn grammar_str() -> &'static str {
     rule := arith '->' rule | arith ;
 
     arith := arith ('+'|'-') @opsum arith_mul | arith_mul ;
-    arith_mul := arith_mul ('*'|'/'|'%') @opmul arith_pow | arith_pow ;
+
+    # Unsure binds tighter thanMul and Add but not than unary minus, pow, factorial.
+    arith_mul := arith_mul ('*'|'/'|'%') @opmul unsure | unsure ;
+    unsure := unsure '~' arith_pow | arith_pow ;
+
     arith_pow := '-' arith_pow | arith_fac '^' arith_pow | arith_fac ;
     arith_fac := arith_fac '!' | primary ;
 
@@ -178,8 +182,15 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
     evaler.action("arith -> arith @opsum arith_mul", math_bin_op);
     evaler.action("arith -> arith_mul", |mut args| args.swap_remove(0));
 
-    evaler.action("arith_mul -> arith_mul @opmul arith_pow", math_bin_op);
-    evaler.action("arith_mul -> arith_pow", |mut args| args.swap_remove(0));
+    evaler.action("arith_mul -> arith_mul @opmul unsure", math_bin_op);
+    evaler.action("arith_mul -> unsure", |mut args| args.swap_remove(0));
+
+    evaler.action("unsure -> arith_pow", |mut args| args.swap_remove(0));
+    evaler.action("unsure -> unsure ~ arith_pow", |mut args| {
+        let n1 = args.swap_remove(2);
+        let n0 = args.swap_remove(0);
+        T::Expr(Box::new(T::Symbol("Unsure".into())), vec![n0, n1])
+    });
 
     evaler.action("arith_pow -> - arith_pow", |mut args| {
         match args.swap_remove(1) {

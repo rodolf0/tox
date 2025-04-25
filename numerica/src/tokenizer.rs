@@ -33,7 +33,7 @@ impl<I: Iterator<Item = char>> Tokenizer<I> {
                 _ => Ok(Some("-".into())),
             },
             // Various single char tokens.
-            Some(x) if "[]{}(),+*^!".contains(x) => Ok(Some(x.into())),
+            Some(x) if "[]{}(),+*^!~".contains(x) => Ok(Some(x.into())),
             // Assignment operator.
             Some(':') => match self.input.next() {
                 Some('=') => Ok(Some(":=".into())),

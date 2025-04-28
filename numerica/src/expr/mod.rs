@@ -25,6 +25,8 @@ pub enum Expr {
     // DateTime(DateTime<Utc>),
     // Matrix(Matrix),
     // Quantity(f64, Dimension),
+    // Complex(f64, f64),
+    // List(Vec<Expr>), // should this just be a primitive too ?
 }
 
 impl Expr {

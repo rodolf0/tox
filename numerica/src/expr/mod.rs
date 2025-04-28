@@ -145,7 +145,7 @@ pub fn evaluate(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
 
 // Execute callable application logic. At this point head has been pre-evaluated and
 // shouldn't need further evaluation (except maybe for some special case like ReplaceAll).
-fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
+pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
     match head {
         Expr::Symbol(ref head_sym) => match head_sym.as_str() {
             "Hold" | "List" => Ok(Expr::Head(Box::new(head), args)),

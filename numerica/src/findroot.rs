@@ -1,10 +1,10 @@
-use crate::matrix::{dot_product, qr_decompose, Matrix};
+use crate::matrix::{Matrix, dot_product, qr_decompose};
 
 pub fn find_roots(
     f: impl Fn(f64) -> Result<f64, String> + Clone,
     x0: f64,
 ) -> Result<Vec<f64>, String> {
-    let brackets = explore_domain(f.clone(), (x0 - 500.0, x0 + 500.0), 50)?;
+    let brackets = explore_domain(f.clone(), (x0 - 5.0, x0 + 5.0), 50)?;
     let mayberoots: Vec<_> = brackets
         .into_iter()
         .map(|(start, end)| regula_falsi(f.clone(), (start, end)))

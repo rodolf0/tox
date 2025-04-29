@@ -185,6 +185,7 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
             "Sin" => transcendental::eval_sin(args),
             "Cos" => transcendental::eval_cos(args),
             "Exp" => transcendental::eval_exp(args),
+            "Abs" => transcendental::eval_abs(args),
             "Table" => table::eval_table(args, ctx),
             "Function" => {
                 let [params, body]: [Expr; 2] = args

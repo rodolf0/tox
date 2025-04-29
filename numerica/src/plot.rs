@@ -1,7 +1,7 @@
 use numerica::{Context, Expr};
 
 pub fn plot_histogram(expr: &Expr, ctx: &mut Context) -> Result<(), String> {
-    const SAMPLES: f64 = 50000.0;
+    const SAMPLES: f64 = 100000.0;
     const BINS: f64 = 31.0;
     let r = numerica::evaluate(
         numerica::Expr::from_head(

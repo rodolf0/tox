@@ -44,3 +44,7 @@ pub(crate) fn eval_cos(args: Vec<Expr>) -> Result<Expr, String> {
 pub(crate) fn eval_exp(args: Vec<Expr>) -> Result<Expr, String> {
     apply_op(args, "Exp", |x| x.exp())
 }
+
+pub(crate) fn eval_abs(args: Vec<Expr>) -> Result<Expr, String> {
+    apply_op(args, "Abs", |x| x.abs())
+}

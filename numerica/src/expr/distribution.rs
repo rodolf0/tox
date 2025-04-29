@@ -21,18 +21,15 @@ impl Distr {
 }
 
 pub(crate) fn eval_normal_dist(args: Vec<Expr>) -> Result<Expr, String> {
-    let [mu, sigma]: [f64; 2] = args
-        .into_iter()
-        .map(|a| match a {
-            Expr::Number(n) => Ok(n),
-            other => Err(format!("NormalDist params must be number. {:?}", other)),
-        })
-        .collect::<Result<Vec<_>, _>>()?
+    let [mu, sigma]: [Expr; 2] = args
         .try_into()
-        .map_err(|e| format!("NormalDist error: {:?}", e))?;
-    Ok(Expr::Distribution(Rc::new(Distr::Normal(
-        rand_distr::Normal::new(mu, sigma).map_err(|e| e.to_string())?,
-    ))))
+        .map_err(|e| format!("NormalDist must have 2 arguments. {:?}", e))?;
+    match (mu, sigma) {
+        (Expr::Number(mu), Expr::Number(sigma)) => Ok(Expr::Distribution(Rc::new(Distr::Normal(
+            rand_distr::Normal::new(mu, sigma).map_err(|e| e.to_string())?,
+        )))),
+        other => Err(format!("NormalDist params must be number. {:?}", other)),
+    }
 }
 
 pub(crate) fn eval_beta_dist(args: Vec<Expr>) -> Result<Expr, String> {
@@ -69,12 +66,14 @@ pub(crate) fn eval_unsure(args: Vec<Expr>) -> Result<Expr, String> {
     let [low, high]: [Expr; 2] = args
         .try_into()
         .map_err(|e| format!("Unsure needs 2 arguments. {:?}", e))?;
-    let (Expr::Number(low), Expr::Number(high)) = (low, high) else {
-        return Err(format!("Unsure needs a numbers for interval."));
-    };
-    let mu = Expr::Number((high + low) / 2.0);
-    let sigma = Expr::Number((high - low).abs() / 3.92); // 2x z-score 95%
-    eval_normal_dist(vec![mu, sigma])
+    match (low, high) {
+        (Expr::Number(low), Expr::Number(high)) => {
+            let mu = Expr::Number((high + low) / 2.0);
+            let sigma = Expr::Number((high - low).abs() / 3.92); // 2x z-score 95%
+            eval_normal_dist(vec![mu, sigma])
+        }
+        _ => Err(format!("Unsure params must be numbers.")),
+    }
 }
 
 pub fn is_stochastic(expr: &Expr) -> bool {

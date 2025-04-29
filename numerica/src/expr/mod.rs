@@ -1,12 +1,13 @@
+mod arithmetic;
 mod distribution;
-pub use distribution::is_stochastic;
-
 mod find_root;
 mod replace_all;
 mod sum;
 mod table;
 mod times;
 mod transcendental;
+
+pub use distribution::is_stochastic;
 
 use core::fmt;
 use std::rc::Rc;
@@ -160,46 +161,11 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
                 // NOTE: this could live in evaluate. Calling it here is an exceptional case !
                 evaluate(replaced, ctx)
             }
-            "Plus" => {
-                // TODO: apply this reduction idea to other ops. Merge this with Times code
-                let numeric: f64 = args
-                    .iter()
-                    .map(|arg| match arg {
-                        Expr::Number(n) => *n,
-                        _ => 0.0,
-                    })
-                    .sum();
-                let mut symbolic: Vec<Expr> = args
-                    .into_iter()
-                    .filter_map(|arg| match arg {
-                        Expr::Number(_) => None,
-                        o => Some(o),
-                    })
-                    .collect();
-                if numeric != 0.0 {
-                    symbolic.insert(0, Expr::Number(numeric));
-                }
-                if symbolic.len() == 1 {
-                    Ok(symbolic.swap_remove(0))
-                } else {
-                    Ok(Expr::Head(Box::new(head), symbolic))
-                }
-            }
+            "Plus" => arithmetic::eval_plus(args),
             "Times" => times::eval_times(args, ctx),
-            "Minus" | "Power" | "Divide" => {
-                let [lhs, rhs]: [Expr; 2] = args
-                    .try_into()
-                    .map_err(|e| format!("{} must have 2 arguments. {:?}", head, e))?;
-                Ok(match (lhs, rhs) {
-                    (Expr::Number(lhs), Expr::Number(rhs)) => match head_sym.as_ref() {
-                        "Minus" => Expr::Number(lhs - rhs),
-                        "Power" => Expr::Number(lhs.powf(rhs)),
-                        "Divide" => Expr::Number(lhs / rhs),
-                        _ => panic!("BUG: {} op not implemented", head),
-                    },
-                    (lhs, rhs) => Expr::Head(Box::new(head), vec![lhs, rhs]),
-                })
-            }
+            "Minus" => arithmetic::eval_minus(args),
+            "Power" => arithmetic::eval_power(args),
+            "Divide" => arithmetic::eval_divide(args),
             "FindRoot" => find_root::eval_find_root(args),
             "Sum" => sum::eval_sum(args, ctx),
             "SetDelayed" | "Set" => {

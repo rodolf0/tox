@@ -12,21 +12,6 @@ fn eval_ctx(expr: &str, ctx: &mut Context) -> Result<Expr, String> {
 }
 
 #[test]
-fn arith_ops() -> Result<(), String> {
-    assert_eq!(eval(r#"1 + 2"#)?, Expr::Number(3.0));
-    assert_eq!(eval(r#"1 + 2 - 3"#)?, Expr::Number(0.0));
-    assert_eq!(eval(r#"1 - 2 + 3"#)?, Expr::Number(2.0));
-    assert_eq!(eval(r#"1 + 2 * 3"#)?, Expr::Number(7.0));
-    assert_eq!(eval(r#"2 ^ 2 ^ 3"#)?, Expr::Number(256.0));
-    assert_eq!(eval(r#"1 + 2 ^ 3"#)?, Expr::Number(9.0));
-    assert_eq!(eval(r#"3 / 2 / 4"#)?, Expr::Number(0.375));
-    assert_eq!(eval(r#"-3"#)?, Expr::Number(-3.0));
-    assert_eq!(eval(r#"--3"#)?, Expr::Number(3.0));
-    assert_eq!(eval(r#"4--3"#)?, Expr::Number(7.0));
-    Ok(())
-}
-
-#[test]
 fn set_delayed() -> Result<(), String> {
     let mut ctx = Context::new();
     assert_eq!(eval_ctx(r#"x := 1"#, &mut ctx)?, Expr::Number(1.0));

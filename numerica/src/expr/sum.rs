@@ -1,6 +1,5 @@
-use super::replace_all::replace_all;
-use super::{Expr, evaluate};
 use crate::context::Context;
+use crate::expr::Expr;
 
 // Parse iteration arguments, Eg: {var, 0, end} or {var, start, end}
 fn parse_sum_args(sum_args: &Expr) -> Result<(String, i32, i32), String> {
@@ -15,21 +14,20 @@ fn parse_sum_args(sum_args: &Expr) -> Result<(String, i32, i32), String> {
     }
 }
 
-// Replace the variable with a given value in the sum expression
-fn render_sum(sum: &Expr, var: &str, val: i32) -> Result<Expr, String> {
-    use super::Expr::*;
-    replace_all(sum.clone(), &[(Symbol(var.into()), Number(val as f64))])
-}
-
 pub(crate) fn eval_sum(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
     let [sum_expr, sum_args]: [Expr; 2] = args
         .try_into()
         .map_err(|e| format!("Sum expected: {{expr, args}}. Got {:?}", e))?;
     let (x, x0, xn) = parse_sum_args(&sum_args)?;
+    // Build sum function out of sum expression and iteration variable
+    let sum_func = super::evaluate(
+        Expr::from_head("Function", vec![Expr::Symbol(x), sum_expr.clone()]),
+        ctx,
+    )?;
     let sum = (x0..=xn).try_fold(0.0, |sum, xi| {
-        match render_sum(&sum_expr, &x, xi).and_then(|s| evaluate(s, ctx)) {
+        match super::apply(sum_func.clone(), vec![Expr::Number(xi as f64)], ctx) {
             Ok(Expr::Number(n)) => Ok(sum + n),
-            Ok(other) => Err(Ok(other)),
+            Ok(other) => Err(Ok(other)), // Short-circuit eval but no failure
             Err(err) => Err(Err(err)),
         }
     });

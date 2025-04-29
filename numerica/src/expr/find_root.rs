@@ -1,5 +1,5 @@
-use super::Expr;
 use crate::context::Context;
+use crate::expr::Expr;
 use crate::{find_root_vec, findroot};
 
 struct VarSpec {

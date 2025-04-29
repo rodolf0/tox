@@ -98,6 +98,7 @@ pub(crate) fn eval_times(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr,
         Ok(Expr::from_head("Times", new_args2))
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -18,11 +18,12 @@ fn grammar_str() -> &'static str {
 
     arith := arith ('+'|'-') @opsum arith_mul | arith_mul ;
 
-    # Unsure binds tighter thanMul and Add but not than unary minus, pow, factorial.
-    arith_mul := arith_mul ('*'|'/'|'%') @opmul unsure | unsure ;
-    unsure := unsure '~' arith_pow | arith_pow ;
+    arith_mul := arith_mul ('*'|'/'|'%') @opmul arith_pow | arith_pow ;
 
-    arith_pow := '-' arith_pow | arith_fac '^' arith_pow | arith_fac ;
+    arith_pow := '-' arith_pow | unsure '^' arith_pow | unsure ;
+
+    unsure := unsure '~' arith_fac | arith_fac ;
+
     arith_fac := arith_fac '!' | primary ;
 
     primary := atom
@@ -38,6 +39,27 @@ fn grammar_str() -> &'static str {
          | '{' '}'
          ;
     "#
+}
+
+fn numerica_grammar() -> Result<earlgrey::Grammar, String> {
+    earlgrey::EbnfGrammarParser::new(grammar_str(), "expr")
+        .plug_terminal("string", |_| true)
+        .plug_terminal("symbol", |s| {
+            s.chars().enumerate().all(|(i, c)| {
+                i == 0 && c.is_alphabetic() || i > 0 && (c.is_alphanumeric() || c == '_')
+            })
+        })
+        .plug_terminal("number", |n| n.parse::<f64>().is_ok())
+        .into_grammar()
+}
+
+pub fn expr_tree(input: &str) -> Result<(), String> {
+    let parser = earlgrey::sexpr_parser(numerica_grammar()?)?;
+    let tokenizer = crate::tokenizer::Tokenizer::new(input.chars());
+    for tree in parser(tokenizer)? {
+        println!("{}", tree.print());
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -74,15 +96,6 @@ fn convert(t: T) -> Expr {
 }
 
 pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
-    let grammar = earlgrey::EbnfGrammarParser::new(grammar_str(), "expr")
-        .plug_terminal("string", |_| true)
-        .plug_terminal("symbol", |s| {
-            s.chars().enumerate().all(|(i, c)| {
-                i == 0 && c.is_alphabetic() || i > 0 && (c.is_alphanumeric() || c == '_')
-            })
-        })
-        .plug_terminal("number", |n| n.parse::<f64>().is_ok())
-        .into_grammar()?;
     let mut evaler = earlgrey::EarleyForest::new(|terminal, lexeme| match terminal {
         "symbol" => T::Symbol(lexeme.into()),
         "number" => T::Number(lexeme.parse::<f64>().unwrap()),
@@ -182,15 +195,8 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
     evaler.action("arith -> arith @opsum arith_mul", math_bin_op);
     evaler.action("arith -> arith_mul", |mut args| args.swap_remove(0));
 
-    evaler.action("arith_mul -> arith_mul @opmul unsure", math_bin_op);
-    evaler.action("arith_mul -> unsure", |mut args| args.swap_remove(0));
-
-    evaler.action("unsure -> arith_pow", |mut args| args.swap_remove(0));
-    evaler.action("unsure -> unsure ~ arith_pow", |mut args| {
-        let n1 = args.swap_remove(2);
-        let n0 = args.swap_remove(0);
-        T::Expr(Box::new(T::Symbol("Unsure".into())), vec![n0, n1])
-    });
+    evaler.action("arith_mul -> arith_mul @opmul arith_pow", math_bin_op);
+    evaler.action("arith_mul -> arith_pow", |mut args| args.swap_remove(0));
 
     evaler.action("arith_pow -> - arith_pow", |mut args| {
         match args.swap_remove(1) {
@@ -201,8 +207,15 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
             ),
         }
     });
-    evaler.action("arith_pow -> arith_fac ^ arith_pow", math_bin_op);
-    evaler.action("arith_pow -> arith_fac", |mut args| args.swap_remove(0));
+    evaler.action("arith_pow -> unsure ^ arith_pow", math_bin_op);
+    evaler.action("arith_pow -> unsure", |mut args| args.swap_remove(0));
+
+    evaler.action("unsure -> arith_fac", |mut args| args.swap_remove(0));
+    evaler.action("unsure -> unsure ~ arith_fac", |mut args| {
+        let n1 = args.swap_remove(2);
+        let n0 = args.swap_remove(0);
+        T::Expr(Box::new(T::Symbol("Unsure".into())), vec![n0, n1])
+    });
 
     evaler.action("arith_fac -> arith_fac !", |mut args| {
         T::Expr(
@@ -221,7 +234,7 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
     evaler.action("@opmul -> /", |_| T::Symbol("Divide".into()));
     evaler.action("@opmul -> %", |_| T::Symbol("Mod".into()));
 
-    let parser = earlgrey::EarleyParser::new(grammar);
+    let parser = earlgrey::EarleyParser::new(numerica_grammar()?);
     Ok(move |input: &str| {
         let tokenizer = crate::tokenizer::Tokenizer::new(input.chars());
         let mut trees = evaler.eval_all_recursive(&parser.parse(tokenizer)?)?;

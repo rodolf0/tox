@@ -7,7 +7,7 @@ pub use context::Context;
 mod expr;
 pub use expr::{Expr, evaluate, is_stochastic};
 mod parser;
-pub use parser::parser;
+pub use parser::{expr_tree, parser};
 
 // TODO: clean this up
 mod findroot;

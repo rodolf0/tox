@@ -4,7 +4,6 @@ mod find_root;
 mod replace_all;
 mod sum;
 mod table;
-mod times;
 mod transcendental;
 
 pub use distribution::is_stochastic;
@@ -162,7 +161,7 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
                 evaluate(replaced, ctx)
             }
             "Plus" => arithmetic::eval_plus(args),
-            "Times" => times::eval_times(args, ctx),
+            "Times" => arithmetic::eval_times(args),
             "Minus" => arithmetic::eval_minus(args),
             "Power" => arithmetic::eval_power(args),
             "Divide" => arithmetic::eval_divide(args),

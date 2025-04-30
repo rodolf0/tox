@@ -73,6 +73,10 @@ pub(crate) fn eval_divide(args: Vec<Expr>) -> Result<Expr, String> {
     eval_non_commutative_binop(args, "Divide", |l, r| l / r)
 }
 
+pub(crate) fn eval_times(args: Vec<Expr>) -> Result<Expr, String> {
+    eval_commutative_binop(args, "Times", |acc, x| acc * x, true)
+}
+
 pub(crate) fn eval_power(args: Vec<Expr>) -> Result<Expr, String> {
     eval_non_commutative_binop(args, "Power", |l, r| l.powf(r))
 }
@@ -108,6 +112,7 @@ mod tests {
 
     #[test]
     fn arith_ops_commutative() -> Result<(), String> {
+        // Check there's no re-ordering leading to a different expression
         assert_eq!(
             eval(r#"x ^ 2"#)?,
             Expr::from_head(

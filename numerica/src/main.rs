@@ -9,14 +9,13 @@ fn main() -> Result<(), String> {
         match parser(input.as_str()) {
             Err(e) => println!("Parse err: {:?}", e),
             Ok(expr) => {
-                let mut ctx = numerica::Context::new();
-                let r = numerica::evaluate(expr, &mut ctx)?;
-                if numerica::is_stochastic(&r) {
-                    if let Err(_) = plot::plot_histogram(&r, &mut ctx) {
-                        println!("{}", r);
+                if numerica::is_stochastic(&expr) {
+                    let mut ctx = numerica::Context::new();
+                    if let Err(_) = plot::plot_histogram(&expr, &mut ctx) {
+                        println!("{}", expr);
                     }
                 } else {
-                    println!("{}", r);
+                    println!("{}", expr);
                 };
             }
         }
@@ -38,14 +37,13 @@ fn main() -> Result<(), String> {
                     match numerica::evaluate(expr, &mut ctx) {
                         Err(e) => println!("Eval err: {:?}", e),
                         Ok(expr) => {
-                            let mut ctx = numerica::Context::new();
-                            let r = numerica::evaluate(expr, &mut ctx)?;
-                            if numerica::is_stochastic(&r) {
-                                if let Err(_) = plot::plot_histogram(&r, &mut ctx) {
-                                    println!("{}", r);
+                            if numerica::is_stochastic(&expr) {
+                                let mut ctx = numerica::Context::new();
+                                if let Err(_) = plot::plot_histogram(&expr, &mut ctx) {
+                                    println!("{}", expr);
                                 }
                             } else {
-                                println!("{}", r);
+                                println!("{}", expr);
                             };
                         }
                     }

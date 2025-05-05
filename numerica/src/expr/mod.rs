@@ -1,6 +1,7 @@
 mod arithmetic;
 mod distribution;
 mod find_root;
+mod listops;
 mod replace_all;
 mod sum;
 mod table;
@@ -36,39 +37,31 @@ impl Expr {
 }
 
 // Lowest number is highest precedence
-fn precedence(e: &Expr) -> usize {
-    match e {
-        Expr::Number(_) => 0,
-        Expr::Symbol(_) => 1,
-        Expr::Head(head, _) => {
-            if let Expr::Symbol(ref symbol) = **head {
-                match symbol.as_ref() {
-                    "List" => 3,
-                    "Sin" | "Cos" | "Exp" => 5,
-                    "Power" => 50,
-                    "Unsure" => 55,
-                    "Divide" => 60,
-                    "Times" => 60,
-                    "Plus" => 70,
-                    "Minus" => 70,
-                    _ => 1000,
-                }
-            } else {
-                1000
-            }
+fn op_print_precedence(e: &Expr) -> Option<usize> {
+    if let Expr::Head(h, _) = e {
+        if let Expr::Symbol(ref symbol) = **h {
+            return match symbol.as_ref() {
+                "Power" => Some(50),
+                "Unsure" => Some(55),
+                "Divide" => Some(60),
+                "Times" => Some(60),
+                "Plus" => Some(70),
+                "Minus" => Some(70),
+                _ => None,
+            };
         }
-        _ => 1000,
     }
+    None
 }
 
 fn join_args(e: &Expr, sep: &str) -> String {
-    let parent_p = precedence(e);
+    let parent_p = op_print_precedence(e);
     let Expr::Head(_, args) = e else {
         panic!("BUG: Tried to join_args for non Expr: {:?}", e);
     };
     args.iter()
         .map(|a| {
-            if parent_p < precedence(a) {
+            if parent_p.is_some() && parent_p < op_print_precedence(a) {
                 format!("({})", a)
             } else {
                 a.to_string()
@@ -206,7 +199,9 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
             "Unsure" => distribution::eval_unsure(args),
             "Sample" => distribution::eval_sample(args, ctx),
             "Histogram" => distribution::eval_histogram(args, ctx),
-            _ => Err(format!("Non-callable head {}", head)),
+            "Outer" => listops::eval_outer(args, ctx),
+            // Return verbatim expression by default
+            _ => Ok(Expr::Head(Box::new(head), args)),
         },
         Expr::Distribution(d) => Ok(Expr::Number(d.sample())),
         Expr::Function(params, body) => {

@@ -32,7 +32,8 @@ fn main() -> Result<(), String> {
             Ok(line) => match parser(line.as_str()) {
                 Err(e) => println!("Parse err: {:?}", e),
                 Ok(expr) => {
-                    let _ = numerica::expr_tree(line.as_str());
+                    // Debug
+                    // let _ = numerica::expr_tree(line.as_str());
                     let _ = rl.add_history_entry(&line);
                     match numerica::evaluate(expr, &mut ctx) {
                         Err(e) => println!("Eval err: {:?}", e),

@@ -9,6 +9,8 @@ pub use expr::{Expr, evaluate, is_stochastic};
 mod parser;
 pub use parser::{expr_tree, parser};
 
+mod itertools;
+
 // TODO: clean this up
 mod findroot;
 pub use findroot::{

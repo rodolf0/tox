@@ -200,6 +200,8 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
             "Sample" => distribution::eval_sample(args, ctx),
             "Histogram" => distribution::eval_histogram(args, ctx),
             "Outer" => listops::eval_outer(args, ctx),
+            "Flatten" => listops::eval_flatten(args),
+            "Reshape" => listops::eval_reshape(args),
             // Return verbatim expression by default
             _ => Ok(Expr::Head(Box::new(head), args)),
         },

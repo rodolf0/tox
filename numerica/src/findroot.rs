@@ -1,5 +1,7 @@
 use crate::matrix::{Matrix, dot_product, qr_decompose};
 
+// TODO: fix explore domain check examples from mathematica
+
 pub fn find_roots(
     f: impl Fn(f64) -> Result<f64, String> + Clone,
     x0: f64,

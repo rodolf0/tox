@@ -1,5 +1,4 @@
 extern crate numerica;
-mod plot;
 
 fn main() -> Result<(), String> {
     let parser = numerica::parser()?;
@@ -11,7 +10,7 @@ fn main() -> Result<(), String> {
             Ok(expr) => {
                 if numerica::is_stochastic(&expr) {
                     let mut ctx = numerica::Context::new();
-                    if let Err(_) = plot::plot_histogram(&expr, &mut ctx) {
+                    if let Err(_) = numerica::plot_histogram(&expr, &mut ctx) {
                         println!("{}", expr);
                     }
                 } else {
@@ -40,7 +39,7 @@ fn main() -> Result<(), String> {
                         Ok(expr) => {
                             if numerica::is_stochastic(&expr) {
                                 let mut ctx = numerica::Context::new();
-                                if let Err(_) = plot::plot_histogram(&expr, &mut ctx) {
+                                if let Err(_) = numerica::plot_histogram(&expr, &mut ctx) {
                                     println!("{}", expr);
                                 }
                             } else {

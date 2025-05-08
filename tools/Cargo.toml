@@ -1,0 +1,11 @@
+[package]
+name = "toxtools"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rustyline = { version = "14.0.0" }
+numerica = { version = "0.1", path = "../numerica" }
+
+# [[bin]]
+# name = "numerica"

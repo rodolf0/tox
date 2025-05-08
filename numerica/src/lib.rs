@@ -21,5 +21,8 @@ pub use findroot::{
 mod matrix;
 pub use matrix::{dot_product, gram_schmidt_orthonorm, outer_product, qr_decompose};
 
+mod plot;
+pub use plot::plot_histogram;
+
 #[cfg(test)]
 mod tests;

@@ -8,14 +8,19 @@ fn main() -> Result<(), String> {
         match parser(input.as_str()) {
             Err(e) => println!("Parse err: {:?}", e),
             Ok(expr) => {
-                if numerica::is_stochastic(&expr) {
-                    let mut ctx = numerica::Context::new();
-                    if let Err(_) = numerica::plot_histogram(&expr, &mut ctx) {
-                        println!("{}", expr);
+                let mut ctx = numerica::Context::new();
+                match numerica::evaluate(expr, &mut ctx) {
+                    Err(e) => println!("Eval err: {:?}", e),
+                    Ok(expr) => {
+                        if numerica::is_stochastic(&expr) {
+                            if let Err(_) = numerica::plot_histogram(&expr, &mut ctx) {
+                                println!("{}", expr);
+                            }
+                        } else {
+                            println!("{}", expr);
+                        };
                     }
-                } else {
-                    println!("{}", expr);
-                };
+                }
             }
         }
         return Ok(());

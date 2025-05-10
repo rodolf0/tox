@@ -21,12 +21,18 @@ fn apply_op(args: Vec<Expr>, op_name: &str, op: fn(f64) -> f64) -> Result<Expr, 
     }
 }
 
+#[cfg(not(feature = "use-libm"))]
 fn gamma(x: f64) -> f64 {
     #[link(name = "m")]
     unsafe extern "C" {
         fn tgamma(x: f64) -> f64;
     }
     unsafe { tgamma(x) }
+}
+
+#[cfg(feature = "use-libm")]
+fn gamma(x: f64) -> f64 {
+    libm::tgamma(x)
 }
 
 pub(crate) fn eval_gamma(args: Vec<Expr>) -> Result<Expr, String> {

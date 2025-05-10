@@ -49,12 +49,8 @@ fn parse_varspec(varspec: Expr) -> Result<Vec<VarSpec>, String> {
 
 fn nonlinear_root(fexpr: Expr, varspec: VarSpec) -> Result<Vec<f64>, String> {
     use super::Expr::*;
-    let ctx = &mut Context::new();
     // Wrap the expression we're finding the root of in a Function
-    let fexpr = crate::evaluate(
-        Expr::from_head("Function", vec![Symbol(varspec.sym), fexpr]),
-        ctx,
-    )?;
+    let fexpr = Expr::Function(vec![varspec.sym], Box::new(fexpr));
     let f = |xi: f64| match super::apply(fexpr.clone(), vec![Number(xi)], &mut Context::new()) {
         Ok(Number(x)) => Ok(x),
         o => Err(format!("FindRoot didn't return Number: {:?}", o)),
@@ -67,25 +63,15 @@ fn nonlinear_root(fexpr: Expr, varspec: VarSpec) -> Result<Vec<f64>, String> {
 
 fn nonlinear_system(fexprs: Vec<Expr>, varspecs: Vec<VarSpec>) -> Result<Vec<f64>, String> {
     use super::Expr::*;
-    let ctx = &mut Context::new();
     let fexprs = fexprs
         .into_iter()
         .map(|fexpr| {
-            crate::evaluate(
-                Expr::from_head(
-                    "Function",
-                    vec![
-                        Expr::from_head(
-                            "List",
-                            varspecs.iter().map(|vs| Symbol(vs.sym.clone())).collect(),
-                        ),
-                        fexpr,
-                    ],
-                ),
-                ctx,
+            Expr::Function(
+                varspecs.iter().map(|vs| vs.sym.clone()).collect(),
+                Box::new(fexpr),
             )
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Vec<_>>();
 
     let funcs = fexprs
         .into_iter()
@@ -140,3 +126,5 @@ pub(crate) fn eval_find_root(args: Vec<Expr>) -> Result<Expr, String> {
         ));
     }
 }
+
+// TODO: add tests

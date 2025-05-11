@@ -19,7 +19,7 @@ fn shape_of(expr: &Expr) -> Vec<usize> {
     shape
 }
 
-fn reshape(head: &Expr, items: Vec<Expr>, shape: Vec<usize>) -> Result<Expr, String> {
+pub(crate) fn reshape(head: &Expr, items: Vec<Expr>, shape: Vec<usize>) -> Result<Expr, String> {
     // Check we have the right amount of items for the shape
     if shape.iter().product::<usize>() != items.len() {
         return Err(format!(

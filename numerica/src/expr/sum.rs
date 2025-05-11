@@ -22,7 +22,7 @@ pub(crate) fn eval_sum(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, Strin
     // Build sum function out of sum expression and iteration variable
     let sum_func = Expr::Function(vec![x], Box::new(sum_expr.clone()));
     let sum = (x0..=xn).try_fold(0.0, |sum, xi| {
-        // TODO: should this be apply or evaluate ?
+        // NOTE: apply here is fine since Function gets evaluated
         match super::apply(sum_func.clone(), vec![Expr::Number(xi as f64)], ctx) {
             Ok(Expr::Number(n)) => Ok(sum + n),
             Ok(other) => Err(Ok(other)), // Short-circuit eval but no failure

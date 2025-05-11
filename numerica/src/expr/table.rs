@@ -1,81 +1,83 @@
-use super::replace_all::replace_all;
-use super::{Expr, evaluate};
+use super::Expr;
 use crate::context::Context;
+use crate::itertools::TableIterator;
 
 pub(crate) fn eval_table(mut args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
     // first arg is the expression that will be evaluated for each table element
-    let expr = args.remove(0);
-    // Figure out iteration dimensions
-    let idxs: Vec<(Expr, f64, f64, f64)> = args
+    let table_expr = args.remove(0);
+    let table_idxs = args
         .into_iter()
-        .map(|spec| evaluate(spec, ctx))
-        .map(|spec| match spec {
-            Ok(Expr::Head(h, spec)) if *h == Expr::Symbol("List".into()) => match spec.as_slice() {
-                [i, Expr::Number(imax)] => Ok((i.clone(), 1.0, *imax, 1.0)),
-                [i, Expr::Number(imin), Expr::Number(imax)] => Ok((i.clone(), *imin, *imax, 1.0)),
-                [i, Expr::Number(imin), Expr::Number(imax), Expr::Number(di)] => {
-                    Ok((i.clone(), *imin, *imax, *di))
-                }
-                other => Err(format!("Table spec not supported. {:?}", other)),
-            },
+        .map(|s| parse_index_spec(s))
+        .collect::<Result<Vec<_>, _>>()?;
+    // Evaluate the expression on each table value
+    let table_expr = Expr::Function(
+        table_idxs.iter().map(|i| i.var.clone()).collect(),
+        Box::new(table_expr),
+    );
+
+    // Deduce the shape of the final table
+    let table_shape = table_idxs
+        .iter()
+        .map(|s| (((s.end - s.start) / s.step).floor() + 1.0) as usize)
+        .collect();
+
+    // Iterate overa all indices generating the flat table
+    let flat_table = TableIterator::new(
+        table_idxs
+            .into_iter()
+            .map(|s| (s.start, s.end, s.step))
+            .collect(),
+    )
+    .map(|idxs| {
+        // Evaluate function at this input table indices
+        super::apply(
+            table_expr.clone(),
+            idxs.into_iter().map(|i| Expr::Number(i)).collect(),
+            ctx,
+        )
+    })
+    .collect::<Result<Vec<_>, _>>()?;
+
+    super::listops::reshape(&Expr::Symbol("List".into()), flat_table, table_shape)
+}
+
+struct IdxRange {
+    var: String,
+    start: f64,
+    end: f64,
+    step: f64,
+}
+
+fn parse_index_spec(spec: Expr) -> Result<IdxRange, String> {
+    match spec {
+        Expr::Head(h, spec) if *h == Expr::Symbol("List".into()) => match spec.as_slice() {
+            [Expr::Symbol(s), Expr::Number(imax)] => Ok(IdxRange {
+                var: s.clone(),
+                start: 1.0,
+                end: *imax,
+                step: 1.0,
+            }),
+            [Expr::Symbol(s), Expr::Number(imin), Expr::Number(imax)] => Ok(IdxRange {
+                var: s.clone(),
+                start: *imin,
+                end: *imax,
+                step: 1.0,
+            }),
+            [
+                Expr::Symbol(s),
+                Expr::Number(imin),
+                Expr::Number(imax),
+                Expr::Number(di),
+            ] => Ok(IdxRange {
+                var: s.clone(),
+                start: *imin,
+                end: *imax,
+                step: *di,
+            }),
             other => Err(format!("Table spec not supported. {:?}", other)),
-        })
-        .collect::<Result<_, _>>()?;
-    // Function to step the cursor across all dimensions. Returns bumped dimension
-    fn cursor_step(
-        spec: &[(Expr, f64, f64, f64)],
-        cursor: Option<Vec<f64>>,
-    ) -> Option<(usize, Vec<f64>)> {
-        // Init cursor
-        let Some(mut cursor) = cursor else {
-            return Some((0, spec.iter().map(|spec| spec.1).collect()));
-        };
-        // Increment cursor values, rippling carries as needed
-        let mut idx = cursor.len() - 1;
-        loop {
-            cursor[idx] += spec[idx].3; // Add step size
-            if cursor[idx] <= spec[idx].2 {
-                return Some((idx, cursor)); // No carry needed
-            }
-            cursor[idx] = spec[idx].1; // Reset to min
-            if idx == 0 {
-                return None; // Done if we carried past first position
-            }
-            idx -= 1; // Move to next position
-        }
+        },
+        other => Err(format!("Table spec not supported. {:?}", other)),
     }
-
-    // Generate the table
-    let mut cursor = None;
-    let mut table = Expr::from_head("List", Vec::new());
-
-    while let Some((bumped_dim, c)) = cursor_step(&idxs, cursor) {
-        let mut inserter = match table {
-            Expr::Head(_, ref mut a) => a,
-            _ => panic!(),
-        };
-        for dim in 0..idxs.len() - 1 {
-            if dim >= bumped_dim {
-                inserter.push(Expr::from_head("List", Vec::new()));
-            }
-            inserter = match inserter.last_mut().unwrap() {
-                Expr::Head(h, a) if **h == Expr::Symbol("List".into()) => a,
-                _ => panic!(),
-            };
-        }
-
-        let rexpr = replace_all(
-            expr.clone(),
-            &idxs
-                .iter()
-                .zip(&c)
-                .map(|(spec, ci)| (spec.0.clone(), Expr::Number(*ci)))
-                .collect::<Vec<_>>(),
-        )?;
-        inserter.push(evaluate(rexpr, ctx)?);
-        cursor = Some(c); // get next iteration
-    }
-    Ok(table)
 }
 
 #[cfg(test)]

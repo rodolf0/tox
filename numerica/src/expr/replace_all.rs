@@ -9,6 +9,7 @@ pub(crate) fn eval_replace_all(args: Vec<Expr>) -> Result<Expr, String> {
 
 // ReplaceAll[x, Rule[x, 3]]
 // ReplaceAll[List[1, 2, 3], Rule[List, FindRoot]]
+// Replacement for each sub-expression stops once the 1st rule matches.
 pub(crate) fn replace_all(expr: Expr, rules: &[(Expr, Expr)]) -> Result<Expr, String> {
     match expr {
         Expr::Head(head, args) => {
@@ -20,31 +21,24 @@ pub(crate) fn replace_all(expr: Expr, rules: &[(Expr, Expr)]) -> Result<Expr, St
                     .collect::<Result<_, _>>()?,
             );
             // Check if update expression matches a replacement too.
-            // TODO: this needs to run in a loop until it the result doesn't change
             let replaced_expr = rules
                 .iter()
                 .filter(|(lhs, _)| replaced_expr == *lhs)
                 .next()
                 .map(|(_, rhs)| rhs.clone())
                 .unwrap_or(replaced_expr);
+
             // Check if a rule is a head re-write
             Ok(match replaced_expr {
-                Expr::Head(head, args) if matches!(*head, Expr::Symbol(_)) => {
-                    let Expr::Symbol(head) = *head else {
-                        unreachable!()
-                    };
-                    let mut replaced_expr = Expr::from_head(&head, args.clone());
-                    for r in rules {
-                        // Resolved heads will be Symbols, so filter LHS to just Symbols
-                        if let (Expr::Symbol(lhs), rhs) = r {
-                            if *lhs == head {
-                                replaced_expr = Expr::Head(Box::new(rhs.clone()), args.clone());
-                            }
-                        }
-                    }
-                    replaced_expr
+                Expr::Head(head, args) => {
+                    let head = rules
+                        .iter()
+                        .filter(|(lhs, _)| *head == *lhs)
+                        .next()
+                        .map(|(_, rhs)| rhs.clone())
+                        .unwrap_or(*head);
+                    Expr::Head(Box::new(head), args)
                 }
-                // Leave head alone
                 expr => expr,
             })
         }

@@ -196,6 +196,15 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
                 }?;
                 Ok(Expr::Function(params, Box::new(body)))
             }
+            "Apply" => {
+                let [new_head, expr]: [Expr; 2] = args
+                    .try_into()
+                    .map_err(|e| format!("Apply takes new-head and an expr. {:?}", e))?;
+                Ok(match expr {
+                    Expr::Head(_, args) => Expr::Head(Box::new(new_head), args),
+                    oexpr => oexpr,
+                })
+            }
             "Unsure" => distribution::eval_unsure(args),
             "Sample" => distribution::eval_sample(args, ctx),
             "Histogram" => distribution::eval_histogram(args, ctx),

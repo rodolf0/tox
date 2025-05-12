@@ -211,6 +211,10 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
             "Outer" => listops::eval_outer(args, ctx),
             "Flatten" => listops::eval_flatten(args),
             "Reshape" => listops::eval_reshape(args),
+            "CompoundExpression" => args
+                .into_iter()
+                .last()
+                .ok_or("Unexpected empty args".into()),
             // Return verbatim expression by default
             _ => Ok(Expr::Head(Box::new(head), args)),
         },

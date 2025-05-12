@@ -6,7 +6,7 @@ use crate::expr::Expr;
 
 fn grammar_str() -> &'static str {
     r#"
-    arglist := arglist ',' expr | expr ;
+    compound_expr := compound_expr ';' expr | expr ;
 
     expr := set ;
 
@@ -26,6 +26,8 @@ fn grammar_str() -> &'static str {
 
     arith_fac := arith_fac '!' | primary ;
 
+    arglist := arglist ',' expr | expr ;
+
     primary := atom
             | '(' expr ')'
             | primary '[' arglist ']'
@@ -42,7 +44,7 @@ fn grammar_str() -> &'static str {
 }
 
 fn numerica_grammar() -> Result<earlgrey::Grammar, String> {
-    earlgrey::EbnfGrammarParser::new(grammar_str(), "expr")
+    earlgrey::EbnfGrammarParser::new(grammar_str(), "compound_expr")
         .plug_terminal("string", |_| true)
         .plug_terminal("symbol", |s| {
             s.chars().enumerate().all(|(i, c)| {
@@ -105,6 +107,105 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         _ => T::Nop,
     });
 
+    evaler.action("compound_expr -> compound_expr ; expr", |mut args| {
+        let rhs = args.swap_remove(2);
+        let lhs = args.swap_remove(0);
+        let args = match lhs {
+            T::Expr(h, mut exprs) if *h == T::Symbol("CompoundExpression".into()) => {
+                exprs.push(rhs);
+                exprs
+            }
+            other => vec![other, rhs],
+        };
+        T::Expr(Box::new(T::Symbol("CompoundExpression".into())), args)
+    });
+    evaler.action("compound_expr -> expr", |mut args| args.swap_remove(0));
+
+    evaler.action("expr -> set", |mut args| args.swap_remove(0));
+
+    evaler.action("set -> replace_all @opset set", |mut args| {
+        let rhs = args.swap_remove(2);
+        let op = args.swap_remove(1);
+        let lhs = args.swap_remove(0);
+        T::Expr(Box::new(op), vec![lhs, rhs])
+    });
+    evaler.action("@opset -> :=", |_| T::Symbol("SetDelayed".into()));
+    evaler.action("@opset -> =", |_| T::Symbol("Set".into()));
+    evaler.action("set -> replace_all", |mut args| args.swap_remove(0));
+
+    evaler.action("replace_all -> replace_all /. rule", |mut args| {
+        let rhs = args.swap_remove(2);
+        let lhs = args.swap_remove(0);
+        T::Expr(Box::new(T::Symbol("ReplaceAll".into())), vec![lhs, rhs])
+    });
+    evaler.action("replace_all -> rule", |mut args| args.swap_remove(0));
+
+    evaler.action("rule -> arith -> rule", |mut args| {
+        let rhs = args.swap_remove(2);
+        let lhs = args.swap_remove(0);
+        T::Expr(Box::new(T::Symbol("Rule".into())), vec![lhs, rhs])
+    });
+    evaler.action("rule -> arith", |mut args| args.swap_remove(0));
+
+    evaler.action("arith -> arith @opsum arith_mul", math_bin_op);
+    evaler.action("arith -> arith_mul", |mut args| args.swap_remove(0));
+
+    evaler.action("arith_mul -> arith_mul @opmul arith_pow", math_bin_op);
+    evaler.action("arith_mul -> arith_pow", |mut args| args.swap_remove(0));
+
+    evaler.action("arith_pow -> - arith_pow", |mut args| {
+        match args.swap_remove(1) {
+            T::Number(n) => T::Number(-n),
+            other => T::Expr(
+                Box::new(T::Symbol("Times".into())),
+                vec![T::Number(-1.0), other],
+            ),
+        }
+    });
+    evaler.action("arith_pow -> unsure ^ arith_pow", math_bin_op);
+    evaler.action("arith_pow -> unsure", |mut args| args.swap_remove(0));
+
+    evaler.action("unsure -> unsure ~ arith_fac", |mut args| {
+        let n1 = args.swap_remove(2);
+        let n0 = args.swap_remove(0);
+        T::Expr(Box::new(T::Symbol("Unsure".into())), vec![n0, n1])
+    });
+    evaler.action("unsure -> arith_fac", |mut args| args.swap_remove(0));
+
+    evaler.action("arith_fac -> arith_fac !", |mut args| {
+        T::Expr(
+            Box::new(T::Symbol("Gamma".into())),
+            vec![T::Expr(
+                Box::new(T::Symbol("Plus".into())),
+                vec![T::Number(1.0), args.swap_remove(0)],
+            )],
+        )
+    });
+    evaler.action("arith_fac -> primary", |mut args| args.swap_remove(0));
+
+    evaler.action("arglist -> arglist , expr", |mut args| {
+        let expr = args.swap_remove(2); // Don't check type could be any
+        let mut arglist = pull!(T::Arglist, args.swap_remove(0));
+        arglist.push(expr);
+        T::Arglist(arglist)
+    });
+    evaler.action("arglist -> expr", |mut args| {
+        // Don't check type could be any
+        T::Arglist(vec![args.swap_remove(0)])
+    });
+
+    evaler.action("primary -> atom", |mut args| args.swap_remove(0));
+    evaler.action("primary -> ( expr )", |mut args| args.swap_remove(1));
+    evaler.action("primary -> primary [ arglist ]", |mut args| {
+        let arglist = pull!(T::Arglist, args.swap_remove(2));
+        let head = args.swap_remove(0);
+        T::Expr(Box::new(head), arglist)
+    });
+    evaler.action("primary -> primary [ ]", |mut args| {
+        let head = args.swap_remove(0);
+        T::Expr(Box::new(head), vec![])
+    });
+
     evaler.action("atom -> \" string \"", |mut args| {
         assert!(matches!(args[1], T::String(_)));
         args.swap_remove(1)
@@ -125,55 +226,6 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         T::Expr(Box::new(T::Symbol("List".into())), vec![])
     });
 
-    evaler.action("primary -> atom", |mut args| args.swap_remove(0));
-    evaler.action("primary -> ( expr )", |mut args| args.swap_remove(1));
-    evaler.action("primary -> primary [ arglist ]", |mut args| {
-        let arglist = pull!(T::Arglist, args.swap_remove(2));
-        let head = args.swap_remove(0);
-        T::Expr(Box::new(head), arglist)
-    });
-    evaler.action("primary -> primary [ ]", |mut args| {
-        let head = args.swap_remove(0);
-        T::Expr(Box::new(head), vec![])
-    });
-
-    evaler.action("expr -> set", |mut args| args.swap_remove(0));
-
-    evaler.action("set -> replace_all", |mut args| args.swap_remove(0));
-    evaler.action("set -> replace_all @opset set", |mut args| {
-        let rhs = args.swap_remove(2);
-        let op = args.swap_remove(1);
-        let lhs = args.swap_remove(0);
-        T::Expr(Box::new(op), vec![lhs, rhs])
-    });
-    evaler.action("@opset -> :=", |_| T::Symbol("SetDelayed".into()));
-    evaler.action("@opset -> =", |_| T::Symbol("Set".into()));
-
-    evaler.action("replace_all -> rule", |mut args| args.swap_remove(0));
-    evaler.action("replace_all -> replace_all /. rule", |mut args| {
-        let rhs = args.swap_remove(2);
-        let lhs = args.swap_remove(0);
-        T::Expr(Box::new(T::Symbol("ReplaceAll".into())), vec![lhs, rhs])
-    });
-
-    evaler.action("rule -> arith", |mut args| args.swap_remove(0));
-    evaler.action("rule -> arith -> rule", |mut args| {
-        let rhs = args.swap_remove(2);
-        let lhs = args.swap_remove(0);
-        T::Expr(Box::new(T::Symbol("Rule".into())), vec![lhs, rhs])
-    });
-
-    evaler.action("arglist -> expr", |mut args| {
-        // Don't check type could be any
-        T::Arglist(vec![args.swap_remove(0)])
-    });
-    evaler.action("arglist -> arglist , expr", |mut args| {
-        let expr = args.swap_remove(2); // Don't check type could be any
-        let mut arglist = pull!(T::Arglist, args.swap_remove(0));
-        arglist.push(expr);
-        T::Arglist(arglist)
-    });
-
     fn math_bin_op(mut args: Vec<T>) -> T {
         assert_eq!(args.len(), 3);
         let rhs = args.swap_remove(2);
@@ -191,42 +243,6 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         }
         T::Expr(Box::new(op), new_args)
     }
-
-    evaler.action("arith -> arith @opsum arith_mul", math_bin_op);
-    evaler.action("arith -> arith_mul", |mut args| args.swap_remove(0));
-
-    evaler.action("arith_mul -> arith_mul @opmul arith_pow", math_bin_op);
-    evaler.action("arith_mul -> arith_pow", |mut args| args.swap_remove(0));
-
-    evaler.action("arith_pow -> - arith_pow", |mut args| {
-        match args.swap_remove(1) {
-            T::Number(n) => T::Number(-n),
-            other => T::Expr(
-                Box::new(T::Symbol("Times".into())),
-                vec![T::Number(-1.0), other],
-            ),
-        }
-    });
-    evaler.action("arith_pow -> unsure ^ arith_pow", math_bin_op);
-    evaler.action("arith_pow -> unsure", |mut args| args.swap_remove(0));
-
-    evaler.action("unsure -> arith_fac", |mut args| args.swap_remove(0));
-    evaler.action("unsure -> unsure ~ arith_fac", |mut args| {
-        let n1 = args.swap_remove(2);
-        let n0 = args.swap_remove(0);
-        T::Expr(Box::new(T::Symbol("Unsure".into())), vec![n0, n1])
-    });
-
-    evaler.action("arith_fac -> arith_fac !", |mut args| {
-        T::Expr(
-            Box::new(T::Symbol("Gamma".into())),
-            vec![T::Expr(
-                Box::new(T::Symbol("Plus".into())),
-                vec![T::Number(1.0), args.swap_remove(0)],
-            )],
-        )
-    });
-    evaler.action("arith_fac -> primary", |mut args| args.swap_remove(0));
 
     evaler.action("@opsum -> +", |_| T::Symbol("Plus".into()));
     evaler.action("@opsum -> -", |_| T::Symbol("Minus".into()));

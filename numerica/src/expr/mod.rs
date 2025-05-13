@@ -114,6 +114,7 @@ pub fn evaluate(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                     // skip eval of LHS, but RHS should be evaluated
                     vec![lhs, evaluate(rhs, ctx)?]
                 }
+                Expr::Symbol(ref h) if h == "Unset" => args, // skip eval of args
                 Expr::Symbol(ref h) if h == "Rule" => {
                     let [lhs, rhs]: [Expr; 2] = args
                         .try_into()
@@ -173,6 +174,18 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
                 };
                 ctx.set(lhs, rhs.clone());
                 Ok(rhs)
+            }
+            "Unset" => {
+                let [arg]: [Expr; 1] = args
+                    .try_into()
+                    .map_err(|e| format!("Unset must have a single arg. {:?}", e))?;
+                match &arg {
+                    Expr::Symbol(arg_name) => {
+                        ctx.del(&arg_name);
+                        Ok(arg)
+                    }
+                    o => Err(format!("Unset arg must be a symbol. {:?}", o)),
+                }
             }
             "Gamma" => transcendental::eval_gamma(args),
             "NormalDist" => distribution::eval_normal_dist(args),

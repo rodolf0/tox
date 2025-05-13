@@ -26,4 +26,8 @@ impl Context {
     pub fn get(&self, sym: &str) -> Option<Expr> {
         self.bindings.get(sym).cloned()
     }
+
+    pub fn del(&mut self, sym: &str) {
+        self.bindings.remove(sym);
+    }
 }

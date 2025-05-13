@@ -73,6 +73,14 @@ pub(crate) fn eval_divide(args: Vec<Expr>) -> Result<Expr, String> {
     eval_non_commutative_binop(args, "Divide", |l, r| l / r)
 }
 
+pub(crate) fn eval_mod(args: Vec<Expr>) -> Result<Expr, String> {
+    eval_non_commutative_binop(args, "Mod", |l, r| l.rem_euclid(r))
+}
+
+pub(crate) fn eval_quotient(args: Vec<Expr>) -> Result<Expr, String> {
+    eval_non_commutative_binop(args, "Quotient", |l, r| l.div_euclid(r))
+}
+
 pub(crate) fn eval_times(args: Vec<Expr>) -> Result<Expr, String> {
     eval_commutative_binop(args, "Times", |acc, x| acc * x, true)
 }

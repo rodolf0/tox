@@ -103,7 +103,6 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         "number" => T::Number(lexeme.parse::<f64>().unwrap()),
         "string" => T::String(lexeme.into()),
         "^" => T::Symbol("Power".into()),
-        "!" => T::Symbol("!".into()), // TODO
         _ => T::Nop,
     });
 

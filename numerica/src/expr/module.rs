@@ -1,3 +1,4 @@
+// Docs https://reference.wolfram.com/language/tutorial/ModularityAndTheNamingOfThings.html
 use super::Expr;
 use crate::context::Context;
 
@@ -29,7 +30,6 @@ fn parse_locals(locals: &[Expr]) -> Result<Vec<String>, String> {
         .map(|s| match s {
             Expr::Symbol(sym) => Ok(sym.clone()),
             // Allow Set/SetDelayed expressions in locals
-            // NOTE: can possible be factored out for With head
             Expr::Head(h, args)
                 if **h == Expr::Symbol("Set".into())
                     || **h == Expr::Symbol("SetDelayed".into()) =>
@@ -89,4 +89,85 @@ pub(crate) fn eval_module(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, St
         .map(|e| super::evaluate(e, ctx))
         .collect::<Result<Vec<_>, _>>()?;
     super::evaluate(expr, ctx)
+}
+
+fn parse_replacements(locals: &[Expr]) -> Result<Vec<(String, Expr)>, String> {
+    locals
+        .iter()
+        .map(|s| match s {
+            Expr::Head(h, args) if **h == Expr::Symbol("Set".into()) => {
+                let [lhs, rhs]: [Expr; 2] = args
+                    .clone()
+                    .try_into()
+                    .map_err(|e| format!("With assigments must be Set expr. {:?}", e))?;
+                match lhs {
+                    Expr::Symbol(lhs) => Ok((lhs, rhs)),
+                    o => Err(format!(
+                        "Malformed Set expr within With assignments. {:?}",
+                        o
+                    )),
+                }
+            }
+            o => Err(format!("With assigments must be Set expr. {:?}", o)),
+        })
+        .collect::<Result<Vec<_>, _>>()
+}
+
+fn replace_sym_expr(expr: Expr, from: &str, to: &Expr) -> Expr {
+    match expr {
+        // Recursively apply replacement for arguments
+        Expr::Head(head, args) => Expr::Head(
+            head,
+            args.into_iter()
+                .map(|e| replace_sym_expr(e, from, to))
+                .collect(),
+        ),
+        Expr::Symbol(x) if x == from => to.clone(),
+        expr => expr,
+    }
+}
+
+pub(crate) fn eval_with(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, String> {
+    let [replacements, expr]: [Expr; 2] = args
+        .try_into()
+        .map_err(|e| format!("With requires a list of assignments and an expr. {:?}", e))?;
+    let replacements = match replacements {
+        Expr::Head(h, syms) if *h == Expr::Symbol("List".into()) => Ok(syms),
+        o => Err(format!("With assignments need to be a List. Got {:?}", o)),
+    }?;
+    let replacements = parse_replacements(&replacements)?;
+    // Re-write the Module body to use the new symbol names
+    let expr = replacements
+        .into_iter()
+        .fold(expr, |reexpr, (orig, replace)| {
+            replace_sym_expr(reexpr, &orig, &replace)
+        });
+
+    // Body hasn't been evaluated yet. With has HoldAll attr.
+    // Now that we've replaced all assignemnts evaluate.
+    super::evaluate(expr, ctx)
+}
+
+pub(crate) fn eval_function(args: Vec<Expr>) -> Result<Expr, String> {
+    if args.len() == 1 {
+        let [body]: [Expr; 1] = args
+            .try_into()
+            .map_err(|e| format!("Unexpected Function err. {:?}", e))?;
+        return Ok(Expr::Function(vec![], Box::new(body)));
+    }
+    let [params, body]: [Expr; 2] = args
+        .try_into()
+        .map_err(|e| format!("Function must have params and body. {:?}", e))?;
+    let params = match params {
+        Expr::Symbol(sym) => Ok(vec![sym]),
+        Expr::Head(h, syms) if *h == Expr::Symbol("List".into()) => syms
+            .into_iter()
+            .map(|s| match s {
+                Expr::Symbol(sym) => Ok(sym),
+                _ => Err(format!("Function params must be symbols: {}", s)),
+            })
+            .collect(),
+        o => Err(format!("Function params must be symbols: {}", o)),
+    }?;
+    Ok(Expr::Function(params, Box::new(body)))
 }

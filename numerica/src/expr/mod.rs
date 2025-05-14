@@ -127,6 +127,7 @@ pub fn evaluate(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                 Expr::Symbol(ref h) if h == "Function" => args,
                 // HoldAll carachteristic (ie: args don't get evaluated until applied)
                 Expr::Symbol(ref h) if h == "Module" => args,
+                Expr::Symbol(ref h) if h == "With" => args,
                 // Sum needs to control sumation variable evaluation
                 Expr::Symbol(ref h) if h == "Sum" => args,
                 Expr::Symbol(ref h) if h == "Hold" => args,
@@ -193,6 +194,7 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
                 }
             }
             "Module" => module::eval_module(args, ctx),
+            "With" => module::eval_with(args, ctx),
             "Gamma" => transcendental::eval_gamma(args),
             "NormalDist" => distribution::eval_normal_dist(args),
             "BetaDist" => distribution::eval_beta_dist(args),
@@ -202,29 +204,7 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
             "Exp" => transcendental::eval_exp(args),
             "Abs" => transcendental::eval_abs(args),
             "Table" => table::eval_table(args, ctx),
-            "Function" => {
-                if args.len() == 1 {
-                    let [body]: [Expr; 1] = args
-                        .try_into()
-                        .map_err(|e| format!("Unexpected Function err. {:?}", e))?;
-                    return Ok(Expr::Function(vec![], Box::new(body)));
-                }
-                let [params, body]: [Expr; 2] = args
-                    .try_into()
-                    .map_err(|e| format!("Function must have params and body. {:?}", e))?;
-                let params = match params {
-                    Expr::Symbol(sym) => Ok(vec![sym]),
-                    Expr::Head(h, syms) if *h == Expr::Symbol("List".into()) => syms
-                        .into_iter()
-                        .map(|s| match s {
-                            Expr::Symbol(sym) => Ok(sym),
-                            _ => Err(format!("Function params must be symbols: {}", s)),
-                        })
-                        .collect(),
-                    o => Err(format!("Function params must be symbols: {}", o)),
-                }?;
-                Ok(Expr::Function(params, Box::new(body)))
-            }
+            "Function" => module::eval_function(args),
             "Apply" => {
                 let [new_head, expr]: [Expr; 2] = args
                     .try_into()

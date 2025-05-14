@@ -10,7 +10,7 @@ pub(crate) fn eval_replace_all(args: Vec<Expr>) -> Result<Expr, String> {
 // ReplaceAll[x, Rule[x, 3]]
 // ReplaceAll[List[1, 2, 3], Rule[List, FindRoot]]
 // Replacement for each sub-expression stops once the 1st rule matches.
-pub(crate) fn replace_all(expr: Expr, rules: &[(Expr, Expr)]) -> Result<Expr, String> {
+fn replace_all(expr: Expr, rules: &[(Expr, Expr)]) -> Result<Expr, String> {
     match expr {
         Expr::Head(head, args) => {
             // Recursively apply replacement for arguments

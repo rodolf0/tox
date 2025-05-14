@@ -2,6 +2,7 @@ mod arithmetic;
 mod distribution;
 mod find_root;
 mod listops;
+mod module;
 mod replace_all;
 mod sum;
 mod table;
@@ -124,6 +125,10 @@ pub fn evaluate(expr: Expr, ctx: &mut Context) -> Result<Expr, String> {
                 }
                 // Mathematica's Function has HoldAll attribute. Body is evaluated at runtime.
                 Expr::Symbol(ref h) if h == "Function" => args,
+                // HoldAll carachteristic (ie: args don't get evaluated until applied)
+                Expr::Symbol(ref h) if h == "Module" => args,
+                // Sum needs to control sumation variable evaluation
+                Expr::Symbol(ref h) if h == "Sum" => args,
                 Expr::Symbol(ref h) if h == "Hold" => args,
                 _ => args
                     .into_iter()
@@ -187,6 +192,7 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
                     o => Err(format!("Unset arg must be a symbol. {:?}", o)),
                 }
             }
+            "Module" => module::eval_module(args, ctx),
             "Gamma" => transcendental::eval_gamma(args),
             "NormalDist" => distribution::eval_normal_dist(args),
             "BetaDist" => distribution::eval_beta_dist(args),
@@ -197,6 +203,12 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
             "Abs" => transcendental::eval_abs(args),
             "Table" => table::eval_table(args, ctx),
             "Function" => {
+                if args.len() == 1 {
+                    let [body]: [Expr; 1] = args
+                        .try_into()
+                        .map_err(|e| format!("Unexpected Function err. {:?}", e))?;
+                    return Ok(Expr::Function(vec![], Box::new(body)));
+                }
                 let [params, body]: [Expr; 2] = args
                     .try_into()
                     .map_err(|e| format!("Function must have params and body. {:?}", e))?;
@@ -245,6 +257,9 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
                 ));
             }
             // Create a new context scoped for the function call
+            // TODO: this isn't the same way mathematica works.
+            // It should allow writing to global vars, closure by ref
+            // This probably needs scopes that reference parent. See git stash
             let mut f_ctx = ctx.extend();
             for (p, a) in params.into_iter().zip(args) {
                 f_ctx.set(p, a);

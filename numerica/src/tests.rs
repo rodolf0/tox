@@ -28,6 +28,23 @@ fn set_delayed() -> Result<(), String> {
 }
 
 #[test]
+fn context_environment() -> Result<(), String> {
+    // TODO: proper Module / Function scope test
+    let mut ctx = Context::new();
+    ctx.set("x".into(), Expr::Number(2.0));
+    // Check context has value set for 'x'
+    assert_eq!(eval_ctx(r#"x + 1"#, &mut ctx)?, Expr::Number(3.0));
+    // Check that evaluating the function has access to 'x'
+    eval_ctx(r#"z = Function[{}, x]"#, &mut ctx)?;
+    assert_eq!(eval_ctx(r#"z[]"#, &mut ctx)?, Expr::Number(2.0));
+    // Update 'x' value and check capture by reference reads new value
+    assert_eq!(eval_ctx(r#"x = 4"#, &mut ctx)?, Expr::Number(4.0));
+    assert_eq!(eval_ctx(r#"z[]"#, &mut ctx)?, Expr::Number(4.0));
+    // TODO: check that function body can write to global context for non params
+    Ok(())
+}
+
+#[test]
 fn composite_expr() -> Result<(), String> {
     assert_eq!(
         eval(r#"ReplaceAll[Times, Rule[Times, Plus]][3, 4]"#)?,

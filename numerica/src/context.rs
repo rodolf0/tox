@@ -13,12 +13,6 @@ impl Context {
         }
     }
 
-    pub fn extend(&self) -> Self {
-        Self {
-            bindings: self.bindings.clone(),
-        }
-    }
-
     pub fn set(&mut self, sym: String, expr: Expr) {
         self.bindings.insert(sym, expr);
     }

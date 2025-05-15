@@ -204,7 +204,7 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
             "Exp" => transcendental::eval_exp(args),
             "Abs" => transcendental::eval_abs(args),
             "Table" => table::eval_table(args, ctx),
-            "Function" => module::eval_function(args),
+            "Function" => module::eval_function_head(args),
             "Apply" => {
                 let [new_head, expr]: [Expr; 2] = args
                     .try_into()
@@ -228,26 +228,7 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
             _ => Ok(Expr::Head(Box::new(head), args)),
         },
         Expr::Distribution(d) => Ok(Expr::Number(d.sample())),
-        Expr::Function(params, body) => {
-            if params.len() != args.len() {
-                return Err(format!(
-                    "Function expected {} args but got {}",
-                    params.len(),
-                    args.len()
-                ));
-            }
-            // Create a new context scoped for the function call
-            // TODO: this isn't the same way mathematica works.
-            // It should allow writing to global vars, closure by ref
-            // This probably needs scopes that reference parent. See git stash
-            let mut f_ctx = ctx.extend();
-            for (p, a) in params.into_iter().zip(args) {
-                f_ctx.set(p, a);
-            }
-            // Body hasn't been evaluated yet. Now that we've got
-            // values for all parameters, we can evaluate the body.
-            evaluate(*body, &mut f_ctx)
-        }
+        Expr::Function(params, body) => module::eval_function(params, *body, args, ctx),
         _ => Err(format!("Non-callable head {}", head)),
     }
 }

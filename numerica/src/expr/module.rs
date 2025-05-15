@@ -148,7 +148,7 @@ pub(crate) fn eval_with(args: Vec<Expr>, ctx: &mut Context) -> Result<Expr, Stri
     super::evaluate(expr, ctx)
 }
 
-pub(crate) fn eval_function(args: Vec<Expr>) -> Result<Expr, String> {
+pub(crate) fn eval_function_head(args: Vec<Expr>) -> Result<Expr, String> {
     if args.len() == 1 {
         let [body]: [Expr; 1] = args
             .try_into()
@@ -170,4 +170,42 @@ pub(crate) fn eval_function(args: Vec<Expr>) -> Result<Expr, String> {
         o => Err(format!("Function params must be symbols: {}", o)),
     }?;
     Ok(Expr::Function(params, Box::new(body)))
+}
+
+pub(crate) fn eval_function(
+    params: Vec<String>,
+    body: Expr,
+    args: Vec<Expr>,
+    ctx: &mut Context,
+) -> Result<Expr, String> {
+    if params.len() != args.len() {
+        return Err(format!(
+            "Function expected {} args but got {}",
+            params.len(),
+            args.len()
+        ));
+    }
+    // Rename each param to var__<random> to avoid collisionss
+    let renamed_params: Vec<_> = params
+        .iter()
+        .map(|p| format!("{}__{}", p, rand16()))
+        .collect();
+    // Re-write the Function body to use the new symbol names
+    let body = params
+        .iter()
+        .zip(&renamed_params)
+        .fold(body, |reexpr, (param, rename)| {
+            replace_temp_sym(reexpr, &param, &rename)
+        });
+    // Set function params in evaluation context
+    for (p, a) in renamed_params.iter().zip(args) {
+        ctx.set(p.clone(), a);
+    }
+    // Body hasn't been evaluated yet. Now that we've got
+    // values for all parameters, we can evaluate the body.
+    let fout = super::evaluate(body, ctx);
+    for p in renamed_params {
+        ctx.del(&p);
+    }
+    fout
 }

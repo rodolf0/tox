@@ -1,5 +1,6 @@
 mod arithmetic;
 mod distribution;
+mod file;
 mod find_root;
 mod listops;
 mod module;
@@ -224,6 +225,7 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
                 .into_iter()
                 .last()
                 .ok_or("Unexpected empty args".into()),
+            "Get" => file::eval_get(args, ctx),
             // Return verbatim expression by default
             _ => Ok(Expr::Head(Box::new(head), args)),
         },

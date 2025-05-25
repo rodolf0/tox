@@ -6,7 +6,10 @@ use crate::expr::Expr;
 
 fn grammar_str() -> &'static str {
     r#"
-    compound_expr := compound_expr ';' expr | expr ;
+    compound_expr := expr
+                  | compound_expr ';'
+                  | compound_expr ';' expr
+                  ;
 
     expr := set ;
 
@@ -106,6 +109,10 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         _ => T::Nop,
     });
 
+    evaler.action("compound_expr -> expr", |mut args| args.swap_remove(0));
+    evaler.action("compound_expr -> compound_expr ;", |mut args| {
+        args.swap_remove(0)
+    });
     evaler.action("compound_expr -> compound_expr ; expr", |mut args| {
         let rhs = args.swap_remove(2);
         let lhs = args.swap_remove(0);
@@ -118,7 +125,6 @@ pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
         };
         T::Expr(Box::new(T::Symbol("CompoundExpression".into())), args)
     });
-    evaler.action("compound_expr -> expr", |mut args| args.swap_remove(0));
 
     evaler.action("expr -> set", |mut args| args.swap_remove(0));
 

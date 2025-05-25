@@ -45,11 +45,20 @@ fn context_environment() -> Result<(), String> {
 }
 
 #[test]
-fn composite_expr() -> Result<(), String> {
+fn compound_expr() -> Result<(), String> {
     assert_eq!(
         eval(r#"ReplaceAll[Times, Rule[Times, Plus]][3, 4]"#)?,
         Expr::Number(7.0)
     );
+    Ok(())
+}
+
+#[test]
+fn compound_semicolon() -> Result<(), String> {
+    assert_eq!(eval("3")?, Expr::Number(3.0));
+    assert_eq!(eval("3;")?, Expr::Number(3.0));
+    assert_eq!(eval("4;3")?, Expr::Number(3.0));
+    assert_eq!(eval("4;3;")?, Expr::Number(3.0));
     Ok(())
 }
 

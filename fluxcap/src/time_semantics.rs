@@ -1,5 +1,7 @@
 #![deny(warnings)]
 
+use core::fmt;
+
 type DateTime = chrono::NaiveDateTime;
 type Date = chrono::NaiveDate;
 
@@ -7,10 +9,39 @@ use earlgrey::{EarleyForest, EarleyParser};
 use kronos as k;
 type Shim = kronos::Shim<'static>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TimeEl {
     Time(k::Range),
     Count(u32),
+}
+
+impl fmt::Display for TimeEl {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match self {
+            TimeEl::Count(number) => write!(f, "{}", number),
+            TimeEl::Time(r) => {
+                use kronos::Grain::*;
+                let fmt_pattern = match r.grain {
+                    Second => "%A, %e %B %Y %H:%M:%S",
+                    Minute => "%A, %e %B %Y %H:%M",
+                    Hour => "%A, %e %B %Y %Hhs",
+                    Day | Week => "%A, %e %B %Y",
+                    Month | Quarter | Half => "%B %Y",
+                    Year | Lustrum | Decade | Century | Millenium => "%Y",
+                };
+                if r.grain <= Day {
+                    write!(f, "{}", r.start.format(fmt_pattern))
+                } else {
+                    write!(
+                        f,
+                        "{} - {}",
+                        r.start.format(fmt_pattern),
+                        r.end.format(fmt_pattern)
+                    )
+                }
+            }
+        }
+    }
 }
 
 impl TimeEl {

@@ -25,7 +25,7 @@ pub enum Expr {
     String(String),
     Distribution(Rc<distribution::Distr>),
     Function(Vec<String>, Box<Expr>),
-    // DateTime(DateTime<Utc>),
+    // DateTime(fluxcap::TimeEl),
     // Matrix(Matrix),
     // Quantity(f64, Dimension),
     // Complex(f64, f64),
@@ -95,6 +95,7 @@ impl fmt::Display for Expr {
                     _ => write!(f, "{}[{}]", head_name, join_args(self, ", ")),
                 }
             }
+            Expr::String(s) => write!(f, "\"{}\"", s),
             _ => write!(f, "{:?}", self),
         }
     }
@@ -226,6 +227,29 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
                 .last()
                 .ok_or("Unexpected empty args".into()),
             "Get" => file::eval_get(args, ctx),
+            "T" => {
+                let [arg]: [Expr; 1] = args
+                    .try_into()
+                    .map_err(|e| format!("T takes a time string. {:?}", e))?;
+                let Expr::String(arg) = arg else {
+                    return Err(format!("T takes a time string. {:?}", arg));
+                };
+                let reftime = chrono::Local::now().naive_local();
+                let time_machine = fluxcap::TimeMachine::new(reftime);
+                let mut time_elems = time_machine
+                    .eval(&arg)?
+                    .into_iter()
+                    .map(|time_el| match time_el {
+                        fluxcap::TimeEl::Count(c) => Expr::Number(c as f64),
+                        o => Expr::String(o.to_string()),
+                    })
+                    .collect::<Vec<_>>();
+                if time_elems.len() == 1 {
+                    Ok(time_elems.remove(0))
+                } else {
+                    Ok(Expr::from_head("List", time_elems))
+                }
+            }
             // Return verbatim expression by default
             _ => Ok(Expr::Head(Box::new(head), args)),
         },

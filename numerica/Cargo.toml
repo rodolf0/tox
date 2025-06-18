@@ -8,6 +8,10 @@ earlgrey = { version = "0.4", path = "../earlgrey" }
 rand_distr = "0.5"
 rand = "0.9"
 libm = { version = "0.2", optional = true }
+# Allow time expressions
+fluxcap = { version = "0.1", path = "../fluxcap" }
+chrono = "0.4"
+
 
 [features]
 # By default don't include libm just link libc math. For WASM use libm

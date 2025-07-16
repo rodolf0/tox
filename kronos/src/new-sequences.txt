@@ -1,0 +1,16 @@
+- grain: eg: hours until ..., days until ..., years until ...
+- comp_grain: eg: every 2 weeks, every 3 days
+
+- friday().or(sunday())
+- friday().and(june())
+- friday().to(sunday())
+
+- every(2, days())
+- every(3, june())
+- every(1, days())
+- monday().every(2).and(may())
+- june().last(day())
+- may().nth(3, day())
+- monday().and(june()).nth(3, day())
+
+- week(2).except(Mondays)

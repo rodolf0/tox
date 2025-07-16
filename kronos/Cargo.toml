@@ -11,4 +11,5 @@ keywords = ["time", "date", "calendar", "chrono", "sequence"]
 categories = ["date-and-time"]
 
 [dependencies]
+time = { version = "0.3", features = ["macros"] }
 chrono = "=0.4.22"

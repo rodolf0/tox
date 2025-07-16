@@ -1,12 +1,13 @@
-#![deny(warnings)]
+// TODO: re-enable this
+// #![deny(warnings)]
 
 mod types;
-pub use crate::types::{Grain, TimeSequence, Range, Season};
+pub use crate::types::{Grain, Range, Season, TimeSequence};
 
 mod utils;
 
 mod seq_named;
-pub use crate::seq_named::{Weekday, Month, Weekend, Year};
+pub use crate::seq_named::{Month, Weekday, Weekend, Year};
 
 mod seq_grain;
 pub use crate::seq_grain::Grains;
@@ -36,10 +37,12 @@ mod seq_mgrain;
 pub use crate::seq_mgrain::MGrain;
 
 mod seq_func;
-pub use crate::seq_func::{Map, shift, step_by};
+pub use crate::seq_func::{shift, step_by, Map};
 
 mod seq_shim;
 pub use crate::seq_shim::Shim;
+
+mod sequence;
 
 #[cfg(test)]
 mod mixed_tests;

@@ -3,6 +3,8 @@
 // https://github.com/wit-ai/duckling_old/blob/master/resources/languages/en/corpus/time.clj
 // https://github.com/wit-ai/duckling_old/blob/master/resources/languages/en/rules/time.clj
 
+// TODO: types should be date-time or duration (not count and TimeEl)
+
 pub fn time_grammar() -> &'static str {
     r#"
     named_seq := day_ordinal
@@ -65,32 +67,44 @@ pub fn time_grammar() -> &'static str {
 }
 
 fn _grammar() -> Result<earlgrey::Grammar, String> {
-    use std::str::FromStr;
     use crate::constants::*;
+    use std::str::FromStr;
     earlgrey::EbnfGrammarParser::new(time_grammar(), "time")
-        .plug_terminal("ordinal", |d| ordinal(d).or_else(|| short_ordinal(d)).is_some())
-        .plug_terminal("day_ordinal", |d| ordinal(d).or_else(|| short_ordinal(d)).is_some())
+        .plug_terminal("ordinal", |d| {
+            ordinal(d).or_else(|| short_ordinal(d)).is_some()
+        })
+        .plug_terminal("day_ordinal", |d| {
+            ordinal(d).or_else(|| short_ordinal(d)).is_some()
+        })
         .plug_terminal("weekday", |d| weekday(d).is_some())
         .plug_terminal("month", |d| month(d).is_some())
         .plug_terminal("grain", |g| kronos::Grain::from_str(g).is_ok())
-        .plug_terminal("year", |y| if let Ok(year) = i32::from_str(y)
-                       { year > 999 && year < 2200 } else { false })
-        .plug_terminal("small_int", |u| if let Ok(u) = usize::from_str(u)
-                       { u < 100 } else { false })
+        .plug_terminal("year", |y| {
+            if let Ok(year) = i32::from_str(y) {
+                year > 999 && year < 2200
+            } else {
+                false
+            }
+        })
+        .plug_terminal("small_int", |u| {
+            if let Ok(u) = usize::from_str(u) {
+                u < 100
+            } else {
+                false
+            }
+        })
         .into_grammar()
 }
 
 pub fn time_parser() -> earlgrey::EarleyParser {
     earlgrey::EarleyParser::new(
-        _grammar()
-        .unwrap_or_else(|e| panic!("TimeMachine grammar BUG: {:?}", e))
+        _grammar().unwrap_or_else(|e| panic!("TimeMachine grammar BUG: {:?}", e)),
     )
 }
 
 pub fn debug_time_expression(time: &str) -> Result<Vec<earlgrey::Sexpr>, String> {
     let parser = earlgrey::sexpr_parser(
-        _grammar()
-        .unwrap_or_else(|e| panic!("TimeMachine grammar BUG: {:?}", e))
+        _grammar().unwrap_or_else(|e| panic!("TimeMachine grammar BUG: {:?}", e)),
     )?;
     parser(time.split(&[' ', ','][..]).filter(|w| !w.is_empty()))
 }

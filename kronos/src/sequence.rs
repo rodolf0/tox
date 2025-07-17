@@ -53,7 +53,7 @@
 // An anchored TimeSequence implements the Iterator trait and you
 // can transform items as needed with iterator methods.
 
-use time::{Duration, PrimitiveDateTime as DateTime, Time};
+use time::{Duration, PrimitiveDateTime as DateTime};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum Grain {
@@ -126,7 +126,7 @@ fn grain_iterator(
 pub enum TimeSequence {
     Seconds,
     Days,
-    Weekdays(u8),
+    Weekdays(u8), // Sunday=0
     Weekends,
     Months,
     Month(u8),
@@ -144,6 +144,13 @@ fn find_month(mut t0: DateTime, month: u8) -> Result<DateTime, String> {
 
 fn find_weekend(mut t0: DateTime) -> Result<DateTime, String> {
     while t0.weekday() != time::Weekday::Saturday && t0.weekday() != time::Weekday::Sunday {
+        t0 = shift(t0, Grain::Day, 1)?;
+    }
+    Ok(t0)
+}
+
+fn find_weekday(mut t0: DateTime, weekday: u8) -> Result<DateTime, String> {
+    while t0.weekday().number_days_from_sunday() != weekday {
         t0 = shift(t0, Grain::Day, 1)?;
     }
     Ok(t0)
@@ -174,34 +181,35 @@ impl TimeSequence {
         Self::Within(n, Box::new(self), Box::new(frame))
     }
 
-    pub fn future(&self, t0: DateTime) -> Box<dyn Iterator<Item = TimeRange> + '_> {
+    pub fn future(&self, t0: DateTime) -> Result<Box<dyn Iterator<Item = TimeRange> + '_>, String> {
         use TimeSequence::*;
-        match self {
+        Ok(match self {
             Seconds => Box::new(grain_iterator(t0, (Grain::Second, 1), (Grain::Second, 1))),
             Days => Box::new(grain_iterator(t0, (Grain::Day, 1), (Grain::Day, 1))),
-            // TODO: find start
-            Weekdays(_n) => Box::new(grain_iterator(t0, (Grain::Day, 1), (Grain::Day, 7))),
-            // TODO: find start
+            Weekdays(n) => {
+                let t0 = find_weekday(t0, *n)?;
+                Box::new(grain_iterator(t0, (Grain::Day, 1), (Grain::Day, 7))),
+            }
             Weekends => {
-                let t0 = find_weekend(t0).unwrap(); // TODO: change future to return Result
+                let t0 = find_weekend(t0)?;
                 Box::new(grain_iterator(t0, (Grain::Day, 2), (Grain::Day, 7)))
             }
-            // TODO: find start
             Month(n) => {
-                let t0 = find_month(t0, *n).unwrap(); // TODO: change future to return Result
+                let t0 = find_month(t0, *n)?;
                 Box::new(grain_iterator(t0, (Grain::Month, 1), (Grain::Month, 12)))
             }
             Within(n, window_spec, frame_spec) => {
                 // TODO: check that window.grain < frame.grain Or will just getting None be it ?
-
                 Box::new(
                     frame_spec
-                        .future(t0)
-                        .inspect(|x| println!("Frame: {:?}", x))
+                        .future(t0)?
+                        // .inspect(|x| println!("Frame: {:?}", x))
                         .filter_map(|frame| {
                             window_spec
                                 .future(frame.start)
-                                .inspect(|x| println!("Window: {:?}", x))
+                                .unwrap() // TODO: this can fail at run-time (ie calling next)
+                                // Should 'future' items be Results instead of TimeRange ?
+                                // .inspect(|x| println!("Window: {:?}", x))
                                 // Window has to start within frame's boundary
                                 .take_while(|w| w.start < frame.end)
                                 .nth((*n - 1) as usize) // TODO: lastof for negative
@@ -209,7 +217,7 @@ impl TimeSequence {
                 )
             }
             _ => todo!(), // Union(spec1, spec2) => Sequence::Union(Box::new(spec1), Box::new(spec2)),
-        }
+        })
     }
 }
 
@@ -219,10 +227,10 @@ mod test {
     use time::macros::datetime;
 
     #[test]
-    fn test_weekend() {
+    fn test_weekend() -> Result<(), String> {
         // The 3rd weekend of june
         let seq = TimeSequence::weekends().within(TimeSequence::month(6), 3);
-        let mut sequence = seq.future(datetime!(2025-07-01 0:00));
+        let mut sequence = seq.future(datetime!(2025-07-01 0:00))?;
         assert_eq!(
             sequence.next().unwrap(),
             TimeRange {
@@ -231,5 +239,6 @@ mod test {
                 grain: Grain::Day,
             }
         );
+        Ok(())
     }
 }

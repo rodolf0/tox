@@ -58,7 +58,7 @@ use std::collections::VecDeque;
 use time::{Duration, PrimitiveDateTime as DateTime};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-pub enum Grain {
+pub(crate) enum Grain {
     Second,
     Minute,
     Hour,
@@ -69,9 +69,9 @@ pub enum Grain {
 
 #[derive(Debug, PartialEq)]
 pub struct TimeSpan {
-    start: DateTime,
-    end: DateTime,
-    grain: Grain,
+    pub(crate) start: DateTime,
+    pub(crate) end: DateTime,
+    pub(crate) grain: Grain,
 }
 
 // Shift a DateTime by a given number of grain-counts.
@@ -150,7 +150,13 @@ fn grain_iterator(
 }
 
 pub enum TimeSeq {
+    // Grain {
+    //     window_span: (Grain, u32),
+    //     step_by: (Grain, i32),
+    // },
     Seconds,
+    // Minutes,
+    // Hours,
     Days,
     Weekdays(u8), // Sunday=0
     Weekends,
@@ -197,6 +203,10 @@ enum TimeDir {
 }
 
 impl TimeSeq {
+    pub fn seconds() -> TimeSeq {
+        TimeSeq::Seconds
+    }
+
     pub fn days() -> TimeSeq {
         TimeSeq::Days
     }
@@ -371,140 +381,5 @@ impl TimeSeq {
 
     pub fn past(&self, t0: DateTime) -> Box<dyn Iterator<Item = TimeSpan> + '_> {
         Box::new(self.seq(t0, TimeDir::Past).skip_while(move |t| t.end > t0))
-    }
-}
-
-#[cfg(test)]
-mod test_grains {
-    use super::*;
-    use time::macros::datetime;
-
-    #[test]
-    fn test_weekend() {
-        //The 3rd weekend of june
-        let seq = TimeSeq::weekends().within(TimeSeq::month(6), 3);
-        let mut sequence = seq.seq(datetime!(2025-07-01 0:00), TimeDir::Future);
-        assert_eq!(
-            sequence.next().unwrap(),
-            TimeSpan {
-                start: datetime!(2026-06-20 0:00),
-                end: datetime!(2026-06-22 0:00),
-                grain: Grain::Day,
-            }
-        );
-    }
-}
-
-#[cfg(test)]
-mod test_within {
-    use super::*;
-    use time::macros::datetime;
-
-    #[test]
-    fn test_within1() {
-        let d10thmo = TimeSeq::days().within(TimeSeq::months(), 10);
-
-        let mut past = d10thmo.seq(datetime!(2015-03-11 0:00), TimeDir::Past);
-        assert_eq!(
-            past.next().unwrap(),
-            TimeSpan {
-                start: datetime!(2015-03-10 0:00),
-                end: datetime!(2015-03-11 0:00),
-                grain: Grain::Day
-            }
-        );
-    }
-
-    #[test]
-    fn test_within2() {
-        // The 10th day of each month
-        let y5th10thday = TimeSeq::days()
-            .within(TimeSeq::months(), 10)
-            .within(TimeSeq::years(), 5);
-
-        // let mut future = y5th10thday.future(&dt(2015, 3, 11));
-        // assert_eq!(future.next().unwrap(),
-        //     Range{start: dt(2015, 5, 10), end: dt(2015, 5, 11), grain: Grain::Day});
-        // assert_eq!(future.next().unwrap(),
-        //     Range{start: dt(2016, 5, 10), end: dt(2016, 5, 11), grain: Grain::Day});
-
-        let mut past = y5th10thday.seq(datetime!(2015-03-11 0:00), TimeDir::Past);
-        // TODO:
-        let _ = past.next();
-        assert_eq!(
-            past.next().unwrap(),
-            TimeSpan {
-                start: datetime!(2014-05-10 0:00),
-                end: datetime!(2014-05-11 0:00),
-                grain: Grain::Day
-            }
-        );
-        // assert_eq!(
-        //     past.next().unwrap(),
-        //     Range {
-        //         start: dt(2013, 5, 10),
-        //         end: dt(2013, 5, 11),
-        //         grain: Grain::Day
-        //     }
-        // );
-    }
-
-    #[test]
-    fn test_lastn() {
-        // 2nd to last day of feb
-        let last2ndfeb = TimeSeq::days().within(TimeSeq::month(2), -2);
-        let mut f = last2ndfeb.seq(datetime!(2025-03-11 0:00), TimeDir::Future);
-        assert_eq!(
-            f.next().unwrap(),
-            TimeSpan {
-                start: datetime!(2026-02-27 0:00),
-                end: datetime!(2026-02-28 0:00),
-                grain: Grain::Day
-            }
-        );
-        // 3nd to last day of feb
-        let last2ndfeb = TimeSeq::days().within(TimeSeq::month(2), -3);
-        let mut f = last2ndfeb.seq(datetime!(2025-03-11 0:00), TimeDir::Future);
-        assert_eq!(
-            f.next().unwrap(),
-            TimeSpan {
-                start: datetime!(2026-02-26 0:00),
-                end: datetime!(2026-02-27 0:00),
-                grain: Grain::Day
-            }
-        );
-        // last day of feb
-        let last2ndfeb = TimeSeq::days().within(TimeSeq::month(2), -1);
-        let mut f = last2ndfeb.seq(datetime!(2025-03-11 0:00), TimeDir::Future);
-        assert_eq!(
-            f.next().unwrap(),
-            TimeSpan {
-                start: datetime!(2026-02-28 0:00),
-                end: datetime!(2026-03-01 0:00),
-                grain: Grain::Day
-            }
-        );
-        // last 27th day of feb
-        let last2ndfeb = TimeSeq::days().within(TimeSeq::month(2), -28);
-        let mut f = last2ndfeb.seq(datetime!(2025-03-11 0:00), TimeDir::Future);
-        assert_eq!(
-            f.next().unwrap(),
-            TimeSpan {
-                start: datetime!(2026-02-01 0:00),
-                end: datetime!(2026-02-02 0:00),
-                grain: Grain::Day
-            }
-        );
-        // last 29th day of feb
-        let last2ndfeb = TimeSeq::days().within(TimeSeq::month(2), -29);
-        let mut f = last2ndfeb.seq(datetime!(2025-03-11 0:00), TimeDir::Future);
-        assert_eq!(
-            f.next().unwrap(),
-            TimeSpan {
-                start: datetime!(2028-02-01 0:00),
-                end: datetime!(2028-02-02 0:00),
-                grain: Grain::Day
-            }
-        );
     }
 }

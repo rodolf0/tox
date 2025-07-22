@@ -150,20 +150,17 @@ fn grain_iterator(
 }
 
 pub enum TimeSeq {
-    // Grain {
-    //     window_span: (Grain, u32),
-    //     step_by: (Grain, i32),
-    // },
-    Seconds,
-    // Minutes,
-    // Hours,
-    Days,
+    Grain {
+        window_span: (Grain, u32),
+        step_by: (Grain, i32),
+    },
+    SpecificGrain {
+        grain: Grain,
+        n: u16,
+    },
+    Monthdays(u8),
     Weekdays(u8), // Sunday=0
     Weekends,
-    Weeks,
-    Months,
-    Month(u8),
-    Years,
     Within {
         nth: isize,
         window: Box<TimeSeq>,
@@ -173,9 +170,28 @@ pub enum TimeSeq {
     Intersection(Box<TimeSeq>, Box<TimeSeq>),
 }
 
-fn find_month(mut t0: DateTime, month: u8) -> DateTime {
-    while t0.month() as u8 != month {
-        t0 = shift(t0, Grain::Month, 1);
+fn grains_in_parent(grain: Grain) -> u16 {
+    match grain {
+        Grain::Second => 60,
+        Grain::Minute => 60,
+        Grain::Hour => 24,
+        Grain::Day => panic!("Day is not a valid grain for grains_in_parent"),
+        Grain::Month => 12,
+        Grain::Year => panic!("Year is not a valid grain for grains_in_parent"),
+    }
+}
+
+fn find_grain(mut t0: DateTime, grain: Grain, n: u16) -> DateTime {
+    while match grain {
+        Grain::Second => t0.second() as u16,
+        Grain::Minute => t0.minute() as u16,
+        Grain::Hour => t0.hour() as u16,
+        Grain::Day => t0.day() as u16,
+        Grain::Month => t0.month() as u16,
+        Grain::Year => panic!("Year is not a valid grain for find_grain"),
+    } != n
+    {
+        t0 = shift(t0, grain, 1);
     }
     t0
 }
@@ -203,28 +219,89 @@ enum TimeDir {
 }
 
 impl TimeSeq {
-    pub fn seconds() -> TimeSeq {
-        TimeSeq::Seconds
+    pub fn seconds(n: Option<u16>) -> TimeSeq {
+        match n {
+            Some(n) => TimeSeq::SpecificGrain {
+                grain: Grain::Second,
+                n,
+            },
+            None => TimeSeq::Grain {
+                window_span: (Grain::Second, 1),
+                step_by: (Grain::Second, 1),
+            },
+        }
+    }
+
+    pub fn minutes(n: Option<u16>) -> TimeSeq {
+        match n {
+            Some(n) => TimeSeq::SpecificGrain {
+                grain: Grain::Minute,
+                n,
+            },
+            None => TimeSeq::Grain {
+                window_span: (Grain::Minute, 1),
+                step_by: (Grain::Minute, 1),
+            },
+        }
+    }
+
+    pub fn hours(n: Option<u16>) -> TimeSeq {
+        match n {
+            Some(n) => TimeSeq::SpecificGrain {
+                grain: Grain::Hour,
+                n,
+            },
+            None => TimeSeq::Grain {
+                window_span: (Grain::Hour, 1),
+                step_by: (Grain::Hour, 1),
+            },
+        }
     }
 
     pub fn days() -> TimeSeq {
-        TimeSeq::Days
+        TimeSeq::Grain {
+            window_span: (Grain::Day, 1),
+            step_by: (Grain::Day, 1),
+        }
+    }
+
+    pub fn months(n: Option<u16>) -> TimeSeq {
+        match n {
+            Some(n) => TimeSeq::SpecificGrain {
+                grain: Grain::Month,
+                n,
+            },
+            None => TimeSeq::Grain {
+                window_span: (Grain::Month, 1),
+                step_by: (Grain::Month, 1),
+            },
+        }
+    }
+
+    pub fn weeks() -> TimeSeq {
+        TimeSeq::Grain {
+            window_span: (Grain::Day, 7),
+            step_by: (Grain::Day, 7),
+        }
+    }
+
+    pub fn years() -> TimeSeq {
+        TimeSeq::Grain {
+            window_span: (Grain::Year, 1),
+            step_by: (Grain::Year, 1),
+        }
     }
 
     pub fn weekends() -> TimeSeq {
         TimeSeq::Weekends
     }
 
-    pub fn months() -> TimeSeq {
-        TimeSeq::Months
+    pub fn weekday(day: u8) -> TimeSeq {
+        TimeSeq::Weekdays(day)
     }
 
-    pub fn month(month: u8) -> TimeSeq {
-        TimeSeq::Month(month)
-    }
-
-    pub fn years() -> TimeSeq {
-        TimeSeq::Years
+    pub fn monthday(day: u8) -> TimeSeq {
+        TimeSeq::Monthdays(day)
     }
 
     pub fn or(self, other: Self) -> Self {
@@ -239,14 +316,21 @@ impl TimeSeq {
         }
     }
 
-    pub fn grain(&self) -> Grain {
+    fn grain(&self) -> Grain {
         match self {
-            TimeSeq::Seconds => Grain::Second,
-            TimeSeq::Days => Grain::Day,
+            TimeSeq::Grain {
+                window_span: (grain, _),
+                step_by: _,
+            } => *grain,
+            TimeSeq::SpecificGrain { grain, n: _ } => *grain,
             TimeSeq::Weekdays(_) => Grain::Day,
+            TimeSeq::Monthdays(_) => Grain::Day,
             TimeSeq::Weekends => Grain::Day,
-            TimeSeq::Month(_) => Grain::Month,
-            TimeSeq::Months => Grain::Month,
+            TimeSeq::Within {
+                nth: _,
+                window,
+                frame: _,
+            } => window.grain(),
             // TimeSeq::Union(left, right) => {
             //     let left_grain = left.grain();
             //     let right_grain = right.grain();
@@ -256,40 +340,23 @@ impl TimeSeq {
             //         Grain::Second
             //     }
             // }
-            TimeSeq::Within {
-                nth: _,
-                window,
-                frame: _,
-            } => window.grain(),
             _ => todo!(),
         }
     }
 
     fn seq(&self, t0: DateTime, direction: TimeDir) -> Box<dyn Iterator<Item = TimeSpan> + '_> {
-        use TimeSeq::*;
         match self {
-            Seconds => {
-                let step_by = match direction {
-                    TimeDir::Future => (Grain::Second, 1),
-                    TimeDir::Past => (Grain::Second, -1),
+            TimeSeq::Grain {
+                window_span,
+                step_by: (sb_grain, sb_n),
+            } => {
+                let step = match direction {
+                    TimeDir::Future => *sb_n,
+                    TimeDir::Past => -*sb_n,
                 };
-                Box::new(grain_iterator(t0, (Grain::Second, 1), step_by))
+                Box::new(grain_iterator(t0, *window_span, (*sb_grain, step)))
             }
-            Days => {
-                let step_by = match direction {
-                    TimeDir::Future => (Grain::Day, 1),
-                    TimeDir::Past => (Grain::Day, -1),
-                };
-                Box::new(grain_iterator(t0, (Grain::Day, 1), step_by))
-            }
-            Weeks => {
-                let step_by = match direction {
-                    TimeDir::Future => (Grain::Day, 7),
-                    TimeDir::Past => (Grain::Day, -7),
-                };
-                Box::new(grain_iterator(t0, (Grain::Day, 7), step_by))
-            }
-            Weekdays(n) => {
+            TimeSeq::Weekdays(n) => {
                 let t0 = find_weekday(t0, *n);
                 let step_by = match direction {
                     TimeDir::Future => (Grain::Day, 7),
@@ -297,7 +364,27 @@ impl TimeSeq {
                 };
                 Box::new(grain_iterator(t0, (Grain::Day, 1), step_by))
             }
-            Weekends => {
+            TimeSeq::Monthdays(n) => {
+                let mut t0_end = t0;
+                Box::new(std::iter::from_fn(move || {
+                    while t0_end.day() != *n {
+                        t0_end += match direction {
+                            TimeDir::Future => Duration::days(1),
+                            TimeDir::Past => Duration::days(-1),
+                        }
+                    }
+                    t0_end += match direction {
+                        TimeDir::Future => Duration::days(1),
+                        TimeDir::Past => Duration::days(-1),
+                    };
+                    Some(TimeSpan {
+                        start: t0_end + Duration::days(-1),
+                        end: t0_end,
+                        grain: Grain::Day,
+                    })
+                }))
+            }
+            TimeSeq::Weekends => {
                 let t0 = find_weekend(t0);
                 let step_by = match direction {
                     TimeDir::Future => (Grain::Day, 7),
@@ -305,29 +392,15 @@ impl TimeSeq {
                 };
                 Box::new(grain_iterator(t0, (Grain::Day, 2), step_by))
             }
-            Month(n) => {
-                let t0 = find_month(t0, *n);
+            TimeSeq::SpecificGrain { grain, n } => {
+                let t0 = find_grain(t0, *grain, *n);
                 let step_by = match direction {
-                    TimeDir::Future => (Grain::Month, 12),
-                    TimeDir::Past => (Grain::Month, -12),
+                    TimeDir::Future => (*grain, grains_in_parent(*grain) as i32),
+                    TimeDir::Past => (*grain, -(grains_in_parent(*grain) as i32)),
                 };
-                Box::new(grain_iterator(t0, (Grain::Month, 1), step_by))
+                Box::new(grain_iterator(t0, (*grain, 1), step_by))
             }
-            Months => {
-                let step_by = match direction {
-                    TimeDir::Future => (Grain::Month, 1),
-                    TimeDir::Past => (Grain::Month, -1),
-                };
-                Box::new(grain_iterator(t0, (Grain::Month, 1), step_by))
-            }
-            Years => {
-                let step_by = match direction {
-                    TimeDir::Future => (Grain::Year, 1),
-                    TimeDir::Past => (Grain::Year, -1),
-                };
-                Box::new(grain_iterator(t0, (Grain::Year, 1), step_by))
-            }
-            Within { nth, window, frame } if *nth > 0 => {
+            TimeSeq::Within { nth, window, frame } if *nth > 0 => {
                 // TODO: check that window.grain < frame.grain Or will just getting None be it ?
                 Box::new(
                     frame
@@ -344,7 +417,7 @@ impl TimeSeq {
                         }),
                 )
             }
-            Within { nth, window, frame } if *nth < 0 => {
+            TimeSeq::Within { nth, window, frame } if *nth < 0 => {
                 let nth = -(*nth) as usize;
                 // TODO: check that window.grain < frame.grain Or will just getting None be it ?
                 Box::new(

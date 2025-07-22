@@ -5,13 +5,44 @@ mod test_grains {
     #[test]
     fn test_weekend() {
         //The 3rd weekend of june
-        let seq = TimeSeq::weekends().within(TimeSeq::month(6), 3);
+        let seq = TimeSeq::weekends().within(TimeSeq::months(Some(6)), 3);
         let mut sequence = seq.future(datetime!(2025-07-01 0:00));
         assert_eq!(
             sequence.next().unwrap(),
             TimeSpan {
                 start: datetime!(2026-06-20 0:00),
                 end: datetime!(2026-06-22 0:00),
+                grain: Grain::Day,
+            }
+        );
+    }
+
+    #[test]
+    fn test_days() {
+        //The 3rd weekend of june
+        let seq = TimeSeq::monthday(31);
+        let mut s = seq.future(datetime!(2025-07-01 0:00));
+        assert_eq!(
+            s.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2025-07-31 0:00),
+                end: datetime!(2025-08-01 0:00),
+                grain: Grain::Day,
+            }
+        );
+        assert_eq!(
+            s.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2025-08-31 0:00),
+                end: datetime!(2025-09-01 0:00),
+                grain: Grain::Day,
+            }
+        );
+        assert_eq!(
+            s.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2025-10-31 0:00),
+                end: datetime!(2025-11-01 0:00),
                 grain: Grain::Day,
             }
         );
@@ -24,7 +55,7 @@ mod test_within {
 
     #[test]
     fn test_within1() {
-        let d10thmo = TimeSeq::days().within(TimeSeq::months(), 10);
+        let d10thmo = TimeSeq::days().within(TimeSeq::months(None), 10);
 
         let mut past = d10thmo.past(datetime!(2015-03-11 0:00));
         assert_eq!(
@@ -41,7 +72,7 @@ mod test_within {
     fn test_within2() {
         // The 10th day of each month
         let y5th10thday = TimeSeq::days()
-            .within(TimeSeq::months(), 10)
+            .within(TimeSeq::months(None), 10)
             .within(TimeSeq::years(), 5);
 
         // let mut future = y5th10thday.future(&dt(2015, 3, 11));
@@ -72,7 +103,7 @@ mod test_within {
     #[test]
     fn test_lastn() {
         // 2nd to last day of feb
-        let last2ndfeb = TimeSeq::days().within(TimeSeq::month(2), -2);
+        let last2ndfeb = TimeSeq::days().within(TimeSeq::months(Some(2)), -2);
         let mut f = last2ndfeb.future(datetime!(2025-03-11 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -83,7 +114,7 @@ mod test_within {
             }
         );
         // 3nd to last day of feb
-        let last2ndfeb = TimeSeq::days().within(TimeSeq::month(2), -3);
+        let last2ndfeb = TimeSeq::days().within(TimeSeq::months(Some(2)), -3);
         let mut f = last2ndfeb.future(datetime!(2025-03-11 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -94,7 +125,7 @@ mod test_within {
             }
         );
         // last day of feb
-        let last2ndfeb = TimeSeq::days().within(TimeSeq::month(2), -1);
+        let last2ndfeb = TimeSeq::days().within(TimeSeq::months(Some(2)), -1);
         let mut f = last2ndfeb.future(datetime!(2025-03-11 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -105,7 +136,7 @@ mod test_within {
             }
         );
         // last 27th day of feb
-        let last2ndfeb = TimeSeq::days().within(TimeSeq::month(2), -28);
+        let last2ndfeb = TimeSeq::days().within(TimeSeq::months(Some(2)), -28);
         let mut f = last2ndfeb.future(datetime!(2025-03-11 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -116,7 +147,7 @@ mod test_within {
             }
         );
         // last 29th day of feb
-        let last2ndfeb = TimeSeq::days().within(TimeSeq::month(2), -29);
+        let last2ndfeb = TimeSeq::days().within(TimeSeq::months(Some(2)), -29);
         let mut f = last2ndfeb.future(datetime!(2025-03-11 0:00));
         assert_eq!(
             f.next().unwrap(),

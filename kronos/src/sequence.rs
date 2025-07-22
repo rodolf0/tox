@@ -1,10 +1,10 @@
-// A TimeSequence is a generator of TimeRanges
+// A TimeSeq is a generator of TimeRanges
 //   a |----|----|----|----|----|----|----|----|
 //
-// A TimeRange is a right-open time interval. [----)
+// A TimeSpan is a right-open time interval. [----)
 // The grain determines up to what granularity start/end timepoints are valid.
 //
-// To make a sequence generate TimeRange items the generator
+// To make a sequence generate TimeSpan items the generator
 // needs to be anchored at a point in time t0.
 //
 //     s0   s1   s2   s3   s4 ....
@@ -12,15 +12,15 @@
 //        ^
 //        | t0
 //
-// The 1st TimeRange item in the sequence will contain t0 unless
+// The 1st TimeSpan item in the sequence will contain t0 unless
 // its impossible because of a non-complete sequence.
 // - Iterating into the future the the start of the first element will be greater than t0.
 // - Iterating into the past the the start of the first element will be greater than t0 ?
-// TODO: add utility method on TimeRange to check if a timepoint is contained.
-// TODO: add utility method to shift TimeRange by an amount.
+// TODO: add utility method on TimeSpan to check if a timepoint is contained.
+// TODO: add utility method to shift TimeSpan by an amount.
 //
 // When iterating into the past. The same applies t0 will be contained by the
-// first emitted TimeRange (unless impossible because of a non-complete sequence).
+// first emitted TimeSpan (unless impossible because of a non-complete sequence).
 //
 // Given right-open intervals, if t0 aligns with the end of a sequence (hence the
 // start of the next) the 1st element will seem like an item into the future.
@@ -50,8 +50,10 @@
 // - apply - first do this ... graph traversal ?
 //
 //
-// An anchored TimeSequence implements the Iterator trait and you
+// An anchored TimeSeq implements the Iterator trait and you
 // can transform items as needed with iterator methods.
+
+use std::collections::VecDeque;
 
 use time::{Duration, PrimitiveDateTime as DateTime};
 
@@ -61,28 +63,28 @@ pub enum Grain {
     Minute,
     Hour,
     Day,
-    Week,
     Month,
     Year,
 }
 
 #[derive(Debug, PartialEq)]
-pub struct TimeRange {
+pub struct TimeSpan {
     start: DateTime,
     end: DateTime,
     grain: Grain,
 }
 
-fn shift(t0: DateTime, grain: Grain, n: i32) -> Result<DateTime, String> {
+// Shift a DateTime by a given number of grain-counts.
+// Day of the month may be clamped in case of month change or leap year.
+fn shift(t0: DateTime, grain: Grain, n: i32) -> DateTime {
     if n == 0 {
-        return Ok(t0);
+        return t0;
     }
     match grain {
-        Grain::Second => Ok(t0 + Duration::seconds(n as i64)),
-        Grain::Minute => Ok(t0 + Duration::minutes(n as i64)),
-        Grain::Hour => Ok(t0 + Duration::hours(n as i64)),
-        Grain::Day => Ok(t0 + Duration::days(n as i64)),
-        Grain::Week => Ok(t0 + Duration::weeks(n as i64)),
+        Grain::Second => t0 + Duration::seconds(n as i64),
+        Grain::Minute => t0 + Duration::minutes(n as i64),
+        Grain::Hour => t0 + Duration::hours(n as i64),
+        Grain::Day => t0 + Duration::days(n as i64),
         Grain::Month => {
             let (year, month, day) = t0.to_calendar_date();
             // Work in month space
@@ -91,19 +93,41 @@ fn shift(t0: DateTime, grain: Grain, n: i32) -> Result<DateTime, String> {
             // Convert back to year and month
             let n_year = total_months.div_euclid(12);
             let n_zero_month = total_months.rem_euclid(12);
-            let n_month = time::Month::try_from(n_zero_month as u8 + 1)
-                .map_err(|e| format!("Invalid month: {}", e))?;
+            let n_month = time::Month::try_from(n_zero_month as u8 + 1).expect("BUG: bad month");
             // Check if the day needs to be clamped because of month change
             let n_day = day.min(n_month.length(n_year));
-            Ok(t0.replace_date(
-                time::Date::from_calendar_date(n_year, n_month, n_day)
-                    .map_err(|e| format!("Invalid date: {}", e))?,
-            ))
+            t0.replace_date(
+                time::Date::from_calendar_date(n_year, n_month, n_day).expect("BUG: bad date"),
+            )
         }
-        Grain::Year => t0
-            .replace_year(t0.year() + n)
-            .map_err(|e| format!("Invalid year: {}", e)),
+        Grain::Year => {
+            // Eg: for Feb 29th max day needs adjustment.
+            let max_month_days = t0.month().length(t0.year() + n);
+            t0.replace_day(t0.day().min(max_month_days))
+                .and_then(|t| t.replace_year(t0.year() + n))
+                .expect(&format!(
+                    "BUG: bad year shift t0={}, n={}, g={:?}",
+                    t0, n, grain
+                ))
+        }
     }
+}
+
+fn truncate(t0: DateTime, grain: Grain) -> DateTime {
+    use Grain::*;
+    match grain {
+        Second => Ok(t0),
+        Minute => t0.replace_second(0),
+        Hour => t0.replace_minute(0).and_then(|t| t.replace_second(0)),
+        Day => Ok(t0.replace_time(time::Time::MIDNIGHT)),
+        Month => t0.replace_time(time::Time::MIDNIGHT).replace_day(1),
+        Year => t0
+            .replace_time(time::Time::MIDNIGHT)
+            .replace_day(1)
+            .and_then(|t| t.replace_month(time::Month::January)),
+    }
+    // The rounding in truncate should never be invalid.
+    .expect("BUG: truncation failed")
 }
 
 // Generate sequences of time ranges. Each element will have window_span template.
@@ -111,11 +135,13 @@ fn grain_iterator(
     t0: DateTime,
     window_span: (Grain, u32),
     step_by: (Grain, i32),
-) -> impl Iterator<Item = TimeRange> {
+) -> impl Iterator<Item = TimeSpan> {
+    // Mask t0's resolution beyond the grain of the span
+    let t0 = truncate(t0, window_span.0);
     (0..).map(move |i| {
-        let start = shift(t0, step_by.0, i * step_by.1).unwrap();
-        let end = shift(start, window_span.0, window_span.1 as i32).unwrap();
-        TimeRange {
+        let start = shift(t0, step_by.0, i * step_by.1);
+        let end = shift(start, window_span.0, window_span.1 as i32);
+        TimeSpan {
             start,
             end,
             grain: window_span.0,
@@ -123,122 +149,362 @@ fn grain_iterator(
     })
 }
 
-pub enum TimeSequence {
+pub enum TimeSeq {
     Seconds,
     Days,
     Weekdays(u8), // Sunday=0
     Weekends,
+    Weeks,
     Months,
     Month(u8),
-    Within(isize, Box<TimeSequence>, Box<TimeSequence>),
-    Union(Box<TimeSequence>, Box<TimeSequence>),
-    Intersection(Box<TimeSequence>, Box<TimeSequence>),
+    Years,
+    Within {
+        nth: isize,
+        window: Box<TimeSeq>,
+        frame: Box<TimeSeq>,
+    },
+    Union(Box<TimeSeq>, Box<TimeSeq>),
+    Intersection(Box<TimeSeq>, Box<TimeSeq>),
 }
 
-fn find_month(mut t0: DateTime, month: u8) -> Result<DateTime, String> {
+fn find_month(mut t0: DateTime, month: u8) -> DateTime {
     while t0.month() as u8 != month {
-        t0 = shift(t0, Grain::Month, 1)?;
+        t0 = shift(t0, Grain::Month, 1);
     }
-    Ok(t0)
+    t0
 }
 
-fn find_weekend(mut t0: DateTime) -> Result<DateTime, String> {
+fn find_weekend(mut t0: DateTime) -> DateTime {
     while t0.weekday() != time::Weekday::Saturday && t0.weekday() != time::Weekday::Sunday {
-        t0 = shift(t0, Grain::Day, 1)?;
+        t0 = shift(t0, Grain::Day, 1);
     }
-    Ok(t0)
+    t0
 }
 
-fn find_weekday(mut t0: DateTime, weekday: u8) -> Result<DateTime, String> {
+fn find_weekday(mut t0: DateTime, weekday: u8) -> DateTime {
     while t0.weekday().number_days_from_sunday() != weekday {
-        t0 = shift(t0, Grain::Day, 1)?;
+        t0 = shift(t0, Grain::Day, 1);
     }
-    Ok(t0)
+    t0
 }
 
-impl TimeSequence {
-    pub fn days() -> TimeSequence {
-        TimeSequence::Days
+// Guard against impossible sequences, eg: 32nd day of the month
+const INFINITE_FUSE: usize = 1000;
+
+enum TimeDir {
+    Future,
+    Past,
+}
+
+impl TimeSeq {
+    pub fn days() -> TimeSeq {
+        TimeSeq::Days
     }
 
-    pub fn weekends() -> TimeSequence {
-        TimeSequence::Weekends
+    pub fn weekends() -> TimeSeq {
+        TimeSeq::Weekends
     }
 
-    pub fn months() -> TimeSequence {
-        TimeSequence::Months
+    pub fn months() -> TimeSeq {
+        TimeSeq::Months
     }
 
-    pub fn month(month: u8) -> TimeSequence {
-        TimeSequence::Month(month)
+    pub fn month(month: u8) -> TimeSeq {
+        TimeSeq::Month(month)
+    }
+
+    pub fn years() -> TimeSeq {
+        TimeSeq::Years
     }
 
     pub fn or(self, other: Self) -> Self {
         Self::Union(Box::new(self), Box::new(other))
     }
 
-    pub fn within(self, frame: Self, n: isize) -> Self {
-        Self::Within(n, Box::new(self), Box::new(frame))
+    pub fn within(self, frame: Self, nth: isize) -> Self {
+        Self::Within {
+            nth,
+            window: Box::new(self),
+            frame: Box::new(frame),
+        }
     }
 
-    pub fn future(&self, t0: DateTime) -> Result<Box<dyn Iterator<Item = TimeRange> + '_>, String> {
-        use TimeSequence::*;
-        Ok(match self {
-            Seconds => Box::new(grain_iterator(t0, (Grain::Second, 1), (Grain::Second, 1))),
-            Days => Box::new(grain_iterator(t0, (Grain::Day, 1), (Grain::Day, 1))),
+    pub fn grain(&self) -> Grain {
+        match self {
+            TimeSeq::Seconds => Grain::Second,
+            TimeSeq::Days => Grain::Day,
+            TimeSeq::Weekdays(_) => Grain::Day,
+            TimeSeq::Weekends => Grain::Day,
+            TimeSeq::Month(_) => Grain::Month,
+            TimeSeq::Months => Grain::Month,
+            // TimeSeq::Union(left, right) => {
+            //     let left_grain = left.grain();
+            //     let right_grain = right.grain();
+            //     if left_grain == right_grain {
+            //         left_grain
+            //     } else {
+            //         Grain::Second
+            //     }
+            // }
+            TimeSeq::Within {
+                nth: _,
+                window,
+                frame: _,
+            } => window.grain(),
+            _ => todo!(),
+        }
+    }
+
+    fn seq(&self, t0: DateTime, direction: TimeDir) -> Box<dyn Iterator<Item = TimeSpan> + '_> {
+        use TimeSeq::*;
+        match self {
+            Seconds => {
+                let step_by = match direction {
+                    TimeDir::Future => (Grain::Second, 1),
+                    TimeDir::Past => (Grain::Second, -1),
+                };
+                Box::new(grain_iterator(t0, (Grain::Second, 1), step_by))
+            }
+            Days => {
+                let step_by = match direction {
+                    TimeDir::Future => (Grain::Day, 1),
+                    TimeDir::Past => (Grain::Day, -1),
+                };
+                Box::new(grain_iterator(t0, (Grain::Day, 1), step_by))
+            }
+            Weeks => {
+                let step_by = match direction {
+                    TimeDir::Future => (Grain::Day, 7),
+                    TimeDir::Past => (Grain::Day, -7),
+                };
+                Box::new(grain_iterator(t0, (Grain::Day, 7), step_by))
+            }
             Weekdays(n) => {
-                let t0 = find_weekday(t0, *n)?;
-                Box::new(grain_iterator(t0, (Grain::Day, 1), (Grain::Day, 7))),
+                let t0 = find_weekday(t0, *n);
+                let step_by = match direction {
+                    TimeDir::Future => (Grain::Day, 7),
+                    TimeDir::Past => (Grain::Day, -7),
+                };
+                Box::new(grain_iterator(t0, (Grain::Day, 1), step_by))
             }
             Weekends => {
-                let t0 = find_weekend(t0)?;
-                Box::new(grain_iterator(t0, (Grain::Day, 2), (Grain::Day, 7)))
+                let t0 = find_weekend(t0);
+                let step_by = match direction {
+                    TimeDir::Future => (Grain::Day, 7),
+                    TimeDir::Past => (Grain::Day, -7),
+                };
+                Box::new(grain_iterator(t0, (Grain::Day, 2), step_by))
             }
             Month(n) => {
-                let t0 = find_month(t0, *n)?;
-                Box::new(grain_iterator(t0, (Grain::Month, 1), (Grain::Month, 12)))
+                let t0 = find_month(t0, *n);
+                let step_by = match direction {
+                    TimeDir::Future => (Grain::Month, 12),
+                    TimeDir::Past => (Grain::Month, -12),
+                };
+                Box::new(grain_iterator(t0, (Grain::Month, 1), step_by))
             }
-            Within(n, window_spec, frame_spec) => {
+            Months => {
+                let step_by = match direction {
+                    TimeDir::Future => (Grain::Month, 1),
+                    TimeDir::Past => (Grain::Month, -1),
+                };
+                Box::new(grain_iterator(t0, (Grain::Month, 1), step_by))
+            }
+            Years => {
+                let step_by = match direction {
+                    TimeDir::Future => (Grain::Year, 1),
+                    TimeDir::Past => (Grain::Year, -1),
+                };
+                Box::new(grain_iterator(t0, (Grain::Year, 1), step_by))
+            }
+            Within { nth, window, frame } if *nth > 0 => {
                 // TODO: check that window.grain < frame.grain Or will just getting None be it ?
                 Box::new(
-                    frame_spec
-                        .future(t0)?
-                        // .inspect(|x| println!("Frame: {:?}", x))
-                        .filter_map(|frame| {
-                            window_spec
-                                .future(frame.start)
-                                .unwrap() // TODO: this can fail at run-time (ie calling next)
-                                // Should 'future' items be Results instead of TimeRange ?
-                                // .inspect(|x| println!("Window: {:?}", x))
-                                // Window has to start within frame's boundary
-                                .take_while(|w| w.start < frame.end)
-                                .nth((*n - 1) as usize) // TODO: lastof for negative
+                    frame
+                        .seq(t0, direction)
+                        // .inspect(|f| println!("Frame: {:?}", f))
+                        .take(INFINITE_FUSE)
+                        .filter_map(|f| {
+                            window
+                                .seq(f.start, TimeDir::Future)
+                                // .inspect(|w| println!("Win: {:?}", w))
+                                // Each window has to start within frame's boundary
+                                .take_while(|w| w.start < f.end)
+                                .nth((*nth - 1) as usize)
+                        }),
+                )
+            }
+            Within { nth, window, frame } if *nth < 0 => {
+                let nth = -(*nth) as usize;
+                // TODO: check that window.grain < frame.grain Or will just getting None be it ?
+                Box::new(
+                    frame
+                        .seq(t0, direction)
+                        // .inspect(|f| println!("Frame: {:?}", f))
+                        .take(INFINITE_FUSE)
+                        .filter_map(move |f| {
+                            let mut deque = VecDeque::with_capacity(nth);
+                            // Consume the whole iterator and keep the tail.
+                            for w in window
+                                .seq(f.start, TimeDir::Future)
+                                // Each window has to start within frame's boundary
+                                .take_while(|w| w.start < f.end)
+                            {
+                                deque.truncate(nth - 1);
+                                deque.push_front(w);
+                            }
+                            // Not poping the back because it may be shorter than nth.
+                            deque.remove(nth - 1)
                         }),
                 )
             }
             _ => todo!(), // Union(spec1, spec2) => Sequence::Union(Box::new(spec1), Box::new(spec2)),
-        })
+        }
+    }
+
+    pub fn future(&self, t0: DateTime) -> Box<dyn Iterator<Item = TimeSpan> + '_> {
+        Box::new(
+            self.seq(t0, TimeDir::Future)
+                .skip_while(move |t| t.end <= t0),
+        )
+    }
+
+    pub fn past(&self, t0: DateTime) -> Box<dyn Iterator<Item = TimeSpan> + '_> {
+        Box::new(self.seq(t0, TimeDir::Past).skip_while(move |t| t.end > t0))
     }
 }
 
 #[cfg(test)]
-mod test {
+mod test_grains {
     use super::*;
     use time::macros::datetime;
 
     #[test]
-    fn test_weekend() -> Result<(), String> {
-        // The 3rd weekend of june
-        let seq = TimeSequence::weekends().within(TimeSequence::month(6), 3);
-        let mut sequence = seq.future(datetime!(2025-07-01 0:00))?;
+    fn test_weekend() {
+        //The 3rd weekend of june
+        let seq = TimeSeq::weekends().within(TimeSeq::month(6), 3);
+        let mut sequence = seq.seq(datetime!(2025-07-01 0:00), TimeDir::Future);
         assert_eq!(
             sequence.next().unwrap(),
-            TimeRange {
+            TimeSpan {
                 start: datetime!(2026-06-20 0:00),
                 end: datetime!(2026-06-22 0:00),
                 grain: Grain::Day,
             }
         );
-        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test_within {
+    use super::*;
+    use time::macros::datetime;
+
+    #[test]
+    fn test_within1() {
+        let d10thmo = TimeSeq::days().within(TimeSeq::months(), 10);
+
+        let mut past = d10thmo.seq(datetime!(2015-03-11 0:00), TimeDir::Past);
+        assert_eq!(
+            past.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-03-10 0:00),
+                end: datetime!(2015-03-11 0:00),
+                grain: Grain::Day
+            }
+        );
+    }
+
+    #[test]
+    fn test_within2() {
+        // The 10th day of each month
+        let y5th10thday = TimeSeq::days()
+            .within(TimeSeq::months(), 10)
+            .within(TimeSeq::years(), 5);
+
+        // let mut future = y5th10thday.future(&dt(2015, 3, 11));
+        // assert_eq!(future.next().unwrap(),
+        //     Range{start: dt(2015, 5, 10), end: dt(2015, 5, 11), grain: Grain::Day});
+        // assert_eq!(future.next().unwrap(),
+        //     Range{start: dt(2016, 5, 10), end: dt(2016, 5, 11), grain: Grain::Day});
+
+        let mut past = y5th10thday.seq(datetime!(2015-03-11 0:00), TimeDir::Past);
+        // TODO:
+        let _ = past.next();
+        assert_eq!(
+            past.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2014-05-10 0:00),
+                end: datetime!(2014-05-11 0:00),
+                grain: Grain::Day
+            }
+        );
+        // assert_eq!(
+        //     past.next().unwrap(),
+        //     Range {
+        //         start: dt(2013, 5, 10),
+        //         end: dt(2013, 5, 11),
+        //         grain: Grain::Day
+        //     }
+        // );
+    }
+
+    #[test]
+    fn test_lastn() {
+        // 2nd to last day of feb
+        let last2ndfeb = TimeSeq::days().within(TimeSeq::month(2), -2);
+        let mut f = last2ndfeb.seq(datetime!(2025-03-11 0:00), TimeDir::Future);
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2026-02-27 0:00),
+                end: datetime!(2026-02-28 0:00),
+                grain: Grain::Day
+            }
+        );
+        // 3nd to last day of feb
+        let last2ndfeb = TimeSeq::days().within(TimeSeq::month(2), -3);
+        let mut f = last2ndfeb.seq(datetime!(2025-03-11 0:00), TimeDir::Future);
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2026-02-26 0:00),
+                end: datetime!(2026-02-27 0:00),
+                grain: Grain::Day
+            }
+        );
+        // last day of feb
+        let last2ndfeb = TimeSeq::days().within(TimeSeq::month(2), -1);
+        let mut f = last2ndfeb.seq(datetime!(2025-03-11 0:00), TimeDir::Future);
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2026-02-28 0:00),
+                end: datetime!(2026-03-01 0:00),
+                grain: Grain::Day
+            }
+        );
+        // last 27th day of feb
+        let last2ndfeb = TimeSeq::days().within(TimeSeq::month(2), -28);
+        let mut f = last2ndfeb.seq(datetime!(2025-03-11 0:00), TimeDir::Future);
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2026-02-01 0:00),
+                end: datetime!(2026-02-02 0:00),
+                grain: Grain::Day
+            }
+        );
+        // last 29th day of feb
+        let last2ndfeb = TimeSeq::days().within(TimeSeq::month(2), -29);
+        let mut f = last2ndfeb.seq(datetime!(2025-03-11 0:00), TimeDir::Future);
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2028-02-01 0:00),
+                end: datetime!(2028-02-02 0:00),
+                grain: Grain::Day
+            }
+        );
     }
 }

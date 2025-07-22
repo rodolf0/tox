@@ -43,6 +43,7 @@ mod seq_shim;
 pub use crate::seq_shim::Shim;
 
 mod sequence;
+pub use crate::sequence::TimeSeq;
 
 #[cfg(test)]
 mod mixed_tests;

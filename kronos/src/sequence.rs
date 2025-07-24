@@ -58,7 +58,7 @@ use std::collections::VecDeque;
 use time::{Duration, PrimitiveDateTime as DateTime};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-pub(crate) enum Grain {
+pub enum Grain {
     Second,
     Minute,
     Hour,
@@ -130,6 +130,26 @@ fn truncate(t0: DateTime, grain: Grain) -> DateTime {
     .expect("BUG: truncation failed")
 }
 
+fn truncate_week(t0: DateTime) -> DateTime {
+    let t0 = t0.replace_time(time::Time::MIDNIGHT);
+    let week_days_offset = t0.weekday().number_days_from_sunday();
+    t0 - Duration::days(week_days_offset as i64)
+}
+
+fn truncate_weekend(t0: DateTime) -> DateTime {
+    // Make sure find_weekend was called before truncate_weekend
+    assert!(
+        t0.weekday() != time::Weekday::Saturday || t0.weekday() != time::Weekday::Sunday,
+        "truncate_weekend needs to be called on a weekend "
+    );
+    let t0 = t0.replace_time(time::Time::MIDNIGHT);
+    match t0.weekday() {
+        time::Weekday::Saturday => t0,
+        time::Weekday::Sunday => t0 - Duration::days(1),
+        _ => unreachable!(),
+    }
+}
+
 // Generate sequences of time ranges. Each element will have window_span template.
 fn grain_iterator(
     t0: DateTime,
@@ -161,6 +181,7 @@ pub enum TimeSeq {
     Monthdays(u8),
     Weekdays(u8), // Sunday=0
     Weekends,
+    Weeks,
     Within {
         nth: isize,
         window: Box<TimeSeq>,
@@ -279,10 +300,7 @@ impl TimeSeq {
     }
 
     pub fn weeks() -> TimeSeq {
-        TimeSeq::Grain {
-            window_span: (Grain::Day, 7),
-            step_by: (Grain::Day, 7),
-        }
+        TimeSeq::Weeks
     }
 
     pub fn years() -> TimeSeq {
@@ -356,6 +374,14 @@ impl TimeSeq {
                 };
                 Box::new(grain_iterator(t0, *window_span, (*sb_grain, step)))
             }
+            TimeSeq::Weeks => {
+                let t0 = truncate_week(t0);
+                let step_by = match direction {
+                    TimeDir::Future => (Grain::Day, 7),
+                    TimeDir::Past => (Grain::Day, -7),
+                };
+                Box::new(grain_iterator(t0, (Grain::Day, 7), step_by))
+            }
             TimeSeq::Weekdays(n) => {
                 let t0 = find_weekday(t0, *n);
                 let step_by = match direction {
@@ -386,6 +412,7 @@ impl TimeSeq {
             }
             TimeSeq::Weekends => {
                 let t0 = find_weekend(t0);
+                let t0 = truncate_weekend(t0);
                 let step_by = match direction {
                     TimeDir::Future => (Grain::Day, 7),
                     TimeDir::Past => (Grain::Day, -7),
@@ -405,12 +432,10 @@ impl TimeSeq {
                 Box::new(
                     frame
                         .seq(t0, direction)
-                        // .inspect(|f| println!("Frame: {:?}", f))
                         .take(INFINITE_FUSE)
                         .filter_map(|f| {
                             window
                                 .seq(f.start, TimeDir::Future)
-                                // .inspect(|w| println!("Win: {:?}", w))
                                 // Each window has to start within frame's boundary
                                 .take_while(|w| w.start < f.end)
                                 .nth((*nth - 1) as usize)
@@ -423,7 +448,6 @@ impl TimeSeq {
                 Box::new(
                     frame
                         .seq(t0, direction)
-                        // .inspect(|f| println!("Frame: {:?}", f))
                         .take(INFINITE_FUSE)
                         .filter_map(move |f| {
                             let mut deque = VecDeque::with_capacity(nth);

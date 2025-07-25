@@ -433,41 +433,34 @@ impl TimeSeq {
                 };
                 Box::new(grain_iterator(t0, (*grain, 1), step_by))
             }
-            TimeSeq::Within { nth, window, frame } if *nth > 0 => {
+            TimeSeq::Within { nth, window, frame } => {
                 // TODO: check that window.grain < frame.grain Or will just getting None be it ?
                 Box::new(
                     frame
                         .seq(t0, direction)
                         .take(INFINITE_FUSE)
                         .filter_map(|f| {
-                            window
-                                .seq(f.start, TimeDir::Future)
-                                // Each window has to start within frame's boundary
-                                .take_while(|w| w.start < f.end)
-                                .nth((*nth - 1) as usize)
-                        }),
-                )
-            }
-            TimeSeq::Within { nth, window, frame } if *nth < 0 => {
-                let nth = -(*nth) as usize;
-                // TODO: check that window.grain < frame.grain Or will just getting None be it ?
-                Box::new(
-                    frame
-                        .seq(t0, direction)
-                        .take(INFINITE_FUSE)
-                        .filter_map(move |f| {
-                            let mut deque = VecDeque::with_capacity(nth);
-                            // Consume the whole iterator and keep the tail.
-                            for w in window
-                                .seq(f.start, TimeDir::Future)
-                                // Each window has to start within frame's boundary
-                                .take_while(|w| w.start < f.end)
-                            {
-                                deque.truncate(nth - 1);
-                                deque.push_front(w);
+                            if *nth > 0 {
+                                window
+                                    .seq(f.start, TimeDir::Future)
+                                    // Each window has to start within frame's boundary
+                                    .take_while(|w| w.start < f.end)
+                                    .nth((*nth - 1) as usize)
+                            } else {
+                                let nth = -(*nth) as usize;
+                                let mut deque = VecDeque::with_capacity(nth);
+                                // Consume the whole iterator and keep the tail.
+                                for w in window
+                                    .seq(f.start, TimeDir::Future)
+                                    // Each window has to start within frame's boundary
+                                    .take_while(|w| w.start < f.end)
+                                {
+                                    deque.truncate(nth - 1);
+                                    deque.push_front(w);
+                                }
+                                // Not poping the back because it may be shorter than nth.
+                                deque.remove(nth - 1)
                             }
-                            // Not poping the back because it may be shorter than nth.
-                            deque.remove(nth - 1)
                         }),
                 )
             }

@@ -24,6 +24,15 @@ mod test_grains {
                 grain: Grain::Day,
             }
         );
+        let mut p = s.past(datetime!(2015-03-14 0:00));
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-03-07 0:00),
+                end: datetime!(2015-03-09 0:00),
+                grain: Grain::Day
+            }
+        );
     }
 
     #[test]
@@ -333,6 +342,10 @@ mod test_within {
                 grain: Grain::Day
             }
         );
+    }
+
+    #[test]
+    fn nthof_leap() {
         // 29th day of february (leap years only)
         let s = TimeSeq::days().within(TimeSeq::months(Some(2)), 29);
         let mut f = s.future(datetime!(2015-01-01 0:00));
@@ -349,6 +362,29 @@ mod test_within {
             TimeSpan {
                 start: datetime!(2020-02-29 0:00),
                 end: datetime!(2020-03-01 0:00),
+                grain: Grain::Day
+            }
+        );
+    }
+
+    #[test]
+    fn nthof_nonaligned() {
+        // 1st weekend of Jan
+        let s = TimeSeq::weekends().within(TimeSeq::months(Some(1)), 1);
+        let mut f = s.future(datetime!(2016-09-04 0:00));
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2016-12-31 0:00),
+                end: datetime!(2017-01-02 0:00),
+                grain: Grain::Day
+            }
+        );
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2018-01-06 0:00),
+                end: datetime!(2018-01-08 0:00),
                 grain: Grain::Day
             }
         );
@@ -392,6 +428,18 @@ mod test_within {
                 start: datetime!(2013-05-10 0:00),
                 end: datetime!(2013-05-11 0:00),
                 grain: Grain::Day
+            }
+        );
+
+        // the 3rd hour of 2nd day of the month
+        let s = TimeSeq::hours(None).within(TimeSeq::days().within(TimeSeq::months(None), 2), 3);
+        let mut f = s.future(datetime!(2015-03-11 0:00));
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-04-02 2:00),
+                end: datetime!(2015-04-02 3:00),
+                grain: Grain::Hour,
             }
         );
     }

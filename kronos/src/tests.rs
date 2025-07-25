@@ -506,5 +506,31 @@ mod test_within {
                 grain: Grain::Day
             }
         );
+
+        // backward: 2nd-to-last day of february (in the past)
+        let s = TimeSeq::days().within(TimeSeq::months(Some(2)), -2);
+        let mut p = s.past(datetime!(2014-02-25 0:00));
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2013-02-27 0:00),
+                end: datetime!(2013-02-28 0:00),
+                grain: Grain::Day
+            }
+        );
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2012-02-28 0:00),
+                end: datetime!(2012-02-29 0:00),
+                grain: Grain::Day
+            }
+        );
+    }
+
+    #[test]
+    fn impossible_lastof() {
+        let s = TimeSeq::days().within(TimeSeq::months(None), 32);
+        assert_eq!(s.future(datetime!(2015-02-25 0:00)).next(), None);
     }
 }

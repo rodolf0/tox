@@ -219,6 +219,37 @@ mod test_grains {
             }
         );
     }
+
+    #[test]
+    fn merge() {
+        let s = TimeSeq::merge(TimeSeq::days(), 2);
+        let mut f = s.future(datetime!(2015-02-28 0:00));
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-02-28 0:00),
+                end: datetime!(2015-03-02 0:00),
+                grain: Grain::Day,
+            }
+        );
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-03-02 0:00),
+                end: datetime!(2015-03-04 0:00),
+                grain: Grain::Day,
+            }
+        );
+        let mut p = s.past(datetime!(2015-02-28 0:00));
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-02-26 0:00),
+                end: datetime!(2015-02-28 0:00),
+                grain: Grain::Day,
+            }
+        );
+    }
 }
 
 mod test_within {

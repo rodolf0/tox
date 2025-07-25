@@ -187,6 +187,7 @@ pub enum TimeSeq {
         window: Box<TimeSeq>,
         frame: Box<TimeSeq>,
     },
+    Merge(Box<TimeSeq>, u8), // merge multiple spans into one
     Union(Box<TimeSeq>, Box<TimeSeq>),
     Intersection(Box<TimeSeq>, Box<TimeSeq>),
 }
@@ -234,6 +235,7 @@ fn find_weekday(mut t0: DateTime, weekday: u8) -> DateTime {
 // Guard against impossible sequences, eg: 32nd day of the month
 const INFINITE_FUSE: usize = 1000;
 
+#[derive(Clone, Copy)]
 enum TimeDir {
     Future,
     Past,
@@ -332,6 +334,10 @@ impl TimeSeq {
             window: Box::new(self),
             frame: Box::new(frame),
         }
+    }
+
+    pub fn merge(self, n: u8) -> Self {
+        Self::Merge(Box::new(self), n)
     }
 
     fn grain(&self) -> Grain {
@@ -464,6 +470,28 @@ impl TimeSeq {
                             deque.remove(nth - 1)
                         }),
                 )
+            }
+            TimeSeq::Merge(s, n) => {
+                let mut _s = match direction {
+                    TimeDir::Future => s.seq(t0, direction).skip(0),
+                    TimeDir::Past => s.seq(t0, direction).skip(1),
+                };
+                Box::new(std::iter::from_fn(move || {
+                    let _s2 = _s.by_ref();
+                    let spans: Vec<_> = _s2.take(*n as usize).collect();
+                    match direction {
+                        TimeDir::Future => Some(TimeSpan {
+                            start: spans.first().unwrap().start,
+                            end: spans.last().unwrap().end,
+                            grain: spans.first().unwrap().grain,
+                        }),
+                        TimeDir::Past => Some(TimeSpan {
+                            start: spans.last().unwrap().start,
+                            end: spans.first().unwrap().end,
+                            grain: spans.first().unwrap().grain,
+                        }),
+                    }
+                }))
             }
             _ => todo!(), // Union(spec1, spec2) => Sequence::Union(Box::new(spec1), Box::new(spec2)),
         }

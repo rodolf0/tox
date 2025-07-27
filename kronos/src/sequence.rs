@@ -187,7 +187,9 @@ pub enum TimeSeq {
         window: Box<TimeSeq>,
         frame: Box<TimeSeq>,
     },
-    Merge(Box<TimeSeq>, u8), // merge multiple spans into one
+    // merge multiple TimeSpans into one
+    Merge(Box<TimeSeq>, u8),
+    // Union emits the elements of both streams in order
     Union(Box<TimeSeq>, Box<TimeSeq>),
     Intersection(Box<TimeSeq>, Box<TimeSeq>),
 }
@@ -235,7 +237,7 @@ fn find_weekday(mut t0: DateTime, weekday: u8) -> DateTime {
 // Guard against impossible sequences, eg: 32nd day of the month
 const INFINITE_FUSE: usize = 1000;
 
-#[derive(Clone, Copy)]
+#[derive(PartialEq, Clone, Copy)]
 enum TimeDir {
     Future,
     Past,
@@ -324,11 +326,16 @@ impl TimeSeq {
         TimeSeq::Monthdays(day)
     }
 
-    pub fn or(self, other: Self) -> Self {
-        Self::Union(Box::new(self), Box::new(other))
+    pub fn union(self, other: Self) -> Result<Self, String> {
+        if self.grain() != other.grain() {
+            Err("Union grains must be the same".to_string())
+        } else {
+            Ok(Self::Union(Box::new(self), Box::new(other)))
+        }
     }
 
     pub fn within(self, frame: Self, nth: isize) -> Self {
+        // TODO: check that window.grain < frame.grain Or will just getting None be it ?
         Self::Within {
             nth,
             window: Box::new(self),
@@ -347,23 +354,18 @@ impl TimeSeq {
                 step_by: _,
             } => *grain,
             TimeSeq::SpecificGrain { grain, n: _ } => *grain,
-            TimeSeq::Weekdays(_) => Grain::Day,
             TimeSeq::Monthdays(_) => Grain::Day,
+            TimeSeq::Weekdays(_) => Grain::Day,
             TimeSeq::Weekends => Grain::Day,
+            TimeSeq::Weeks => Grain::Day,
             TimeSeq::Within {
                 nth: _,
                 window,
                 frame: _,
             } => window.grain(),
-            // TimeSeq::Union(left, right) => {
-            //     let left_grain = left.grain();
-            //     let right_grain = right.grain();
-            //     if left_grain == right_grain {
-            //         left_grain
-            //     } else {
-            //         Grain::Second
-            //     }
-            // }
+            TimeSeq::Merge(s, _) => s.grain(),
+            // Constructor asserts that s1 and s2 have the same grain
+            TimeSeq::Union(s1, s2) => s1.grain(),
             _ => todo!(),
         }
     }
@@ -434,7 +436,6 @@ impl TimeSeq {
                 Box::new(grain_iterator(t0, (*grain, 1), step_by))
             }
             TimeSeq::Within { nth, window, frame } => {
-                // TODO: check that window.grain < frame.grain Or will just getting None be it ?
                 Box::new(
                     frame
                         .seq(t0, direction)
@@ -486,7 +487,34 @@ impl TimeSeq {
                     }
                 }))
             }
-            _ => todo!(), // Union(spec1, spec2) => Sequence::Union(Box::new(spec1), Box::new(spec2)),
+            TimeSeq::Union(s1, s2) => {
+                let mut s1 = s1.seq(t0, direction);
+                let mut s2 = s2.seq(t0, direction);
+                let mut next1 = s1.next().unwrap(); // TODO remove unwrap
+                let mut next2 = s2.next().unwrap();
+                Box::new(std::iter::from_fn(move || {
+                    if (direction == TimeDir::Future && next1.start <= next2.start)
+                        || (direction == TimeDir::Past && next1.start > next2.start)
+                    {
+                        let union = TimeSpan {
+                            start: next1.start,
+                            end: next1.end,
+                            grain: next1.grain,
+                        };
+                        next1 = s1.next().unwrap();
+                        Some(union)
+                    } else {
+                        let union = TimeSpan {
+                            start: next2.start,
+                            end: next2.end,
+                            grain: next2.grain,
+                        };
+                        next2 = s2.next().unwrap();
+                        Some(union)
+                    }
+                }))
+            }
+            _ => todo!(),
         }
     }
 

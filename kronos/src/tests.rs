@@ -534,3 +534,66 @@ mod test_within {
         assert_eq!(s.future(datetime!(2015-02-25 0:00)).next(), None);
     }
 }
+
+mod test_union {
+    use crate::sequence::*;
+    use time::macros::datetime;
+
+    #[test]
+    fn test_union() {
+        // Mondays and Wednesdays
+        let s = TimeSeq::weekday(1).union(TimeSeq::weekday(3)).unwrap();
+        let mut f = s.future(datetime!(2015-02-27 0:00));
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-03-02 0:00),
+                end: datetime!(2015-03-03 0:00),
+                grain: Grain::Day
+            }
+        );
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-03-04 0:00),
+                end: datetime!(2015-03-05 0:00),
+                grain: Grain::Day
+            }
+        );
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-03-09 0:00),
+                end: datetime!(2015-03-10 0:00),
+                grain: Grain::Day
+            }
+        );
+    }
+
+    #[test]
+    fn test_union_past() {
+        // Mondays and Wednesdays and Fridays (into the past)
+        let s = TimeSeq::weekday(1)
+            .union(TimeSeq::weekday(3))
+            .unwrap()
+            .union(TimeSeq::weekday(5))
+            .unwrap();
+        let mut p = s.past(datetime!(2015-02-27 0:00));
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-02-25 0:00),
+                end: datetime!(2015-02-26 0:00),
+                grain: Grain::Day
+            }
+        );
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-02-23 0:00),
+                end: datetime!(2015-02-24 0:00),
+                grain: Grain::Day
+            }
+        );
+    }
+}

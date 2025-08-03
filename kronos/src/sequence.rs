@@ -67,11 +67,25 @@ pub enum Grain {
     Year,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TimeSpan {
     pub(crate) start: DateTime,
     pub(crate) end: DateTime,
     pub(crate) grain: Grain,
+}
+
+impl TimeSpan {
+    pub fn intersect(&self, other: &TimeSpan) -> Option<TimeSpan> {
+        use std::cmp;
+        if self.start < other.end && self.end > other.start {
+            return Some(TimeSpan {
+                start: cmp::max(self.start, other.start),
+                end: cmp::min(self.end, other.end),
+                grain: cmp::min(self.grain, other.grain),
+            });
+        }
+        None
+    }
 }
 
 // Shift a DateTime by a given number of grain-counts.
@@ -347,6 +361,10 @@ impl TimeSeq {
         Self::Merge(Box::new(self), n)
     }
 
+    pub fn intersection(self, other: Self) -> Self {
+        Self::Intersection(Box::new(self), Box::new(other))
+    }
+
     fn grain(&self) -> Grain {
         match self {
             TimeSeq::Grain {
@@ -365,7 +383,7 @@ impl TimeSeq {
             } => window.grain(),
             TimeSeq::Merge(s, _) => s.grain(),
             // Constructor asserts that s1 and s2 have the same grain
-            TimeSeq::Union(s1, s2) => s1.grain(),
+            TimeSeq::Union(s1, _) => s1.grain(),
             _ => todo!(),
         }
     }
@@ -496,25 +514,38 @@ impl TimeSeq {
                     if (direction == TimeDir::Future && next1.start <= next2.start)
                         || (direction == TimeDir::Past && next1.start > next2.start)
                     {
-                        let union = TimeSpan {
-                            start: next1.start,
-                            end: next1.end,
-                            grain: next1.grain,
-                        };
+                        let union = next1.clone();
                         next1 = s1.next().unwrap();
                         Some(union)
                     } else {
-                        let union = TimeSpan {
-                            start: next2.start,
-                            end: next2.end,
-                            grain: next2.grain,
-                        };
+                        let union = next2.clone();
                         next2 = s2.next().unwrap();
                         Some(union)
                     }
                 }))
             }
-            _ => todo!(),
+            TimeSeq::Intersection(s1, s2) => {
+                let mut s1 = s1.seq(t0, direction);
+                let mut s2 = s2.seq(t0, direction);
+                let mut next1 = s1.next().unwrap(); // TODO remove unwrap
+                let mut next2 = s2.next().unwrap();
+                Box::new(std::iter::from_fn(move || {
+                    for _ in 0..INFINITE_FUSE {
+                        let overlap = next1.intersect(&next2);
+                        if (direction == TimeDir::Future && next1.end <= next2.end)
+                            || (direction == TimeDir::Past && next1.start >= next2.start)
+                        {
+                            next1 = s1.next().unwrap();
+                        } else {
+                            next2 = s2.next().unwrap();
+                        }
+                        if overlap.is_some() {
+                            return overlap;
+                        }
+                    }
+                    panic!("Intersect INFINITE_FUSE blown");
+                }))
+            }
         }
     }
 

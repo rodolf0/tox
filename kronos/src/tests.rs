@@ -597,3 +597,138 @@ mod test_union {
         );
     }
 }
+
+mod test_intersect {
+    use crate::sequence::*;
+    use time::macros::datetime;
+
+    #[test]
+    fn intersect_basic() {
+        // Mondays of June
+        let s = TimeSeq::months(Some(6)).intersection(TimeSeq::weekday(1));
+        let mut f = s.future(datetime!(2015-03-11 0:00));
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-06-01 0:00),
+                end: datetime!(2015-06-02 0:00),
+                grain: Grain::Day
+            }
+        );
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-06-08 0:00),
+                end: datetime!(2015-06-09 0:00),
+                grain: Grain::Day
+            }
+        );
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-06-15 0:00),
+                end: datetime!(2015-06-16 0:00),
+                grain: Grain::Day
+            }
+        );
+
+        let mut p = s.past(datetime!(2015-06-05 0:00));
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-06-01 0:00),
+                end: datetime!(2015-06-02 0:00),
+                grain: Grain::Day
+            }
+        );
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2014-06-30 0:00),
+                end: datetime!(2014-07-01 0:00),
+                grain: Grain::Day
+            }
+        );
+    }
+
+    #[test]
+    fn intersect2() {
+        // 3PM on mondays
+        let s = TimeSeq::hours(Some(15)).intersection(TimeSeq::weekday(1));
+        let mut f = s.future(datetime!(2015-03-11 0:00));
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-03-16 15:00),
+                end: datetime!(2015-03-16 16:00),
+                grain: Grain::Hour
+            }
+        );
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-03-23 15:00),
+                end: datetime!(2015-03-23 16:00),
+                grain: Grain::Hour
+            }
+        );
+        let mut p = s.past(datetime!(2015-03-16 16:00));
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-03-16 15:00),
+                end: datetime!(2015-03-16 16:00),
+                grain: Grain::Hour
+            }
+        );
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-03-09 15:00),
+                end: datetime!(2015-03-09 16:00),
+                grain: Grain::Hour
+            }
+        );
+    }
+
+    #[test]
+    fn intersect_union() {
+        // 3PM on (mondays or tuesdays)
+        let hour_15 = TimeSeq::hours(Some(15)).intersection(
+            TimeSeq::weekday(1).union(TimeSeq::weekday(2)).unwrap());
+        let mut f = hour_15.future(datetime!(2015-03-11 0:00));
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-03-16 15:00),
+                end: datetime!(2015-03-16 16:00),
+                grain: Grain::Hour
+            }
+        );
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-03-17 15:00),
+                end: datetime!(2015-03-17 16:00),
+                grain: Grain::Hour
+            }
+        );
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-03-23 15:00),
+                end: datetime!(2015-03-23 16:00),
+                grain: Grain::Hour
+            }
+        );
+        let mut f = f.skip(6);
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-04-14 15:00),
+                end: datetime!(2015-04-14 16:00),
+                grain: Grain::Hour
+            }
+        );
+    }
+}

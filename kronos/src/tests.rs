@@ -268,7 +268,9 @@ mod test_within {
     #[test]
     fn nthof() {
         //The 3rd weekend of june
-        let s = TimeSeq::weekends().within(TimeSeq::months(Some(6)), 3);
+        let s = TimeSeq::weekends()
+            .within(TimeSeq::months(Some(6)), 3)
+            .unwrap();
         let mut f = s.future(datetime!(2025-07-01 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -287,7 +289,7 @@ mod test_within {
             }
         );
         // 10th day of each month (past)
-        let s = TimeSeq::days().within(TimeSeq::months(None), 10);
+        let s = TimeSeq::days().within(TimeSeq::months(None), 10).unwrap();
         let mut p = s.past(datetime!(2015-03-11 0:00));
         assert_eq!(
             p.next().unwrap(),
@@ -306,7 +308,9 @@ mod test_within {
             }
         );
         // 3rd monday of each month
-        let s = TimeSeq::weekday(1).within(TimeSeq::months(None), 3);
+        let s = TimeSeq::weekday(1)
+            .within(TimeSeq::months(None), 3)
+            .unwrap();
         let mut f = s.future(datetime!(2015-03-11 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -347,7 +351,9 @@ mod test_within {
     #[test]
     fn nthof_leap() {
         // 29th day of february (leap years only)
-        let s = TimeSeq::days().within(TimeSeq::months(Some(2)), 29);
+        let s = TimeSeq::days()
+            .within(TimeSeq::months(Some(2)), 29)
+            .unwrap();
         let mut f = s.future(datetime!(2015-01-01 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -370,7 +376,9 @@ mod test_within {
     #[test]
     fn nthof_nonaligned() {
         // 1st weekend of Jan
-        let s = TimeSeq::weekends().within(TimeSeq::months(Some(1)), 1);
+        let s = TimeSeq::weekends()
+            .within(TimeSeq::months(Some(1)), 1)
+            .unwrap();
         let mut f = s.future(datetime!(2016-09-04 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -395,7 +403,9 @@ mod test_within {
         // 10th day of the 5th month of each year
         let s = TimeSeq::days()
             .within(TimeSeq::months(None), 10)
-            .within(TimeSeq::years(), 5);
+            .unwrap()
+            .within(TimeSeq::years(), 5)
+            .unwrap();
         let mut f = s.future(datetime!(2015-03-11 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -432,7 +442,9 @@ mod test_within {
         );
 
         // the 3rd hour of 2nd day of the month
-        let s = TimeSeq::hours(None).within(TimeSeq::days().within(TimeSeq::months(None), 2), 3);
+        let s = TimeSeq::hours(None)
+            .within(TimeSeq::days().within(TimeSeq::months(None), 2).unwrap(), 3)
+            .unwrap();
         let mut f = s.future(datetime!(2015-03-11 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -447,7 +459,7 @@ mod test_within {
     #[test]
     fn lastof() {
         // 2nd to last day of feb
-        let s = TimeSeq::days().within(TimeSeq::months(Some(2)), -2);
+        let s = TimeSeq::days().within(TimeSeq::months(Some(2)), -2).unwrap();
         let mut f = s.future(datetime!(2025-03-11 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -466,7 +478,7 @@ mod test_within {
             }
         );
         // last day of feb
-        let s = TimeSeq::days().within(TimeSeq::months(Some(2)), -1);
+        let s = TimeSeq::days().within(TimeSeq::months(Some(2)), -1).unwrap();
         let mut f = s.future(datetime!(2025-03-11 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -477,7 +489,7 @@ mod test_within {
             }
         );
         // last 29th day of feb
-        let s = TimeSeq::days().within(TimeSeq::months(Some(2)), -29);
+        let s = TimeSeq::days().within(TimeSeq::months(Some(2)), -29).unwrap();
         let mut f = s.future(datetime!(2025-03-11 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -488,7 +500,7 @@ mod test_within {
             }
         );
         // Last monday of each month
-        let s = TimeSeq::weekday(1).within(TimeSeq::months(None), -1);
+        let s = TimeSeq::weekday(1).within(TimeSeq::months(None), -1).unwrap();
         let mut f = s.future(datetime!(2015-03-11 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -508,7 +520,7 @@ mod test_within {
         );
 
         // backward: 2nd-to-last day of february (in the past)
-        let s = TimeSeq::days().within(TimeSeq::months(Some(2)), -2);
+        let s = TimeSeq::days().within(TimeSeq::months(Some(2)), -2).unwrap();
         let mut p = s.past(datetime!(2014-02-25 0:00));
         assert_eq!(
             p.next().unwrap(),
@@ -530,7 +542,7 @@ mod test_within {
 
     #[test]
     fn impossible_lastof() {
-        let s = TimeSeq::days().within(TimeSeq::months(None), 32);
+        let s = TimeSeq::days().within(TimeSeq::months(None), 32).unwrap();
         assert_eq!(s.future(datetime!(2015-02-25 0:00)).next(), None);
     }
 }
@@ -694,8 +706,8 @@ mod test_intersect {
     #[test]
     fn intersect_union() {
         // 3PM on (mondays or tuesdays)
-        let hour_15 = TimeSeq::hours(Some(15)).intersection(
-            TimeSeq::weekday(1).union(TimeSeq::weekday(2)).unwrap());
+        let hour_15 = TimeSeq::hours(Some(15))
+            .intersection(TimeSeq::weekday(1).union(TimeSeq::weekday(2)).unwrap());
         let mut f = hour_15.future(datetime!(2015-03-11 0:00));
         assert_eq!(
             f.next().unwrap(),

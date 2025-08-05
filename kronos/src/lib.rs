@@ -1,5 +1,4 @@
-// TODO
-// #![deny(warnings)]
+#![deny(warnings)]
 
 mod sequence;
 pub use crate::sequence::{TimeSeq, TimeSpan};

@@ -16,8 +16,6 @@
 // its impossible because of a non-complete sequence.
 // - Iterating into the future the the start of the first element will be greater than t0.
 // - Iterating into the past the the start of the first element will be greater than t0 ?
-// TODO: add utility method on TimeSpan to check if a timepoint is contained.
-// TODO: add utility method to shift TimeSpan by an amount.
 //
 // When iterating into the past. The same applies t0 will be contained by the
 // first emitted TimeSpan (unless impossible because of a non-complete sequence).
@@ -54,7 +52,6 @@
 // can transform items as needed with iterator methods.
 
 use std::collections::VecDeque;
-
 use time::{Duration, PrimitiveDateTime as DateTime};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
@@ -85,6 +82,18 @@ impl TimeSpan {
             });
         }
         None
+    }
+
+    pub fn contains(&self, t: &DateTime) -> bool {
+        self.start <= *t && *t < self.end
+    }
+
+    pub fn shift(self, grain: Grain, n: i32) -> Self {
+        TimeSpan {
+            start: shift(self.start, grain, n),
+            end: shift(self.end, grain, n),
+            grain: self.grain,
+        }
     }
 }
 
@@ -348,12 +357,15 @@ impl TimeSeq {
         }
     }
 
-    pub fn within(self, frame: Self, nth: isize) -> Self {
-        // TODO: check that window.grain < frame.grain Or will just getting None be it ?
-        Self::Within {
-            nth,
-            window: Box::new(self),
-            frame: Box::new(frame),
+    pub fn within(self, frame: Self, nth: isize) -> Result<Self, String> {
+        if self.grain() >= frame.grain() {
+            Err("Within needs win grain < frame grain".to_string())
+        } else {
+            Ok(Self::Within {
+                nth,
+                window: Box::new(self),
+                frame: Box::new(frame),
+            })
         }
     }
 
@@ -366,6 +378,7 @@ impl TimeSeq {
     }
 
     fn grain(&self) -> Grain {
+        use std::cmp;
         match self {
             TimeSeq::Grain {
                 window_span: (grain, _),
@@ -384,7 +397,7 @@ impl TimeSeq {
             TimeSeq::Merge(s, _) => s.grain(),
             // Constructor asserts that s1 and s2 have the same grain
             TimeSeq::Union(s1, _) => s1.grain(),
-            _ => todo!(),
+            TimeSeq::Intersection(s1, s2) => cmp::min(s1.grain(), s2.grain()),
         }
     }
 
@@ -511,6 +524,7 @@ impl TimeSeq {
                 let mut next1 = s1.next().unwrap(); // TODO remove unwrap
                 let mut next2 = s2.next().unwrap();
                 Box::new(std::iter::from_fn(move || {
+                    // emit the span that starts first
                     if (direction == TimeDir::Future && next1.start <= next2.start)
                         || (direction == TimeDir::Past && next1.start > next2.start)
                     {
@@ -532,6 +546,7 @@ impl TimeSeq {
                 Box::new(std::iter::from_fn(move || {
                     for _ in 0..INFINITE_FUSE {
                         let overlap = next1.intersect(&next2);
+                        // advance the stream that is lagging
                         if (direction == TimeDir::Future && next1.end <= next2.end)
                             || (direction == TimeDir::Past && next1.start >= next2.start)
                         {

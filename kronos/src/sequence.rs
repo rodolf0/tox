@@ -519,43 +519,52 @@ impl TimeSeq {
                 }))
             }
             TimeSeq::Union(s1, s2) => {
-                let mut s1 = s1.seq(t0, direction);
-                let mut s2 = s2.seq(t0, direction);
-                let mut next1 = s1.next().unwrap(); // TODO remove unwrap
-                let mut next2 = s2.next().unwrap();
+                let mut s1 = s1.seq(t0, direction).peekable();
+                let mut s2 = s2.seq(t0, direction).peekable();
+                let starts_first = match direction {
+                    TimeDir::Future => |n1: &TimeSpan, n2: &TimeSpan| n1.start <= n2.start,
+                    TimeDir::Past => |n1: &TimeSpan, n2: &TimeSpan| n1.start > n2.start,
+                };
                 Box::new(std::iter::from_fn(move || {
                     // emit the span that starts first
-                    if (direction == TimeDir::Future && next1.start <= next2.start)
-                        || (direction == TimeDir::Past && next1.start > next2.start)
-                    {
-                        let union = next1.clone();
-                        next1 = s1.next().unwrap();
-                        Some(union)
-                    } else {
-                        let union = next2.clone();
-                        next2 = s2.next().unwrap();
-                        Some(union)
+                    match (s1.peek(), s2.peek()) {
+                        (Some(n1), Some(n2)) => {
+                            if starts_first(n1, n2) {
+                                s1.next()
+                            } else {
+                                s2.next()
+                            }
+                        }
+                        (Some(_), None) => s1.next(),
+                        (None, Some(_)) => s2.next(),
+                        (None, None) => None,
                     }
                 }))
             }
             TimeSeq::Intersection(s1, s2) => {
-                let mut s1 = s1.seq(t0, direction);
-                let mut s2 = s2.seq(t0, direction);
-                let mut next1 = s1.next().unwrap(); // TODO remove unwrap
-                let mut next2 = s2.next().unwrap();
+                let mut s1 = s1.seq(t0, direction).peekable();
+                let mut s2 = s2.seq(t0, direction).peekable();
+                let ends_first = match direction {
+                    TimeDir::Future => |n1: &TimeSpan, n2: &TimeSpan| n1.end <= n2.end,
+                    TimeDir::Past => |n1: &TimeSpan, n2: &TimeSpan| n1.start >= n2.start,
+                };
                 Box::new(std::iter::from_fn(move || {
                     for _ in 0..INFINITE_FUSE {
-                        let overlap = next1.intersect(&next2);
-                        // advance the stream that is lagging
-                        if (direction == TimeDir::Future && next1.end <= next2.end)
-                            || (direction == TimeDir::Past && next1.start >= next2.start)
-                        {
-                            next1 = s1.next().unwrap();
-                        } else {
-                            next2 = s2.next().unwrap();
-                        }
-                        if overlap.is_some() {
-                            return overlap;
+                        match (s1.peek(), s2.peek()) {
+                            (Some(n1), Some(n2)) => {
+                                let overlap = n1.intersect(&n2);
+                                // advance the stream that is lagging
+                                if ends_first(n1, n2) {
+                                    s1.next()
+                                } else {
+                                    s2.next()
+                                };
+                                if overlap.is_some() {
+                                    return overlap;
+                                }
+                            }
+                            // If either stream ended there's no more intersections
+                            _ => return None,
                         }
                     }
                     panic!("Intersect INFINITE_FUSE blown");

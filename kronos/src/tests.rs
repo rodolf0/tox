@@ -744,3 +744,102 @@ mod test_intersect {
         );
     }
 }
+
+mod test_except {
+    use crate::sequence::*;
+    use time::macros::datetime;
+
+    #[test]
+    fn except_basic() {
+        // days except Friday and thursdays
+        let s = TimeSeq::days().except(TimeSeq::weekday(4)).except(TimeSeq::weekday(5));
+        let mut f = s.future(datetime!(2018-08-22 0:00));
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2018-08-22 0:00),
+                end: datetime!(2018-08-23 0:00),
+                grain: Grain::Day
+            }
+        );
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2018-08-25 0:00),
+                end: datetime!(2018-08-26 0:00),
+                grain: Grain::Day
+            }
+        );
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2018-08-26 0:00),
+                end: datetime!(2018-08-27 0:00),
+                grain: Grain::Day
+            }
+        );
+
+        let mut p = s.past(datetime!(2018-08-19 0:00));
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2018-08-18 0:00),
+                end: datetime!(2018-08-19 0:00),
+                grain: Grain::Day
+            }
+        );
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2018-08-15 0:00),
+                end: datetime!(2018-08-16 0:00),
+                grain: Grain::Day
+            }
+        );
+
+        let mut p = s.past(datetime!(2018-08-17 0:00));
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2018-08-15 0:00),
+                end: datetime!(2018-08-16 0:00),
+                grain: Grain::Day
+            }
+        );
+    }
+
+    #[test]
+    fn except_diff_grains() {
+        // mondays except september
+        let s = TimeSeq::weekday(1).except(TimeSeq::months(Some(9)));
+        let mut f = s.future(datetime!(2018-08-22 0:00));
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2018-08-27 0:00),
+                end: datetime!(2018-08-28 0:00),
+                grain: Grain::Day
+            }
+        );
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2018-10-01 0:00),
+                end: datetime!(2018-10-02 0:00),
+                grain: Grain::Day
+            }
+        );
+
+        // mondays except August - past
+        let s = TimeSeq::weekday(1).except(TimeSeq::months(Some(8)));
+        let mut p = s.past(datetime!(2018-08-22 0:00));
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2018-07-30 0:00),
+                end: datetime!(2018-07-31 0:00),
+                grain: Grain::Day
+            }
+        );
+    }
+}

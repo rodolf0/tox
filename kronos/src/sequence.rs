@@ -215,6 +215,7 @@ pub enum TimeSeq {
     // Union emits the elements of both streams in order
     Union(Box<TimeSeq>, Box<TimeSeq>),
     Intersection(Box<TimeSeq>, Box<TimeSeq>),
+    Except(Box<TimeSeq>, Box<TimeSeq>),
 }
 
 fn grains_in_parent(grain: Grain) -> u16 {
@@ -377,6 +378,10 @@ impl TimeSeq {
         Self::Intersection(Box::new(self), Box::new(other))
     }
 
+    pub fn except(self, other: Self) -> Self {
+        Self::Except(Box::new(self), Box::new(other))
+    }
+
     fn grain(&self) -> Grain {
         use std::cmp;
         match self {
@@ -398,6 +403,7 @@ impl TimeSeq {
             // Constructor asserts that s1 and s2 have the same grain
             TimeSeq::Union(s1, _) => s1.grain(),
             TimeSeq::Intersection(s1, s2) => cmp::min(s1.grain(), s2.grain()),
+            TimeSeq::Except(s1, _) => s1.grain(),
         }
     }
 
@@ -568,6 +574,25 @@ impl TimeSeq {
                         }
                     }
                     panic!("Intersect INFINITE_FUSE blown");
+                }))
+            }
+            TimeSeq::Except(s, except) => {
+                let s = s.seq(t0, direction);
+                let mut except = except.seq(t0, direction);
+                let mut ex = except.next();
+                let except_lagging_seq = match direction {
+                    TimeDir::Future => |s1: &TimeSpan, ex: &TimeSpan| ex.end < s1.start,
+                    TimeDir::Past => |s1: &TimeSpan, ex: &TimeSpan| ex.start >= s1.end,
+                };
+                Box::new(s.filter(move |span| {
+                    // Catchup the except seq to the stream to know if they intersect
+                    while ex.as_ref().is_some_and(|ex| except_lagging_seq(span, &ex)) {
+                        ex = except.next();
+                    }
+                    match &ex {
+                        Some(ex) => span.intersect(&ex).is_none(),
+                        None => true
+                    }
                 }))
             }
         }

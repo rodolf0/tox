@@ -216,6 +216,7 @@ pub enum TimeSeq {
     Union(Box<TimeSeq>, Box<TimeSeq>),
     Intersection(Box<TimeSeq>, Box<TimeSeq>),
     Except(Box<TimeSeq>, Box<TimeSeq>),
+    Shift(Box<TimeSeq>, Grain, i32),
 }
 
 fn grains_in_parent(grain: Grain) -> u16 {
@@ -382,6 +383,10 @@ impl TimeSeq {
         Self::Except(Box::new(self), Box::new(other))
     }
 
+    pub fn shift(self, grain: Grain, n: i32) -> Self {
+        Self::Shift(Box::new(self), grain, n)
+    }
+
     fn grain(&self) -> Grain {
         use std::cmp;
         match self {
@@ -404,6 +409,7 @@ impl TimeSeq {
             TimeSeq::Union(s1, _) => s1.grain(),
             TimeSeq::Intersection(s1, s2) => cmp::min(s1.grain(), s2.grain()),
             TimeSeq::Except(s1, _) => s1.grain(),
+            TimeSeq::Shift(s1, _, _) => s1.grain(),
         }
     }
 
@@ -594,6 +600,9 @@ impl TimeSeq {
                         None => true
                     }
                 }))
+            }
+            TimeSeq::Shift(s, grain, n) => {
+                Box::new(s.seq(t0, direction).map(|s| s.shift(*grain, *n)))
             }
         }
     }

@@ -1,7 +1,7 @@
 [package]
 name = "kronos"
 version = "0.1.5"
-edition = "2021"
+edition = "2024"
 license = "MIT"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "A tool to calculate complex time expressions"
@@ -11,8 +11,6 @@ keywords = ["time", "date", "calendar", "chrono", "sequence"]
 categories = ["date-and-time"]
 
 [dependencies]
-# TODO: only include macros for dev
-
-# TODO: get rid of chrono
+# NOTE macros only used for tests but can't easily 
+# toggle them off. So we keep thm for release builds too.
 time = { version = "0.3", features = ["macros"] }
-chrono = "=0.4.22"

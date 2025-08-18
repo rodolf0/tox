@@ -940,3 +940,114 @@ mod test_mixed {
         );
     }
 }
+
+mod test_interval {
+    use crate::sequence::*;
+    use time::macros::datetime;
+
+    #[test]
+    fn interval_future() {
+        // Spring
+        let spring = TimeSeq::days()
+            .within(TimeSeq::months(Some(9)), 21)
+            .unwrap()
+            .to(
+                TimeSeq::days()
+                    .within(TimeSeq::months(Some(12)), 21)
+                    .unwrap(),
+                true,
+            );
+        // Test reftime outside interval 
+        let mut f = spring.future(datetime!(2025-08-22 0:00));
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2025-09-21 0:00),
+                end: datetime!(2025-12-22 0:00),
+                grain: Grain::Day
+            }
+        );
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2026-09-21 0:00),
+                end: datetime!(2026-12-22 0:00),
+                grain: Grain::Day
+            }
+        );
+        // Test reftime inside
+        let mut f = spring.future(datetime!(2025-10-22 0:00));
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2025-09-21 0:00),
+                end: datetime!(2025-12-22 0:00),
+                grain: Grain::Day
+            }
+        );
+        // Test reftime last day of interval
+        let mut f = spring.future(datetime!(2025-12-21 15:00));
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2025-09-21 0:00),
+                end: datetime!(2025-12-22 0:00),
+                grain: Grain::Day
+            }
+        );
+    }
+
+    #[test]
+    fn interval_past() {
+        // Spring
+        let spring = TimeSeq::days()
+            .within(TimeSeq::months(Some(9)), 21)
+            .unwrap()
+            .to(
+                TimeSeq::days()
+                    .within(TimeSeq::months(Some(12)), 21)
+                    .unwrap(),
+                true,
+            );
+        // Test reftime outside interval 
+        let mut p = spring.past(datetime!(2025-08-22 0:00));
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2024-09-21 0:00),
+                end: datetime!(2024-12-22 0:00),
+                grain: Grain::Day
+            }
+        );
+        // Test reftime inside. 
+        let mut p = spring.past(datetime!(2025-10-22 0:00));
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2024-09-21 0:00),
+                end: datetime!(2024-12-22 0:00),
+                grain: Grain::Day
+            }
+        );
+        // Test reftime inside - 'seq'
+        let mut p = spring.seq(datetime!(2025-10-22 0:00), TimeDir::Past);
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2025-09-21 0:00),
+                end: datetime!(2025-12-22 0:00),
+                grain: Grain::Day
+            }
+        );
+        // Test reftime last day of interval
+        let mut p = spring.past(datetime!(2025-12-21 15:00));
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2024-09-21 0:00),
+                end: datetime!(2024-12-22 0:00),
+                grain: Grain::Day
+            }
+        );
+    }
+}

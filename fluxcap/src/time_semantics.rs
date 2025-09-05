@@ -1,13 +1,10 @@
 #![deny(warnings)]
 
 use core::fmt;
-
-type DateTime = chrono::NaiveDateTime;
-type Date = chrono::NaiveDate;
+use time::{Duration, PrimitiveDateTime as DateTime};
 
 use earlgrey::{EarleyForest, EarleyParser};
 use kronos as k;
-type Shim = kronos::Shim<'static>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TimeEl {

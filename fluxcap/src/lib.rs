@@ -8,5 +8,9 @@ pub use time_parser::debug_time_expression;
 mod time_semantics;
 pub use time_semantics::{TimeMachine, TimeEl};
 
+// TODO
 #[cfg(test)]
 mod time_test;
+
+#[cfg(test)]
+mod tests;

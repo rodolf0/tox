@@ -156,7 +156,7 @@ impl Span {
 
     /// Scans or Completions that led to the creation of this Span.
     /// Only ever borrowed non-mutable ref returned for public consumption
-    pub fn sources(&self) -> cell::Ref<Vec<SpanSource>> {
+    pub fn sources(&self) -> cell::Ref<'_, Vec<SpanSource>> {
         self.backpointers.borrow()
     }
 

@@ -149,12 +149,22 @@ pub struct GrammarBuilder {
 impl GrammarBuilder {
     fn add_symbol(&mut self, symbol: Symbol, ignore_dups: bool) {
         // Check for duplicate symbols to avoid overwriting by mistake
-        if !self.symbols.contains_key(symbol.name()) {
-            self.symbols
-                .insert(symbol.name().to_string(), Rc::new(symbol));
-        } else if !ignore_dups {
-            // Convenience for adding symbols programatically
-            self.error = Some(format!("Duplicate Symbol: {}", symbol.name()));
+        match self.symbols.get(symbol.name()) {
+            None => {
+                self.symbols
+                    .insert(symbol.name().to_string(), Rc::new(symbol));
+            }
+            Some(_existing) => {
+                if !ignore_dups {
+                    self.error = Some(format!("Duplicate Symbol: {}", symbol.name()));
+                // TODO add_symbol should be the only way, not terminal/nonterminal
+                // } else if existing.is_terminal() != symbol.is_terminal() {
+                //     self.error = Some(format!(
+                //         "Symbol: {} added as term and non-term",
+                //         symbol.name()
+                //     ));
+                }
+            }
         }
     }
 

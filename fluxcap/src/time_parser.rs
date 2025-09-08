@@ -1,5 +1,3 @@
-#![deny(warnings)]
-
 // https://github.com/wit-ai/duckling_old/blob/master/resources/languages/en/corpus/time.clj
 // https://github.com/wit-ai/duckling_old/blob/master/resources/languages/en/rules/time.clj
 
@@ -13,18 +11,18 @@ pub fn time_grammar() -> &'static str {
                ;
 
     anchored_spec := weekday
-                   | weekday month ordinal
-                   | weekday ordinal 'of' month
-                   | weekday ordinal 'of' month year
-                   | weekday hour ('pm' | 'am')
-                   | month
-                   | month year
-                   | month ordinal
-                   | month ordinal year
-                   | ordinal 'of' month
-                   | ordinal 'of' month year
-                   | year
-                   | hour ('pm' | 'am')
+                   | weekday monthname ordinal
+                   | weekday ordinal 'of' monthname
+                   | weekday ordinal 'of' monthname yearnumber
+                   | weekday hourspec
+                   | monthname
+                   | monthname yearnumber
+                   | monthname ordinal
+                   | monthname ordinal yearnumber
+                   | ordinal 'of' monthname
+                   | ordinal 'of' monthname yearnumber
+                   | yearnumber
+                   | hourspec
                    | 'now'
                    | 'today'
                    | 'yesterday'
@@ -34,7 +32,7 @@ pub fn time_grammar() -> &'static str {
     relative_spec := 'this' recurring_token
                    | 'next' recurring_token
                    | 'last' recurring_token
-                   | ('the' | 'a' | small_int) recurring_token relative_anchor
+                   | [('the' | 'a' | small_int)] recurring_token relative_anchor
                    | 'in' ('a' | 'an' | small_int) recurring_token
                    ;
 
@@ -47,12 +45,12 @@ pub fn time_grammar() -> &'static str {
                      | 'week'
                      | 'weekend'
                      | weekday
-                     | month
-                     | ordinal 'of' month
-                     | month ordinal
-                     | weekday month ordinal
-                     | weekday ordinal 'of' month
-                     | hour ('pm' | 'am')
+                     | monthname
+                     | ordinal 'of' monthname
+                     | monthname ordinal
+                     | weekday monthname ordinal
+                     | weekday ordinal 'of' monthname
+                     | hourspec
                      ;
 
     # TODO: group relative_spec, anchored_spec, scoped_spec into time_spec
@@ -92,19 +90,30 @@ fn _grammar() -> Result<earlgrey::Grammar, String> {
     use std::str::FromStr;
     earlgrey::EbnfGrammarParser::new(time_grammar(), "time_spec")
         .plug_terminal("weekday", |d| weekday(d).is_some())
-        .plug_terminal("month", |d| month(d).is_some())
+        .plug_terminal("monthname", |d| month(d).is_some())
         .plug_terminal("ordinal", |d| {
             ordinal(d).or_else(|| short_ordinal(d)).is_some()
         })
-        .plug_terminal("year", |y| {
+        .plug_terminal("yearnumber", |y| {
             i32::from_str(y).map(|y| 999 < y && y < 3000).is_ok()
         })
-        .plug_terminal("hour", |h| {
-            usize::from_str(h).map(|h| 0 <= h && h <= 23).is_ok()
+        .plug_terminal("hourspec", |h| {
+            h.len() > 2 && h.split_at_checked(h.len() - 2).map(|(h, ampm)| {
+                (ampm == "am" || ampm == "pm")
+                    && usize::from_str(h).map(|h| 1 <= h && h <= 12).is_ok()
+            }) == Some(true)
         })
         .plug_terminal("small_int", |s| {
             usize::from_str(s).map(|s| s <= 999).is_ok()
         })
+        // literlas that we want to check variations of
+        .plug_terminal("second", |s| s == "second" || s == "seconds")
+        .plug_terminal("minute", |s| s == "minute" || s == "minutes")
+        .plug_terminal("hour", |s| s == "hour" || s == "hours")
+        .plug_terminal("day", |s| s == "day" || s == "days")
+        .plug_terminal("week", |s| s == "week" || s == "weeks")
+        .plug_terminal("month", |s| s == "month" || s == "months")
+        .plug_terminal("year", |s| s == "year" || s == "years")
         .into_grammar()
 }
 

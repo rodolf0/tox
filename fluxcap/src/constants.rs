@@ -15,19 +15,19 @@ pub fn weekday(d: &str) -> Option<u32> {
 
 pub fn month(m: &str) -> Option<u32> {
     match m {
-        "january"   |  "jan"    => Some(1),
-        "february"  |  "feb"    => Some(2),
-        "march"     |  "mar"    => Some(3),
-        "april"     |  "apr"    => Some(4),
-        "may"       => Some(5),
-        "june"      |  "jun"    => Some(6),
-        "july"      |  "jul"    => Some(7),
-        "august"    |  "aug"    => Some(8),
-        "september" |  "sep"    => Some(9),
-        "october"   |  "oct"    => Some(10),
-        "november"  |  "nov"    => Some(11),
-        "december"  |  "dec"    => Some(12),
-        _           => None
+        "january"   | "januaries"  | "jan"  => Some(1),
+        "february"  | "februaries" | "feb"  => Some(2),
+        "march"     | "marches"    | "mar"  => Some(3),
+        "april"     | "aprils"     | "apr"  => Some(4),
+        "may"       | "mays"                => Some(5),
+        "june"      | "junes"      | "jun"  => Some(6),
+        "july"      | "julys"      | "jul"  => Some(7),
+        "august"    | "augusts"    | "aug"  => Some(8),
+        "september" | "septembers" | "sep"  => Some(9),
+        "october"   | "octobers"   | "oct"  => Some(10),
+        "november"  | "novembers"  | "nov"  => Some(11),
+        "december"  | "decembers"  | "dec"  => Some(12),
+        _ => None
     }
 }
 
@@ -51,7 +51,7 @@ pub fn short_ordinal(n: &str) -> Option<u32> {
     use std::str::FromStr;
     let num = n.chars().take_while(|d| d.is_numeric()).collect::<String>();
     match &n[num.len()..] {
-        "st"|"nd"|"rd"|"th" => u32::from_str(&num).ok(),
+        "st"|"nd"|"rd"|"th"|"sts"|"nds"|"rds"|"ths" => u32::from_str(&num).ok(),
         _ => None
     }
 }

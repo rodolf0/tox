@@ -147,61 +147,65 @@ pub struct GrammarBuilder {
 
 /// Builds a Gramar while validating existence of Symbols and checking rules.
 impl GrammarBuilder {
-    fn add_symbol(&mut self, symbol: Symbol, ignore_dups: bool) {
+    // Register new symbols for the grammar. Returns true if added.
+    fn add_symbol(&mut self, symbol: Symbol) -> Option<String> {
         // Check for duplicate symbols to avoid overwriting by mistake
         match self.symbols.get(symbol.name()) {
             None => {
                 self.symbols
                     .insert(symbol.name().to_string(), Rc::new(symbol));
+                None
             }
-            Some(_existing) => {
-                if !ignore_dups {
-                    self.error = Some(format!("Duplicate Symbol: {}", symbol.name()));
-                // TODO add_symbol should be the only way, not terminal/nonterminal
-                // } else if existing.is_terminal() != symbol.is_terminal() {
-                //     self.error = Some(format!(
-                //         "Symbol: {} added as term and non-term",
-                //         symbol.name()
-                //     ));
+            Some(existing) => {
+                if existing.is_terminal() != symbol.is_terminal() {
+                    // Always report overwrite switching term/non-term
+                    self.error = Some(format!(
+                        "Symbol: {} added as term and non-term",
+                        symbol.name()
+                    ));
+                    self.error.clone()
+                } else {
+                    Some(format!("Duplicate Symbol: {}", symbol.name()))
                 }
             }
         }
     }
 
     pub fn nonterm(mut self, name: &str) -> Self {
-        self.add_symbol(Symbol::NonTerm(name.into()), false);
+        if let Some(error) = self.add_symbol(Symbol::NonTerm(name.into())) {
+            self.error = Some(error);
+        }
         self
     }
 
     pub fn terminal(mut self, name: &str, pred: impl Fn(&str) -> bool + 'static) -> Self {
-        self.add_symbol(Symbol::Term(name.into(), Box::new(pred)), false);
+        if let Some(error) = self.add_symbol(Symbol::Term(name.into(), Box::new(pred))) {
+            self.error = Some(error);
+        }
         self
     }
 
-    pub fn nonterm_try(&mut self, name: &str) {
-        self.add_symbol(Symbol::NonTerm(name.into()), true);
+    pub fn silent_nonterm(&mut self, name: &str) {
+        self.add_symbol(Symbol::NonTerm(name.into()));
     }
 
-    pub fn terminal_try(&mut self, name: &str, pred: impl Fn(&str) -> bool + 'static) {
-        self.add_symbol(Symbol::Term(name.into(), Box::new(pred)), true);
+    pub fn silent_terminal(&mut self, name: &str, pred: impl Fn(&str) -> bool + 'static) {
+        self.add_symbol(Symbol::Term(name.into(), Box::new(pred)));
     }
 
     // Register new rules for the grammar
-    fn add_rule(&mut self, head: &str, spec: &[&str], ignore_dups: bool) {
+    fn add_rule(&mut self, head: &str, spec: &[&str]) -> Option<String> {
         // First check that all symbols have been registered (need references)
         if let Some(s) = spec.iter().find(|&n| !self.symbols.contains_key(*n)) {
-            self.error = Some(format!("Missing Symbol: {}", s));
-            return;
+            return Some(format!("Missing Symbol: {}", s));
         }
         // Check the head
         if let Some(s) = self.symbols.get(head) {
             if s.is_terminal() {
-                self.error = Some(format!("Rule head must be Term: {}", head));
-                return;
+                return Some(format!("Rule head must be Term: {}", head));
             }
         } else {
-            self.error = Some(format!("Missing Symbol: {}", head));
-            return;
+            return Some(format!("Missing Symbol: {}", head));
         }
         // Build the rule
         let rule = Rc::new(Rule {
@@ -209,20 +213,22 @@ impl GrammarBuilder {
             spec: spec.iter().map(|&s| self.symbols[s].clone()).collect(),
         });
         // Check this rule is only added once. NOTE: `Rc`s equal on inner value
-        if !self.rules.contains(&rule) {
-            self.rules.push(rule);
-        } else if !ignore_dups {
-            self.error = Some(format!("Duplicate Rule: {}", rule));
+        if self.rules.contains(&rule) {
+            return Some(format!("Duplicate Rule: {}", rule));
         }
+        self.rules.push(rule);
+        None
     }
 
     pub fn rule(mut self, head: &str, spec: &[&str]) -> Self {
-        self.add_rule(head, spec, false);
+        if let Some(error) = self.add_rule(head, spec) {
+            self.error = Some(error);
+        }
         self
     }
 
-    pub fn rule_try(&mut self, head: &str, spec: &[&str]) {
-        self.add_rule(head, spec, true)
+    pub fn silent_rule(&mut self, head: &str, spec: &[&str]) {
+        self.add_rule(head, spec);
     }
 
     pub fn into_grammar(mut self, start: &str) -> Result<Grammar, String> {

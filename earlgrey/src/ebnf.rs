@@ -149,11 +149,17 @@ fn ebnf_variant_action(ev: &mut EarleyForest<'_, G>) {
 
 fn ebnf_grouping_action<'a>(ev: &mut EarleyForest<'a, G>, user_gb: &'a RefCell<GrammarBuilder>) {
     ev.action("<Atom> -> ( <VariantList> )", move |mut n| {
-        let aux = user_gb.borrow().unique_symbol_name();
+        let body = pull!(G::VariantList, n.remove(1));
+        let aux = format!(
+            "({})",
+            body.iter()
+                .map(|l| l.join(""))
+                .collect::<Vec<_>>()
+                .join("|")
+        );
         debug!("Adding non-term {:?}", aux);
         let mut t_gb = user_gb.borrow_mut();
         t_gb.silent_nonterm(&aux);
-        let body = pull!(G::VariantList, n.remove(1));
         for rule in body {
             debug!("Adding rule {:?} -> {:?}", aux, rule);
             t_gb.silent_rule(
@@ -183,11 +189,18 @@ fn ebnf_grouping_action<'a>(ev: &mut EarleyForest<'a, G>, user_gb: &'a RefCell<G
 fn ebnf_optional_action<'a>(ev: &mut EarleyForest<'a, G>, user_gb: &'a RefCell<GrammarBuilder>) {
     ev.action("<Atom> -> [ <VariantList> ]", move |mut n| {
         // <Atom> -> aux ; aux -> <e> | <VariantList> ;
-        let aux = user_gb.borrow().unique_symbol_name();
+        let body = pull!(G::VariantList, n.remove(1));
+        let aux = format!(
+            "[{}]",
+            body.iter()
+                .map(|l| l.join(""))
+                .collect::<Vec<_>>()
+                .join("|")
+        );
         debug!("Adding non-term {:?}", aux);
         let mut t_gb = user_gb.borrow_mut();
         t_gb.silent_nonterm(&aux);
-        let body = pull!(G::VariantList, n.remove(1));
+
         for rule in body {
             debug!("Adding rule {:?} -> {:?}", aux, rule);
             t_gb.silent_rule(
@@ -221,11 +234,17 @@ fn ebnf_optional_action<'a>(ev: &mut EarleyForest<'a, G>, user_gb: &'a RefCell<G
 fn ebnf_repeat_action<'a>(ev: &mut EarleyForest<'a, G>, user_gb: &'a RefCell<GrammarBuilder>) {
     ev.action("<Atom> -> { <VariantList> }", move |mut n| {
         // <Atom> -> aux ; aux -> <e> | <VariantList> aux ;
-        let aux = user_gb.borrow().unique_symbol_name();
+        let body = pull!(G::VariantList, n.remove(1));
+        let aux = format!(
+            "{{{}}}",
+            body.iter()
+                .map(|l| l.join(""))
+                .collect::<Vec<_>>()
+                .join("|")
+        );
         debug!("Adding non-term {:?}", aux);
         let mut t_gb = user_gb.borrow_mut();
         t_gb.silent_nonterm(&aux);
-        let body = pull!(G::VariantList, n.remove(1));
         for mut rule in body {
             rule.push(aux.clone());
             debug!("Adding rule {:?} -> {:?}", aux, rule);
@@ -295,6 +314,7 @@ impl EbnfGrammarParser {
     pub fn into_grammar(self) -> Result<Grammar, String> {
         // As the EBNF parser evaluates evaluates semantic actions, it will
         // build the user grammar. We need a mutable GrammarBuilder for that.
+        // The RefCell is because actions are evaluated as encountered.
         let user_gb = RefCell::new(self.user_gb);
         {
             let mut user_semanter =

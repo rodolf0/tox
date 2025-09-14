@@ -32,19 +32,13 @@ pub fn time_grammar() -> &'static str {
     relative_spec := 'this' recurring_token
                    | 'next' recurring_token
                    | 'last' recurring_token
-                   | [('the' | 'a' | small_int)] recurring_token relative_anchor
+                   | ['the' | 'a' | small_int] recurring_token relative_anchor
                    | 'in' ('a' | 'an' | small_int) recurring_token
                    ;
 
-    recurring_token := 'second'
-                     | 'minute'
-                     | 'hour'
-                     | 'day'
-                     | 'month'
-                     | 'year'
-                     | 'week'
-                     | 'weekend'
+    recurring_token := time_quantity  # eg: 'day', 'week', 'month', etc.
                      | weekday
+                     | 'weekend'
                      | monthname
                      | ordinal 'of' monthname
                      | monthname ordinal
@@ -107,13 +101,8 @@ fn _grammar() -> Result<earlgrey::Grammar, String> {
             usize::from_str(s).map(|s| s <= 999).is_ok()
         })
         // literlas that we want to check variations of
-        .plug_terminal("second", |s| s == "second" || s == "seconds")
-        .plug_terminal("minute", |s| s == "minute" || s == "minutes")
-        .plug_terminal("hour", |s| s == "hour" || s == "hours")
-        .plug_terminal("day", |s| s == "day" || s == "days")
-        .plug_terminal("week", |s| s == "week" || s == "weeks")
-        .plug_terminal("month", |s| s == "month" || s == "months")
-        .plug_terminal("year", |s| s == "year" || s == "years")
+        .plug_terminal("time_quantity", is_time_quantity)
+        // .plug_terminal("weekend", |w| w == "weekend" || w == "weekends")
         .into_grammar()
 }
 

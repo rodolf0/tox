@@ -36,7 +36,12 @@ fn check_trees<T: fmt::Debug>(trees: &Vec<T>, expected: Vec<&str>) {
     let mut expect = HashSet::<&str>::from_iter(expected);
     for t in trees {
         let debug_string = format!("{:?}", t);
-        eprintln!("Removing {}", debug_string);
+        if ! expect.contains(debug_string.as_str()) {
+            eprintln!("Trying to remove {}", debug_string);
+            for items in expect.iter() {
+                eprintln!("  possible item: {}", items);
+            }
+        }
         assert!(expect.remove(debug_string.as_str()));
     }
     assert_eq!(0, expect.len());
@@ -92,15 +97,15 @@ fn repetition() {
     check_trees(
         &trees,
         vec![concat!(
-            r#"Node("arg -> b <Uniq-4>", ["#,
+            r#"Node("arg -> b {,b}", ["#,
             r#"Node("b -> 1", [Leaf("1", "1")]), "#,
-            r#"Node("<Uniq-4> -> , b <Uniq-4>", ["#,
+            r#"Node("{,b} -> , b {,b}", ["#,
             r#"Leaf(",", ","), "#,
             r#"Node("b -> 0", [Leaf("0", "0")]), "#,
-            r#"Node("<Uniq-4> -> , b <Uniq-4>", ["#,
+            r#"Node("{,b} -> , b {,b}", ["#,
             r#"Leaf(",", ","), "#,
             r#"Node("b -> 1", [Leaf("1", "1")]), "#,
-            r#"Node("<Uniq-4> -> ", [])])])])"#
+            r#"Node("{,b} -> ", [])])])])"#
         )],
     );
 }
@@ -146,9 +151,9 @@ fn option() {
     check_trees(
         &trees,
         vec![concat!(
-            r#"Node("complex -> d <Uniq-5>", ["#,
+            r#"Node("complex -> d [i]", ["#,
             r#"Node("d -> 1", [Leaf("1", "1")]), "#,
-            r#"Node("<Uniq-5> -> ", [])])"#
+            r#"Node("[i] -> ", [])])"#
         )],
     );
 
@@ -156,9 +161,9 @@ fn option() {
     check_trees(
         &trees,
         vec![concat!(
-            r#"Node("complex -> d <Uniq-5>", ["#,
+            r#"Node("complex -> d [i]", ["#,
             r#"Node("d -> 2", [Leaf("2", "2")]), "#,
-            r#"Node("<Uniq-5> -> i", [Leaf("i", "i")])])"#
+            r#"Node("[i] -> i", [Leaf("i", "i")])])"#
         )],
     );
 
@@ -211,9 +216,9 @@ fn grouping() {
     check_trees(
         &trees,
         vec![concat!(
-            r#"Node("row -> <Uniq-5> <Uniq-2>", ["#,
-            r#"Node("<Uniq-5> -> b", [Leaf("b", "b")]), "#,
-            r#"Node("<Uniq-2> -> 1", [Leaf("1", "1")])])"#
+            r#"Node("row -> (a|b) (0|1)", ["#,
+            r#"Node("(a|b) -> b", [Leaf("b", "b")]), "#,
+            r#"Node("(0|1) -> 1", [Leaf("1", "1")])])"#
         )],
     );
 
@@ -221,9 +226,9 @@ fn grouping() {
     check_trees(
         &trees,
         vec![concat!(
-            r#"Node("row -> <Uniq-5> <Uniq-2>", ["#,
-            r#"Node("<Uniq-5> -> a", [Leaf("a", "a")]), "#,
-            r#"Node("<Uniq-2> -> 0", [Leaf("0", "0")])])"#
+            r#"Node("row -> (a|b) (0|1)", ["#,
+            r#"Node("(a|b) -> a", [Leaf("a", "a")]), "#,
+            r#"Node("(0|1) -> 0", [Leaf("0", "0")])])"#
         )],
     );
 
@@ -275,11 +280,11 @@ fn mixed() {
     check_trees(
         &trees,
         vec![concat!(
-            r#"Node("row -> a <Uniq-6> <Uniq-4> <Uniq-1>", ["#,
+            r#"Node("row -> a [b] (0|1) [c]", ["#,
             r#"Leaf("a", "a"), "#,
-            r#"Node("<Uniq-6> -> ", []), "#,
-            r#"Node("<Uniq-4> -> 0", [Leaf("0", "0")]), "#,
-            r#"Node("<Uniq-1> -> ", [])])"#
+            r#"Node("[b] -> ", []), "#,
+            r#"Node("(0|1) -> 0", [Leaf("0", "0")]), "#,
+            r#"Node("[c] -> ", [])])"#
         )],
     );
 
@@ -287,11 +292,11 @@ fn mixed() {
     check_trees(
         &trees,
         vec![concat!(
-            r#"Node("row -> a <Uniq-6> <Uniq-4> <Uniq-1>", ["#,
+            r#"Node("row -> a [b] (0|1) [c]", ["#,
             r#"Leaf("a", "a"), "#,
-            r#"Node("<Uniq-6> -> b", [Leaf("b", "b")]), "#,
-            r#"Node("<Uniq-4> -> 1", [Leaf("1", "1")]), "#,
-            r#"Node("<Uniq-1> -> ", [])])"#
+            r#"Node("[b] -> b", [Leaf("b", "b")]), "#,
+            r#"Node("(0|1) -> 1", [Leaf("1", "1")]), "#,
+            r#"Node("[c] -> ", [])])"#
         )],
     );
 
@@ -299,11 +304,11 @@ fn mixed() {
     check_trees(
         &trees,
         vec![concat!(
-            r#"Node("row -> a <Uniq-6> <Uniq-4> <Uniq-1>", ["#,
+            r#"Node("row -> a [b] (0|1) [c]", ["#,
             r#"Leaf("a", "a"), "#,
-            r#"Node("<Uniq-6> -> ", []), "#,
-            r#"Node("<Uniq-4> -> 1", [Leaf("1", "1")]), "#,
-            r#"Node("<Uniq-1> -> c", [Leaf("c", "c")])])"#
+            r#"Node("[b] -> ", []), "#,
+            r#"Node("(0|1) -> 1", [Leaf("1", "1")]), "#,
+            r#"Node("[c] -> c", [Leaf("c", "c")])])"#
         )],
     );
 

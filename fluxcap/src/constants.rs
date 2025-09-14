@@ -56,6 +56,14 @@ pub fn short_ordinal(n: &str) -> Option<u32> {
     }
 }
 
+pub fn is_time_quantity(q: &str) -> bool {
+    static TIME_QUANTITIES: [&str;14] = [
+        "second", "minute", "hour", "day", "week", "month", "year",
+        "seconds", "minutes", "hours", "days", "weeks", "months", "years",
+    ];
+    TIME_QUANTITIES.contains(&q)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{ordinal, short_ordinal};

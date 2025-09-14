@@ -248,11 +248,6 @@ impl GrammarBuilder {
             Err,
         )
     }
-
-    // Generate unique name for a Symbol (used to build grammar mechanically)
-    pub fn unique_symbol_name(&self) -> String {
-        format!("<Uniq-{}>", self.symbols.len())
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

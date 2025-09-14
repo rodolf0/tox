@@ -46,6 +46,7 @@ mod grammar_checks {
         "in 4 januaries",
         "3 feb 4ths ago",
         "last monday",
+        "last weekend",
         "in 4 monday feb 27ths",
     ];
 

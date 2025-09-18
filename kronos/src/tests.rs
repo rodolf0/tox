@@ -1,6 +1,6 @@
 mod test_grains {
     use crate::sequence::*;
-    use time::macros::datetime;
+    use time::macros::utc_datetime as datetime;
 
     #[test]
     fn weekend() {
@@ -263,7 +263,7 @@ mod test_grains {
 
 mod test_within {
     use crate::sequence::*;
-    use time::macros::datetime;
+    use time::macros::utc_datetime as datetime;
 
     #[test]
     fn nthof() {
@@ -559,7 +559,7 @@ mod test_within {
 
 mod test_union {
     use crate::sequence::*;
-    use time::macros::datetime;
+    use time::macros::utc_datetime as datetime;
 
     #[test]
     fn test_union() {
@@ -622,7 +622,7 @@ mod test_union {
 
 mod test_intersect {
     use crate::sequence::*;
-    use time::macros::datetime;
+    use time::macros::utc_datetime as datetime;
 
     #[test]
     fn intersect_basic() {
@@ -757,7 +757,7 @@ mod test_intersect {
 
 mod test_except {
     use crate::sequence::*;
-    use time::macros::datetime;
+    use time::macros::utc_datetime as datetime;
 
     #[test]
     fn except_basic() {
@@ -858,7 +858,7 @@ mod test_except {
 
 mod test_mixed {
     use crate::sequence::*;
-    use time::macros::datetime;
+    use time::macros::utc_datetime as datetime;
 
     #[test]
     fn test_multi() {
@@ -943,7 +943,7 @@ mod test_mixed {
 
 mod test_interval {
     use crate::sequence::*;
-    use time::macros::datetime;
+    use time::macros::utc_datetime as datetime;
 
     #[test]
     fn interval_future() {

@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 pub struct EarleyForest<'a, ASTNode: Clone> {
     // Semantic actions to apply when a production is completed
+    // TODO: actions should be keyed by rule id/hash/Rule itself not name
     actions: HashMap<String, Box<dyn Fn(Vec<ASTNode>) -> ASTNode + 'a>>,
     // How to lift a 'scanned' terminal into an AST node.
     terminal_parser: Box<dyn Fn(&str, &str) -> ASTNode + 'a>,

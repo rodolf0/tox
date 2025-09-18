@@ -60,7 +60,7 @@ mod grammar_checks {
         "2 months before next month",
         "2 months before a year ago",
         // relative_spec -> relative_anchor -> 'in' small_int recurring_token
-        "4 days before in 2 weeks", // TODO: should we reject this ? nah it's valid
+        "4 days before in 2 weeks", // should we reject this ? nah it's valid
         // relative_spec -> ... relative_anchor -> relative_spec
         "2 months before 3 mondays hence",
         // relative_spec -> ... relative_anchor -> anchored_spec

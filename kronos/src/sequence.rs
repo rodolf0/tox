@@ -53,7 +53,7 @@
 // can transform items as needed with iterator methods.
 
 use std::collections::VecDeque;
-use time::{Duration, PrimitiveDateTime as DateTime};
+use time::{Duration, UtcDateTime as DateTime};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum Grain {
@@ -94,6 +94,18 @@ impl TimeSpan {
             start: shift(self.start, grain, n),
             end: shift(self.end, grain, n),
             grain: self.grain,
+        }
+    }
+
+    pub fn year(y: i32) -> Self {
+        let start = DateTime::new(
+            time::Date::from_calendar_date(y, time::Month::January, 1).unwrap(),
+            time::Time::MIDNIGHT,
+        );
+        TimeSpan {
+            start,
+            end: start.replace_year(y + 1).unwrap(),
+            grain: Grain::Year,
         }
     }
 }
@@ -193,6 +205,7 @@ fn grain_iterator(
     })
 }
 
+#[derive(Clone, Debug)]
 pub enum TimeSeq {
     Grain {
         window_span: (Grain, u32),
@@ -654,7 +667,7 @@ impl TimeSeq {
                 // If we couldn't find a reasonable t0 then there's no viable TimeSeq
                 let t0 = match t0 {
                     Some(t0) => t0,
-                    None => return Box::new(std::iter::empty())
+                    None => return Box::new(std::iter::empty()),
                 };
                 // Grain will be the smallest resolution of either grain
                 let grain = std::cmp::min(from.grain(), to.grain());

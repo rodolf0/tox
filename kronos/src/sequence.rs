@@ -205,41 +205,6 @@ fn grain_iterator(
     })
 }
 
-#[derive(Clone, Debug)]
-pub enum TimeSeq {
-    Grain {
-        window_span: (Grain, u32),
-        step_by: (Grain, i32),
-    },
-    SpecificGrain {
-        grain: Grain,
-        n: u16,
-    },
-    Monthdays(u8),
-    Weekdays(u8), // Sunday=0
-    Weekends,
-    Weeks,
-    Within {
-        nth: isize,
-        window: Box<TimeSeq>,
-        frame: Box<TimeSeq>,
-    },
-    // merge multiple TimeSpans into one
-    Merge(Box<TimeSeq>, u8),
-    // Union emits the elements of both streams in order
-    Union(Box<TimeSeq>, Box<TimeSeq>),
-    Intersection(Box<TimeSeq>, Box<TimeSeq>),
-    Except(Box<TimeSeq>, Box<TimeSeq>),
-    Shift(Box<TimeSeq>, Grain, i32),
-    // Example: Sep 21st to Dec 21st - inclusive (Spring in South)
-    // Example: Mon through Friday
-    Interval {
-        from: Box<TimeSeq>,
-        to: Box<TimeSeq>,
-        inclusive: bool,
-    },
-}
-
 fn grains_in_parent(grain: Grain) -> u16 {
     match grain {
         Grain::Second => 60,
@@ -280,96 +245,126 @@ fn find_weekday(mut t0: DateTime, weekday: u8) -> DateTime {
     t0
 }
 
-// Guard against impossible sequences, eg: 32nd day of the month
-const INFINITE_FUSE: usize = 1000;
-
-#[derive(PartialEq, Clone, Copy)]
-pub(crate) enum TimeDir {
-    Future,
-    Past,
+#[derive(Clone, Debug)]
+pub enum TimeSeqSpec {
+    Grain {
+        window_span: (Grain, u32),
+        step_by: (Grain, i32),
+    },
+    SpecificGrain {
+        grain: Grain,
+        n: u16,
+    },
+    Monthdays(u8),
+    Weekdays(u8), // Sunday=0
+    Weekends,
+    Weeks,
+    Within {
+        nth: isize,
+        window: Box<TimeSeqSpec>,
+        frame: Box<TimeSeqSpec>,
+    },
+    // merge multiple TimeSpans into one
+    Merge(Box<TimeSeqSpec>, u8),
+    // Union emits the elements of both streams in order
+    Union(Box<TimeSeqSpec>, Box<TimeSeqSpec>),
+    Intersection(Box<TimeSeqSpec>, Box<TimeSeqSpec>),
+    Except(Box<TimeSeqSpec>, Box<TimeSeqSpec>),
+    Shift(Box<TimeSeqSpec>, Grain, i32),
+    // Example: Sep 21st to Dec 21st - inclusive (Spring in South)
+    // Example: Mon through Friday
+    Interval {
+        from: Box<TimeSeqSpec>,
+        to: Box<TimeSeqSpec>,
+        inclusive: bool,
+    },
 }
 
-impl TimeSeq {
-    pub fn seconds(n: Option<u16>) -> TimeSeq {
+// #[derive(Clone, Debug)]
+// TODO
+// pub struct TimeSequenceSpec(TimeSeqSpec);
+
+impl TimeSeqSpec {
+    pub fn seconds(n: Option<u16>) -> TimeSeqSpec {
         match n {
-            Some(n) => TimeSeq::SpecificGrain {
+            Some(n) => TimeSeqSpec::SpecificGrain {
                 grain: Grain::Second,
                 n,
             },
-            None => TimeSeq::Grain {
+            None => TimeSeqSpec::Grain {
                 window_span: (Grain::Second, 1),
                 step_by: (Grain::Second, 1),
             },
         }
     }
 
-    pub fn minutes(n: Option<u16>) -> TimeSeq {
+    pub fn minutes(n: Option<u16>) -> TimeSeqSpec {
         match n {
-            Some(n) => TimeSeq::SpecificGrain {
+            Some(n) => TimeSeqSpec::SpecificGrain {
                 grain: Grain::Minute,
                 n,
             },
-            None => TimeSeq::Grain {
+            None => TimeSeqSpec::Grain {
                 window_span: (Grain::Minute, 1),
                 step_by: (Grain::Minute, 1),
             },
         }
     }
 
-    pub fn hours(n: Option<u16>) -> TimeSeq {
+    pub fn hours(n: Option<u16>) -> TimeSeqSpec {
         match n {
-            Some(n) => TimeSeq::SpecificGrain {
+            Some(n) => TimeSeqSpec::SpecificGrain {
                 grain: Grain::Hour,
                 n,
             },
-            None => TimeSeq::Grain {
+            None => TimeSeqSpec::Grain {
                 window_span: (Grain::Hour, 1),
                 step_by: (Grain::Hour, 1),
             },
         }
     }
 
-    pub fn days() -> TimeSeq {
-        TimeSeq::Grain {
+    pub fn days() -> TimeSeqSpec {
+        TimeSeqSpec::Grain {
             window_span: (Grain::Day, 1),
             step_by: (Grain::Day, 1),
         }
     }
 
-    pub fn months(n: Option<u16>) -> TimeSeq {
+    pub fn months(n: Option<u16>) -> TimeSeqSpec {
         match n {
-            Some(n) => TimeSeq::SpecificGrain {
+            Some(n) => TimeSeqSpec::SpecificGrain {
                 grain: Grain::Month,
                 n,
             },
-            None => TimeSeq::Grain {
+            None => TimeSeqSpec::Grain {
                 window_span: (Grain::Month, 1),
                 step_by: (Grain::Month, 1),
             },
         }
     }
 
-    pub fn weeks() -> TimeSeq {
-        TimeSeq::Weeks
+    pub fn weeks() -> TimeSeqSpec {
+        TimeSeqSpec::Weeks
     }
 
-    pub fn years() -> TimeSeq {
-        TimeSeq::Grain {
+    pub fn years() -> TimeSeqSpec {
+        TimeSeqSpec::Grain {
             window_span: (Grain::Year, 1),
             step_by: (Grain::Year, 1),
         }
     }
 
-    pub fn weekends() -> TimeSeq {
-        TimeSeq::Weekends
+    pub fn weekends() -> TimeSeqSpec {
+        TimeSeqSpec::Weekends
     }
 
-    pub fn weekday(day: u8) -> TimeSeq {
-        TimeSeq::Weekdays(day)
+    pub fn weekday(day: u8) -> TimeSeqSpec {
+        TimeSeqSpec::Weekdays(day)
     }
 
-    pub fn monthday(day: u8) -> TimeSeq {
-        TimeSeq::Monthdays(day)
+    pub fn monthday(day: u8) -> TimeSeqSpec {
+        TimeSeqSpec::Monthdays(day)
     }
 
     pub fn union(self, other: Self) -> Result<Self, String> {
@@ -419,51 +414,60 @@ impl TimeSeq {
     fn grain(&self) -> Grain {
         use std::cmp;
         match self {
-            TimeSeq::Grain {
+            TimeSeqSpec::Grain {
                 window_span: (grain, _),
                 step_by: _,
             } => *grain,
-            TimeSeq::SpecificGrain { grain, n: _ } => *grain,
-            TimeSeq::Monthdays(_) => Grain::Day,
-            TimeSeq::Weekdays(_) => Grain::Day,
-            TimeSeq::Weekends => Grain::Day,
-            TimeSeq::Weeks => Grain::Day,
-            TimeSeq::Within {
+            TimeSeqSpec::SpecificGrain { grain, n: _ } => *grain,
+            TimeSeqSpec::Monthdays(_) => Grain::Day,
+            TimeSeqSpec::Weekdays(_) => Grain::Day,
+            TimeSeqSpec::Weekends => Grain::Day,
+            TimeSeqSpec::Weeks => Grain::Day,
+            TimeSeqSpec::Within {
                 nth: _,
                 window,
                 frame: _,
             } => window.grain(),
-            TimeSeq::Merge(s, _) => s.grain(),
+            TimeSeqSpec::Merge(s, _) => s.grain(),
             // Constructor asserts that s1 and s2 have the same grain
-            TimeSeq::Union(s1, _) => s1.grain(),
-            TimeSeq::Intersection(s1, s2) => cmp::min(s1.grain(), s2.grain()),
-            TimeSeq::Except(s1, _) => s1.grain(),
-            TimeSeq::Shift(s1, _, _) => s1.grain(),
-            TimeSeq::Interval {
+            TimeSeqSpec::Union(s1, _) => s1.grain(),
+            TimeSeqSpec::Intersection(s1, s2) => cmp::min(s1.grain(), s2.grain()),
+            TimeSeqSpec::Except(s1, _) => s1.grain(),
+            TimeSeqSpec::Shift(s1, _, _) => s1.grain(),
+            TimeSeqSpec::Interval {
                 from,
                 to,
                 inclusive: _,
             } => std::cmp::min(from.grain(), to.grain()),
         }
     }
+}
 
-    pub(crate) fn seq(
-        &self,
-        t0: DateTime,
-        direction: TimeDir,
-    ) -> Box<dyn Iterator<Item = TimeSpan> + '_> {
+// Guard against impossible sequences, eg: 32nd day of the month
+const INFINITE_FUSE: usize = 1000;
+
+#[derive(PartialEq, Clone, Copy)]
+pub(crate) enum TimeDir {
+    Future,
+    Past,
+}
+
+pub type TimeSequence = Box<dyn Iterator<Item = TimeSpan>>;
+
+impl TimeSeqSpec {
+    pub(crate) fn seq(self, t0: DateTime, direction: TimeDir) -> TimeSequence {
         match self {
-            TimeSeq::Grain {
+            TimeSeqSpec::Grain {
                 window_span,
                 step_by: (sb_grain, sb_n),
             } => {
                 let step = match direction {
-                    TimeDir::Future => *sb_n,
-                    TimeDir::Past => -*sb_n,
+                    TimeDir::Future => sb_n,
+                    TimeDir::Past => -sb_n,
                 };
-                Box::new(grain_iterator(t0, *window_span, (*sb_grain, step)))
+                Box::new(grain_iterator(t0, window_span, (sb_grain, step)))
             }
-            TimeSeq::Weeks => {
+            TimeSeqSpec::Weeks => {
                 let t0 = truncate_week(t0);
                 let step_by = match direction {
                     TimeDir::Future => (Grain::Day, 7),
@@ -471,18 +475,18 @@ impl TimeSeq {
                 };
                 Box::new(grain_iterator(t0, (Grain::Day, 7), step_by))
             }
-            TimeSeq::Weekdays(n) => {
-                let t0 = find_weekday(t0, *n);
+            TimeSeqSpec::Weekdays(n) => {
+                let t0 = find_weekday(t0, n);
                 let step_by = match direction {
                     TimeDir::Future => (Grain::Day, 7),
                     TimeDir::Past => (Grain::Day, -7),
                 };
                 Box::new(grain_iterator(t0, (Grain::Day, 1), step_by))
             }
-            TimeSeq::Monthdays(n) => {
+            TimeSeqSpec::Monthdays(n) => {
                 let mut t0_end = t0;
                 Box::new(std::iter::from_fn(move || {
-                    while t0_end.day() != *n {
+                    while t0_end.day() != n {
                         t0_end += match direction {
                             TimeDir::Future => Duration::days(1),
                             TimeDir::Past => Duration::days(-1),
@@ -499,7 +503,7 @@ impl TimeSeq {
                     })
                 }))
             }
-            TimeSeq::Weekends => {
+            TimeSeqSpec::Weekends => {
                 let t0 = find_weekend(t0);
                 let t0 = truncate_weekend(t0);
                 let step_by = match direction {
@@ -508,28 +512,29 @@ impl TimeSeq {
                 };
                 Box::new(grain_iterator(t0, (Grain::Day, 2), step_by))
             }
-            TimeSeq::SpecificGrain { grain, n } => {
-                let t0 = find_grain(t0, *grain, *n);
+            TimeSeqSpec::SpecificGrain { grain, n } => {
+                let t0 = find_grain(t0, grain, n);
                 let step_by = match direction {
-                    TimeDir::Future => (*grain, grains_in_parent(*grain) as i32),
-                    TimeDir::Past => (*grain, -(grains_in_parent(*grain) as i32)),
+                    TimeDir::Future => (grain, grains_in_parent(grain) as i32),
+                    TimeDir::Past => (grain, -(grains_in_parent(grain) as i32)),
                 };
-                Box::new(grain_iterator(t0, (*grain, 1), step_by))
+                Box::new(grain_iterator(t0, (grain, 1), step_by))
             }
-            TimeSeq::Within { nth, window, frame } => {
+            TimeSeqSpec::Within { nth, window, frame } => {
                 Box::new(
                     frame
                         .seq(t0, direction)
                         .take(INFINITE_FUSE)
-                        .filter_map(|f| {
-                            if *nth > 0 {
+                        .filter_map(move |f| {
+                            let window = window.clone();
+                            if nth > 0 {
                                 window
                                     .seq(f.start, TimeDir::Future)
                                     // Each window has to start within frame's boundary
                                     .take_while(|w| w.start < f.end)
-                                    .nth((*nth - 1) as usize)
+                                    .nth((nth - 1) as usize)
                             } else {
-                                let nth = -(*nth) as usize;
+                                let nth = -nth as usize;
                                 let mut deque = VecDeque::with_capacity(nth);
                                 // Consume the whole iterator and keep the tail.
                                 for w in window
@@ -546,14 +551,14 @@ impl TimeSeq {
                         }),
                 )
             }
-            TimeSeq::Merge(s, n) => {
+            TimeSeqSpec::Merge(s, n) => {
                 let mut _s = match direction {
                     TimeDir::Future => s.seq(t0, direction).skip(0),
                     TimeDir::Past => s.seq(t0, direction).skip(1),
                 };
                 Box::new(std::iter::from_fn(move || {
                     let _s2 = _s.by_ref();
-                    let spans: Vec<_> = _s2.take(*n as usize).collect();
+                    let spans: Vec<_> = _s2.take(n as usize).collect();
                     match direction {
                         TimeDir::Future => Some(TimeSpan {
                             start: spans.first().unwrap().start,
@@ -568,7 +573,7 @@ impl TimeSeq {
                     }
                 }))
             }
-            TimeSeq::Union(s1, s2) => {
+            TimeSeqSpec::Union(s1, s2) => {
                 let mut s1 = s1.seq(t0, direction).peekable();
                 let mut s2 = s2.seq(t0, direction).peekable();
                 let starts_first = match direction {
@@ -591,7 +596,7 @@ impl TimeSeq {
                     }
                 }))
             }
-            TimeSeq::Intersection(s1, s2) => {
+            TimeSeqSpec::Intersection(s1, s2) => {
                 let mut s1 = s1.seq(t0, direction).peekable();
                 let mut s2 = s2.seq(t0, direction).peekable();
                 let ends_first = match direction {
@@ -620,7 +625,7 @@ impl TimeSeq {
                     None // panic!("Intersect INFINITE_FUSE blown");
                 }))
             }
-            TimeSeq::Except(s, except) => {
+            TimeSeqSpec::Except(s, except) => {
                 let s = s.seq(t0, direction);
                 let mut except = except.seq(t0, direction);
                 let mut ex = except.next();
@@ -639,10 +644,10 @@ impl TimeSeq {
                     }
                 }))
             }
-            TimeSeq::Shift(s, grain, n) => {
-                Box::new(s.seq(t0, direction).map(|s| s.shift(*grain, *n)))
+            TimeSeqSpec::Shift(s, grain, n) => {
+                Box::new(s.seq(t0, direction).map(move |s| s.shift(grain, n)))
             }
-            TimeSeq::Interval {
+            TimeSeqSpec::Interval {
                 from,
                 to,
                 inclusive,
@@ -651,15 +656,17 @@ impl TimeSeq {
                 // Item needs to be strictly less than (contained by) 'to''s item.
                 // So adjust t0 to 1) be inside the interval, 2) truncate it to start.
                 let t0 = to
+                    .clone()
                     .seq(t0, direction)
                     .next()
-                    .map(|s| if *inclusive { s.end } else { s.start });
+                    .map(|s| if inclusive { s.end } else { s.start });
                 // This is the 'truncate' to interval boundary/start.
                 // Find interval start back from the just-found interval end.
                 let t0 = t0
                     .and_then(|t0| {
                         // find interval starting point
-                        from.seq(t0, TimeDir::Past)
+                        from.clone()
+                            .seq(t0, TimeDir::Past)
                             .skip_while(|t| t.end > t0) // 1st seq Past item contains t0
                             .next()
                     })
@@ -674,27 +681,29 @@ impl TimeSeq {
                 Box::new(
                     from.seq(t0, direction)
                         .take(INFINITE_FUSE)
-                        .filter_map(move |f| match to.seq(f.start, TimeDir::Future).next() {
-                            Some(t) => Some(TimeSpan {
-                                start: f.start,
-                                end: if *inclusive { t.end } else { t.start },
-                                grain,
-                            }),
-                            None => None,
+                        .filter_map(move |f| {
+                            match to.clone().seq(f.start, TimeDir::Future).next() {
+                                Some(t) => Some(TimeSpan {
+                                    start: f.start,
+                                    end: if inclusive { t.end } else { t.start },
+                                    grain,
+                                }),
+                                None => None,
+                            }
                         }),
                 )
             }
         }
     }
 
-    pub fn future(&self, t0: DateTime) -> Box<dyn Iterator<Item = TimeSpan> + '_> {
+    pub fn future(self, t0: DateTime) -> TimeSequence {
         Box::new(
             self.seq(t0, TimeDir::Future)
                 .skip_while(move |t| t.end <= t0),
         )
     }
 
-    pub fn past(&self, t0: DateTime) -> Box<dyn Iterator<Item = TimeSpan> + '_> {
+    pub fn past(self, t0: DateTime) -> TimeSequence {
         Box::new(self.seq(t0, TimeDir::Past).skip_while(move |t| t.end > t0))
     }
 }

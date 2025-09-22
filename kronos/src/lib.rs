@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
 mod sequence;
-pub use crate::sequence::{Grain, TimeSeq, TimeSpan};
+pub use crate::sequence::{Grain, TimeSeqSpec, TimeSpan, TimeSequence};
 
 #[cfg(test)]
 mod tests;

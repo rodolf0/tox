@@ -1030,7 +1030,7 @@ mod test_interval {
             }
         );
         // Test reftime inside - 'seq'
-        let mut p = spring.clone().seq(datetime!(2025-10-22 0:00), TimeDir::Past);
+        let mut p = spring.clone().0.seq(datetime!(2025-10-22 0:00), TimeDir::Past);
         assert_eq!(
             p.next().unwrap(),
             TimeSpan {

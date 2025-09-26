@@ -246,7 +246,7 @@ fn find_weekday(mut t0: DateTime, weekday: u8) -> DateTime {
 }
 
 #[derive(Clone, Debug)]
-pub enum TimeSeqSpec {
+pub(crate) enum SeqSpecInternal {
     Grain {
         window_span: (Grain, u32),
         step_by: (Grain, i32),
@@ -261,180 +261,181 @@ pub enum TimeSeqSpec {
     Weeks,
     Within {
         nth: isize,
-        window: Box<TimeSeqSpec>,
-        frame: Box<TimeSeqSpec>,
+        window: Box<SeqSpecInternal>,
+        frame: Box<SeqSpecInternal>,
     },
     // merge multiple TimeSpans into one
-    Merge(Box<TimeSeqSpec>, u8),
+    Merge(Box<SeqSpecInternal>, u8),
     // Union emits the elements of both streams in order
-    Union(Box<TimeSeqSpec>, Box<TimeSeqSpec>),
-    Intersection(Box<TimeSeqSpec>, Box<TimeSeqSpec>),
-    Except(Box<TimeSeqSpec>, Box<TimeSeqSpec>),
-    Shift(Box<TimeSeqSpec>, Grain, i32),
+    Union(Box<SeqSpecInternal>, Box<SeqSpecInternal>),
+    Intersection(Box<SeqSpecInternal>, Box<SeqSpecInternal>),
+    Except(Box<SeqSpecInternal>, Box<SeqSpecInternal>),
+    Shift(Box<SeqSpecInternal>, Grain, i32),
     // Example: Sep 21st to Dec 21st - inclusive (Spring in South)
     // Example: Mon through Friday
     Interval {
-        from: Box<TimeSeqSpec>,
-        to: Box<TimeSeqSpec>,
+        from: Box<SeqSpecInternal>,
+        to: Box<SeqSpecInternal>,
         inclusive: bool,
     },
 }
 
-// #[derive(Clone, Debug)]
-// TODO
-// pub struct TimeSequenceSpec(TimeSeqSpec);
+#[derive(Clone, Debug)]
+pub struct TimeSeqSpec(pub(crate) SeqSpecInternal);
 
 impl TimeSeqSpec {
     pub fn seconds(n: Option<u16>) -> TimeSeqSpec {
-        match n {
-            Some(n) => TimeSeqSpec::SpecificGrain {
+        TimeSeqSpec(match n {
+            Some(n) => SeqSpecInternal::SpecificGrain {
                 grain: Grain::Second,
                 n,
             },
-            None => TimeSeqSpec::Grain {
+            None => SeqSpecInternal::Grain {
                 window_span: (Grain::Second, 1),
                 step_by: (Grain::Second, 1),
             },
-        }
+        })
     }
 
     pub fn minutes(n: Option<u16>) -> TimeSeqSpec {
-        match n {
-            Some(n) => TimeSeqSpec::SpecificGrain {
+        TimeSeqSpec(match n {
+            Some(n) => SeqSpecInternal::SpecificGrain {
                 grain: Grain::Minute,
                 n,
             },
-            None => TimeSeqSpec::Grain {
+            None => SeqSpecInternal::Grain {
                 window_span: (Grain::Minute, 1),
                 step_by: (Grain::Minute, 1),
             },
-        }
+        })
     }
 
     pub fn hours(n: Option<u16>) -> TimeSeqSpec {
-        match n {
-            Some(n) => TimeSeqSpec::SpecificGrain {
+        TimeSeqSpec(match n {
+            Some(n) => SeqSpecInternal::SpecificGrain {
                 grain: Grain::Hour,
                 n,
             },
-            None => TimeSeqSpec::Grain {
+            None => SeqSpecInternal::Grain {
                 window_span: (Grain::Hour, 1),
                 step_by: (Grain::Hour, 1),
             },
-        }
+        })
     }
 
     pub fn days() -> TimeSeqSpec {
-        TimeSeqSpec::Grain {
+        TimeSeqSpec(SeqSpecInternal::Grain {
             window_span: (Grain::Day, 1),
             step_by: (Grain::Day, 1),
-        }
+        })
     }
 
     pub fn months(n: Option<u16>) -> TimeSeqSpec {
-        match n {
-            Some(n) => TimeSeqSpec::SpecificGrain {
+        TimeSeqSpec(match n {
+            Some(n) => SeqSpecInternal::SpecificGrain {
                 grain: Grain::Month,
                 n,
             },
-            None => TimeSeqSpec::Grain {
+            None => SeqSpecInternal::Grain {
                 window_span: (Grain::Month, 1),
                 step_by: (Grain::Month, 1),
             },
-        }
+        })
     }
 
     pub fn weeks() -> TimeSeqSpec {
-        TimeSeqSpec::Weeks
+        TimeSeqSpec(SeqSpecInternal::Weeks)
     }
 
     pub fn years() -> TimeSeqSpec {
-        TimeSeqSpec::Grain {
+        TimeSeqSpec(SeqSpecInternal::Grain {
             window_span: (Grain::Year, 1),
             step_by: (Grain::Year, 1),
-        }
+        })
     }
 
     pub fn weekends() -> TimeSeqSpec {
-        TimeSeqSpec::Weekends
+        TimeSeqSpec(SeqSpecInternal::Weekends)
     }
 
     pub fn weekday(day: u8) -> TimeSeqSpec {
-        TimeSeqSpec::Weekdays(day)
+        TimeSeqSpec(SeqSpecInternal::Weekdays(day))
     }
 
     pub fn monthday(day: u8) -> TimeSeqSpec {
-        TimeSeqSpec::Monthdays(day)
+        TimeSeqSpec(SeqSpecInternal::Monthdays(day))
     }
 
     pub fn union(self, other: Self) -> Result<Self, String> {
-        if self.grain() != other.grain() {
+        if self.0.grain() != other.0.grain() {
             Err("Union grains must be the same".to_string())
         } else {
-            Ok(Self::Union(Box::new(self), Box::new(other)))
+            Ok(TimeSeqSpec(SeqSpecInternal::Union(Box::new(self.0), Box::new(other.0))))
         }
     }
 
     pub fn within(self, frame: Self, nth: isize) -> Result<Self, String> {
-        if self.grain() >= frame.grain() {
+        if self.0.grain() >= frame.0.grain() {
             Err("Within needs win grain < frame grain".to_string())
         } else {
-            Ok(Self::Within {
+            Ok(TimeSeqSpec(SeqSpecInternal::Within {
                 nth,
-                window: Box::new(self),
-                frame: Box::new(frame),
-            })
+                window: Box::new(self.0),
+                frame: Box::new(frame.0),
+            }))
         }
     }
 
     pub fn merge(self, n: u8) -> Self {
-        Self::Merge(Box::new(self), n)
+        TimeSeqSpec(SeqSpecInternal::Merge(Box::new(self.0), n))
     }
 
     pub fn intersection(self, other: Self) -> Self {
-        Self::Intersection(Box::new(self), Box::new(other))
+        TimeSeqSpec(SeqSpecInternal::Intersection(Box::new(self.0), Box::new(other.0)))
     }
 
     pub fn except(self, other: Self) -> Self {
-        Self::Except(Box::new(self), Box::new(other))
+        TimeSeqSpec(SeqSpecInternal::Except(Box::new(self.0), Box::new(other.0)))
     }
 
     pub fn shift(self, grain: Grain, n: i32) -> Self {
-        Self::Shift(Box::new(self), grain, n)
+        TimeSeqSpec(SeqSpecInternal::Shift(Box::new(self.0), grain, n))
     }
 
     pub fn to(self, other: Self, inclusive: bool) -> Self {
-        Self::Interval {
-            from: Box::new(self),
-            to: Box::new(other),
+        TimeSeqSpec(SeqSpecInternal::Interval {
+            from: Box::new(self.0),
+            to: Box::new(other.0),
             inclusive,
-        }
+        })
     }
+}
 
+impl SeqSpecInternal {
     fn grain(&self) -> Grain {
         use std::cmp;
         match self {
-            TimeSeqSpec::Grain {
+            SeqSpecInternal::Grain {
                 window_span: (grain, _),
                 step_by: _,
             } => *grain,
-            TimeSeqSpec::SpecificGrain { grain, n: _ } => *grain,
-            TimeSeqSpec::Monthdays(_) => Grain::Day,
-            TimeSeqSpec::Weekdays(_) => Grain::Day,
-            TimeSeqSpec::Weekends => Grain::Day,
-            TimeSeqSpec::Weeks => Grain::Day,
-            TimeSeqSpec::Within {
+            SeqSpecInternal::SpecificGrain { grain, n: _ } => *grain,
+            SeqSpecInternal::Monthdays(_) => Grain::Day,
+            SeqSpecInternal::Weekdays(_) => Grain::Day,
+            SeqSpecInternal::Weekends => Grain::Day,
+            SeqSpecInternal::Weeks => Grain::Day,
+            SeqSpecInternal::Within {
                 nth: _,
                 window,
                 frame: _,
             } => window.grain(),
-            TimeSeqSpec::Merge(s, _) => s.grain(),
+            SeqSpecInternal::Merge(s, _) => s.grain(),
             // Constructor asserts that s1 and s2 have the same grain
-            TimeSeqSpec::Union(s1, _) => s1.grain(),
-            TimeSeqSpec::Intersection(s1, s2) => cmp::min(s1.grain(), s2.grain()),
-            TimeSeqSpec::Except(s1, _) => s1.grain(),
-            TimeSeqSpec::Shift(s1, _, _) => s1.grain(),
-            TimeSeqSpec::Interval {
+            SeqSpecInternal::Union(s1, _) => s1.grain(),
+            SeqSpecInternal::Intersection(s1, s2) => cmp::min(s1.grain(), s2.grain()),
+            SeqSpecInternal::Except(s1, _) => s1.grain(),
+            SeqSpecInternal::Shift(s1, _, _) => s1.grain(),
+            SeqSpecInternal::Interval {
                 from,
                 to,
                 inclusive: _,
@@ -454,10 +455,10 @@ pub(crate) enum TimeDir {
 
 pub type TimeSequence = Box<dyn Iterator<Item = TimeSpan>>;
 
-impl TimeSeqSpec {
+impl SeqSpecInternal {
     pub(crate) fn seq(self, t0: DateTime, direction: TimeDir) -> TimeSequence {
         match self {
-            TimeSeqSpec::Grain {
+            SeqSpecInternal::Grain {
                 window_span,
                 step_by: (sb_grain, sb_n),
             } => {
@@ -467,7 +468,7 @@ impl TimeSeqSpec {
                 };
                 Box::new(grain_iterator(t0, window_span, (sb_grain, step)))
             }
-            TimeSeqSpec::Weeks => {
+            SeqSpecInternal::Weeks => {
                 let t0 = truncate_week(t0);
                 let step_by = match direction {
                     TimeDir::Future => (Grain::Day, 7),
@@ -475,7 +476,7 @@ impl TimeSeqSpec {
                 };
                 Box::new(grain_iterator(t0, (Grain::Day, 7), step_by))
             }
-            TimeSeqSpec::Weekdays(n) => {
+            SeqSpecInternal::Weekdays(n) => {
                 let t0 = find_weekday(t0, n);
                 let step_by = match direction {
                     TimeDir::Future => (Grain::Day, 7),
@@ -483,7 +484,7 @@ impl TimeSeqSpec {
                 };
                 Box::new(grain_iterator(t0, (Grain::Day, 1), step_by))
             }
-            TimeSeqSpec::Monthdays(n) => {
+            SeqSpecInternal::Monthdays(n) => {
                 let mut t0_end = t0;
                 Box::new(std::iter::from_fn(move || {
                     while t0_end.day() != n {
@@ -503,7 +504,7 @@ impl TimeSeqSpec {
                     })
                 }))
             }
-            TimeSeqSpec::Weekends => {
+            SeqSpecInternal::Weekends => {
                 let t0 = find_weekend(t0);
                 let t0 = truncate_weekend(t0);
                 let step_by = match direction {
@@ -512,7 +513,7 @@ impl TimeSeqSpec {
                 };
                 Box::new(grain_iterator(t0, (Grain::Day, 2), step_by))
             }
-            TimeSeqSpec::SpecificGrain { grain, n } => {
+            SeqSpecInternal::SpecificGrain { grain, n } => {
                 let t0 = find_grain(t0, grain, n);
                 let step_by = match direction {
                     TimeDir::Future => (grain, grains_in_parent(grain) as i32),
@@ -520,7 +521,7 @@ impl TimeSeqSpec {
                 };
                 Box::new(grain_iterator(t0, (grain, 1), step_by))
             }
-            TimeSeqSpec::Within { nth, window, frame } => {
+            SeqSpecInternal::Within { nth, window, frame } => {
                 Box::new(
                     frame
                         .seq(t0, direction)
@@ -551,7 +552,7 @@ impl TimeSeqSpec {
                         }),
                 )
             }
-            TimeSeqSpec::Merge(s, n) => {
+            SeqSpecInternal::Merge(s, n) => {
                 let mut _s = match direction {
                     TimeDir::Future => s.seq(t0, direction).skip(0),
                     TimeDir::Past => s.seq(t0, direction).skip(1),
@@ -573,7 +574,7 @@ impl TimeSeqSpec {
                     }
                 }))
             }
-            TimeSeqSpec::Union(s1, s2) => {
+            SeqSpecInternal::Union(s1, s2) => {
                 let mut s1 = s1.seq(t0, direction).peekable();
                 let mut s2 = s2.seq(t0, direction).peekable();
                 let starts_first = match direction {
@@ -596,7 +597,7 @@ impl TimeSeqSpec {
                     }
                 }))
             }
-            TimeSeqSpec::Intersection(s1, s2) => {
+            SeqSpecInternal::Intersection(s1, s2) => {
                 let mut s1 = s1.seq(t0, direction).peekable();
                 let mut s2 = s2.seq(t0, direction).peekable();
                 let ends_first = match direction {
@@ -625,7 +626,7 @@ impl TimeSeqSpec {
                     None // panic!("Intersect INFINITE_FUSE blown");
                 }))
             }
-            TimeSeqSpec::Except(s, except) => {
+            SeqSpecInternal::Except(s, except) => {
                 let s = s.seq(t0, direction);
                 let mut except = except.seq(t0, direction);
                 let mut ex = except.next();
@@ -644,10 +645,10 @@ impl TimeSeqSpec {
                     }
                 }))
             }
-            TimeSeqSpec::Shift(s, grain, n) => {
+            SeqSpecInternal::Shift(s, grain, n) => {
                 Box::new(s.seq(t0, direction).map(move |s| s.shift(grain, n)))
             }
-            TimeSeqSpec::Interval {
+            SeqSpecInternal::Interval {
                 from,
                 to,
                 inclusive,
@@ -695,15 +696,17 @@ impl TimeSeqSpec {
             }
         }
     }
+}
 
+impl TimeSeqSpec {
     pub fn future(self, t0: DateTime) -> TimeSequence {
         Box::new(
-            self.seq(t0, TimeDir::Future)
+            self.0.seq(t0, TimeDir::Future)
                 .skip_while(move |t| t.end <= t0),
         )
     }
 
     pub fn past(self, t0: DateTime) -> TimeSequence {
-        Box::new(self.seq(t0, TimeDir::Past).skip_while(move |t| t.end > t0))
+        Box::new(self.0.seq(t0, TimeDir::Past).skip_while(move |t| t.end > t0))
     }
 }

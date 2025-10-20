@@ -284,6 +284,13 @@ pub(crate) enum SeqSpecInternal {
 pub struct TimeSeqSpec(pub(crate) SeqSpecInternal);
 
 impl TimeSeqSpec {
+    pub fn grain(g: Grain) -> TimeSeqSpec {
+        TimeSeqSpec(SeqSpecInternal::Grain {
+            window_span: (g, 1),
+            step_by: (g, 1),
+        })
+    }
+
     pub fn seconds(n: Option<u16>) -> TimeSeqSpec {
         TimeSeqSpec(match n {
             Some(n) => SeqSpecInternal::SpecificGrain {
@@ -370,7 +377,10 @@ impl TimeSeqSpec {
         if self.0.grain() != other.0.grain() {
             Err("Union grains must be the same".to_string())
         } else {
-            Ok(TimeSeqSpec(SeqSpecInternal::Union(Box::new(self.0), Box::new(other.0))))
+            Ok(TimeSeqSpec(SeqSpecInternal::Union(
+                Box::new(self.0),
+                Box::new(other.0),
+            )))
         }
     }
 
@@ -391,7 +401,10 @@ impl TimeSeqSpec {
     }
 
     pub fn intersection(self, other: Self) -> Self {
-        TimeSeqSpec(SeqSpecInternal::Intersection(Box::new(self.0), Box::new(other.0)))
+        TimeSeqSpec(SeqSpecInternal::Intersection(
+            Box::new(self.0),
+            Box::new(other.0),
+        ))
     }
 
     pub fn except(self, other: Self) -> Self {
@@ -701,12 +714,17 @@ impl SeqSpecInternal {
 impl TimeSeqSpec {
     pub fn future(self, t0: DateTime) -> TimeSequence {
         Box::new(
-            self.0.seq(t0, TimeDir::Future)
+            self.0
+                .seq(t0, TimeDir::Future)
                 .skip_while(move |t| t.end <= t0),
         )
     }
 
     pub fn past(self, t0: DateTime) -> TimeSequence {
-        Box::new(self.0.seq(t0, TimeDir::Past).skip_while(move |t| t.end > t0))
+        Box::new(
+            self.0
+                .seq(t0, TimeDir::Past)
+                .skip_while(move |t| t.end > t0),
+        )
     }
 }

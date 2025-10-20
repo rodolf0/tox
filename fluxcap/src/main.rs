@@ -17,8 +17,8 @@ fn main() -> Result<(), String> {
 
     let tm = fluxcap::TimeMachine::new();
 
-    for r in tm.eval(&input, None)? {
-        println!("{:?}", r);
+    for mut r in tm.eval(&input, None)? {
+        println!("{:?}", r.next());
     }
 
     let verbose = std::env::args().any(|arg| arg == "-v");

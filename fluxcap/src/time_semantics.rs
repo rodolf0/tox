@@ -2,10 +2,11 @@ use core::fmt;
 use time::UtcDateTime as DateTime;
 
 use earlgrey::{EarleyForest, EarleyParser};
-use kronos::{Grain, TimeSeq, TimeSpan};
+use kronos::{Grain, TimeSeqSpec, TimeSpan, TimeSequence};
 
 #[derive(Clone, Debug)]
 enum TimeAstNode {
+    Keyword,
     Weekday(u8),
     MonthName(u8),
     Ordinal(u8),
@@ -15,12 +16,10 @@ enum TimeAstNode {
     TimeGrain(Grain),
     Week,
     Weekend,
-    TimeSeq(kronos::TimeSeq),
-    TimeSpan(kronos::TimeSpan),
+    TimeSeqSpec(TimeSeqSpec),
+    TimeSpan(TimeSpan),
     RelTimeSpan { shift: (Grain, i32), grain: Grain },
 }
-
-pub struct TimeStream<'a>(Box<dyn Iterator<Item = TimeSpan> + 'a>);
 
 impl TimeAstNode {
     fn i32(self) -> i32 {
@@ -30,14 +29,20 @@ impl TimeAstNode {
             TimeAstNode::Ordinal(x) => x as i32,
             TimeAstNode::YearNumber(x) => x as i32,
             TimeAstNode::HourSpec(x) => x as i32,
+            TimeAstNode::SmallInt(x) => x as i32,
             _ => panic!("BUG: cannot convert {:?} to i32", self),
         }
     }
 
-    fn eval(&self, reftime: DateTime) -> TimeStream {
+    fn eval(self, reftime: DateTime) -> TimeSequence {
         match self {
-            TimeAstNode::TimeSeq(s) => TimeStream(s.future(reftime)),
-            _ => todo!(),
+            TimeAstNode::TimeSeqSpec(s) => s.future(reftime),
+            TimeAstNode::RelTimeSpan{shift, grain} => {
+                Box::new(
+                TimeSeqSpec::grain(grain).shift(shift.0, shift.1).future(reftime).take(1)
+                )
+            }
+            _ => todo!("eval for {:?}", self),
         }
     }
 }
@@ -58,16 +63,11 @@ fn terminal_eval() -> impl Fn(&str, &str) -> TimeAstNode {
             q => TimeGrain(kronos_grain(q).unwrap()),
         },
         "weekend" => Weekend,
+        "now" | "today" | "yesterday" | "tomorrow" | "after" | "of" => Keyword,
         _ => unreachable!("Unknown terminal {}", terminal),
     }
 }
 
-// #[derive(Debug, PartialEq, Clone)]
-// pub enum TimeEl {
-//     Time(k::Range),
-//     Count(u32),
-// }
-//
 // impl fmt::Display for TimeEl {
 //     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
 //         match self {
@@ -97,33 +97,6 @@ fn terminal_eval() -> impl Fn(&str, &str) -> TimeAstNode {
 //     }
 // }
 //
-// impl TimeEl {
-//     fn range(self) -> k::Range {
-//         if let TimeEl::Time(x) = self {
-//             x
-//         } else {
-//             panic!("BUG")
-//         }
-//     }
-// }
-//
-// #[derive(Clone)]
-// enum TimeNode {
-//     Int(i32),
-//     Grain(k::Grain),
-//     Shifts(Vec<(k::Grain, i32)>),
-//     Nop,
-//     Seq(Shim),
-//     This(Shim),
-//     Next(Shim, usize),
-//     Last(Shim, usize),
-//     RefNext(Shim, DateTime),
-//     RefPrev(Shim, DateTime),
-//     Until(Shim, DateTime),
-//     Since(Shim, DateTime),
-//     Between(Shim, DateTime, DateTime),
-// }
-//
 // // Shift a sequence by multiple shifts
 // fn build_shifter(shifts: Vec<(k::Grain, i32)>, sign: i32, grain: k::Grain) -> Shim {
 //     // get the finest grain of the composition to anchor the lookback
@@ -137,90 +110,6 @@ fn terminal_eval() -> impl Fn(&str, &str) -> TimeAstNode {
 //     shifted
 // }
 //
-// macro_rules! s {
-//     ($e:expr) => {
-//         TimeNode::Seq(Shim::new($e))
-//     };
-// }
-//
-// impl TimeNode {
-//     fn i32(&self) -> i32 {
-//         if let TimeNode::Int(x) = self {
-//             *x as i32
-//         } else {
-//             panic!("BUG")
-//         }
-//     }
-//     fn u32(&self) -> u32 {
-//         if let TimeNode::Int(x) = self {
-//             *x as u32
-//         } else {
-//             panic!("BUG")
-//         }
-//     }
-//     fn usize(&self) -> usize {
-//         if let TimeNode::Int(x) = self {
-//             *x as usize
-//         } else {
-//             panic!("BUG")
-//         }
-//     }
-//     fn grain(&self) -> k::Grain {
-//         if let TimeNode::Grain(x) = self {
-//             *x
-//         } else {
-//             panic!("BUG")
-//         }
-//     }
-//     fn seq(&self) -> Shim {
-//         if let TimeNode::Seq(x) = self {
-//             x.clone()
-//         } else {
-//             panic!("BUG")
-//         }
-//     }
-//     fn shifts(self) -> Vec<(k::Grain, i32)> {
-//         if let TimeNode::Shifts(x) = self {
-//             x
-//         } else {
-//             panic!("BUG")
-//         }
-//     }
-//
-//     fn eval(&self, reftime: DateTime) -> TimeEl {
-//         use TimeNode::*;
-//         use kronos::TimeSequence;
-//         match self {
-//             This(seq) => TimeEl::Time(seq._future_raw(&reftime).next().unwrap()),
-//             Next(seq, n) => TimeEl::Time(
-//                 seq.future(&reftime)
-//                     // skip_while needed to go over 'This'
-//                     .skip_while(|x| x.start <= reftime)
-//                     .nth(*n)
-//                     .unwrap(),
-//             ),
-//             Last(seq, n) => TimeEl::Time(seq.past(&reftime).nth(*n).unwrap()),
-//             RefNext(seq, t0) => TimeEl::Time(seq.future(t0).next().unwrap()),
-//             RefPrev(seq, t0) => TimeEl::Time(seq.past(t0).next().unwrap()),
-//             Until(seq, tn) => TimeEl::Count(
-//                 seq.future(&reftime)
-//                     .take_while(|x| x.start < *tn && x.end <= *tn)
-//                     .count() as u32,
-//             ),
-//             Since(seq, tn) => TimeEl::Count(
-//                 seq.future(tn)
-//                     .take_while(|x| x.start < reftime && x.end <= reftime)
-//                     .count() as u32,
-//             ),
-//             Between(seq, t0, tn) => TimeEl::Count(
-//                 seq.future(t0)
-//                     .take_while(|x| x.start < *tn && x.end <= *tn)
-//                     .count() as u32,
-//             ),
-//             _ => unreachable!(),
-//         }
-//     }
-// }
 //
 // fn evaler_time(ev: &mut EarleyForest<'_, TimeNode>, reftime: DateTime) {
 //     use TimeNode::*;
@@ -322,27 +211,27 @@ impl<'a> TimeMachine<'a> {
 
         // anchored_spec
         ev.action("anchored_spec -> weekday", |mut t| {
-            TimeAstNode::TimeSeq(TimeSeq::weekday(t.remove(0).i32() as u8))
+            TimeAstNode::TimeSeqSpec(TimeSeqSpec::weekday(t.remove(0).i32() as u8))
         });
         ev.action("anchored_spec -> weekday monthname ordinal", |mut t| {
             let ordinal = t.remove(2).i32() as isize;
             let month = t.remove(1).i32() as u16;
             let weekday = t.remove(0).i32() as u8;
-            let seq = TimeSeq::days()
-                .within(TimeSeq::months(Some(month)), ordinal)
+            let seq = TimeSeqSpec::days()
+                .within(TimeSeqSpec::months(Some(month)), ordinal)
                 .unwrap_or_else(|err| panic!("BUG: invalid within {}", err))
-                .intersection(TimeSeq::weekday(weekday));
-            TimeAstNode::TimeSeq(seq)
+                .intersection(TimeSeqSpec::weekday(weekday));
+            TimeAstNode::TimeSeqSpec(seq)
         });
         ev.action("anchored_spec -> weekday ordinal of monthname", |mut t| {
             let month = t.remove(3).i32() as u16;
             let ordinal = t.remove(1).i32() as isize;
             let weekday = t.remove(0).i32() as u8;
-            let seq = TimeSeq::days()
-                .within(TimeSeq::months(Some(month)), ordinal)
+            let seq = TimeSeqSpec::days()
+                .within(TimeSeqSpec::months(Some(month)), ordinal)
                 .unwrap_or_else(|err| panic!("BUG: invalid within {}", err))
-                .intersection(TimeSeq::weekday(weekday));
-            TimeAstNode::TimeSeq(seq)
+                .intersection(TimeSeqSpec::weekday(weekday));
+            TimeAstNode::TimeSeqSpec(seq)
         });
         ev.action(
             "anchored_spec -> weekday ordinal of monthname yearnumber",
@@ -352,34 +241,34 @@ impl<'a> TimeMachine<'a> {
                 let month = t.remove(3).i32() as u16;
                 let ordinal = t.remove(1).i32() as isize;
                 let weekday = t.remove(0).i32() as u8;
-                let seq = TimeSeq::days()
-                    .within(TimeSeq::months(Some(month)), ordinal)
+                let seq = TimeSeqSpec::days()
+                    .within(TimeSeqSpec::months(Some(month)), ordinal)
                     .unwrap_or_else(|err| panic!("BUG: invalid within {}", err))
-                    .intersection(TimeSeq::weekday(weekday));
-                TimeAstNode::TimeSeq(seq)
+                    .intersection(TimeSeqSpec::weekday(weekday));
+                TimeAstNode::TimeSeqSpec(seq)
             },
         );
         ev.action("anchored_spec -> weekday hourspec", |mut t| {
             let hour = t.remove(1).i32() as u16;
             let weekday = t.remove(0).i32() as u8;
-            TimeAstNode::TimeSeq(TimeSeq::hours(Some(hour)).intersection(TimeSeq::weekday(weekday)))
+            TimeAstNode::TimeSeqSpec(TimeSeqSpec::hours(Some(hour)).intersection(TimeSeqSpec::weekday(weekday)))
         });
         ev.action("anchored_spec -> monthname", |mut t| {
             let month = t.remove(0).i32() as u16;
-            TimeAstNode::TimeSeq(TimeSeq::months(Some(month)))
+            TimeAstNode::TimeSeqSpec(TimeSeqSpec::months(Some(month)))
         });
         ev.action("anchored_spec -> monthname yearnumber", |mut t| {
             // TODO
             let year = t.remove(1).i32() as u16;
             let month = t.remove(0).i32() as u16;
-            TimeAstNode::TimeSeq(TimeSeq::months(Some(month)))
+            TimeAstNode::TimeSeqSpec(TimeSeqSpec::months(Some(month)))
         });
         ev.action("anchored_spec -> monthname ordinal", |mut t| {
             let ordinal = t.remove(1).i32() as isize;
             let month = t.remove(0).i32() as u16;
-            TimeAstNode::TimeSeq(
-                TimeSeq::days()
-                    .within(TimeSeq::months(Some(month)), ordinal)
+            TimeAstNode::TimeSeqSpec(
+                TimeSeqSpec::days()
+                    .within(TimeSeqSpec::months(Some(month)), ordinal)
                     .unwrap(), // TODO: how should we deal with this?
             )
         });
@@ -388,31 +277,31 @@ impl<'a> TimeMachine<'a> {
             let year = t.remove(2).i32() as u16;
             let ordinal = t.remove(1).i32() as isize;
             let month = t.remove(0).i32() as u16;
-            TimeAstNode::TimeSeq(
-                TimeSeq::days()
-                    .within(TimeSeq::months(Some(month)), ordinal)
+            TimeAstNode::TimeSeqSpec(
+                TimeSeqSpec::days()
+                    .within(TimeSeqSpec::months(Some(month)), ordinal)
                     .unwrap_or_else(|err| panic!("BUG: invalid within {}", err)),
             )
         });
-        ev.action("anchored_spec -> ordinal 'of' monthname", |mut t| {
+        ev.action("anchored_spec -> ordinal of monthname", |mut t| {
             let month = t.remove(2).i32() as u16;
             let ordinal = t.remove(0).i32() as isize;
-            TimeAstNode::TimeSeq(
-                TimeSeq::days()
-                    .within(TimeSeq::months(Some(month)), ordinal)
+            TimeAstNode::TimeSeqSpec(
+                TimeSeqSpec::days()
+                    .within(TimeSeqSpec::months(Some(month)), ordinal)
                     .unwrap_or_else(|err| panic!("BUG: invalid within {}", err)),
             )
         });
         ev.action(
-            "anchored_spec -> ordinal 'of' monthname yearnumber",
+            "anchored_spec -> ordinal of monthname yearnumber",
             |mut t| {
                 // TODO
                 let year = t.remove(2).i32() as u16;
                 let month = t.remove(2).i32() as u16;
                 let ordinal = t.remove(0).i32() as isize;
-                TimeAstNode::TimeSeq(
-                    TimeSeq::days()
-                        .within(TimeSeq::months(Some(month)), ordinal)
+                TimeAstNode::TimeSeqSpec(
+                    TimeSeqSpec::days()
+                        .within(TimeSeqSpec::months(Some(month)), ordinal)
                         .unwrap_or_else(|err| panic!("BUG: invalid within {}", err)),
                 )
             },
@@ -423,7 +312,7 @@ impl<'a> TimeMachine<'a> {
         });
         ev.action("anchored_spec -> hourspec", |mut t| {
             let hour = t.remove(0).i32() as u16;
-            TimeAstNode::TimeSeq(TimeSeq::hours(Some(hour)))
+            TimeAstNode::TimeSeqSpec(TimeSeqSpec::hours(Some(hour)))
         });
         ev.action("anchored_spec -> now", |_| TimeAstNode::RelTimeSpan {
             shift: (Grain::Second, 0),
@@ -448,7 +337,7 @@ impl<'a> TimeMachine<'a> {
         }
     }
 
-    pub fn eval(&self, time: &str, reftime: Option<DateTime>) -> Result<Vec<TimeStream<'a>>, String> {
+    pub fn eval(&self, time: &str, reftime: Option<DateTime>) -> Result<Vec<TimeSequence>, String> {
         let mut tokenizer = time.split(&[' ', ','][..]).filter(|w| !w.is_empty());
         let state = self
             .parser

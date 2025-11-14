@@ -67,7 +67,7 @@ pub enum Grain {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TimeSpan {
-    pub(crate) start: DateTime,
+    pub start: DateTime,
     pub(crate) end: DateTime,
     pub(crate) grain: Grain,
 }

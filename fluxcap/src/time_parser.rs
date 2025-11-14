@@ -89,10 +89,12 @@ fn _grammar() -> Result<earlgrey::Grammar, String> {
             ordinal(d).or_else(|| short_ordinal(d)).is_some()
         })
         .plug_terminal("yearnumber", |y| {
-            i32::from_str(y).map(|y| 999 < y && y < 3000).is_ok()
+            i32::from_str(y).map(|y| 999 < y && y < 3000) == Ok(true)
         })
         .plug_terminal("hourspec", |h| hour_spec(h).is_some())
-        .plug_terminal("small_int", |s| u16::from_str(s).map(|s| s <= 999).is_ok())
+        .plug_terminal("small_int", |s| {
+            u16::from_str(s).map(|s| s <= 999) == Ok(true)
+        })
         // literlas that we want to check variations of
         .plug_terminal("time_quantity", |q| {
             kronos_grain(q).is_some() || q == "week" || q == "weeks"

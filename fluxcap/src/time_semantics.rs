@@ -2,7 +2,7 @@ use core::fmt;
 use time::UtcDateTime as DateTime;
 
 use earlgrey::{EarleyForest, EarleyParser};
-use kronos::{Grain, TimeSeqSpec, TimeSpan, TimeSequence};
+use kronos::{Grain, TimeSeqSpec, TimeSequence, TimeSpan};
 
 #[derive(Clone, Debug)]
 enum TimeAstNode {
@@ -17,31 +17,38 @@ enum TimeAstNode {
     Week,
     Weekend,
     TimeSeqSpec(TimeSeqSpec),
+    AnchoredTimeSeqSpec(TimeSeqSpec, DateTime),
     TimeSpan(TimeSpan),
     RelTimeSpan { shift: (Grain, i32), grain: Grain },
 }
 
 impl TimeAstNode {
     fn i32(self) -> i32 {
+        use TimeAstNode::*;
         match self {
-            TimeAstNode::Weekday(x) => x as i32,
-            TimeAstNode::MonthName(x) => x as i32,
-            TimeAstNode::Ordinal(x) => x as i32,
-            TimeAstNode::YearNumber(x) => x as i32,
-            TimeAstNode::HourSpec(x) => x as i32,
-            TimeAstNode::SmallInt(x) => x as i32,
+            Weekday(x) => x as i32,
+            MonthName(x) => x as i32,
+            Ordinal(x) => x as i32,
+            YearNumber(x) => x as i32,
+            HourSpec(x) => x as i32,
+            SmallInt(x) => x as i32,
             _ => panic!("BUG: cannot convert {:?} to i32", self),
         }
     }
 
     fn eval(self, reftime: DateTime) -> TimeSequence {
+        use TimeAstNode::*;
         match self {
-            TimeAstNode::TimeSeqSpec(s) => s.future(reftime),
-            TimeAstNode::RelTimeSpan{shift, grain} => {
-                Box::new(
-                TimeSeqSpec::grain(grain).shift(shift.0, shift.1).future(reftime).take(1)
-                )
-            }
+            TimeSeqSpec(s) => s.future(reftime),
+            RelTimeSpan { shift, grain } => Box::new(
+                kronos::TimeSeqSpec::grain(grain)
+                    .shift(shift.0, shift.1)
+                    .future(reftime)
+                    .take(1),
+            ),
+            AnchoredTimeSeqSpec(s, ref_override) => s.future(ref_override),
+            TimeSpan(span) => Box::new(std::iter::once(span)),
+
             _ => todo!("eval for {:?}", self),
         }
     }
@@ -236,8 +243,7 @@ impl<'a> TimeMachine<'a> {
         ev.action(
             "anchored_spec -> weekday ordinal of monthname yearnumber",
             |mut t| {
-                // TODO
-                let year = t.remove(4).i32() as u16;
+                let year = t.remove(4).i32();
                 let month = t.remove(3).i32() as u16;
                 let ordinal = t.remove(1).i32() as isize;
                 let weekday = t.remove(0).i32() as u8;
@@ -245,23 +251,27 @@ impl<'a> TimeMachine<'a> {
                     .within(TimeSeqSpec::months(Some(month)), ordinal)
                     .unwrap_or_else(|err| panic!("BUG: invalid within {}", err))
                     .intersection(TimeSeqSpec::weekday(weekday));
-                TimeAstNode::TimeSeqSpec(seq)
+                TimeAstNode::AnchoredTimeSeqSpec(seq, TimeSpan::year(year).start)
             },
         );
         ev.action("anchored_spec -> weekday hourspec", |mut t| {
             let hour = t.remove(1).i32() as u16;
             let weekday = t.remove(0).i32() as u8;
-            TimeAstNode::TimeSeqSpec(TimeSeqSpec::hours(Some(hour)).intersection(TimeSeqSpec::weekday(weekday)))
+            TimeAstNode::TimeSeqSpec(
+                TimeSeqSpec::hours(Some(hour)).intersection(TimeSeqSpec::weekday(weekday)),
+            )
         });
         ev.action("anchored_spec -> monthname", |mut t| {
             let month = t.remove(0).i32() as u16;
             TimeAstNode::TimeSeqSpec(TimeSeqSpec::months(Some(month)))
         });
         ev.action("anchored_spec -> monthname yearnumber", |mut t| {
-            // TODO
-            let year = t.remove(1).i32() as u16;
+            let year = t.remove(1).i32();
             let month = t.remove(0).i32() as u16;
-            TimeAstNode::TimeSeqSpec(TimeSeqSpec::months(Some(month)))
+            TimeAstNode::AnchoredTimeSeqSpec(
+                TimeSeqSpec::months(Some(month)),
+                TimeSpan::year(year).start,
+            )
         });
         ev.action("anchored_spec -> monthname ordinal", |mut t| {
             let ordinal = t.remove(1).i32() as isize;
@@ -270,17 +280,18 @@ impl<'a> TimeMachine<'a> {
                 TimeSeqSpec::days()
                     .within(TimeSeqSpec::months(Some(month)), ordinal)
                     .unwrap(), // TODO: how should we deal with this?
+                               // Maybe match the None and emit empty
             )
         });
         ev.action("anchored_spec -> monthname ordinal yearnumber", |mut t| {
-            // TODO
-            let year = t.remove(2).i32() as u16;
+            let year = t.remove(2).i32();
             let ordinal = t.remove(1).i32() as isize;
             let month = t.remove(0).i32() as u16;
-            TimeAstNode::TimeSeqSpec(
+            TimeAstNode::AnchoredTimeSeqSpec(
                 TimeSeqSpec::days()
                     .within(TimeSeqSpec::months(Some(month)), ordinal)
                     .unwrap_or_else(|err| panic!("BUG: invalid within {}", err)),
+                TimeSpan::year(year).start,
             )
         });
         ev.action("anchored_spec -> ordinal of monthname", |mut t| {
@@ -295,14 +306,14 @@ impl<'a> TimeMachine<'a> {
         ev.action(
             "anchored_spec -> ordinal of monthname yearnumber",
             |mut t| {
-                // TODO
-                let year = t.remove(2).i32() as u16;
+                let year = t.remove(3).i32();
                 let month = t.remove(2).i32() as u16;
                 let ordinal = t.remove(0).i32() as isize;
-                TimeAstNode::TimeSeqSpec(
+                TimeAstNode::AnchoredTimeSeqSpec(
                     TimeSeqSpec::days()
                         .within(TimeSeqSpec::months(Some(month)), ordinal)
                         .unwrap_or_else(|err| panic!("BUG: invalid within {}", err)),
+                    TimeSpan::year(year).start,
                 )
             },
         );

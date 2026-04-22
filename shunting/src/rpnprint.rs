@@ -9,7 +9,7 @@ enum AST<'a> {
 }
 
 impl RPNExpr {
-    fn build_ast(&self) -> AST {
+    fn build_ast(&self) -> AST<'_> {
         let mut ops = Vec::new();
         for token in &self.0 {
             match token {

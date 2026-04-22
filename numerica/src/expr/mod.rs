@@ -234,15 +234,11 @@ pub(crate) fn apply(head: Expr, args: Vec<Expr>, ctx: &mut Context) -> Result<Ex
                 let Expr::String(arg) = arg else {
                     return Err(format!("T takes a time string. {:?}", arg));
                 };
-                let reftime = chrono::Local::now().naive_local();
-                let time_machine = fluxcap::TimeMachine::new(reftime);
+                let time_machine = fluxcap::TimeMachine::new();
                 let mut time_elems = time_machine
-                    .eval(&arg)?
+                    .eval(&arg, None)?
                     .into_iter()
-                    .map(|time_el| match time_el {
-                        fluxcap::TimeEl::Count(c) => Expr::Number(c as f64),
-                        o => Expr::String(o.to_string()),
-                    })
+                    .map(|o| Expr::String(format!("{:?}", o)))
                     .collect::<Vec<_>>();
                 if time_elems.len() == 1 {
                     Ok(time_elems.remove(0))

@@ -289,7 +289,9 @@ mod test_within {
             }
         );
         // 10th day of each month (past)
-        let s = TimeSeqSpec::days().within(TimeSeqSpec::months(None), 10).unwrap();
+        let s = TimeSeqSpec::days()
+            .within(TimeSeqSpec::months(None), 10)
+            .unwrap();
         let mut p = s.clone().past(datetime!(2015-03-11 0:00));
         assert_eq!(
             p.next().unwrap(),
@@ -443,7 +445,12 @@ mod test_within {
 
         // the 3rd hour of 2nd day of the month
         let s = TimeSeqSpec::hours(None)
-            .within(TimeSeqSpec::days().within(TimeSeqSpec::months(None), 2).unwrap(), 3)
+            .within(
+                TimeSeqSpec::days()
+                    .within(TimeSeqSpec::months(None), 2)
+                    .unwrap(),
+                3,
+            )
             .unwrap();
         let mut f = s.clone().future(datetime!(2015-03-11 0:00));
         assert_eq!(
@@ -552,7 +559,9 @@ mod test_within {
 
     #[test]
     fn impossible_lastof() {
-        let s = TimeSeqSpec::days().within(TimeSeqSpec::months(None), 32).unwrap();
+        let s = TimeSeqSpec::days()
+            .within(TimeSeqSpec::months(None), 32)
+            .unwrap();
         assert_eq!(s.clone().future(datetime!(2015-02-25 0:00)).next(), None);
     }
 }
@@ -564,7 +573,9 @@ mod test_union {
     #[test]
     fn test_union() {
         // Mondays and Wednesdays
-        let s = TimeSeqSpec::weekday(1).union(TimeSeqSpec::weekday(3)).unwrap();
+        let s = TimeSeqSpec::weekday(1)
+            .union(TimeSeqSpec::weekday(3))
+            .unwrap();
         let mut f = s.clone().future(datetime!(2015-02-27 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -716,8 +727,11 @@ mod test_intersect {
     #[test]
     fn intersect_union() {
         // 3PM on (mondays or tuesdays)
-        let hour_15 = TimeSeqSpec::hours(Some(15))
-            .intersection(TimeSeqSpec::weekday(1).union(TimeSeqSpec::weekday(2)).unwrap());
+        let hour_15 = TimeSeqSpec::hours(Some(15)).intersection(
+            TimeSeqSpec::weekday(1)
+                .union(TimeSeqSpec::weekday(2))
+                .unwrap(),
+        );
         let mut f = hour_15.clone().future(datetime!(2015-03-11 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -957,7 +971,7 @@ mod test_interval {
                     .unwrap(),
                 true,
             );
-        // Test reftime outside interval 
+        // Test reftime outside interval
         let mut f = spring.clone().future(datetime!(2025-08-22 0:00));
         assert_eq!(
             f.next().unwrap(),
@@ -1009,7 +1023,7 @@ mod test_interval {
                     .unwrap(),
                 true,
             );
-        // Test reftime outside interval 
+        // Test reftime outside interval
         let mut p = spring.clone().past(datetime!(2025-08-22 0:00));
         assert_eq!(
             p.next().unwrap(),
@@ -1019,7 +1033,7 @@ mod test_interval {
                 grain: Grain::Day
             }
         );
-        // Test reftime inside. 
+        // Test reftime inside.
         let mut p = spring.clone().past(datetime!(2025-10-22 0:00));
         assert_eq!(
             p.next().unwrap(),
@@ -1030,7 +1044,10 @@ mod test_interval {
             }
         );
         // Test reftime inside - 'seq'
-        let mut p = spring.clone().0.seq(datetime!(2025-10-22 0:00), TimeDir::Past);
+        let mut p = spring
+            .clone()
+            .0
+            .seq(datetime!(2025-10-22 0:00), TimeDir::Past);
         assert_eq!(
             p.next().unwrap(),
             TimeSpan {

@@ -68,8 +68,8 @@ pub enum Grain {
 #[derive(Debug, PartialEq, Clone)]
 pub struct TimeSpan {
     pub start: DateTime,
-    pub(crate) end: DateTime,
-    pub(crate) grain: Grain,
+    pub end: DateTime,
+    pub grain: Grain,
 }
 
 impl TimeSpan {
@@ -669,11 +669,13 @@ impl SeqSpecInternal {
                 // The first emitted item (future or past) should contain t0.
                 // Item needs to be strictly less than (contained by) 'to''s item.
                 // So adjust t0 to 1) be inside the interval, 2) truncate it to start.
-                let t0 = to
-                    .clone()
-                    .seq(t0, direction)
-                    .next()
-                    .map(|s| if inclusive { s.end } else { s.start });
+                let t0 = to.clone().seq(t0, direction).next().map(|s| {
+                    if inclusive {
+                        s.end
+                    } else {
+                        s.start
+                    }
+                });
                 // This is the 'truncate' to interval boundary/start.
                 // Find interval start back from the just-found interval end.
                 let t0 = t0

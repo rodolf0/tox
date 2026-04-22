@@ -13,7 +13,7 @@ pub struct Resolver<'a> {
 }
 
 impl<'a> Resolver<'a> {
-    pub fn new(interp: &mut LoxInterpreter) -> Resolver {
+    pub fn new(interp: &mut LoxInterpreter) -> Resolver<'_> {
         Resolver {
             interpreter: interp,
             scopes: Vec::new(),

@@ -5,84 +5,72 @@
 
 pub fn time_grammar() -> &'static str {
     r#"
-    time_spec := anchored_spec
-               | relative_spec
-               | scoped_spec
+    time_expr := time_span
+               | 'on' time_span
                ;
 
-    anchored_spec := weekday
-                   | weekday monthname ordinal
-                   | weekday ordinal 'of' monthname
-                   | weekday ordinal 'of' monthname yearnumber
-                   | weekday hourspec
-                   | monthname
-                   | monthname yearnumber
-                   | monthname ordinal
-                   | monthname ordinal yearnumber
-                   | ordinal 'of' monthname
-                   | ordinal 'of' monthname yearnumber
-                   | yearnumber
-                   | hourspec
-                   | 'now'
-                   | 'today'
-                   | 'yesterday'
-                   | 'tomorrow'
-                   ;
+    time_span := explicit_span
+               | sequence
+               ;
 
-    relative_spec := 'this' recurring_token
-                   | 'next' recurring_token
-                   | 'last' recurring_token
-                   | ['the' | 'a' | small_int] recurring_token relative_anchor
-                   | 'in' ('a' | 'an' | small_int) recurring_token
-                   ;
+    # These yield a single span
+    explicit_span := 'now'
+               | 'today'
+               | 'yesterday'
+               | 'tomorrow'
+               | 'this' sequence
+               | 'next' sequence
+               | 'last' sequence
+               | ['the' | 'a' | small_int] sequence relative_anchor
+               | 'in' ('a' | 'an' | small_int) sequence
+               | sequence yearnumber
+               | yearnumber
+               | ['the'] ordinal_qualifier sequence 'of' ['the'] explicit_span
+               | 'since' time_span
+               | 'until' time_span
+               | 'between' time_span 'and' time_span
+               | duration 'ago'
+               | 'in' duration
+               ;
 
-    recurring_token := time_quantity  # eg: 'day', 'week', 'month', etc.
-                     | weekday
-                     | 'weekend'
-                     | monthname
-                     | ordinal 'of' monthname
-                     | monthname ordinal
-                     | weekday monthname ordinal
-                     | weekday ordinal 'of' monthname
-                     | hourspec
-                     ;
+    # A sequence yields a series of time spans of which some are selected
+    sequence := time_quantity  # eg: 'day', 'week', 'month', etc.
+              | 'weekend'
+              | monthname
+              | monthname ordinal
+              | ordinal 'of' monthname
+              | weekday
+              | weekday monthname ordinal
+              | weekday ordinal 'of' monthname
+              | weekday hourspec
+              | hourspec
+              | ['the'] ordinal_qualifier sequence 'of' ['the'] sequence
+              | ['the'] ordinal
+              | weekday ['the'] ordinal
+              ;
 
-    # TODO: group relative_spec, anchored_spec, scoped_spec into time_spec
+    duration := small_int time_quantity
+              | 'a' time_quantity
+              | duration 'and' small_int time_quantity
+              | duration 'and' 'a' time_quantity
+              ;
 
     relative_anchor := 'ago'
                      | 'hence'
                      | 'before' 'last'
-                     | 'before' relative_spec
-                     | 'before' anchored_spec
-                     | 'before' scoped_spec
+                     | 'before' time_span
                      | ('from' | 'after') 'next'
-                     | ('from' | 'after') relative_spec
-                     | ('from' | 'after') anchored_spec
-                     | ('from' | 'after') scoped_spec
+                     | ('from' | 'after') time_span
                      ;
 
-    scoped_spec := ['the'] ordinal_qualifier recurring_token 'of' ['the'] scoped_anchor ;
-
-    scoped_anchor := recurring_token
-                   | scoped_spec
-                   | anchored_spec
-                   | relative_spec
-                   ;
-
     ordinal_qualifier := 'next' | 'last' | ordinal | 'last' ordinal ;
-
-
-    # TODO: comp-grain (3 days and 4 hours ago)
-    # TODO: sequence 'until' time
-    # TODO: sequence 'since' time
-    # TODO: sequence 'between' time 'and' time
     "#
 }
 
 fn _grammar() -> Result<earlgrey::Grammar, String> {
     use crate::constants::*;
     use std::str::FromStr;
-    earlgrey::EbnfGrammarParser::new(time_grammar(), "time_spec")
+    earlgrey::EbnfGrammarParser::new(time_grammar(), "time_expr")
         .plug_terminal("weekday", |d| weekday(d).is_some())
         .plug_terminal("monthname", |d| month(d).is_some())
         .plug_terminal("ordinal", |d| {

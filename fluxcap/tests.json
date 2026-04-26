@@ -1,0 +1,164 @@
+[
+  {
+    "description": "Anchors: now",
+    "input": "now",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-15T15:30:45Z", "end": "2026-04-15T15:30:46Z", "grain": "Second" }
+  },
+  {
+    "description": "Anchors: today",
+    "input": "today",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-15T00:00:00Z", "end": "2026-04-16T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Anchors: yesterday",
+    "input": "yesterday",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-14T00:00:00Z", "end": "2026-04-15T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Anchors: tomorrow",
+    "input": "tomorrow",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-16T00:00:00Z", "end": "2026-04-17T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Explicit Year",
+    "input": "2026",
+    "reftime": "2025-01-01T00:00:00Z",
+    "expected": { "start": "2026-01-01T00:00:00Z", "end": "2027-01-01T00:00:00Z", "grain": "Year" }
+  },
+  {
+    "description": "Relative (Quantity): this week",
+    "input": "this week",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-12T00:00:00Z", "end": "2026-04-19T00:00:00Z", "grain": "Week" }
+  },
+  {
+    "description": "Relative (Quantity): next week",
+    "input": "next week",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-19T00:00:00Z", "end": "2026-04-26T00:00:00Z", "grain": "Week" }
+  },
+  {
+    "description": "Relative (Quantity): next week",
+    "input": "next week",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-19T00:00:00Z", "end": "2026-04-26T00:00:00Z", "grain": "Week" }
+  },
+  {
+    "description": "Relative (Quantity): last month",
+    "input": "last month",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-03-01T00:00:00Z", "end": "2026-04-01T00:00:00Z", "grain": "Month" }
+  },
+  {
+    "description": "Relative (Named): this monday (today is Wed)",
+    "input": "this monday",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-20T00:00:00Z", "end": "2026-04-21T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Relative (Named): next monday (today is Wed)",
+    "input": "next monday",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-20T00:00:00Z", "end": "2026-04-21T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Relative (Named): last monday (today is Wed)",
+    "input": "last monday",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-13T00:00:00Z", "end": "2026-04-14T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Relative (Named): this january (we are in April)",
+    "input": "this january",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2027-01-01T00:00:00Z", "end": "2027-02-01T00:00:00Z", "grain": "Month" }
+  },
+  {
+    "description": "Snapping: 3 days ago (snaps to Day)",
+    "input": "3 days ago",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-12T00:00:00Z", "end": "2026-04-13T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Snapping: in 3 weeks (snaps to Week)",
+    "input": "in 3 weeks",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-05-06T00:00:00Z", "end": "2026-05-07T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Snapping: in 21 days",
+    "input": "in 21 days",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-05-06T00:00:00Z", "end": "2026-05-07T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Snapping (Exact): 4 hours ago (keeps time)",
+    "input": "4 hours ago",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-15T11:30:45Z", "end": "2026-04-15T11:30:46Z", "grain": "Second" }
+  },
+  {
+    "description": "Snapping (Mixed): 3 days and 4 hours ago (snaps to Day)",
+    "input": "3 days and 4 hours ago",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-11T20:00:00Z", "end": "2026-04-12T20:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Ranges: since yesterday",
+    "input": "since yesterday",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-14T00:00:00Z", "end": "2026-04-15T15:30:45Z", "grain": "Second" }
+  },
+  {
+    "description": "Ranges: between today and tomorrow",
+    "input": "between today and tomorrow",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-15T00:00:00Z", "end": "2026-04-16T00:00:00Z", "grain": "Second" }
+  },
+  {
+    "description": "Ranges: until next week",
+    "input": "until next week",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-15T15:30:45Z", "end": "2026-04-19T00:00:00Z", "grain": "Second" }
+  },
+  {
+    "description": "Nested Scopes (Sequence of explicit span): the 1st week of january 2026",
+    "input": "the 1st week of january 2026",
+    "reftime": "2025-01-01T00:00:00Z",
+    "expected": { "start": "2025-12-28T00:00:00Z", "end": "2026-01-04T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Nested Scopes (Sequence of sequence): the 2nd week of january",
+    "input": "the 2nd week of january",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2027-01-03T00:00:00Z", "end": "2027-01-10T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Relative Anchors: 3 days before next month",
+    "input": "3 days before next month",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-28T00:00:00Z", "end": "2026-04-29T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Standalone Ordinals: the 3rd (implicitly of the month)",
+    "input": "the 3rd",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-05-03T00:00:00Z", "end": "2026-05-04T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Weekday Ordinals: monday the 3rd",
+    "input": "monday the 3rd",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-08-03T00:00:00Z", "end": "2026-08-04T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "The 'on' preposition: on monday",
+    "input": "on monday",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-20T00:00:00Z", "end": "2026-04-21T00:00:00Z", "grain": "Day" }
+  }
+]

@@ -31,7 +31,7 @@ pub enum TimeValue {
         dir: TimeDir,
         shifts: Vec<(Grain, i32)>,
     },
-    RelAnchor(Anchor, TimeDir),
+    RelAnchor(Anchor, TimeDir, usize),
     Interval {
         start: Box<TimeValue>,
         end: Box<TimeValue>,
@@ -107,11 +107,12 @@ impl TimeValue {
                     }
                 };
                 
-                // Snap down to Day if the shift includes Day or larger grain
-                let mut snap_to_day = false;
+                // Snap down to Day only if all shifts are Day or larger grain
+                let mut snap_to_day = true;
                 for (g, _) in &shifts {
-                    if *g >= Grain::Day {
-                        snap_to_day = true;
+                    if *g < Grain::Day {
+                        snap_to_day = false;
+                        break;
                     }
                 }
                 
@@ -327,8 +328,8 @@ impl<'a> TimeMachine<'a> {
             let count = t.remove(0).to_int() as usize;
 
             match anchor_val {
-                TimeValue::RelAnchor(anchor, dir) => {
-                    let skip = count.saturating_sub(1);
+                TimeValue::RelAnchor(anchor, dir, offset) => {
+                    let skip = count.saturating_sub(1) + offset;
                     TimeValue::Span { seq, anchor, dir, skip }
                 }
                 _ => unreachable!("relative_anchor should be RelAnchor"),
@@ -442,22 +443,21 @@ impl<'a> TimeMachine<'a> {
             TimeValue::Interval { start: Box::new(start), end: Box::new(end) }
         });
 
-        ev.action("relative_anchor -> ago", |_| TimeValue::RelAnchor(Anchor::Now, TimeDir::Past));
-        ev.action("relative_anchor -> hence", |_| TimeValue::RelAnchor(Anchor::Now, TimeDir::Future));
-        ev.action("relative_anchor -> before last", |_| TimeValue::RelAnchor(Anchor::Now, TimeDir::Past));
+        ev.action("relative_anchor -> ago", |_| TimeValue::RelAnchor(Anchor::Now, TimeDir::Past, 0));
+        ev.action("relative_anchor -> hence", |_| TimeValue::RelAnchor(Anchor::Now, TimeDir::Future, 0));
+        ev.action("relative_anchor -> before last", |_| TimeValue::RelAnchor(Anchor::Now, TimeDir::Past, 1));
         ev.action("relative_anchor -> before time_span", |mut t| {
             let span = t.remove(1);
-            TimeValue::RelAnchor(Anchor::Deferred(Box::new(span), false), TimeDir::Past)
+            TimeValue::RelAnchor(Anchor::Deferred(Box::new(span), false), TimeDir::Past, 0)
         });
-        ev.action("relative_anchor -> from next", |_| TimeValue::RelAnchor(Anchor::Now, TimeDir::Future));
-        ev.action("relative_anchor -> after next", |_| TimeValue::RelAnchor(Anchor::Now, TimeDir::Future));
-        ev.action("relative_anchor -> from time_span", |mut t| {
+
+        ev.action("(from|after) -> from", |_| TimeValue::Keyword);
+        ev.action("(from|after) -> after", |_| TimeValue::Keyword);
+
+        ev.action("relative_anchor -> (from|after) next", |_| TimeValue::RelAnchor(Anchor::Now, TimeDir::Future, 1));
+        ev.action("relative_anchor -> (from|after) time_span", |mut t| {
             let span = t.remove(1);
-            TimeValue::RelAnchor(Anchor::Deferred(Box::new(span), true), TimeDir::Future)
-        });
-        ev.action("relative_anchor -> after time_span", |mut t| {
-            let span = t.remove(1);
-            TimeValue::RelAnchor(Anchor::Deferred(Box::new(span), true), TimeDir::Future)
+            TimeValue::RelAnchor(Anchor::Deferred(Box::new(span), true), TimeDir::Future, 0)
         });
         
         ev.action("ordinal_qualifier -> next", |_| TimeValue::Ordinal(1));
@@ -482,9 +482,10 @@ impl<'a> TimeMachine<'a> {
 
         // Default reftime to local time
         let reftime = reftime.unwrap_or_else(|| {
-            time::OffsetDateTime::now_local()
-                .unwrap_or_else(|_| time::OffsetDateTime::now_utc())
-                .into()
+            let local_now = time::OffsetDateTime::now_local()
+                .unwrap_or_else(|_| time::OffsetDateTime::now_utc());
+            let local_naive = time::PrimitiveDateTime::new(local_now.date(), local_now.time());
+            local_naive.assume_utc().into()
         });
 
         Ok(self

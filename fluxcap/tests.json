@@ -102,10 +102,10 @@
     "expected": { "start": "2026-04-15T11:30:45Z", "end": "2026-04-15T11:30:46Z", "grain": "Second" }
   },
   {
-    "description": "Snapping (Mixed): 3 days and 4 hours ago (snaps to Day)",
+    "description": "Snapping (Mixed): 3 days and 4 hours ago (exact due to hours)",
     "input": "3 days and 4 hours ago",
     "reftime": "2026-04-15T15:30:45Z",
-    "expected": { "start": "2026-04-11T20:00:00Z", "end": "2026-04-12T20:00:00Z", "grain": "Day" }
+    "expected": { "start": "2026-04-12T11:30:45Z", "end": "2026-04-12T11:30:46Z", "grain": "Second" }
   },
   {
     "description": "Ranges: since yesterday",
@@ -160,5 +160,17 @@
     "input": "on monday",
     "reftime": "2026-04-15T15:30:45Z",
     "expected": { "start": "2026-04-20T00:00:00Z", "end": "2026-04-21T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Relative Anchor: monday after next",
+    "input": "monday after next",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-27T00:00:00Z", "end": "2026-04-28T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Snapping (Exact): 3 days and 2 minutes ago",
+    "input": "3 days and 2 minutes ago",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-04-12T15:28:45Z", "end": "2026-04-12T15:28:46Z", "grain": "Second" }
   }
 ]

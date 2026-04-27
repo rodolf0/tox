@@ -73,24 +73,33 @@ impl TimeValue {
         }
     }
 
-    fn eval(self, reftime: DateTime) -> TimeSpan {
+    fn eval(self, reftime: DateTime) -> Option<TimeSpan> {
         match self {
             TimeValue::Span { seq, anchor, dir, skip } => {
-                let t0 = match anchor {
-                    Anchor::Now => reftime,
-                    Anchor::Time(t) => t,
-                    Anchor::Deferred(tv, use_end) => {
-                        let span = tv.eval(reftime);
-                        if use_end {
-                            span.end
-                        } else {
-                            span.start
+                match anchor {
+                    Anchor::Deferred(tv, _) => {
+                        let bounds = tv.eval(reftime)?;
+                        let mut iter: Box<dyn Iterator<Item = TimeSpan>> = match dir {
+                            TimeDir::Future => {
+                                Box::new(seq.future(bounds.start).take_while(move |s| s.start < bounds.end))
+                            }
+                            TimeDir::Past => {
+                                Box::new(seq.past(bounds.end).take_while(move |s| s.end > bounds.start))
+                            }
+                        };
+                        iter.nth(skip)
+                    }
+                    _ => {
+                        let t0 = match anchor {
+                            Anchor::Now => reftime,
+                            Anchor::Time(t) => t,
+                            _ => unreachable!(),
+                        };
+                        match dir {
+                            TimeDir::Future => seq.future(t0).nth(skip),
+                            TimeDir::Past => seq.past(t0).nth(skip),
                         }
                     }
-                };
-                match dir {
-                    TimeDir::Future => seq.future(t0).nth(skip).unwrap(),
-                    TimeDir::Past => seq.past(t0).nth(skip).unwrap(),
                 }
             }
             TimeValue::ShiftedSpan { anchor, dir, shifts } => {
@@ -98,7 +107,7 @@ impl TimeValue {
                     Anchor::Now => reftime,
                     Anchor::Time(t) => t,
                     Anchor::Deferred(tv, use_end) => {
-                        let span = tv.eval(reftime);
+                        let span = tv.eval(reftime)?;
                         if use_end {
                             span.end
                         } else {
@@ -143,16 +152,16 @@ impl TimeValue {
                     };
                     span = span.shift(g, shift_amt);
                 }
-                span
+                Some(span)
             }
             TimeValue::Interval { start, end } => {
-                let start_span = start.eval(reftime);
-                let end_span = end.eval(reftime);
-                TimeSpan {
+                let start_span = start.eval(reftime)?;
+                let end_span = end.eval(reftime)?;
+                Some(TimeSpan {
                     start: start_span.start,
                     end: end_span.start,
                     grain: Grain::Second,
-                }
+                })
             }
             _ => panic!("eval called on un-evaluable TimeValue"),
         }
@@ -535,7 +544,7 @@ impl<'a> TimeMachine<'a> {
             .eval_all(&state)
             .map_err(|e| format!("TimeMachine {:?} for '{}'", e, time))?
             .into_iter()
-            .map(|tree| tree.eval(reftime))
+            .filter_map(|tree| tree.eval(reftime))
             .collect())
     }
 }

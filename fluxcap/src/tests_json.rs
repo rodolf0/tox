@@ -17,7 +17,7 @@ mod tests {
         description: String,
         input: String,
         reftime: String,
-        expected: Expected,
+        expected: Option<Expected>,
     }
 
     fn parse_time(s: &str) -> time::UtcDateTime {
@@ -49,28 +49,34 @@ mod tests {
         for case in tests {
             let reftime = parse_time(&case.reftime);
             let mut results = tm.eval(&case.input, Some(reftime)).unwrap();
-            let result = results.remove(0);
+            
+            match case.expected {
+                Some(expected_val) => {
+                    let result = results.remove(0);
+                    let expected_start = parse_time(&expected_val.start);
+                    let expected_end = parse_time(&expected_val.end);
+                    let expected_grain = parse_grain(&expected_val.grain);
 
-            if case.description.contains("last month") {
-                let p = crate::TimeMachine::new().eval("last month", Some(reftime)).unwrap();
-                println!("last month gives: {:?}", p);
+                    let expected = TimeSpan {
+                        start: expected_start,
+                        end: expected_end,
+                        grain: expected_grain,
+                    };
+
+                    assert_eq!(
+                        result, expected,
+                        "Failed test: {}\nInput: '{}'\nExpected: {:?}\nGot: {:?}",
+                        case.description, case.input, expected, result
+                    );
+                }
+                None => {
+                    assert!(
+                        results.is_empty(),
+                        "Failed test: {}\nInput: '{}'\nExpected empty results, got: {:?}",
+                        case.description, case.input, results
+                    );
+                }
             }
-
-            let expected_start = parse_time(&case.expected.start);
-            let expected_end = parse_time(&case.expected.end);
-            let expected_grain = parse_grain(&case.expected.grain);
-
-            let expected = TimeSpan {
-                start: expected_start,
-                end: expected_end,
-                grain: expected_grain,
-            };
-
-            assert_eq!(
-                result, expected,
-                "Failed test: {}\nInput: '{}'\nExpected: {:?}\nGot: {:?}",
-                case.description, case.input, expected, result
-            );
         }
     }
 }

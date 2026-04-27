@@ -184,5 +184,11 @@
     "input": "3 weeks before last weekend",
     "reftime": "2026-04-15T15:30:45Z",
     "expected": { "start": "2026-03-21T00:00:00Z", "end": "2026-03-22T00:00:00Z", "grain": "Day" }
+  },
+  {
+    "description": "Impossible Date Bounds: the 1st monday jan 1st of last year",
+    "input": "the 1st monday jan 1st of last year",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": null
   }
 ]

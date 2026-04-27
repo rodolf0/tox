@@ -398,7 +398,10 @@ impl<'a> TimeMachine<'a> {
                 _ => panic!("Expected Quantity"),
             }
         });
-        ev.action("duration -> a time_quantity", |mut t| {
+        ev.action("(a|an) -> a", |_| TimeValue::Keyword);
+        ev.action("(a|an) -> an", |_| TimeValue::Keyword);
+
+        ev.action("duration -> (a|an) time_quantity", |mut t| {
             let q = t.remove(1);
             match q {
                 TimeValue::Quantity(g, m) => TimeValue::Duration(vec![(g, m)]),
@@ -417,7 +420,7 @@ impl<'a> TimeMachine<'a> {
                 _ => panic!("Expected Quantity"),
             }
         });
-        ev.action("duration -> duration and a time_quantity", |mut t| {
+        ev.action("duration -> duration and (a|an) time_quantity", |mut t| {
             let q = t.remove(3);
             let mut dur = t.remove(0).to_duration();
             match q {

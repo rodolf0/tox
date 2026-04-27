@@ -53,9 +53,9 @@ pub fn time_grammar() -> &'static str {
                ;
 
     duration := small_int time_quantity
-              | 'a' time_quantity
+              | ('a' | 'an') time_quantity
               | duration 'and' small_int time_quantity
-              | duration 'and' 'a' time_quantity
+              | duration 'and' ('a' | 'an') time_quantity
               ;
 
     relative_anchor := shift_anchor

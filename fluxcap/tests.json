@@ -484,5 +484,255 @@
       "end": "2026-05-10T00:00:00Z",
       "grain": "Day"
     }
+  },
+  {
+    "description": "Missing branch: the last 2nd monday of the year",
+    "input": "the last 2nd monday of the year",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-12-21T00:00:00Z",
+      "end": "2026-12-22T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: this weekend",
+    "input": "this weekend",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-18T00:00:00Z",
+      "end": "2026-04-20T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: last weekend",
+    "input": "last weekend",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-11T00:00:00Z",
+      "end": "2026-04-13T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: next weekend",
+    "input": "next weekend",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-18T00:00:00Z",
+      "end": "2026-04-20T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: 3 days before tomorrow",
+    "input": "3 days before tomorrow",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-13T00:00:00Z",
+      "end": "2026-04-14T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: 4 weeks from yesterday",
+    "input": "4 weeks from yesterday",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-05-13T00:00:00Z",
+      "end": "2026-05-14T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: 2 months after today",
+    "input": "2 months after today",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-06-16T00:00:00Z",
+      "end": "2026-06-17T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: 3 weekends ago",
+    "input": "3 weekends ago",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-03-28T00:00:00Z",
+      "end": "2026-03-30T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: 2 januaries hence",
+    "input": "2 januaries hence",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2028-01-01T00:00:00Z",
+      "end": "2028-02-01T00:00:00Z",
+      "grain": "Month"
+    }
+  },
+  {
+    "description": "Missing branch: 3 mondays before last",
+    "input": "3 mondays before last",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-03-23T00:00:00Z",
+      "end": "2026-03-24T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: 4 tuesdays from next",
+    "input": "4 tuesdays from next",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-05-19T00:00:00Z",
+      "end": "2026-05-20T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: 2 fridays after next",
+    "input": "2 fridays after next",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-05-01T00:00:00Z",
+      "end": "2026-05-02T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: 3 mondays before next month",
+    "input": "3 mondays before next month",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-05-11T00:00:00Z",
+      "end": "2026-05-12T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: 2 fridays after last year",
+    "input": "2 fridays after last year",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2025-01-10T00:00:00Z",
+      "end": "2025-01-11T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: in an hour",
+    "input": "in an hour",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-15T16:30:45Z",
+      "end": "2026-04-15T16:30:46Z",
+      "grain": "Second"
+    }
+  },
+  {
+    "description": "Missing branch: a week ago",
+    "input": "a week ago",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-08T00:00:00Z",
+      "end": "2026-04-09T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: the month after next",
+    "input": "the month after next",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-05-01T00:00:00Z",
+      "end": "2026-06-01T00:00:00Z",
+      "grain": "Month"
+    }
+  },
+  {
+    "description": "Missing branch: a year before last",
+    "input": "a year before last",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2024-01-01T00:00:00Z",
+      "end": "2025-01-01T00:00:00Z",
+      "grain": "Year"
+    }
+  },
+  {
+    "description": "Missing branch: a week and 3 days ago",
+    "input": "a week and 3 days ago",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-05T00:00:00Z",
+      "end": "2026-04-06T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: 3 weeks and a day hence",
+    "input": "3 weeks and a day hence",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-05-07T00:00:00Z",
+      "end": "2026-05-08T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: in a month and 2 days",
+    "input": "in a month and 2 days",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-05-17T00:00:00Z",
+      "end": "2026-05-18T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: monday january 3rd 2026",
+    "input": "monday january 3rd 2026",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2028-01-03T00:00:00Z",
+      "end": "2028-01-04T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: january 3rd 2026",
+    "input": "january 3rd 2026",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-01-03T00:00:00Z",
+      "end": "2026-01-04T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: the 3rd 2026",
+    "input": "the 3rd 2026",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-01-03T00:00:00Z",
+      "end": "2026-01-04T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Missing branch: monday the 3rd 2026",
+    "input": "monday the 3rd 2026",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-08-03T00:00:00Z",
+      "end": "2026-08-04T00:00:00Z",
+      "grain": "Day"
+    }
   }
 ]

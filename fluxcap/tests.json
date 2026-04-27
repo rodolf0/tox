@@ -172,5 +172,17 @@
     "input": "3 days and 2 minutes ago",
     "reftime": "2026-04-15T15:30:45Z",
     "expected": { "start": "2026-04-12T15:28:45Z", "end": "2026-04-12T15:28:46Z", "grain": "Second" }
+  },
+  {
+    "description": "Sequence Enumeration: 3 weeks before last",
+    "input": "3 weeks before last",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-03-15T00:00:00Z", "end": "2026-03-22T00:00:00Z", "grain": "Week" }
+  },
+  {
+    "description": "Duration Shift: 3 weeks before last weekend",
+    "input": "3 weeks before last weekend",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": { "start": "2026-03-21T00:00:00Z", "end": "2026-03-22T00:00:00Z", "grain": "Day" }
   }
 ]

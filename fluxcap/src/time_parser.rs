@@ -1,8 +1,6 @@
 // https://github.com/wit-ai/duckling_old/blob/master/resources/languages/en/corpus/time.clj
 // https://github.com/wit-ai/duckling_old/blob/master/resources/languages/en/rules/time.clj
 
-// TODO: types should be date-time or duration (not count and TimeEl)
-
 pub fn time_grammar() -> &'static str {
     r#"
     time_expr := time_span
@@ -13,29 +11,12 @@ pub fn time_grammar() -> &'static str {
                | sequence
                ;
 
-    # These yield a single span
-    explicit_span := 'now'
-               | 'today'
-               | 'yesterday'
-               | 'tomorrow'
-               | 'this' sequence
-               | 'next' sequence
-               | 'last' sequence
-               | ['the' | 'a' | small_int] sequence relative_anchor
-               | 'in' ('a' | 'an' | small_int) sequence
-               | sequence yearnumber
-               | yearnumber
-               | ['the'] ordinal_qualifier sequence 'of' ['the'] explicit_span
-               | 'since' time_span
-               | 'until' time_span
-               | 'between' time_span 'and' time_span
-               | duration 'ago'
-               | 'in' duration
-               ;
-
     # A sequence yields a series of time spans of which some are selected
-    sequence := time_quantity  # eg: 'day', 'week', 'month', etc.
-              | 'weekend'
+    sequence := time_quantity
+              | named_sequence
+              ;
+
+    named_sequence := 'weekend'
               | monthname
               | monthname ordinal
               | ordinal 'of' monthname
@@ -49,19 +30,44 @@ pub fn time_grammar() -> &'static str {
               | weekday ['the'] ordinal
               ;
 
+    # These yield a single span
+    explicit_span := 'now'
+               | 'today'
+               | 'yesterday'
+               | 'tomorrow'
+               | 'this' sequence
+               | 'next' sequence
+               | 'last' sequence
+               | ['the' | 'a' | small_int] named_sequence relative_anchor
+               | 'in' ('a' | 'an' | small_int) named_sequence
+               | sequence yearnumber
+               | yearnumber
+               | ['the'] ordinal_qualifier sequence 'of' ['the'] explicit_span
+               | 'since' time_span
+               | 'until' time_span
+               | 'between' time_span 'and' time_span
+               | duration shift_anchor
+               | 'in' duration
+               | ['the' | 'a' | small_int] time_quantity 'before' 'last'
+               | ['the' | 'a' | small_int] time_quantity ('from' | 'after') 'next'
+               ;
+
     duration := small_int time_quantity
               | 'a' time_quantity
               | duration 'and' small_int time_quantity
               | duration 'and' 'a' time_quantity
               ;
 
-    relative_anchor := 'ago'
-                     | 'hence'
+    relative_anchor := shift_anchor
                      | 'before' 'last'
-                     | 'before' time_span
                      | ('from' | 'after') 'next'
-                     | ('from' | 'after') time_span
                      ;
+
+    shift_anchor := 'ago'
+                  | 'hence'
+                  | 'before' time_span
+                  | ('from' | 'after') time_span
+                  ;
 
     ordinal_qualifier := 'next' | 'last' | ordinal | 'last' ordinal ;
     "#

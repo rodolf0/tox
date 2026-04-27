@@ -57,6 +57,7 @@ mod grammar_checks {
 
     const RELATIVE_SPEC_ANCHORED_TESTS: &[&str] = &[
         "3 weeks before last",
+        "3 weeks before last weekend",
         "2 months before next month",
         "2 months before a year ago",
         // relative_spec -> relative_anchor -> 'in' small_int recurring_token

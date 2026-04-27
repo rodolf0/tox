@@ -2,7 +2,7 @@
 mod tests {
     use kronos::{Grain, TimeSpan};
     use serde::Deserialize;
-    use time::{macros::format_description, PrimitiveDateTime, UtcOffset, OffsetDateTime};
+    use time::{macros::format_description, PrimitiveDateTime, UtcOffset};
     use std::fs;
 
     #[derive(Deserialize)]
@@ -52,7 +52,7 @@ mod tests {
             let result = results.remove(0);
 
             if case.description.contains("last month") {
-                let mut p = crate::TimeMachine::new().eval("last month", Some(reftime)).unwrap();
+                let p = crate::TimeMachine::new().eval("last month", Some(reftime)).unwrap();
                 println!("last month gives: {:?}", p);
             }
 

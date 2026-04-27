@@ -180,6 +180,13 @@ fn terminal_eval() -> impl Fn(&str, &str) -> TimeValue {
         "small_int" => TimeValue::Int(i32::from_str(lexeme).unwrap()),
         "time_quantity" => match lexeme {
             "week" | "weeks" => TimeValue::Quantity(Grain::Day, 7),
+            "fortnight" | "fortnights" => TimeValue::Quantity(Grain::Day, 14),
+            "quarter" | "quarters" => TimeValue::Quantity(Grain::Month, 3),
+            "half" | "halfs" | "halves" => TimeValue::Quantity(Grain::Month, 6),
+            "lustrum" | "lustrums" | "lustra" => TimeValue::Quantity(Grain::Year, 5),
+            "decade" | "decades" => TimeValue::Quantity(Grain::Year, 10),
+            "century" | "centuries" => TimeValue::Quantity(Grain::Year, 100),
+            "millennium" | "millennia" | "millenium" | "milleniums" => TimeValue::Quantity(Grain::Year, 1000),
             q => TimeValue::Quantity(kronos_grain(q).unwrap(), 1),
         },
         "weekend" => TimeValue::Seq(TimeSeqSpec::weekends()),
@@ -269,6 +276,7 @@ impl<'a> TimeMachine<'a> {
             match q {
                 TimeValue::Quantity(Grain::Day, 7) => TimeValue::QuantitySeq(TimeSeqSpec::weeks()),
                 TimeValue::Quantity(g, 1) => TimeValue::QuantitySeq(TimeSeqSpec::grain(g)),
+                TimeValue::Quantity(g, m) => TimeValue::QuantitySeq(TimeSeqSpec::grain(g).merge(m as u16)),
                 _ => panic!("Unexpected time_quantity"),
             }
         });
@@ -457,6 +465,7 @@ impl<'a> TimeMachine<'a> {
             let seq = match q {
                 TimeValue::Quantity(Grain::Day, 7) => TimeSeqSpec::weeks(),
                 TimeValue::Quantity(g, 1) => TimeSeqSpec::grain(g),
+                TimeValue::Quantity(g, m) => TimeSeqSpec::grain(g).merge(m as u16),
                 _ => panic!("Unexpected time_quantity"),
             };
 
@@ -472,6 +481,7 @@ impl<'a> TimeMachine<'a> {
             let seq = match q {
                 TimeValue::Quantity(Grain::Day, 7) => TimeSeqSpec::weeks(),
                 TimeValue::Quantity(g, 1) => TimeSeqSpec::grain(g),
+                TimeValue::Quantity(g, m) => TimeSeqSpec::grain(g).merge(m as u16),
                 _ => panic!("Unexpected time_quantity"),
             };
 

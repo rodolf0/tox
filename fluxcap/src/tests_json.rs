@@ -32,7 +32,6 @@ mod tests {
             "Minute" => Grain::Minute,
             "Hour" => Grain::Hour,
             "Day" => Grain::Day,
-            "Week" => Grain::Day, // Weeks evaluate to Days internally in kronos
             "Month" => Grain::Month,
             "Year" => Grain::Year,
             _ => panic!("Unknown grain: {}", s),

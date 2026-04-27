@@ -55,6 +55,9 @@
 use std::collections::VecDeque;
 use time::{Duration, UtcDateTime as DateTime};
 
+// Grain represents the resolution of start/end timepoints of a TimeSpan.
+// It does *not* dictate the length of the span.
+// Eg: week is not a grain, it's a span of 7 days.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum Grain {
     Second,
@@ -265,7 +268,7 @@ pub(crate) enum SeqSpecInternal {
         frame: Box<SeqSpecInternal>,
     },
     // merge multiple TimeSpans into one
-    Merge(Box<SeqSpecInternal>, u8),
+    Merge(Box<SeqSpecInternal>, u16),
     // Union emits the elements of both streams in order
     Union(Box<SeqSpecInternal>, Box<SeqSpecInternal>),
     Intersection(Box<SeqSpecInternal>, Box<SeqSpecInternal>),
@@ -396,7 +399,7 @@ impl TimeSeqSpec {
         }
     }
 
-    pub fn merge(self, n: u8) -> Self {
+    pub fn merge(self, n: u16) -> Self {
         TimeSeqSpec(SeqSpecInternal::Merge(Box::new(self.0), n))
     }
 

@@ -91,7 +91,18 @@ fn _grammar() -> Result<earlgrey::Grammar, String> {
         })
         // literlas that we want to check variations of
         .plug_terminal("time_quantity", |q| {
-            kronos_grain(q).is_some() || q == "week" || q == "weeks"
+            kronos_grain(q).is_some() 
+                || matches!(
+                    q, 
+                    "week" | "weeks" 
+                    | "fortnight" | "fortnights" 
+                    | "quarter" | "quarters" 
+                    | "half" | "halfs" | "halves" 
+                    | "lustrum" | "lustrums" | "lustra" 
+                    | "decade" | "decades" 
+                    | "century" | "centuries" 
+                    | "millennium" | "millennia" | "millenium" | "milleniums"
+                )
         })
         .plug_terminal("weekend", |w| w == "weekend" || w == "weekends")
         .into_grammar()

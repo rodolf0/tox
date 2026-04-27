@@ -56,7 +56,7 @@
     "expected": {
       "start": "2026-04-12T00:00:00Z",
       "end": "2026-04-19T00:00:00Z",
-      "grain": "Week"
+      "grain": "Day"
     }
   },
   {
@@ -66,17 +66,7 @@
     "expected": {
       "start": "2026-04-19T00:00:00Z",
       "end": "2026-04-26T00:00:00Z",
-      "grain": "Week"
-    }
-  },
-  {
-    "description": "Relative (Quantity): next week",
-    "input": "next week",
-    "reftime": "2026-04-15T15:30:45Z",
-    "expected": {
-      "start": "2026-04-19T00:00:00Z",
-      "end": "2026-04-26T00:00:00Z",
-      "grain": "Week"
+      "grain": "Day"
     }
   },
   {
@@ -296,7 +286,7 @@
     "expected": {
       "start": "2026-03-15T00:00:00Z",
       "end": "2026-03-22T00:00:00Z",
-      "grain": "Week"
+      "grain": "Day"
     }
   },
   {

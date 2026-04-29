@@ -276,6 +276,9 @@ impl<'a> TimeMachine<'a> {
             match q {
                 TimeValue::Quantity(Grain::Day, 7) => TimeValue::QuantitySeq(TimeSeqSpec::weeks()),
                 TimeValue::Quantity(g, 1) => TimeValue::QuantitySeq(TimeSeqSpec::grain(g)),
+                TimeValue::Quantity(Grain::Month, m) => TimeValue::QuantitySeq(TimeSeqSpec::month_group(m as u32)),
+                TimeValue::Quantity(Grain::Year, 5) => TimeValue::QuantitySeq(TimeSeqSpec::grain(Grain::Year).merge(5)),
+                TimeValue::Quantity(Grain::Year, m) => TimeValue::QuantitySeq(TimeSeqSpec::year_group(m as u32)),
                 TimeValue::Quantity(g, m) => TimeValue::QuantitySeq(TimeSeqSpec::grain(g).merge(m as u16)),
                 _ => panic!("Unexpected time_quantity"),
             }
@@ -465,6 +468,9 @@ impl<'a> TimeMachine<'a> {
             let seq = match q {
                 TimeValue::Quantity(Grain::Day, 7) => TimeSeqSpec::weeks(),
                 TimeValue::Quantity(g, 1) => TimeSeqSpec::grain(g),
+                TimeValue::Quantity(Grain::Month, m) => TimeSeqSpec::month_group(m as u32),
+                TimeValue::Quantity(Grain::Year, 5) => TimeSeqSpec::grain(Grain::Year).merge(5),
+                TimeValue::Quantity(Grain::Year, m) => TimeSeqSpec::year_group(m as u32),
                 TimeValue::Quantity(g, m) => TimeSeqSpec::grain(g).merge(m as u16),
                 _ => panic!("Unexpected time_quantity"),
             };
@@ -481,6 +487,9 @@ impl<'a> TimeMachine<'a> {
             let seq = match q {
                 TimeValue::Quantity(Grain::Day, 7) => TimeSeqSpec::weeks(),
                 TimeValue::Quantity(g, 1) => TimeSeqSpec::grain(g),
+                TimeValue::Quantity(Grain::Month, m) => TimeSeqSpec::month_group(m as u32),
+                TimeValue::Quantity(Grain::Year, 5) => TimeSeqSpec::grain(Grain::Year).merge(5),
+                TimeValue::Quantity(Grain::Year, m) => TimeSeqSpec::year_group(m as u32),
                 TimeValue::Quantity(g, m) => TimeSeqSpec::grain(g).merge(m as u16),
                 _ => panic!("Unexpected time_quantity"),
             };

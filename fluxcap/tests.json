@@ -724,5 +724,95 @@
       "end": "2026-08-04T00:00:00Z",
       "grain": "Day"
     }
+  },
+  {
+    "description": "New grains: in 2 fortnights",
+    "input": "in 2 fortnights",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-05-13T00:00:00Z",
+      "end": "2026-05-14T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "New grains: 3 quarters ago",
+    "input": "3 quarters ago",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2025-07-15T00:00:00Z",
+      "end": "2025-07-16T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "New grains: next half",
+    "input": "next half",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-07-01T00:00:00Z",
+      "end": "2027-01-01T00:00:00Z",
+      "grain": "Month"
+    }
+  },
+  {
+    "description": "New grains: last lustrum",
+    "input": "last lustrum",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2021-01-01T00:00:00Z",
+      "end": "2026-01-01T00:00:00Z",
+      "grain": "Year"
+    }
+  },
+  {
+    "description": "New grains: a decade hence",
+    "input": "a decade hence",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2036-04-15T00:00:00Z",
+      "end": "2036-04-16T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "New grains: 2 centuries ago",
+    "input": "2 centuries ago",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "1826-04-15T00:00:00Z",
+      "end": "1826-04-16T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "New grains: this millennium",
+    "input": "this millennium",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2000-01-01T00:00:00Z",
+      "end": "3000-01-01T00:00:00Z",
+      "grain": "Year"
+    }
+  },
+  {
+    "description": "New grains: the 2nd fortnight of january",
+    "input": "the 2nd fortnight of january",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2027-01-15T00:00:00Z",
+      "end": "2027-01-29T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "New grains: the last quarter of 2026",
+    "input": "the last quarter of 2026",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-10-01T00:00:00Z",
+      "end": "2027-01-01T00:00:00Z",
+      "grain": "Month"
+    }
   }
 ]

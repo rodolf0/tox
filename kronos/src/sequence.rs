@@ -189,6 +189,27 @@ fn truncate_weekend(t0: DateTime) -> DateTime {
     }
 }
 
+fn truncate_group_month(t0: DateTime, n: u32) -> DateTime {
+    let month = ((t0.month() as u32 - 1) / n) * n + 1;
+    let month_enum = time::Month::try_from(month as u8).unwrap();
+    t0.replace_time(time::Time::MIDNIGHT)
+        .replace_day(1)
+        .unwrap()
+        .replace_month(month_enum)
+        .unwrap()
+}
+
+fn truncate_group_year(t0: DateTime, n: u32) -> DateTime {
+    let year = t0.year() - t0.year().rem_euclid(n as i32);
+    t0.replace_time(time::Time::MIDNIGHT)
+        .replace_day(1)
+        .unwrap()
+        .replace_month(time::Month::January)
+        .unwrap()
+        .replace_year(year)
+        .unwrap()
+}
+
 // Generate sequences of time ranges. Each element will have window_span template.
 fn grain_iterator(
     t0: DateTime,
@@ -281,6 +302,10 @@ pub(crate) enum SeqSpecInternal {
         to: Box<SeqSpecInternal>,
         inclusive: bool,
     },
+    AlignedGroup {
+        grain: Grain,
+        n: u32,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -361,6 +386,20 @@ impl TimeSeqSpec {
         TimeSeqSpec(SeqSpecInternal::Grain {
             window_span: (Grain::Year, 1),
             step_by: (Grain::Year, 1),
+        })
+    }
+
+    pub fn month_group(n: u32) -> TimeSeqSpec {
+        TimeSeqSpec(SeqSpecInternal::AlignedGroup {
+            grain: Grain::Month,
+            n,
+        })
+    }
+
+    pub fn year_group(n: u32) -> TimeSeqSpec {
+        TimeSeqSpec(SeqSpecInternal::AlignedGroup {
+            grain: Grain::Year,
+            n,
         })
     }
 
@@ -451,6 +490,7 @@ impl SeqSpecInternal {
             SeqSpecInternal::Intersection(s1, s2) => cmp::min(s1.grain(), s2.grain()),
             SeqSpecInternal::Except(s1, _) => s1.grain(),
             SeqSpecInternal::Shift(s1, _, _) => s1.grain(),
+            SeqSpecInternal::AlignedGroup { grain, .. } => *grain,
             SeqSpecInternal::Interval {
                 from,
                 to,
@@ -483,6 +523,23 @@ impl SeqSpecInternal {
                     TimeDir::Past => -sb_n,
                 };
                 Box::new(grain_iterator(t0, window_span, (sb_grain, step)))
+            }
+            SeqSpecInternal::AlignedGroup { grain, n } => {
+                let step = match direction {
+                    TimeDir::Future => n as i32,
+                    TimeDir::Past => -(n as i32),
+                };
+                match grain {
+                    Grain::Month => {
+                        let t0 = truncate_group_month(t0, n);
+                        Box::new(grain_iterator(t0, (Grain::Month, n), (Grain::Month, step)))
+                    }
+                    Grain::Year => {
+                        let t0 = truncate_group_year(t0, n);
+                        Box::new(grain_iterator(t0, (Grain::Year, n), (Grain::Year, step)))
+                    }
+                    _ => panic!("AlignedGroup only supports Month and Year"),
+                }
             }
             SeqSpecInternal::Weeks => {
                 let t0 = truncate_week(t0);

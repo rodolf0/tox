@@ -13,7 +13,8 @@ pub enum TimeDir {
 pub enum Anchor {
     Now,
     Time(DateTime),
-    Deferred(Box<TimeValue>, bool), // bool = use_end
+    Within(Box<TimeValue>, bool), // bool = use_end
+    Relative(Box<TimeValue>, bool), // bool = use_end
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -130,7 +131,7 @@ impl TimeValue {
         match self {
             TimeValue::Span { seq, anchor, dir, skip } => {
                 match anchor {
-                    Anchor::Deferred(tv, _) => {
+                    Anchor::Within(tv, _) => {
                         let bounds = tv.eval(reftime)?;
                         let mut iter: Box<dyn Iterator<Item = TimeSpan>> = match dir {
                             TimeDir::Future => {
@@ -141,6 +142,14 @@ impl TimeValue {
                             }
                         };
                         iter.nth(skip)
+                    }
+                    Anchor::Relative(tv, use_end) => {
+                        let bounds = tv.eval(reftime)?;
+                        let t0 = if use_end { bounds.end } else { bounds.start };
+                        match dir {
+                            TimeDir::Future => seq.future(t0).nth(skip),
+                            TimeDir::Past => seq.past(t0).nth(skip),
+                        }
                     }
                     _ => {
                         let t0 = match anchor {
@@ -159,7 +168,7 @@ impl TimeValue {
                 let t0 = match anchor {
                     Anchor::Now => reftime,
                     Anchor::Time(t) => t,
-                    Anchor::Deferred(tv, use_end) => {
+                    Anchor::Within(tv, use_end) | Anchor::Relative(tv, use_end) => {
                         let span = tv.eval(reftime)?;
                         if use_end {
                             span.end
@@ -476,7 +485,7 @@ impl<'a> TimeMachine<'a> {
 
             TimeValue::Span {
                 seq,
-                anchor: Anchor::Deferred(Box::new(span), use_end),
+                anchor: Anchor::Within(Box::new(span), use_end),
                 dir,
                 skip,
             }
@@ -611,11 +620,11 @@ impl<'a> TimeMachine<'a> {
         ev.action("shift_anchor -> hence", |_| TimeValue::RelAnchor(Anchor::Now, TimeDir::Future, 0));
         ev.action("shift_anchor -> before time_span", |mut t| {
             let span = t.remove(1);
-            TimeValue::RelAnchor(Anchor::Deferred(Box::new(span), false), TimeDir::Past, 0)
+            TimeValue::RelAnchor(Anchor::Relative(Box::new(span), false), TimeDir::Past, 0)
         });
         ev.action("shift_anchor -> (from|after) time_span", |mut t| {
             let span = t.remove(1);
-            TimeValue::RelAnchor(Anchor::Deferred(Box::new(span), true), TimeDir::Future, 0)
+            TimeValue::RelAnchor(Anchor::Relative(Box::new(span), true), TimeDir::Future, 0)
         });
 
         ev.action("relative_anchor -> before last", |_| TimeValue::RelAnchor(Anchor::Now, TimeDir::Past, 1));

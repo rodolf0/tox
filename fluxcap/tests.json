@@ -814,5 +814,55 @@
       "end": "2027-01-01T00:00:00Z",
       "grain": "Month"
     }
+  },
+  {
+    "description": "Counting: days since the last quarter of 2013",
+    "input": "days since the last quarter of 2013",
+    "reftime": "2014-01-15T12:00:00Z",
+    "expected_count": {
+      "unit": "days",
+      "total": 106.5,
+      "full_spans": 106
+    }
+  },
+  {
+    "description": "Counting: days between mar and apr",
+    "input": "days between mar and apr",
+    "reftime": "2026-05-15T12:00:00Z",
+    "expected_count": {
+      "unit": "days",
+      "total": 31.0,
+      "full_spans": 31
+    }
+  },
+  {
+    "description": "Counting: years since mar 13th 2005",
+    "input": "years since mar 13th 2005",
+    "reftime": "2026-04-28T00:00:00Z",
+    "expected_count": {
+      "unit": "years",
+      "total": 21.126027397260273,
+      "full_spans": 20,
+      "span": {
+        "start": "2005-03-13T00:00:00Z",
+        "end": "2026-04-28T00:00:00Z",
+        "grain": "Second"
+      }
+    }
+  },
+  {
+    "description": "Counting: years since jun 22nd 2012",
+    "input": "years since jun 22nd 2012",
+    "reftime": "2026-04-28T00:00:00Z",
+    "expected_count": {
+      "unit": "years",
+      "total": 13.847870349577065,
+      "full_spans": 13,
+      "span": {
+        "start": "2012-06-22T00:00:00Z",
+        "end": "2026-04-28T00:00:00Z",
+        "grain": "Second"
+      }
+    }
   }
 ]

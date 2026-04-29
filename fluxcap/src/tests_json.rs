@@ -13,11 +13,20 @@ mod tests {
     }
 
     #[derive(Deserialize)]
+    struct ExpectedCount {
+        unit: String,
+        span: Option<Expected>,
+        total: f64,
+        full_spans: usize,
+    }
+
+    #[derive(Deserialize)]
     struct TestCase {
         description: String,
         input: String,
         reftime: String,
         expected: Option<Expected>,
+        expected_count: Option<ExpectedCount>,
     }
 
     fn parse_time(s: &str) -> time::UtcDateTime {
@@ -49,32 +58,68 @@ mod tests {
             let reftime = parse_time(&case.reftime);
             let mut results = tm.eval(&case.input, Some(reftime)).unwrap();
             
-            match case.expected {
-                Some(expected_val) => {
-                    let result = results.remove(0);
-                    let expected_start = parse_time(&expected_val.start);
-                    let expected_end = parse_time(&expected_val.end);
-                    let expected_grain = parse_grain(&expected_val.grain);
+            if let Some(expected_val) = case.expected {
+                let result = results.remove(0);
+                let expected_start = parse_time(&expected_val.start);
+                let expected_end = parse_time(&expected_val.end);
+                let expected_grain = parse_grain(&expected_val.grain);
 
-                    let expected = TimeSpan {
-                        start: expected_start,
-                        end: expected_end,
-                        grain: expected_grain,
-                    };
+                let expected = TimeSpan {
+                    start: expected_start,
+                    end: expected_end,
+                    grain: expected_grain,
+                };
 
+                assert_eq!(
+                    result, crate::time_semantics::TimeResult::Span(expected.clone()),
+                    "Failed test: {}\nInput: '{}'\nExpected: {:?}\nGot: {:?}",
+                    case.description, case.input, expected, result
+                );
+            } else if let Some(expected_count) = case.expected_count {
+                let result = results.remove(0);
+                
+                if let crate::time_semantics::TimeResult::Count(actual_count) = &result {
                     assert_eq!(
-                        result, expected,
-                        "Failed test: {}\nInput: '{}'\nExpected: {:?}\nGot: {:?}",
-                        case.description, case.input, expected, result
+                        actual_count.unit, expected_count.unit,
+                        "Failed test: {}\nInput: '{}'\nExpected unit: {}\nGot: {}",
+                        case.description, case.input, expected_count.unit, actual_count.unit
                     );
-                }
-                None => {
+                    assert_eq!(
+                        actual_count.full_spans, expected_count.full_spans,
+                        "Failed test: {}\nInput: '{}'\nExpected full_spans: {}\nGot: {}",
+                        case.description, case.input, expected_count.full_spans, actual_count.full_spans
+                    );
+                    // Use epsilon for float comparison
                     assert!(
-                        results.is_empty(),
-                        "Failed test: {}\nInput: '{}'\nExpected empty results, got: {:?}",
-                        case.description, case.input, results
+                        (actual_count.total - expected_count.total).abs() < 1e-6,
+                        "Failed test: {}\nInput: '{}'\nExpected total: {}\nGot: {}",
+                        case.description, case.input, expected_count.total, actual_count.total
                     );
+                    
+                    if let Some(expected_span) = expected_count.span {
+                        let expected_start = parse_time(&expected_span.start);
+                        let expected_end = parse_time(&expected_span.end);
+                        let expected_grain = parse_grain(&expected_span.grain);
+                        let span = TimeSpan {
+                            start: expected_start,
+                            end: expected_end,
+                            grain: expected_grain,
+                        };
+                        assert_eq!(
+                            actual_count.span, span,
+                            "Failed test: {}\nInput: '{}'\nExpected span: {:?}\nGot: {:?}",
+                            case.description, case.input, span, actual_count.span
+                        );
+                    }
+                } else {
+                    panic!("Failed test: {}\nInput: '{}'\nExpected CountResult, got: {:?}", case.description, case.input, result);
                 }
+            } else {
+                assert!(
+                    results.is_empty(),
+                    "Failed test: {}\nInput: '{}'\nExpected empty results, got: {:?}",
+                    case.description, case.input, results
+                );
             }
         }
     }

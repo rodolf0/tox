@@ -5,6 +5,10 @@ pub fn time_grammar() -> &'static str {
     r#"
     time_expr := time_span
                | 'on' time_span
+               | sequence 'since' time_span
+               | sequence 'until' time_span
+               | sequence 'between' time_span 'and' time_span
+               | sequence 'in' time_span
                ;
 
     time_span := explicit_span

@@ -16,10 +16,25 @@ pub enum Anchor {
     Deferred(Box<TimeValue>, bool), // bool = use_end
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct CountResult {
+    pub unit: String,
+    pub span: TimeSpan,
+    pub total: f64,
+    pub full_spans: usize,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum TimeResult {
+    Span(TimeSpan),
+    Count(CountResult),
+}
+
 #[derive(Clone, Debug)]
 pub enum TimeValue {
-    Seq(TimeSeqSpec),
-    QuantitySeq(TimeSeqSpec),
+    Seq(Option<String>, TimeSeqSpec),
+    QuantitySeq(Option<String>, TimeSeqSpec),
+    Count(String, TimeSeqSpec, Box<TimeValue>),
     Span {
         seq: TimeSeqSpec,
         anchor: Anchor,
@@ -37,17 +52,26 @@ pub enum TimeValue {
         end: Box<TimeValue>,
     },
     Duration(Vec<(Grain, i32)>),
-    Quantity(Grain, i32),
+    Quantity(Option<String>, Grain, i32),
     Ordinal(isize),
     Int(i32),
     Keyword,
 }
 
 impl TimeValue {
+    fn to_label(&self) -> Option<String> {
+        match self {
+            TimeValue::Seq(Some(l), _) => Some(l.clone()),
+            TimeValue::QuantitySeq(Some(l), _) => Some(l.clone()),
+            TimeValue::Quantity(Some(l), _, _) => Some(l.clone()),
+            _ => None,
+        }
+    }
+
     fn to_seq(self) -> TimeSeqSpec {
         match self {
-            TimeValue::Seq(s) => s,
-            TimeValue::QuantitySeq(s) => s,
+            TimeValue::Seq(_, s) => s,
+            TimeValue::QuantitySeq(_, s) => s,
             _ => panic!("Expected Seq, found {:?}", self),
         }
     }
@@ -70,6 +94,35 @@ impl TimeValue {
         match self {
             TimeValue::Duration(d) => d,
             _ => panic!("Expected Duration, found {:?}", self),
+        }
+    }
+
+    fn eval_top(self, reftime: DateTime) -> Option<TimeResult> {
+        match self {
+            TimeValue::Count(label, seq, bound_val) => {
+                let bounds = bound_val.eval(reftime)?;
+                let mut full_spans = 0;
+                let mut total = 0.0;
+                for span in seq.future(bounds.start).take_while(|s| s.start < bounds.end) {
+                    let overlap_start = span.start.max(bounds.start);
+                    let overlap_end = span.end.min(bounds.end);
+                    let overlap_duration = (overlap_end - overlap_start).whole_seconds() as f64;
+                    let span_duration = (span.end - span.start).whole_seconds() as f64;
+                    if span_duration > 0.0 {
+                        total += overlap_duration / span_duration;
+                    }
+                    if span.start >= bounds.start && span.end <= bounds.end {
+                        full_spans += 1;
+                    }
+                }
+                Some(TimeResult::Count(CountResult {
+                    unit: label,
+                    span: bounds,
+                    total,
+                    full_spans,
+                }))
+            }
+            other => other.eval(reftime).map(TimeResult::Span),
         }
     }
 
@@ -172,24 +225,24 @@ fn terminal_eval() -> impl Fn(&str, &str) -> TimeValue {
     use crate::constants::*;
     use std::str::FromStr;
     |terminal, lexeme| match terminal {
-        "weekday" => TimeValue::Seq(TimeSeqSpec::weekday(weekday(lexeme).unwrap())),
-        "monthname" => TimeValue::Seq(TimeSeqSpec::months(Some(month(lexeme).unwrap() as u16))),
+        "weekday" => TimeValue::Seq(Some(lexeme.to_string()), TimeSeqSpec::weekday(weekday(lexeme).unwrap())),
+        "monthname" => TimeValue::Seq(Some(lexeme.to_string()), TimeSeqSpec::months(Some(month(lexeme).unwrap() as u16))),
         "ordinal" => TimeValue::Ordinal(ordinal(lexeme).or_else(|| short_ordinal(lexeme)).unwrap() as isize),
         "yearnumber" => TimeValue::Int(i32::from_str(lexeme).unwrap()),
-        "hourspec" => TimeValue::Seq(TimeSeqSpec::hours(Some(hour_spec(lexeme).unwrap() as u16))),
+        "hourspec" => TimeValue::Seq(Some(lexeme.to_string()), TimeSeqSpec::hours(Some(hour_spec(lexeme).unwrap() as u16))),
         "small_int" => TimeValue::Int(i32::from_str(lexeme).unwrap()),
         "time_quantity" => match lexeme {
-            "week" | "weeks" => TimeValue::Quantity(Grain::Day, 7),
-            "fortnight" | "fortnights" => TimeValue::Quantity(Grain::Day, 14),
-            "quarter" | "quarters" => TimeValue::Quantity(Grain::Month, 3),
-            "half" | "halfs" | "halves" => TimeValue::Quantity(Grain::Month, 6),
-            "lustrum" | "lustrums" | "lustra" => TimeValue::Quantity(Grain::Year, 5),
-            "decade" | "decades" => TimeValue::Quantity(Grain::Year, 10),
-            "century" | "centuries" => TimeValue::Quantity(Grain::Year, 100),
-            "millennium" | "millennia" | "millenium" | "milleniums" => TimeValue::Quantity(Grain::Year, 1000),
-            q => TimeValue::Quantity(kronos_grain(q).unwrap(), 1),
+            "week" | "weeks" => TimeValue::Quantity(Some(lexeme.to_string()), Grain::Day, 7),
+            "fortnight" | "fortnights" => TimeValue::Quantity(Some(lexeme.to_string()), Grain::Day, 14),
+            "quarter" | "quarters" => TimeValue::Quantity(Some(lexeme.to_string()), Grain::Month, 3),
+            "half" | "halfs" | "halves" => TimeValue::Quantity(Some(lexeme.to_string()), Grain::Month, 6),
+            "lustrum" | "lustrums" | "lustra" => TimeValue::Quantity(Some(lexeme.to_string()), Grain::Year, 5),
+            "decade" | "decades" => TimeValue::Quantity(Some(lexeme.to_string()), Grain::Year, 10),
+            "century" | "centuries" => TimeValue::Quantity(Some(lexeme.to_string()), Grain::Year, 100),
+            "millennium" | "millennia" | "millenium" | "milleniums" => TimeValue::Quantity(Some(lexeme.to_string()), Grain::Year, 1000),
+            q => TimeValue::Quantity(Some(lexeme.to_string()), kronos_grain(q).unwrap(), 1),
         },
-        "weekend" => TimeValue::Seq(TimeSeqSpec::weekends()),
+        "weekend" => TimeValue::Seq(Some(lexeme.to_string()), TimeSeqSpec::weekends()),
         "now" | "today" | "yesterday" | "tomorrow" | "this" | "next" | "last" | "ago" | "hence" | "before" | "after" | "from" | "in" | "the" | "a" | "an" | "of" | "on" | "and" | "since" | "until" | "between" => {
             TimeValue::Keyword
         }
@@ -209,6 +262,45 @@ impl<'a> TimeMachine<'a> {
         // time_expr
         ev.action("time_expr -> time_span", |mut t| t.remove(0));
         ev.action("time_expr -> on time_span", |mut t| t.remove(1));
+        // sequence counting
+        ev.action("time_expr -> sequence since time_span", |mut t| {
+            let span = t.remove(2);
+            let seq_val = t.remove(0);
+            let label = seq_val.to_label().unwrap_or_else(|| "units".to_string());
+            let interval = TimeValue::Interval {
+                start: Box::new(span),
+                end: Box::new(TimeValue::Span { seq: TimeSeqSpec::grain(Grain::Second), anchor: Anchor::Now, dir: TimeDir::Future, skip: 0 })
+            };
+            TimeValue::Count(label, seq_val.to_seq(), Box::new(interval))
+        });
+        
+        ev.action("time_expr -> sequence until time_span", |mut t| {
+            let span = t.remove(2);
+            let seq_val = t.remove(0);
+            let label = seq_val.to_label().unwrap_or_else(|| "units".to_string());
+            let interval = TimeValue::Interval {
+                start: Box::new(TimeValue::Span { seq: TimeSeqSpec::grain(Grain::Second), anchor: Anchor::Now, dir: TimeDir::Future, skip: 0 }),
+                end: Box::new(span)
+            };
+            TimeValue::Count(label, seq_val.to_seq(), Box::new(interval))
+        });
+
+        ev.action("time_expr -> sequence between time_span and time_span", |mut t| {
+            let end = t.remove(4);
+            let start = t.remove(2);
+            let seq_val = t.remove(0);
+            let label = seq_val.to_label().unwrap_or_else(|| "units".to_string());
+            let interval = TimeValue::Interval { start: Box::new(start), end: Box::new(end) };
+            TimeValue::Count(label, seq_val.to_seq(), Box::new(interval))
+        });
+        
+        ev.action("time_expr -> sequence in time_span", |mut t| {
+            let span = t.remove(2);
+            let seq_val = t.remove(0);
+            let label = seq_val.to_label().unwrap_or_else(|| "units".to_string());
+            TimeValue::Count(label, seq_val.to_seq(), Box::new(span))
+        });
+
 
         // time_span
         ev.action("time_span -> explicit_span", |mut t| t.remove(0));
@@ -234,8 +326,8 @@ impl<'a> TimeMachine<'a> {
         ev.action("explicit_span -> this sequence", |mut t| {
             let seq_val = t.remove(1);
             let skip = match &seq_val {
-                TimeValue::QuantitySeq(_) => 0,
-                TimeValue::Seq(_) => 0,
+                TimeValue::QuantitySeq(..) => 0,
+                TimeValue::Seq(..) => 0,
                 _ => 0,
             };
             TimeValue::Span { seq: seq_val.to_seq(), anchor: Anchor::Now, dir: TimeDir::Future, skip }
@@ -243,8 +335,8 @@ impl<'a> TimeMachine<'a> {
         ev.action("explicit_span -> next sequence", |mut t| {
             let seq_val = t.remove(1);
             let skip = match &seq_val {
-                TimeValue::QuantitySeq(_) => 1,
-                TimeValue::Seq(_) => 0, // Named sequence split!
+                TimeValue::QuantitySeq(..) => 1,
+                TimeValue::Seq(..) => 0, // Named sequence split!
                 _ => 1,
             };
             TimeValue::Span { seq: seq_val.to_seq(), anchor: Anchor::Now, dir: TimeDir::Future, skip }
@@ -252,8 +344,8 @@ impl<'a> TimeMachine<'a> {
         ev.action("explicit_span -> last sequence", |mut t| {
             let seq_val = t.remove(1);
             let skip = match &seq_val {
-                TimeValue::QuantitySeq(_) => 0,
-                TimeValue::Seq(_) => 0,
+                TimeValue::QuantitySeq(..) => 0,
+                TimeValue::Seq(..) => 0,
                 _ => 1,
             };
             TimeValue::Span { seq: seq_val.to_seq(), anchor: Anchor::Now, dir: TimeDir::Past, skip }
@@ -274,12 +366,12 @@ impl<'a> TimeMachine<'a> {
         ev.action("sequence -> time_quantity", |mut t| {
             let q = t.remove(0);
             match q {
-                TimeValue::Quantity(Grain::Day, 7) => TimeValue::QuantitySeq(TimeSeqSpec::weeks()),
-                TimeValue::Quantity(g, 1) => TimeValue::QuantitySeq(TimeSeqSpec::grain(g)),
-                TimeValue::Quantity(Grain::Month, m) => TimeValue::QuantitySeq(TimeSeqSpec::month_group(m as u32)),
-                TimeValue::Quantity(Grain::Year, 5) => TimeValue::QuantitySeq(TimeSeqSpec::grain(Grain::Year).merge(5)),
-                TimeValue::Quantity(Grain::Year, m) => TimeValue::QuantitySeq(TimeSeqSpec::year_group(m as u32)),
-                TimeValue::Quantity(g, m) => TimeValue::QuantitySeq(TimeSeqSpec::grain(g).merge(m as u16)),
+                TimeValue::Quantity(_, Grain::Day, 7) => TimeValue::QuantitySeq(q.to_label(), TimeSeqSpec::weeks()),
+                TimeValue::Quantity(_, g, 1) => TimeValue::QuantitySeq(q.to_label(), TimeSeqSpec::grain(g)),
+                TimeValue::Quantity(_, Grain::Month, m) => TimeValue::QuantitySeq(q.to_label(), TimeSeqSpec::month_group(m as u32)),
+                TimeValue::Quantity(_, Grain::Year, 5) => TimeValue::QuantitySeq(q.to_label(), TimeSeqSpec::grain(Grain::Year).merge(5)),
+                TimeValue::Quantity(_, Grain::Year, m) => TimeValue::QuantitySeq(q.to_label(), TimeSeqSpec::year_group(m as u32)),
+                TimeValue::Quantity(_, g, m) => TimeValue::QuantitySeq(q.to_label(), TimeSeqSpec::grain(g).merge(m as u16)),
                 _ => panic!("Unexpected time_quantity"),
             }
         });
@@ -293,44 +385,44 @@ impl<'a> TimeMachine<'a> {
         ev.action("named_sequence -> monthname ordinal", |mut t| {
             let ordinal = t.remove(1).to_ordinal();
             let seq = TimeSeqSpec::days().within(t.remove(0).to_seq(), ordinal).unwrap();
-            TimeValue::Seq(seq)
+            TimeValue::Seq(None, seq)
         });
         ev.action("named_sequence -> ordinal of monthname", |mut t| {
             let month = t.remove(2).to_seq();
             let ordinal = t.remove(0).to_ordinal();
             let seq = TimeSeqSpec::days().within(month, ordinal).unwrap();
-            TimeValue::Seq(seq)
+            TimeValue::Seq(None, seq)
         });
         ev.action("named_sequence -> weekday monthname ordinal", |mut t| {
             let ordinal = t.remove(2).to_ordinal();
             let month = t.remove(1).to_seq();
             let weekday = t.remove(0).to_seq();
             let seq = TimeSeqSpec::days().within(month, ordinal).unwrap().intersection(weekday);
-            TimeValue::Seq(seq)
+            TimeValue::Seq(None, seq)
         });
         ev.action("named_sequence -> weekday ordinal of monthname", |mut t| {
             let month = t.remove(3).to_seq();
             let ordinal = t.remove(1).to_ordinal();
             let weekday = t.remove(0).to_seq();
             let seq = TimeSeqSpec::days().within(month, ordinal).unwrap().intersection(weekday);
-            TimeValue::Seq(seq)
+            TimeValue::Seq(None, seq)
         });
         ev.action("named_sequence -> weekday hourspec", |mut t| {
             let hourspec = t.remove(1).to_seq();
             let weekday = t.remove(0).to_seq();
-            TimeValue::Seq(hourspec.intersection(weekday))
+            TimeValue::Seq(None, hourspec.intersection(weekday))
         });
         
         ev.action("named_sequence -> [the] ordinal", |mut t| {
             let ordinal = t.remove(1).to_ordinal();
             let seq = TimeSeqSpec::days().within(TimeSeqSpec::months(None), ordinal).unwrap();
-            TimeValue::Seq(seq)
+            TimeValue::Seq(None, seq)
         });
         ev.action("named_sequence -> weekday [the] ordinal", |mut t| {
             let ordinal = t.remove(2).to_ordinal();
             let weekday = t.remove(0).to_seq();
             let seq = TimeSeqSpec::days().within(TimeSeqSpec::months(None), ordinal).unwrap().intersection(weekday);
-            TimeValue::Seq(seq)
+            TimeValue::Seq(None, seq)
         });
         
         // Generated EBNF rules for counts
@@ -398,14 +490,14 @@ impl<'a> TimeMachine<'a> {
             let nth = t.remove(1).to_ordinal() as isize;
             let _the1 = t.remove(0);
 
-            TimeValue::Seq(seq.within(frame, nth).unwrap())
+            TimeValue::Seq(None, seq.within(frame, nth).unwrap())
         });
         
         ev.action("duration -> small_int time_quantity", |mut t| {
             let q = t.remove(1);
             let amt = t.remove(0).to_int();
             match q {
-                TimeValue::Quantity(g, m) => TimeValue::Duration(vec![(g, amt * m)]),
+                TimeValue::Quantity(_, g, m) => TimeValue::Duration(vec![(g, amt * m)]),
                 _ => panic!("Expected Quantity"),
             }
         });
@@ -415,7 +507,7 @@ impl<'a> TimeMachine<'a> {
         ev.action("duration -> (a|an) time_quantity", |mut t| {
             let q = t.remove(1);
             match q {
-                TimeValue::Quantity(g, m) => TimeValue::Duration(vec![(g, m)]),
+                TimeValue::Quantity(_, g, m) => TimeValue::Duration(vec![(g, m)]),
                 _ => panic!("Expected Quantity"),
             }
         });
@@ -424,7 +516,7 @@ impl<'a> TimeMachine<'a> {
             let amt = t.remove(2).to_int();
             let mut dur = t.remove(0).to_duration();
             match q {
-                TimeValue::Quantity(g, m) => {
+                TimeValue::Quantity(_, g, m) => {
                     dur.push((g, amt * m));
                     TimeValue::Duration(dur)
                 }
@@ -435,7 +527,7 @@ impl<'a> TimeMachine<'a> {
             let q = t.remove(3);
             let mut dur = t.remove(0).to_duration();
             match q {
-                TimeValue::Quantity(g, m) => {
+                TimeValue::Quantity(_, g, m) => {
                     dur.push((g, m));
                     TimeValue::Duration(dur)
                 }
@@ -466,12 +558,12 @@ impl<'a> TimeMachine<'a> {
             let count = t.remove(0).to_int() as usize;
 
             let seq = match q {
-                TimeValue::Quantity(Grain::Day, 7) => TimeSeqSpec::weeks(),
-                TimeValue::Quantity(g, 1) => TimeSeqSpec::grain(g),
-                TimeValue::Quantity(Grain::Month, m) => TimeSeqSpec::month_group(m as u32),
-                TimeValue::Quantity(Grain::Year, 5) => TimeSeqSpec::grain(Grain::Year).merge(5),
-                TimeValue::Quantity(Grain::Year, m) => TimeSeqSpec::year_group(m as u32),
-                TimeValue::Quantity(g, m) => TimeSeqSpec::grain(g).merge(m as u16),
+                TimeValue::Quantity(_, Grain::Day, 7) => TimeSeqSpec::weeks(),
+                TimeValue::Quantity(_, g, 1) => TimeSeqSpec::grain(g),
+                TimeValue::Quantity(_, Grain::Month, m) => TimeSeqSpec::month_group(m as u32),
+                TimeValue::Quantity(_, Grain::Year, 5) => TimeSeqSpec::grain(Grain::Year).merge(5),
+                TimeValue::Quantity(_, Grain::Year, m) => TimeSeqSpec::year_group(m as u32),
+                TimeValue::Quantity(_, g, m) => TimeSeqSpec::grain(g).merge(m as u16),
                 _ => panic!("Unexpected time_quantity"),
             };
 
@@ -485,12 +577,12 @@ impl<'a> TimeMachine<'a> {
             let count = t.remove(0).to_int() as usize;
 
             let seq = match q {
-                TimeValue::Quantity(Grain::Day, 7) => TimeSeqSpec::weeks(),
-                TimeValue::Quantity(g, 1) => TimeSeqSpec::grain(g),
-                TimeValue::Quantity(Grain::Month, m) => TimeSeqSpec::month_group(m as u32),
-                TimeValue::Quantity(Grain::Year, 5) => TimeSeqSpec::grain(Grain::Year).merge(5),
-                TimeValue::Quantity(Grain::Year, m) => TimeSeqSpec::year_group(m as u32),
-                TimeValue::Quantity(g, m) => TimeSeqSpec::grain(g).merge(m as u16),
+                TimeValue::Quantity(_, Grain::Day, 7) => TimeSeqSpec::weeks(),
+                TimeValue::Quantity(_, g, 1) => TimeSeqSpec::grain(g),
+                TimeValue::Quantity(_, Grain::Month, m) => TimeSeqSpec::month_group(m as u32),
+                TimeValue::Quantity(_, Grain::Year, 5) => TimeSeqSpec::grain(Grain::Year).merge(5),
+                TimeValue::Quantity(_, Grain::Year, m) => TimeSeqSpec::year_group(m as u32),
+                TimeValue::Quantity(_, g, m) => TimeSeqSpec::grain(g).merge(m as u16),
                 _ => panic!("Unexpected time_quantity"),
             };
 
@@ -546,7 +638,7 @@ impl<'a> TimeMachine<'a> {
         }
     }
 
-    pub fn eval(&self, time: &str, reftime: Option<DateTime>) -> Result<Vec<TimeSpan>, String> {
+    pub fn eval(&self, time: &str, reftime: Option<DateTime>) -> Result<Vec<TimeResult>, String> {
         let mut tokenizer = time.split(&[' ', ','][..]).filter(|w| !w.is_empty());
         let state = self
             .parser
@@ -566,7 +658,7 @@ impl<'a> TimeMachine<'a> {
             .eval_all(&state)
             .map_err(|e| format!("TimeMachine {:?} for '{}'", e, time))?
             .into_iter()
-            .filter_map(|tree| tree.eval(reftime))
+            .filter_map(|tree| tree.eval_top(reftime))
             .collect())
     }
 }

@@ -864,5 +864,50 @@
         "grain": "Second"
       }
     }
+  },
+  {
+    "description": "Numeric Date: US format MM/DD/YYYY",
+    "input": "12/31/2018",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2018-12-31T00:00:00Z",
+      "end": "2019-01-01T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Numeric Date: ISO format YYYY-MM-DD",
+    "input": "2018-12-31",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2018-12-31T00:00:00Z",
+      "end": "2019-01-01T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Clock Time: 14:30 on next friday",
+    "input": "14:30 on next friday",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-17T14:30:00Z",
+      "end": "2026-04-17T14:31:00Z",
+      "grain": "Minute"
+    }
+  },
+  {
+    "description": "Clock Time: 3:15pm on next friday",
+    "input": "3:15pm on next friday",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-17T15:15:00Z",
+      "end": "2026-04-17T15:16:00Z",
+      "grain": "Minute"
+    }
+  },
+  {
+    "description": "Numeric Date: Invalid date 2013-04-31",
+    "input": "2013-04-31",
+    "reftime": "2026-04-15T15:30:45Z"
   }
 ]

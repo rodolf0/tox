@@ -92,19 +92,86 @@ pub fn kronos_grain(q: &str) -> Option<kronos::Grain> {
     }
 }
 
-pub fn hour_spec(h: &str) -> Option<u8> {
+pub fn parse_clock_time(s: &str) -> Option<(u8, u8, u8, kronos::Grain)> {
     use std::str::FromStr;
-    if h.len() < 3 {
+    let s = s.trim();
+    let mut ampm = None;
+    let mut time_part = s;
+    // Parse am/pm suffix if present
+    if s.ends_with("am") {
+        ampm = Some("am");
+        time_part = &s[..s.len() - 2];
+    } else if s.ends_with("pm") {
+        ampm = Some("pm");
+        time_part = &s[..s.len() - 2];
+    }
+    // Split time part into components
+    let parts: Vec<&str> = time_part.split(':').collect();
+    if parts.is_empty() || parts.len() > 3 {
         return None;
     }
-    let Some((hour, ampm)) = h.split_at_checked(h.len() - 2) else {
-        return None;
+    // Parse hour, minute, second
+    let mut hour = u8::from_str(parts[0]).ok()?;
+    let minute = if parts.len() >= 2 { u8::from_str(parts[1]).ok()? } else { 0 };
+    let second = if parts.len() == 3 { u8::from_str(parts[2]).ok()? } else { 0 };
+    let grain = match parts.len() {
+        3 => kronos::Grain::Second,
+        2 => kronos::Grain::Minute,
+        _ => kronos::Grain::Hour,
     };
-    let hour = u8::from_str(hour).ok()?;
-    match ampm {
-        "am" => Some(if hour == 12 { 0 } else { hour }),
-        "pm" => Some(if hour == 12 { 12 } else { hour + 12 }),
-        _ => None,
+    // Adjust hour based on am/pm
+    if let Some(ap) = ampm {
+        if hour > 12 { return None; }
+        if ap == "am" && hour == 12 {
+            hour = 0;
+        } else if ap == "pm" && hour < 12 {
+            hour += 12;
+        }
+    }
+    if hour > 23 || minute > 59 || second > 59 {
+        return None;
+    }
+    Some((hour, minute, second, grain))
+}
+
+pub fn parse_date(s: &str) -> Option<(i32, u8, u8)> {
+    use std::str::FromStr;
+    if s.contains('/') {
+        let parts: Vec<&str> = s.split('/').collect();
+        if parts.len() < 2 || parts.len() > 3 {
+            return None;
+        }
+        let month = u8::from_str(parts[0]).ok()?;
+        let day = u8::from_str(parts[1]).ok()?;
+        let year = if parts.len() == 3 {
+            let mut y = i32::from_str(parts[2]).ok()?;
+            if y < 100 {
+                y += 2000;
+            }
+            y
+        } else {
+            time::OffsetDateTime::now_utc().year()
+        };
+        let month_enum = month.try_into().ok()?;
+        if time::Date::from_calendar_date(year, month_enum, day).is_err() {
+            return None;
+        }
+        Some((year, month, day))
+    } else if s.contains('-') {
+        let parts: Vec<&str> = s.split('-').collect();
+        if parts.len() != 3 {
+            return None;
+        }
+        let year = i32::from_str(parts[0]).ok()?;
+        let month = u8::from_str(parts[1]).ok()?;
+        let day = u8::from_str(parts[2]).ok()?;
+        let month_enum = month.try_into().ok()?;
+        if time::Date::from_calendar_date(year, month_enum, day).is_err() {
+            return None;
+        }
+        Some((year, month, day))
+    } else {
+        None
     }
 }
 

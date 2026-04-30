@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 use time::UtcDateTime as DateTime;
 
 use earlgrey::{EarleyForest, EarleyParser};
@@ -238,7 +240,6 @@ fn terminal_eval() -> impl Fn(&str, &str) -> TimeValue {
         "monthname" => TimeValue::Seq(Some(lexeme.to_string()), TimeSeqSpec::months(Some(month(lexeme).unwrap() as u16))),
         "ordinal" => TimeValue::Ordinal(ordinal(lexeme).or_else(|| short_ordinal(lexeme)).unwrap() as isize),
         "yearnumber" => TimeValue::Int(i32::from_str(lexeme).unwrap()),
-        "hourspec" => TimeValue::Seq(Some(lexeme.to_string()), TimeSeqSpec::hours(Some(hour_spec(lexeme).unwrap() as u16))),
         "small_int" => TimeValue::Int(i32::from_str(lexeme).unwrap()),
         "time_quantity" => match lexeme {
             "week" | "weeks" => TimeValue::Quantity(Some(lexeme.to_string()), Grain::Day, 7),
@@ -252,6 +253,29 @@ fn terminal_eval() -> impl Fn(&str, &str) -> TimeValue {
             q => TimeValue::Quantity(Some(lexeme.to_string()), kronos_grain(q).unwrap(), 1),
         },
         "weekend" => TimeValue::Seq(Some(lexeme.to_string()), TimeSeqSpec::weekends()),
+        "clock_time" => {
+            let (h, m, s, grain) = parse_clock_time(lexeme).unwrap();
+            let mut seq = TimeSeqSpec::hours(Some(h as u16));
+            if grain <= Grain::Minute {
+                seq = seq.intersection(TimeSeqSpec::minutes(Some(m as u16)));
+            }
+            if grain <= Grain::Second {
+                seq = seq.intersection(TimeSeqSpec::seconds(Some(s as u16)));
+            }
+            TimeValue::Seq(Some(lexeme.to_string()), seq)
+        }
+        "numeric_date" => {
+            let (y, m, d) = parse_date(lexeme).unwrap();
+            let start_time = time::Date::from_calendar_date(y, m.try_into().unwrap(), d).unwrap()
+                .with_hms(0, 0, 0).unwrap()
+                .assume_utc().into();
+            TimeValue::Span {
+                seq: TimeSeqSpec::grain(Grain::Day),
+                anchor: Anchor::Time(start_time),
+                dir: TimeDir::Future,
+                skip: 0,
+            }
+        }
         "now" | "today" | "yesterday" | "tomorrow" | "this" | "next" | "last" | "ago" | "hence" | "before" | "after" | "from" | "in" | "the" | "a" | "an" | "of" | "on" | "and" | "since" | "until" | "between" => {
             TimeValue::Keyword
         }
@@ -330,6 +354,7 @@ impl<'a> TimeMachine<'a> {
         ev.action("explicit_span -> tomorrow", |_| {
             TimeValue::Span { seq: TimeSeqSpec::grain(Grain::Day), anchor: Anchor::Now, dir: TimeDir::Future, skip: 1 }
         });
+        ev.action("explicit_span -> numeric_date", |mut t| t.remove(0));
         
         // explicit_span (relative basic)
         ev.action("explicit_span -> this sequence", |mut t| {
@@ -389,7 +414,7 @@ impl<'a> TimeMachine<'a> {
         ev.action("named_sequence -> weekend", |mut t| t.remove(0));
         ev.action("named_sequence -> monthname", |mut t| t.remove(0));
         ev.action("named_sequence -> weekday", |mut t| t.remove(0));
-        ev.action("named_sequence -> hourspec", |mut t| t.remove(0));
+        ev.action("named_sequence -> clock_time", |mut t| t.remove(0));
 
         ev.action("named_sequence -> monthname ordinal", |mut t| {
             let ordinal = t.remove(1).to_ordinal();
@@ -416,10 +441,10 @@ impl<'a> TimeMachine<'a> {
             let seq = TimeSeqSpec::days().within(month, ordinal).unwrap().intersection(weekday);
             TimeValue::Seq(None, seq)
         });
-        ev.action("named_sequence -> weekday hourspec", |mut t| {
-            let hourspec = t.remove(1).to_seq();
+        ev.action("named_sequence -> weekday clock_time", |mut t| {
+            let clock_time = t.remove(1).to_seq();
             let weekday = t.remove(0).to_seq();
-            TimeValue::Seq(None, hourspec.intersection(weekday))
+            TimeValue::Seq(None, clock_time.intersection(weekday))
         });
         
         ev.action("named_sequence -> [the] ordinal", |mut t| {
@@ -489,6 +514,13 @@ impl<'a> TimeMachine<'a> {
                 dir,
                 skip,
             }
+        });
+
+        ev.action("explicit_span -> sequence on explicit_span", |mut t| {
+            let anchor = Anchor::Within(Box::new(t.remove(2)), false);
+            let _on = t.remove(1);
+            let seq = t.remove(0).to_seq();
+            TimeValue::Span { seq, anchor, dir: TimeDir::Future, skip: 0 }
         });
 
         ev.action("named_sequence -> [the] ordinal_qualifier sequence of [the] sequence", |mut t| {

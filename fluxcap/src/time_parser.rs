@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 // https://github.com/wit-ai/duckling_old/blob/master/resources/languages/en/corpus/time.clj
 // https://github.com/wit-ai/duckling_old/blob/master/resources/languages/en/rules/time.clj
 
@@ -27,8 +29,8 @@ pub fn time_grammar() -> &'static str {
               | weekday
               | weekday monthname ordinal
               | weekday ordinal 'of' monthname
-              | weekday hourspec
-              | hourspec
+              | clock_time
+              | weekday clock_time
               | ['the'] ordinal_qualifier sequence 'of' ['the'] sequence
               | ['the'] ordinal
               | weekday ['the'] ordinal
@@ -39,6 +41,7 @@ pub fn time_grammar() -> &'static str {
                | 'today'
                | 'yesterday'
                | 'tomorrow'
+               | numeric_date
                | 'this' sequence
                | 'next' sequence
                | 'last' sequence
@@ -47,6 +50,7 @@ pub fn time_grammar() -> &'static str {
                | sequence yearnumber
                | yearnumber
                | ['the'] ordinal_qualifier sequence 'of' ['the'] explicit_span
+               | sequence 'on' explicit_span
                | 'since' time_span
                | 'until' time_span
                | 'between' time_span 'and' time_span
@@ -89,7 +93,8 @@ fn _grammar() -> Result<earlgrey::Grammar, String> {
         .plug_terminal("yearnumber", |y| {
             i32::from_str(y).map(|y| 999 < y && y < 3000) == Ok(true)
         })
-        .plug_terminal("hourspec", |h| hour_spec(h).is_some())
+        .plug_terminal("clock_time", |h| parse_clock_time(h).is_some())
+        .plug_terminal("numeric_date", |d| parse_date(d).is_some())
         .plug_terminal("small_int", |s| {
             u16::from_str(s).map(|s| s <= 999) == Ok(true)
         })

@@ -1,0 +1,138 @@
+# earley
+- span::stringify should print tree branches instead of just spaces
+- rule to_string: should be something more explicit for giving the rule a name. Ideally not computed to avoid recurrent cost.
+- rule: remove the test method 'new' to the tests section
+
+- earlgrey EarleyForest::reduce: with no action and len(args) == 1 should be a passthrough unless debug which can print info
+- abackus: rules with no action should have an implicit default
+
+- parser should be single thing, much easier to construct by default.
+- consider semantic actions annotated within the grammar
+- rule needs an 'id' that is hash / concat of head+spec
+- semantic actions should be keyed by rule, or rule id (a hash of it).
+- Assertions about all rules having an action (optional check requested by user).
+- robust parsing: allow skipping on error and getting next token
+- earley trees and earley parser should be a single parser thing. semantic actions registered directly with the parser
+- earley types (in earley forest, etc) should be traits not compile time type params
+
+----------------------------------------------
+
+3.  **`eval_table` Nested List Building:**
+    *   **File:** `src/expr/table.rs`
+    *   **Issue:** The `while let Some(...)` loop with the `inserter` logic to build the nested `Expr::Expr("List", ...)` structure is imperative and hard to visualize.
+    *   **Potential Simplification:** A recursive helper function might be cleaner.
+        ```rust
+        // Conceptual sketch (needs fleshing out)
+        fn build_table_recursive(
+            expr_template: &Expr,
+            specs: &[(Expr, f64, f64, f64)], // Remaining specs
+            current_bindings: &mut Vec<(Expr, Expr)>,
+            ctx: &mut Context
+        ) -> Result<Expr, String> {
+            if specs.is_empty() {
+                // Base case: evaluate the expression with current bindings
+                let rexpr = replace_all(expr_template.clone(), current_bindings)?;
+                eval_with_ctx(rexpr, ctx)
+            } else {
+                let (current_spec, remaining_specs) = specs.split_first().unwrap();
+                let (var, min, max, step) = current_spec;
+                let mut results = Vec::new();
+                let mut current_val = *min;
+                while current_val <= *max {
+                    current_bindings.push((var.clone(), Expr::Number(current_val)));
+                    results.push(build_table_recursive(expr_template, remaining_specs, current_bindings, ctx)?);
+                    current_bindings.pop(); // Backtrack
+                    current_val += *step;
+                }
+                Ok(Expr::Expr("List".to_string(), results))
+            }
+        }
+        // Initial call in eval_table:
+        // build_table_recursive(&expr, &idxs, &mut Vec::new(), ctx)
+        ```
+
+----------------------------------------------
+Keep a trace of symbols being evaluated to avoid infinite recursion
+a = b
+b = a
+a
+
+----------------------------------------------
+Unsure Beta ... RandomOds[0.2]
+--------------------
+Fix find root domain exploration. See mathematica examples for FindRoot
+--------------------
+Split findoot.rs for linear systems
+----------------------------------------------
+a Stats primitive type
+or a function that gets min, max, p95, avg, etc.
+
+----------------------------------------------
+CompoundExpression should be allowed within Module, Function, etc.
+
+
+########################
+fluxcap refactor
+- ask gemini for an extensive list of time expressions so that I assign the expected result and it builds tests cases against them.
+- probabilistic AST scores to resolve ambiguities. Then make the grammar simpler.
+
+add seasons, named periods like holidays, historic eras, etc ?
+
+crawl duckling links, whats missing in the grammar ?
+
+This should span 3 months
+17:58:29 ~/Source/tox 0 $ ./target/debug/fluxcap next 3 months
+Error: "TimeMachine \"Parse Error: No Rule completes\" for 'next 3 months'"
+
+- named-dates (eg christmas, easter, etc)
+- ISO format dates
+
+missing rule
+15:02:09 ~/Source/tox 0 $ ./target/debug/fluxcap mon after jan 1st
+15:02:14 ~/Source/tox 0 $ ./target/debug/fluxcap mon after jan
+Span(TimeSpan { start: 2027-01-04 0:00:00.0 +00, end: 2027-01-05 0:00:00.0 +00, grain: Day })
+15:02:18 ~/Source/tox 0 $ ./target/debug/fluxcap mon after jan 1st
+15:02:23 ~/Source/tox 0 $ ./target/debug/fluxcap jan 1st
+Span(TimeSpan { start: 2027-01-01 0:00:00.0 +00, end: 2027-01-02 0:00:00.0 +00, grain: Day })
+15:02:26 ~/Source/tox 0 $ ./target/debug/fluxcap mon after jan 1st
+
+- 3:30pm on friday
+- noon on jan 1st
+
+I dug deeper into the parser rules and lexer definitions of units.py to identify all the natural language and date-math capabilities it has that are currently missing from fluxcap.
+Here is the comprehensive breakdown of the gaps:
+1. Numeric Dates (US and ISO formatting)
+fluxcap expects verbose English, but units.py natively parses raw slashes and dashes:
+*   MM/DD/YYYY (12/31/2018)
+*   MM/DD/YY (12/31/18)
+*   MM/DD (12/31)
+*   YYYY-MM-DD (2018-12-31)
+2. Time Formatting and AM/PM logic
+fluxcap supports basic hourspec ("3pm", "15:00"), but units.py has dedicated, robust lexical support for exact clock times and 12-hour math:
+*   HH:MM and HH:MM:SS (Standard and international)
+*   Explicit AM/PM suffixing: p_verbose_time_pm mathematically adds 12 hours to any parsed time.
+3. Named Times
+units.py has a concept of named_time:
+*   "noon"
+*   "midnight"
+*   "eod" or "end of day"
+4. Named Dates (Holidays)
+units.py has a p_named_date rule that lets you anchor logic to specific holidays (and optionally specify the year):
+*   "christmas"
+*   "christmas eve"
+*   "christmas 2024"
+5. ISO Week Numbering
+fluxcap knows how to evaluate "a week", but it doesn't understand the ISO 8601 week calendar. units.py natively supports week-number calculations:
+*   "Week 12"
+*   "Week 12 2018" or "Week 12 / 2018"
+*   "Week 12 of 2018"
+*   "first week of 2018" / "last week of 2018"
+6. Quarter and Half Shorthands
+While fluxcap supports the words "quarter" and "half", units.py explicitly supports their corporate shorthands combined with years:
+*   "Q1" / "Q1 2018"
+*   "H2" / "H2 2019"
+7. Explicit "First/Last" of an Interval
+fluxcap relies on its generic ordinal grammar ([ordinal] sequence of time_span, e.g., "1st month of the year"), whereas units.py has dedicated shortcut grammar specifically optimized for first/last:
+*   "first of next month"
+*   "last of this year"
+*   "first day of next month"

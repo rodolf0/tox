@@ -56,7 +56,20 @@ mod tests {
 
         for case in tests {
             let reftime = parse_time(&case.reftime);
-            let mut results = tm.eval(&case.input, Some(reftime)).unwrap();
+            let eval_result = tm.eval(&case.input, Some(reftime));
+            
+            if case.expected.is_none() && case.expected_count.is_none() {
+                if let Ok(results) = eval_result {
+                    assert!(
+                        results.is_empty(),
+                        "Failed test: {}\nInput: '{}'\nExpected empty results, got: {:?}",
+                        case.description, case.input, results
+                    );
+                }
+                continue;
+            }
+            
+            let mut results = eval_result.unwrap();
             
             if let Some(expected_val) = case.expected {
                 let result = results.remove(0);

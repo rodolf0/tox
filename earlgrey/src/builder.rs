@@ -158,6 +158,15 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
                 forest.action(&rule_str, move |v| a(&head, v));
                 continue;
             }
+            // Provide a specific error for EBNF repetition rules
+            if rule.head.starts_with('{') && rule.spec.len() >= 2 {
+                return Err(format!(
+                    "EBNF repetition rule '{}' has no action. \
+                     When using {{...}} repetition in your grammar, you must provide \
+                     either `list_action` or `default_action` to combine repeated items.",
+                    rule_str
+                ));
+            }
             return Err(format!("Missing action for rule: {}", rule_str));
         }
 

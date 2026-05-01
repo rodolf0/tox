@@ -75,7 +75,7 @@ impl<T: Clone + 'static> ParserBuilder<T> {
         }
         for name in self.literals.keys() {
             let n = name.clone();
-            ebnf_parser = ebnf_parser.plug_terminal(&name, move |s| s == n);
+            ebnf_parser = ebnf_parser.plug_terminal(name, move |s| s == n);
         }
         let grammar = ebnf_parser.into_grammar()?;
 

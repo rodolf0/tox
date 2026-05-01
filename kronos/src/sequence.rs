@@ -681,7 +681,7 @@ impl SeqSpecInternal {
                     for _ in 0..INFINITE_FUSE {
                         match (s1.peek(), s2.peek()) {
                             (Some(n1), Some(n2)) => {
-                                let overlap = n1.intersect(&n2);
+                                let overlap = n1.intersect(n2);
                                 // advance the stream that is lagging
                                 if ends_first(n1, n2) {
                                     s1.next()
@@ -709,11 +709,11 @@ impl SeqSpecInternal {
                 };
                 Box::new(s.filter(move |span| {
                     // Catchup the except seq to the stream to know if they intersect
-                    while ex.as_ref().is_some_and(|ex| except_lagging_seq(span, &ex)) {
+                    while ex.as_ref().is_some_and(|ex| except_lagging_seq(span, ex)) {
                         ex = except.next();
                     }
                     match &ex {
-                        Some(ex) => span.intersect(&ex).is_none(),
+                        Some(ex) => span.intersect(ex).is_none(),
                         None => true,
                     }
                 }))
@@ -743,8 +743,7 @@ impl SeqSpecInternal {
                         // find interval starting point
                         from.clone()
                             .seq(t0, TimeDir::Past)
-                            .skip_while(|t| t.end > t0) // 1st seq Past item contains t0
-                            .next()
+                            .find(|t| t.end <= t0) // 1st seq Past item contains t0
                     })
                     .map(|s| s.start);
                 // If we couldn't find a reasonable t0 then there's no viable TimeSeq
@@ -758,14 +757,11 @@ impl SeqSpecInternal {
                     from.seq(t0, direction)
                         .take(INFINITE_FUSE)
                         .filter_map(move |f| {
-                            match to.clone().seq(f.start, TimeDir::Future).next() {
-                                Some(t) => Some(TimeSpan {
-                                    start: f.start,
-                                    end: if inclusive { t.end } else { t.start },
-                                    grain,
-                                }),
-                                None => None,
-                            }
+                            to.clone().seq(f.start, TimeDir::Future).next().map(|t| TimeSpan {
+                                start: f.start,
+                                end: if inclusive { t.end } else { t.start },
+                                grain,
+                            })
                         }),
                 )
             }

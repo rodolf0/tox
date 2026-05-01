@@ -4,24 +4,26 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 #[allow(clippy::type_complexity)]
-pub struct ParserBuilder<T: Clone + 'static> {
+pub struct ParserBuilder<'a, T: Clone + 'a> {
     grammar_str: String,
     start_rule: String,
-    terminals: HashMap<String, Rc<dyn Fn(&str) -> Option<T>>>,
+    terminals: HashMap<String, Rc<dyn Fn(&str) -> Option<T> + 'a>>,
+    terminal_preds: HashMap<String, Rc<dyn Fn(&str) -> bool + 'static>>,
     literals: HashMap<String, T>,
-    actions: HashMap<String, Rc<dyn Fn(Vec<T>) -> T>>,
-    default_action: Option<Rc<dyn Fn(&str, Vec<T>) -> T>>,
-    empty_action: Option<Rc<dyn Fn() -> T>>,
-    list_action: Option<Rc<dyn Fn(T, T) -> T>>,
-    unmapped_literal: Option<Rc<dyn Fn(&str) -> T>>,
+    actions: HashMap<String, Rc<dyn Fn(Vec<T>) -> T + 'a>>,
+    default_action: Option<Rc<dyn Fn(&str, Vec<T>) -> T + 'a>>,
+    empty_action: Option<Rc<dyn Fn() -> T + 'a>>,
+    list_action: Option<Rc<dyn Fn(T, T) -> T + 'a>>,
+    unmapped_literal: Option<Rc<dyn Fn(&str) -> T + 'a>>,
 }
 
-impl<T: Clone + 'static> ParserBuilder<T> {
+impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
     pub fn new(grammar: &str, start: &str) -> Self {
         Self {
             grammar_str: grammar.to_string(),
             start_rule: start.to_string(),
             terminals: HashMap::new(),
+            terminal_preds: HashMap::new(),
             literals: HashMap::new(),
             actions: HashMap::new(),
             default_action: None,
@@ -32,7 +34,9 @@ impl<T: Clone + 'static> ParserBuilder<T> {
     }
 
     pub fn terminal(mut self, name: &str, parse: impl Fn(&str) -> Option<T> + 'static) -> Self {
-        self.terminals.insert(name.to_string(), Rc::new(parse));
+        let p = Rc::new(parse);
+        self.terminals.insert(name.to_string(), p.clone());
+        self.terminal_preds.insert(name.to_string(), Rc::new(move |s| p(s).is_some()));
         self
     }
 
@@ -66,12 +70,12 @@ impl<T: Clone + 'static> ParserBuilder<T> {
         self
     }
 
-    pub fn build(self) -> Result<Parser<T>, String> {
+    pub fn build(self) -> Result<Parser<'a, T>, String> {
         // Parse the user's EBNF like grammar and build an internal representation.
         let mut ebnf_parser = EbnfGrammarParser::new(&self.grammar_str, &self.start_rule);
-        for (name, parse) in self.terminals.iter() {
-            let p = parse.clone();
-            ebnf_parser = ebnf_parser.plug_terminal(name, move |s| p(s).is_some());
+        for (name, pred) in self.terminal_preds.iter() {
+            let p = pred.clone();
+            ebnf_parser = ebnf_parser.plug_terminal(name, move |s| p(s));
         }
         for name in self.literals.keys() {
             let n = name.clone();
@@ -97,7 +101,7 @@ impl<T: Clone + 'static> ParserBuilder<T> {
         let terminals = self.terminals;
         let literals = self.literals;
         let unmapped_literal = self.unmapped_literal;
-        let mut forest = EarleyForest::<T>::new(move |sym, tok| {
+        let mut forest = EarleyForest::<'a, T>::new(move |sym, tok| {
             if let Some(parse) = terminals.get(sym) {
                 parse(tok).expect("Terminal matched but failed to parse")
             } else if let Some(val) = literals.get(sym) {
@@ -168,12 +172,12 @@ impl<T: Clone + 'static> ParserBuilder<T> {
     }
 }
 
-pub struct Parser<T: Clone + 'static> {
+pub struct Parser<'a, T: Clone + 'a> {
     earley_parser: EarleyParser,
-    forest: EarleyForest<'static, T>,
+    forest: EarleyForest<'a, T>,
 }
 
-impl<T: Clone + 'static> Parser<T> {
+impl<'a, T: Clone + 'a> Parser<'a, T> {
     pub fn parse<I, S>(&self, tokenizer: I) -> Result<T, String>
     where
         I: Iterator<Item = S>,

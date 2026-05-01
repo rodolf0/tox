@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
-use super::ebnf::EbnfGrammarParser;
-use super::{EarleyForest, EarleyParser, Grammar};
+use crate::ebnf::EbnfGrammarParser;
+use crate::earley::{EarleyForest, EarleyParser, Grammar};
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]

@@ -34,11 +34,14 @@ impl Symbol {
 impl hash::Hash for Symbol {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {
-            Symbol::Term(name, matcher) => {
+            Symbol::Term(name, _) => {
+                0u8.hash(state);
                 name.hash(state);
-                (matcher as *const dyn Fn(&str) -> bool).hash(state);
             }
-            Symbol::NonTerm(name) => name.hash(state),
+            Symbol::NonTerm(name) => {
+                1u8.hash(state);
+                name.hash(state);
+            }
         }
     }
 }
@@ -46,13 +49,7 @@ impl hash::Hash for Symbol {
 impl PartialEq for Symbol {
     fn eq(&self, other: &Symbol) -> bool {
         match (self, other) {
-            (Symbol::Term(s, m1), Symbol::Term(o, m2)) => {
-                s == o
-                    && std::ptr::addr_eq(
-                        &m1 as *const dyn Fn(&str) -> bool,
-                        &m2 as *const dyn Fn(&str) -> bool,
-                    )
-            }
+            (Symbol::Term(s, _), Symbol::Term(o, _)) => s == o,
             (Symbol::NonTerm(s), Symbol::NonTerm(o)) => s == o,
             _ => false,
         }
@@ -70,7 +67,7 @@ impl fmt::Debug for Symbol {
     }
 }
 
-#[derive(PartialEq, Hash)]
+#[derive(PartialEq, Eq, Hash)]
 pub struct Rule {
     pub head: String,
     pub spec: Vec<Rc<Symbol>>,

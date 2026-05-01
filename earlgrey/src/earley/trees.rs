@@ -5,12 +5,14 @@ use super::spans::{Span, SpanSource};
 use std::collections::HashMap;
 use std::rc::Rc;
 
+pub type ActionFn<'a, ASTNode> = Box<dyn Fn(Vec<ASTNode>) -> ASTNode + 'a>;
+pub type TerminalParserFn<'a, ASTNode> = Box<dyn Fn(&str, &str) -> ASTNode + 'a>;
+
 pub struct EarleyForest<'a, ASTNode: Clone> {
     // Semantic actions to apply when a production is completed
-    // TODO: actions should be keyed by rule id/hash/Rule itself not name
-    actions: HashMap<String, Box<dyn Fn(Vec<ASTNode>) -> ASTNode + 'a>>,
+    actions: HashMap<String, ActionFn<'a, ASTNode>>,
     // How to lift a 'scanned' terminal into an AST node.
-    terminal_parser: Box<dyn Fn(&str, &str) -> ASTNode + 'a>,
+    terminal_parser: TerminalParserFn<'a, ASTNode>,
 }
 
 impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
@@ -27,7 +29,9 @@ impl<'a, ASTNode: Clone> EarleyForest<'a, ASTNode> {
     }
 }
 
+#[cfg(test)]
 impl<ASTNode: Clone> EarleyForest<'_, ASTNode> {
+
     fn reduce(&self, root: &Rc<Span>, args: Vec<ASTNode>) -> Result<Vec<ASTNode>, String> {
         // If span is not complete, reduce is a noop passthrough
         if !root.complete() {
@@ -89,7 +93,7 @@ impl<ASTNode: Clone> EarleyForest<'_, ASTNode> {
     ) -> Result<Vec<Vec<ASTNode>>, String> {
         assert!(level < 100, "Bottomless grammar, stack blew up");
         let source = root.sources();
-        if source.len() == 0 {
+        if source.is_empty() {
             return Ok(vec![self.reduce(root, Vec::new())?]);
         }
         let mut trees = Vec::new();
@@ -210,7 +214,7 @@ impl<ASTNode: Clone> EarleyForest<'_, ASTNode> {
 
             // (Reachable) Spans with no sources mean we've unwound to the
             // begining of a production/rule. Apply the rule reducing args.
-            if cursor.sources().len() == 0 {
+            if cursor.sources().is_empty() {
                 let completed_rule = &completions
                     .pop()
                     .expect("BUG: span rule never completed")
@@ -255,6 +259,7 @@ impl<ASTNode: Clone> EarleyForest<'_, ASTNode> {
         Ok(args.pop().expect("BUG: mismatched reduce args"))
     }
 
+    #[cfg(test)]
     pub fn eval(&self, ptrees: &ParseTrees) -> Result<ASTNode, String> {
         let root = ptrees.0.first().expect("BUG: ParseTrees empty").clone();
         self.eval_one(root, |_| 0)

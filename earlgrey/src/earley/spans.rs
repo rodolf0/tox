@@ -350,7 +350,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn item_failed_merge_1() {
+    fn item_failed_merge() {
         let rule1 = gen_rule1();
         let item1 = item(rule1.clone(), 0, 0, 0);
         let item2 = item(rule1.clone(), 0, 1, 0);
@@ -358,8 +358,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn item_failed_merge_2() {
+    fn item_success_merge() {
         let item3 = item(gen_rule2(), 0, 0, 0);
         let item4 = item(gen_rule2(), 0, 0, 0);
         item3.merge_sources(item4);

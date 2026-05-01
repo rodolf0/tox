@@ -65,6 +65,10 @@ impl EarleyParser {
             })
     }
 
+    // Storing Rc<Span> in a HashSet, and Span contains RefCell (backpointers).
+    // Span implements custom Hash and PartialEq traits that explicitly ignore
+    // the RefCell and only compare immutable fields (rule, dot, start, end).
+    #[allow(clippy::mutable_key_type)]
     pub fn parse<T>(&self, mut tokenizer: T) -> Result<ParseTrees, String>
     where
         T: Iterator,

@@ -105,13 +105,13 @@ impl<ASTNode: Clone> EarleyForest<'_, ASTNode> {
             explored.push(backpointer.clone());
             match backpointer {
                 SpanSource::Completion(source, trigger) => {
-                    // collect left-side-tree of each node
-                    for args in self.walker_all(source, level + 1, explored.clone())? {
-                        // collect right-side-tree of each node
-                        for trig in self.walker_all(trigger, level + 1, explored.clone())? {
-                            let mut args = args.clone();
-                            args.extend(trig);
-                            trees.push(self.reduce(root, args)?);
+                    let left_trees = self.walker_all(source, level + 1, explored.clone())?;
+                    let right_trees = self.walker_all(trigger, level + 1, explored.clone())?;
+                    for args in left_trees {
+                        for trig in &right_trees {
+                            let mut combined = args.clone();
+                            combined.extend(trig.clone());
+                            trees.push(self.reduce(root, combined)?);
                         }
                     }
                 }

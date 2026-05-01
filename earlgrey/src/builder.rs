@@ -70,16 +70,15 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
         self
     }
 
-    pub fn build(self) -> Result<Parser<'a, T>, String> {
+    pub fn build(mut self) -> Result<Parser<'a, T>, String> {
         // Parse the user's EBNF like grammar and build an internal representation.
         let mut ebnf_parser = EbnfGrammarParser::new(&self.grammar_str, &self.start_rule);
-        for (name, pred) in self.terminal_preds.iter() {
-            let p = pred.clone();
-            ebnf_parser = ebnf_parser.plug_terminal(name, move |s| p(s));
+        for (name, pred) in self.terminal_preds.into_iter() {
+            ebnf_parser = ebnf_parser.plug_terminal(&name, move |s| pred(s));
         }
         for name in self.literals.keys() {
             let n = name.clone();
-            ebnf_parser = ebnf_parser.plug_terminal(name, move |s| s == n);
+            ebnf_parser = ebnf_parser.plug_terminal(&name, move |s| s == n);
         }
         let grammar = ebnf_parser.into_grammar()?;
 
@@ -115,16 +114,14 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
         for rule in &grammar.rules {
             let rule_str = rule.to_string();
             // map semantic action for each rule in the grammar.
-            if let Some(action) = self.actions.get(&rule_str) {
-                let a = action.clone();
-                forest.action(&rule_str, move |v| a(v));
+            if let Some(action) = self.actions.remove(&rule_str) {
+                forest.action(&rule_str, move |v| action(v));
                 continue;
             }
             // Fallback to 'empty_action' if the rule is an epsilon production.
             if rule.spec.is_empty() {
-                if let Some(ref empty_a) = self.empty_action {
-                    let a = empty_a.clone();
-                    forest.action(&rule_str, move |_| a());
+                if let Some(empty_a) = self.empty_action.take() {
+                    forest.action(&rule_str, move |_| empty_a());
                     continue;
                 } else {
                     return Err(format!("Missing action for empty rule: {}", rule_str));
@@ -134,12 +131,11 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
             // The user can provide a 'list_action' to combine multiple items into a list.
             if rule.head.starts_with('{') && rule.spec.len() >= 2 {
                 #[allow(clippy::collapsible_if)]
-                if let Some(ref list_a) = self.list_action {
-                    let a = list_a.clone();
+                if let Some(list_a) = self.list_action.take() {
                     forest.action(&rule_str, move |mut v| {
                         let list = v.pop().unwrap();
                         let item = v.remove(0); // If there are middle elements, this only takes the first and last
-                        a(item, list)
+                        list_a(item, list)
                     });
                     continue;
                 }

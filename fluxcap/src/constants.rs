@@ -40,11 +40,11 @@ pub fn ordinal(n: &str) -> Option<u8> {
         "fifth",
         "sixth",
         "seventh",
-        "eigth",
+        "eighth",
         "ninth",
-        "thenth",
+        "tenth",
         "eleventh",
-        "twelveth",
+        "twelfth",
         "thirteenth",
         "fourteenth",
         "fifteenth",
@@ -57,10 +57,10 @@ pub fn ordinal(n: &str) -> Option<u8> {
         "twenty-second",
         "twenty-third",
         "twenty-fourth",
-        "twenty-fith",
+        "twenty-fifth",
         "twenty-sixth",
         "twenty-seventh",
-        "twenty-eigth",
+        "twenty-eighth",
         "twenty-ninth",
         "thirtieth",
         "thirty-first",
@@ -98,12 +98,12 @@ pub fn parse_clock_time(s: &str) -> Option<(u8, u8, u8, kronos::Grain)> {
     let mut ampm = None;
     let mut time_part = s;
     // Parse am/pm suffix if present
-    if s.ends_with("am") {
+    if let Some(stripped) = s.strip_suffix("am") {
         ampm = Some("am");
-        time_part = &s[..s.len() - 2];
-    } else if s.ends_with("pm") {
+        time_part = stripped;
+    } else if let Some(stripped) = s.strip_suffix("pm") {
         ampm = Some("pm");
-        time_part = &s[..s.len() - 2];
+        time_part = stripped;
     }
     // Split time part into components
     let parts: Vec<&str> = time_part.split(':').collect();
@@ -187,6 +187,6 @@ mod tests {
     #[test]
     fn test_ordinal() {
         assert_eq!(ordinal("twenty-fourth"), Some(24));
-        assert_eq!(ordinal("twelveth"), Some(12));
+        assert_eq!(ordinal("twelfth"), Some(12));
     }
 }

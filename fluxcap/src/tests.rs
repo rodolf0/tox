@@ -1,11 +1,8 @@
 mod grammar_checks {
     fn grammar_accepts(spec_tests: &[&str]) {
-        let parser = crate::time_parser();
+        let tm = crate::TimeMachine::new();
         for test in spec_tests {
-            let tok = test.split(&[' ', ','][..]).filter(|w| !w.is_empty());
-            parser
-                .parse(tok)
-                .expect(&format!("Failed '{}'", test));
+            tm.eval(test, None).expect(&format!("Failed '{}'", test));
         }
     }
 

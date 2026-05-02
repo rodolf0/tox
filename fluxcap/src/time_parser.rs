@@ -1,8 +1,5 @@
 #![deny(warnings)]
 
-// https://github.com/wit-ai/duckling_old/blob/master/resources/languages/en/corpus/time.clj
-// https://github.com/wit-ai/duckling_old/blob/master/resources/languages/en/rules/time.clj
-
 pub fn time_grammar() -> &'static str {
     r#"
     time_expr := time_span
@@ -81,51 +78,7 @@ pub fn time_grammar() -> &'static str {
     "#
 }
 
-fn _grammar() -> Result<earlgrey::Grammar, String> {
-    use crate::constants::*;
-    use std::str::FromStr;
-    earlgrey::EbnfGrammarParser::new(time_grammar(), "time_expr")
-        .plug_terminal("weekday", |d| weekday(d).is_some())
-        .plug_terminal("monthname", |d| month(d).is_some())
-        .plug_terminal("ordinal", |d| {
-            ordinal(d).or_else(|| short_ordinal(d)).is_some()
-        })
-        .plug_terminal("yearnumber", |y| {
-            i32::from_str(y).map(|y| 999 < y && y < 3000) == Ok(true)
-        })
-        .plug_terminal("clock_time", |h| parse_clock_time(h).is_some())
-        .plug_terminal("numeric_date", |d| parse_date(d).is_some())
-        .plug_terminal("small_int", |s| {
-            u16::from_str(s).map(|s| s <= 999) == Ok(true)
-        })
-        // literlas that we want to check variations of
-        .plug_terminal("time_quantity", |q| {
-            kronos_grain(q).is_some() 
-                || matches!(
-                    q, 
-                    "week" | "weeks" 
-                    | "fortnight" | "fortnights" 
-                    | "quarter" | "quarters" 
-                    | "half" | "halfs" | "halves" 
-                    | "lustrum" | "lustrums" | "lustra" 
-                    | "decade" | "decades" 
-                    | "century" | "centuries" 
-                    | "millennium" | "millennia" | "millenium" | "milleniums"
-                )
-        })
-        .plug_terminal("weekend", |w| w == "weekend" || w == "weekends")
-        .into_grammar()
-}
-
-pub fn time_parser() -> earlgrey::EarleyParser {
-    earlgrey::EarleyParser::new(
-        _grammar().unwrap_or_else(|e| panic!("TimeMachine grammar BUG: {:?}", e)),
-    )
-}
-
 pub fn debug_time_expression(time: &str) -> Result<Vec<earlgrey::Sexpr>, String> {
-    let parser = earlgrey::sexpr_parser(
-        _grammar().unwrap_or_else(|e| panic!("TimeMachine grammar BUG: {:?}", e)),
-    )?;
+    let parser = earlgrey::sexpr_parser(time_grammar(), "time_expr")?;
     parser(time.split(&[' ', ','][..]).filter(|w| !w.is_empty()))
 }

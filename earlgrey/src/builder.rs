@@ -38,19 +38,26 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
 
     pub fn terminal(mut self, name: &str, parse: impl Fn(&str) -> Option<T> + 'static) -> Self {
         let p = Rc::new(parse);
-        self.terminals.insert(name.to_string(), p.clone());
-        self.terminal_preds.insert(name.to_string(), Rc::new(move |s| p(s).is_some()));
+        self.terminals
+            .insert(name.to_string(), p.clone())
+            .map(|_| panic!("Duplicate terminal registered: {}", name));
+        self.terminal_preds
+            .insert(name.to_string(), Rc::new(move |s| p(s).is_some()));
         self
     }
 
     pub fn literal(mut self, name: &str, value: T) -> Self {
-        self.literals.insert(name.to_string(), value);
+        self.literals
+            .insert(name.to_string(), value)
+            .map(|_| panic!("Duplicate literal registered: {}", name));
         self
     }
 
     pub fn literals(mut self, names: &[&str], value: T) -> Self {
         for name in names {
-            self.literals.insert(name.to_string(), value.clone());
+            self.literals
+                .insert(name.to_string(), value.clone())
+                .map(|_| panic!("Duplicate literal registered: {}", name));
         }
         self
     }
@@ -61,42 +68,61 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
     }
 
     pub fn action(mut self, rule: &str, action: impl Fn(Vec<T>) -> T + 'static) -> Self {
-        self.actions.insert(rule.to_string(), Rc::new(action));
+        self.actions
+            .insert(rule.to_string(), Rc::new(action))
+            .map(|_| panic!("Duplicate action registered for rule: {}", rule));
         self
     }
 
     pub fn action1(mut self, rule: &str, action: impl Fn(T) -> T + 'static) -> Self {
-        self.actions.insert(rule.to_string(), Rc::new(move |mut v| action(v.remove(0))));
+        self.actions
+            .insert(rule.to_string(), Rc::new(move |mut v| action(v.remove(0))))
+            .map(|_| panic!("Duplicate action registered for rule: {}", rule));
         self
     }
 
     pub fn action2(mut self, rule: &str, action: impl Fn(T, T) -> T + 'static) -> Self {
-        self.actions.insert(rule.to_string(), Rc::new(move |mut v| {
-            let a2 = v.remove(1);
-            let a1 = v.remove(0);
-            action(a1, a2)
-        }));
+        self.actions
+            .insert(
+                rule.to_string(),
+                Rc::new(move |mut v| {
+                    let a2 = v.remove(1);
+                    let a1 = v.remove(0);
+                    action(a1, a2)
+                }),
+            )
+            .map(|_| panic!("Duplicate action registered for rule: {}", rule));
         self
     }
 
     pub fn action3(mut self, rule: &str, action: impl Fn(T, T, T) -> T + 'static) -> Self {
-        self.actions.insert(rule.to_string(), Rc::new(move |mut v| {
-            let a3 = v.remove(2);
-            let a2 = v.remove(1);
-            let a1 = v.remove(0);
-            action(a1, a2, a3)
-        }));
+        self.actions
+            .insert(
+                rule.to_string(),
+                Rc::new(move |mut v| {
+                    let a3 = v.remove(2);
+                    let a2 = v.remove(1);
+                    let a1 = v.remove(0);
+                    action(a1, a2, a3)
+                }),
+            )
+            .map(|_| panic!("Duplicate action registered for rule: {}", rule));
         self
     }
 
     pub fn action4(mut self, rule: &str, action: impl Fn(T, T, T, T) -> T + 'static) -> Self {
-        self.actions.insert(rule.to_string(), Rc::new(move |mut v| {
-            let a4 = v.remove(3);
-            let a3 = v.remove(2);
-            let a2 = v.remove(1);
-            let a1 = v.remove(0);
-            action(a1, a2, a3, a4)
-        }));
+        self.actions
+            .insert(
+                rule.to_string(),
+                Rc::new(move |mut v| {
+                    let a4 = v.remove(3);
+                    let a3 = v.remove(2);
+                    let a2 = v.remove(1);
+                    let a1 = v.remove(0);
+                    action(a1, a2, a3, a4)
+                }),
+            )
+            .map(|_| panic!("Duplicate action registered for rule: {}", rule));
         self
     }
 
@@ -135,7 +161,11 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
         // Validate that all symbols in the grammar have been registered.
         for rule in &grammar.rules {
             for sym in &rule.spec {
-                if sym.is_terminal() && !self.terminals.contains_key(sym.name()) && !self.literals.contains_key(sym.name()) && self.unmapped_literal.is_none() {
+                if sym.is_terminal()
+                    && !self.terminals.contains_key(sym.name())
+                    && !self.literals.contains_key(sym.name())
+                    && self.unmapped_literal.is_none()
+                {
                     return Err(format!("Missing terminal parser for: {}", sym.name()));
                 }
             }
@@ -269,7 +299,9 @@ impl<'a, T: Clone + 'a> Parser<'a, T> {
         if results.len() > 1 {
             return Err("Ambiguous grammar: multiple parse trees found".to_string());
         }
-        results.pop().ok_or_else(|| "No parse tree found".to_string())
+        results
+            .pop()
+            .ok_or_else(|| "No parse tree found".to_string())
     }
 
     pub fn parse_all<I, S>(&self, tokenizer: I) -> Result<Vec<T>, String>
@@ -287,9 +319,7 @@ impl<'a, T: Clone + 'a> Parser<'a, T> {
         S: AsRef<str> + std::fmt::Debug,
     {
         let trees = self.earley_parser.parse(tokenizer)?;
-        let mut sexpr_forest = EarleyForest::<Sexpr>::new(|_sym, tok| {
-            Sexpr::Atom(tok.to_string())
-        });
+        let mut sexpr_forest = EarleyForest::<Sexpr>::new(|_sym, tok| Sexpr::Atom(tok.to_string()));
         for rule in &self.earley_parser.grammar.rules {
             let rule_str = rule.to_string();
             sexpr_forest.action(&rule_str, |mut nodes| {

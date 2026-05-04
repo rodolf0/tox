@@ -6,10 +6,7 @@ use crate::expr::Expr;
 
 fn grammar_str() -> &'static str {
     r#"
-    compound_expr := expr
-                  | compound_expr ';'
-                  | compound_expr ';' expr
-                  ;
+    compound_expr := expr { ';' expr } [ ';' ] ;
 
     expr := set ;
 
@@ -29,42 +26,19 @@ fn grammar_str() -> &'static str {
 
     arith_fac := arith_fac '!' | primary ;
 
-    arglist := arglist ',' expr | expr ;
+    arglist := expr { ',' expr } ;
 
     primary := atom
             | '(' expr ')'
-            | primary '[' arglist ']'
-            | primary '[' ']'
+            | primary '[' [ arglist ] ']'
             ;
 
     atom := '"' string '"'
          | symbol
          | number
-         | '{' arglist '}'
-         | '{' '}'
+         | '{' [ arglist ] '}'
          ;
     "#
-}
-
-fn numerica_grammar() -> Result<earlgrey::Grammar, String> {
-    earlgrey::EbnfGrammarParser::new(grammar_str(), "compound_expr")
-        .plug_terminal("string", |_| true)
-        .plug_terminal("symbol", |s| {
-            s.chars().enumerate().all(|(i, c)| {
-                i == 0 && c.is_alphabetic() || i > 0 && (c.is_alphanumeric() || c == '_')
-            })
-        })
-        .plug_terminal("number", |n| n.parse::<f64>().is_ok())
-        .into_grammar()
-}
-
-pub fn expr_tree(input: &str) -> Result<(), String> {
-    let parser = earlgrey::sexpr_parser(numerica_grammar()?)?;
-    let tokenizer = crate::tokenizer::Tokenizer::new(input.chars());
-    for tree in parser(tokenizer)? {
-        println!("{}", tree.print());
-    }
-    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -100,165 +74,128 @@ fn convert(t: T) -> Expr {
     }
 }
 
-pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
-    let mut evaler = earlgrey::EarleyForest::new(|terminal, lexeme| match terminal {
-        "symbol" => T::Symbol(lexeme.into()),
-        "number" => T::Number(lexeme.parse::<f64>().unwrap()),
-        "string" => T::String(lexeme.into()),
-        "^" => T::Symbol("Power".into()),
-        _ => T::Nop,
-    });
+fn math_bin_op(lhs: T, op: T, rhs: T) -> T {
+    let reduce = op == T::Symbol("Plus".into()) || op == T::Symbol("Times".into());
+    let mut new_args = Vec::new();
+    match lhs {
+        T::Expr(h, a) if *h == op && reduce => new_args.extend(a),
+        other => new_args.push(other),
+    }
+    match rhs {
+        T::Expr(h, a) if *h == op && reduce => new_args.extend(a),
+        other => new_args.push(other),
+    }
+    T::Expr(Box::new(op), new_args)
+}
 
-    evaler.action("compound_expr -> expr", |mut args| args.swap_remove(0));
-    evaler.action("compound_expr -> compound_expr ;", |mut args| {
-        args.swap_remove(0)
-    });
-    evaler.action("compound_expr -> compound_expr ; expr", |mut args| {
-        let rhs = args.swap_remove(2);
-        let lhs = args.swap_remove(0);
-        let args = match lhs {
-            T::Expr(h, mut exprs) if *h == T::Symbol("CompoundExpression".into()) => {
-                exprs.push(rhs);
-                exprs
+fn build_parser() -> Result<earlgrey::Parser<'static, T>, String> {
+    earlgrey::ParserBuilder::<T>::new(grammar_str(), "compound_expr")
+        .terminal("string", |s| Some(T::String(s.into())))
+        .terminal("symbol", |s| {
+            if s.chars().enumerate().all(|(i, c)| {
+                i == 0 && c.is_alphabetic() || i > 0 && (c.is_alphanumeric() || c == '_')
+            }) {
+                Some(T::Symbol(s.into()))
+            } else {
+                None
             }
-            other => vec![other, rhs],
-        };
-        T::Expr(Box::new(T::Symbol("CompoundExpression".into())), args)
-    });
-
-    evaler.action("expr -> set", |mut args| args.swap_remove(0));
-
-    evaler.action("set -> replace_all @opset set", |mut args| {
-        let rhs = args.swap_remove(2);
-        let op = args.swap_remove(1);
-        let lhs = args.swap_remove(0);
-        T::Expr(Box::new(op), vec![lhs, rhs])
-    });
-    evaler.action("@opset -> :=", |_| T::Symbol("SetDelayed".into()));
-    evaler.action("@opset -> =", |_| T::Symbol("Set".into()));
-    evaler.action("set -> replace_all", |mut args| args.swap_remove(0));
-
-    evaler.action("replace_all -> replace_all /. rule", |mut args| {
-        let rhs = args.swap_remove(2);
-        let lhs = args.swap_remove(0);
-        T::Expr(Box::new(T::Symbol("ReplaceAll".into())), vec![lhs, rhs])
-    });
-    evaler.action("replace_all -> rule", |mut args| args.swap_remove(0));
-
-    evaler.action("rule -> arith -> rule", |mut args| {
-        let rhs = args.swap_remove(2);
-        let lhs = args.swap_remove(0);
-        T::Expr(Box::new(T::Symbol("Rule".into())), vec![lhs, rhs])
-    });
-    evaler.action("rule -> arith", |mut args| args.swap_remove(0));
-
-    evaler.action("arith -> arith @opsum arith_mul", math_bin_op);
-    evaler.action("arith -> arith_mul", |mut args| args.swap_remove(0));
-
-    evaler.action("arith_mul -> arith_mul @opmul arith_pow", math_bin_op);
-    evaler.action("arith_mul -> arith_pow", |mut args| args.swap_remove(0));
-
-    evaler.action("arith_pow -> - arith_pow", |mut args| {
-        match args.swap_remove(1) {
+        })
+        .terminal("number", |n| n.parse::<f64>().ok().map(T::Number))
+        .unmapped_literal(|tok| match tok {
+            "^" => T::Symbol("Power".into()),
+            _ => T::Nop,
+        })
+        .optional_empty(|| T::Arglist(vec![]))
+        .list_empty(|| T::Arglist(vec![]))
+        .list_action(|list, mut items| {
+            let mut a = pull!(T::Arglist, list);
+            a.push(items.remove(1));
+            T::Arglist(a)
+        })
+        .action3("compound_expr -> expr {;expr} [;]", |expr, list, _| {
+            let a = pull!(T::Arglist, list);
+            if a.is_empty() {
+                expr
+            } else {
+                let mut args = vec![expr];
+                args.extend(a);
+                T::Expr(Box::new(T::Symbol("CompoundExpression".into())), args)
+            }
+        })
+        .action3("set -> replace_all @opset set", |lhs, op, rhs| {
+            T::Expr(Box::new(op), vec![lhs, rhs])
+        })
+        .action1("@opset -> :=", |_| T::Symbol("SetDelayed".into()))
+        .action1("@opset -> =", |_| T::Symbol("Set".into()))
+        .action3("replace_all -> replace_all /. rule", |lhs, _, rhs| {
+            T::Expr(Box::new(T::Symbol("ReplaceAll".into())), vec![lhs, rhs])
+        })
+        .action3("rule -> arith -> rule", |lhs, _, rhs| {
+            T::Expr(Box::new(T::Symbol("Rule".into())), vec![lhs, rhs])
+        })
+        .action3("arith -> arith @opsum arith_mul", math_bin_op)
+        .action3("arith_mul -> arith_mul @opmul arith_pow", math_bin_op)
+        .action2("arith_pow -> - arith_pow", |_, pow| match pow {
             T::Number(n) => T::Number(-n),
             other => T::Expr(
                 Box::new(T::Symbol("Times".into())),
                 vec![T::Number(-1.0), other],
             ),
-        }
-    });
-    evaler.action("arith_pow -> unsure ^ arith_pow", math_bin_op);
-    evaler.action("arith_pow -> unsure", |mut args| args.swap_remove(0));
+        })
+        .action3("arith_pow -> unsure ^ arith_pow", math_bin_op)
+        .action3("unsure -> unsure ~ arith_fac", |n0, _, n1| {
+            T::Expr(Box::new(T::Symbol("Unsure".into())), vec![n0, n1])
+        })
+        .action2("arith_fac -> arith_fac !", |fac, _| {
+            T::Expr(
+                Box::new(T::Symbol("Gamma".into())),
+                vec![T::Expr(
+                    Box::new(T::Symbol("Plus".into())),
+                    vec![T::Number(1.0), fac],
+                )],
+            )
+        })
+        .action2("arglist -> expr {,expr}", |expr, list| {
+            let mut a = vec![expr];
+            a.extend(pull!(T::Arglist, list));
+            T::Arglist(a)
+        })
+        .action3("primary -> ( expr )", |_, expr, _| expr)
+        .action4("primary -> primary [ [arglist] ]", |head, _, arglist, _| {
+            T::Expr(Box::new(head), pull!(T::Arglist, arglist))
+        })
+        .action3("atom -> \" string \"", |_, s, _| {
+            assert!(matches!(s, T::String(_)));
+            s
+        })
+        .action3("atom -> { [arglist] }", |_, arglist, _| {
+            T::Expr(
+                Box::new(T::Symbol("List".into())),
+                pull!(T::Arglist, arglist),
+            )
+        })
+        .action1("@opsum -> +", |_| T::Symbol("Plus".into()))
+        .action1("@opsum -> -", |_| T::Symbol("Minus".into()))
+        .action1("@opmul -> *", |_| T::Symbol("Times".into()))
+        .action1("@opmul -> /", |_| T::Symbol("Divide".into()))
+        .action1("@opmul -> %", |_| T::Symbol("Mod".into()))
+        .build()
+}
 
-    evaler.action("unsure -> unsure ~ arith_fac", |mut args| {
-        let n1 = args.swap_remove(2);
-        let n0 = args.swap_remove(0);
-        T::Expr(Box::new(T::Symbol("Unsure".into())), vec![n0, n1])
-    });
-    evaler.action("unsure -> arith_fac", |mut args| args.swap_remove(0));
-
-    evaler.action("arith_fac -> arith_fac !", |mut args| {
-        T::Expr(
-            Box::new(T::Symbol("Gamma".into())),
-            vec![T::Expr(
-                Box::new(T::Symbol("Plus".into())),
-                vec![T::Number(1.0), args.swap_remove(0)],
-            )],
-        )
-    });
-    evaler.action("arith_fac -> primary", |mut args| args.swap_remove(0));
-
-    evaler.action("arglist -> arglist , expr", |mut args| {
-        let expr = args.swap_remove(2); // Don't check type could be any
-        let mut arglist = pull!(T::Arglist, args.swap_remove(0));
-        arglist.push(expr);
-        T::Arglist(arglist)
-    });
-    evaler.action("arglist -> expr", |mut args| {
-        // Don't check type could be any
-        T::Arglist(vec![args.swap_remove(0)])
-    });
-
-    evaler.action("primary -> atom", |mut args| args.swap_remove(0));
-    evaler.action("primary -> ( expr )", |mut args| args.swap_remove(1));
-    evaler.action("primary -> primary [ arglist ]", |mut args| {
-        let arglist = pull!(T::Arglist, args.swap_remove(2));
-        let head = args.swap_remove(0);
-        T::Expr(Box::new(head), arglist)
-    });
-    evaler.action("primary -> primary [ ]", |mut args| {
-        let head = args.swap_remove(0);
-        T::Expr(Box::new(head), vec![])
-    });
-
-    evaler.action("atom -> \" string \"", |mut args| {
-        assert!(matches!(args[1], T::String(_)));
-        args.swap_remove(1)
-    });
-    evaler.action("atom -> symbol", |mut args| {
-        assert!(matches!(args[0], T::Symbol(_)));
-        args.swap_remove(0)
-    });
-    evaler.action("atom -> number", |mut args| {
-        assert!(matches!(args[0], T::Number(_)));
-        args.swap_remove(0)
-    });
-    evaler.action("atom -> { arglist }", |mut args| {
-        let arglist = pull!(T::Arglist, args.swap_remove(1));
-        T::Expr(Box::new(T::Symbol("List".into())), arglist)
-    });
-    evaler.action("atom -> { }", |_| {
-        T::Expr(Box::new(T::Symbol("List".into())), vec![])
-    });
-
-    fn math_bin_op(mut args: Vec<T>) -> T {
-        assert_eq!(args.len(), 3);
-        let rhs = args.swap_remove(2);
-        let op = args.swap_remove(1);
-        let lhs = args.swap_remove(0);
-        let reduce = op == T::Symbol("Plus".into()) || op == T::Symbol("Times".into());
-        let mut new_args = Vec::new();
-        match lhs {
-            T::Expr(h, a) if *h == op && reduce => new_args.extend(a),
-            other => new_args.push(other),
-        }
-        match rhs {
-            T::Expr(h, a) if *h == op && reduce => new_args.extend(a),
-            other => new_args.push(other),
-        }
-        T::Expr(Box::new(op), new_args)
+pub fn expr_tree(input: &str) -> Result<(), String> {
+    let parser = build_parser()?;
+    let tokenizer = crate::tokenizer::Tokenizer::new(input.chars());
+    for tree in parser.parse_sexpr(tokenizer)? {
+        println!("{}", tree.print());
     }
+    Ok(())
+}
 
-    evaler.action("@opsum -> +", |_| T::Symbol("Plus".into()));
-    evaler.action("@opsum -> -", |_| T::Symbol("Minus".into()));
-    evaler.action("@opmul -> *", |_| T::Symbol("Times".into()));
-    evaler.action("@opmul -> /", |_| T::Symbol("Divide".into()));
-    evaler.action("@opmul -> %", |_| T::Symbol("Mod".into()));
-
-    let parser = earlgrey::EarleyParser::new(numerica_grammar()?);
+pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
+    let parser = build_parser()?;
     Ok(move |input: &str| {
         let tokenizer = crate::tokenizer::Tokenizer::new(input.chars());
-        let mut trees = evaler.eval_all_recursive(&parser.parse(tokenizer)?)?;
+        let mut trees = parser.parse_all(tokenizer)?;
         if trees.len() > 1 {
             for t in &trees {
                 eprintln!("{:?}", t);

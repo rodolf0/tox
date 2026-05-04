@@ -23,7 +23,7 @@ fn main() -> Result<(), String> {
 
     let verbose = std::env::args().any(|arg| arg == "-v");
     if verbose {
-        match fluxcap::debug_time_expression(&input) {
+        match tm.parse_sexpr(&input) {
             Err(error) => eprintln!("{}", error),
             Ok(trees) => for t in trees {
                 println!("{}", t.print());

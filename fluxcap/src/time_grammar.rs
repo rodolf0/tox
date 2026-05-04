@@ -77,8 +77,3 @@ pub fn time_grammar() -> &'static str {
     ordinal_qualifier := 'next' | 'last' | ordinal | 'last' ordinal ;
     "#
 }
-
-pub fn debug_time_expression(time: &str) -> Result<Vec<earlgrey::Sexpr>, String> {
-    let parser = earlgrey::sexpr_parser(time_grammar(), "time_expr")?;
-    parser(time.split(&[' ', ','][..]).filter(|w| !w.is_empty()))
-}

@@ -157,29 +157,29 @@ fn ebnf_grouping_action<'a>(ev: &mut EarleyForest<'a, G>, user_gb: &'a RefCell<G
                 .collect::<Vec<_>>()
                 .join("|")
         );
-        debug!("Adding non-term {:?}", aux);
         let mut t_gb = user_gb.borrow_mut();
+        debug!("Adding non-term {:?}", aux);
         t_gb.silent_nonterm(&aux);
         for rule in body {
             debug!("Adding rule {:?} -> {:?}", aux, rule);
             t_gb.silent_rule(
                 &aux,
-                &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+                &rule.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
             );
         }
         G::Atom(aux)
     });
     ev.action("<Atom> -> ( <VariantList> ) @<Tag>", move |mut n| {
         let aux = pull!(G::Atom, n.remove(3));
-        debug!("Adding non-term {:?}", aux);
         let mut t_gb = user_gb.borrow_mut();
+        debug!("Adding non-term {:?}", aux);
         t_gb.silent_nonterm(&aux);
         let body = pull!(G::VariantList, n.remove(1));
         for rule in body {
             debug!("Adding rule {:?} -> {:?}", aux, rule);
             t_gb.silent_rule(
                 &aux,
-                &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+                &rule.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
             );
         }
         G::Atom(aux)
@@ -197,35 +197,34 @@ fn ebnf_optional_action<'a>(ev: &mut EarleyForest<'a, G>, user_gb: &'a RefCell<G
                 .collect::<Vec<_>>()
                 .join("|")
         );
-        debug!("Adding non-term {:?}", aux);
         let mut t_gb = user_gb.borrow_mut();
+        debug!("Adding non-term {:?}", aux);
         t_gb.silent_nonterm(&aux);
-
+        debug!("Adding rule {:?} -> []", aux);
+        t_gb.silent_rule(&aux, &[]);
         for rule in body {
-            debug!("Adding rule {:?} -> {:?}", aux, rule);
+            debug!("Adding rule {:?} -> {:?}", aux, &rule);
             t_gb.silent_rule(
                 &aux,
-                &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+                &rule.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
             );
-            debug!("Adding rule {:?} -> []", aux);
-            t_gb.silent_rule(&aux, &[]);
         }
         G::Atom(aux)
     });
     ev.action("<Atom> -> [ <VariantList> ] @<Tag>", move |mut n| {
         let aux = pull!(G::Atom, n.remove(3));
-        debug!("Adding non-term {:?}", aux);
         let mut t_gb = user_gb.borrow_mut();
+        debug!("Adding non-term {:?}", aux);
         t_gb.silent_nonterm(&aux);
+        debug!("Adding rule {:?} -> []", aux);
+        t_gb.silent_rule(&aux, &[]);
         let body = pull!(G::VariantList, n.remove(1));
         for rule in body {
             debug!("Adding rule {:?} -> {:?}", aux, rule);
             t_gb.silent_rule(
                 &aux,
-                &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
+                &rule.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
             );
-            debug!("Adding rule {:?} -> []", aux);
-            t_gb.silent_rule(&aux, &[]);
         }
         G::Atom(aux)
     });
@@ -242,37 +241,33 @@ fn ebnf_repeat_action<'a>(ev: &mut EarleyForest<'a, G>, user_gb: &'a RefCell<Gra
                 .collect::<Vec<_>>()
                 .join("|")
         );
-        debug!("Adding non-term {:?}", aux);
         let mut t_gb = user_gb.borrow_mut();
+        debug!("Adding non-term {:?}", aux);
         t_gb.silent_nonterm(&aux);
-        for mut rule in body {
-            rule.push(aux.clone());
-            debug!("Adding rule {:?} -> {:?}", aux, rule);
-            t_gb.silent_rule(
-                &aux,
-                &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
-            );
-            debug!("Adding rule {:?} -> []", aux);
-            t_gb.silent_rule(&aux, &[]);
+        debug!("Adding rule {:?} -> []", aux);
+        t_gb.silent_rule(&aux, &[]);
+        for rule in body {
+            let mut aux_rule = vec![aux.as_str()];
+            aux_rule.extend(rule.iter().map(|s| s.as_str()));
+            debug!("Adding rule {:?} -> {:?}", aux, &aux_rule);
+            t_gb.silent_rule(&aux, aux_rule.as_slice());
         }
         G::Atom(aux)
     });
     ev.action("<Atom> -> { <VariantList> } @<Tag>", move |mut n| {
         // <Atom> -> aux ; aux -> <e> | <VariantList> aux ;
         let aux = pull!(G::Atom, n.remove(3));
-        debug!("Adding non-term {:?}", aux);
         let mut t_gb = user_gb.borrow_mut();
+        debug!("Adding non-term {:?}", aux);
         t_gb.silent_nonterm(&aux);
+        debug!("Adding rule {:?} -> []", aux);
+        t_gb.silent_rule(&aux, &[]);
         let body = pull!(G::VariantList, n.remove(1));
-        for mut rule in body {
-            rule.push(aux.clone());
-            debug!("Adding rule {:?} -> {:?}", aux, rule);
-            t_gb.silent_rule(
-                &aux,
-                &rule.iter().map(|s| s.as_str()).collect::<Vec<&str>>(),
-            );
-            debug!("Adding rule {:?} -> []", aux);
-            t_gb.silent_rule(&aux, &[]);
+        for rule in body {
+            let mut aux_rule = vec![aux.as_str()];
+            aux_rule.extend(rule.iter().map(|s| s.as_str()));
+            debug!("Adding rule {:?} -> {:?}", aux, &aux_rule);
+            t_gb.silent_rule(&aux, aux_rule.as_slice());
         }
         G::Atom(aux)
     });

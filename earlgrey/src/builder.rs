@@ -1,5 +1,6 @@
 use crate::earley::{EarleyForest, EarleyParser};
 use crate::ebnf::EbnfGrammarParser;
+use crate::sexpr::Sexpr;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -12,8 +13,9 @@ pub struct ParserBuilder<'a, T: Clone + 'a> {
     literals: HashMap<String, T>,
     actions: HashMap<String, Rc<dyn Fn(Vec<T>) -> T + 'a>>,
     default_action: Option<Rc<dyn Fn(&str, Vec<T>) -> T + 'a>>,
-    empty_action: Option<Rc<dyn Fn() -> T + 'a>>,
-    list_action: Option<Rc<dyn Fn(T, T) -> T + 'a>>,
+    optional_empty: Option<Rc<dyn Fn() -> T + 'a>>,
+    list_empty: Option<Rc<dyn Fn() -> T + 'a>>,
+    list_action: Option<Rc<dyn Fn(T, Vec<T>) -> T + 'a>>,
     unmapped_literal: Option<Rc<dyn Fn(&str) -> T + 'a>>,
 }
 
@@ -27,7 +29,8 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
             literals: HashMap::new(),
             actions: HashMap::new(),
             default_action: None,
-            empty_action: None,
+            optional_empty: None,
+            list_empty: None,
             list_action: None,
             unmapped_literal: None,
         }
@@ -45,6 +48,13 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
         self
     }
 
+    pub fn literals(mut self, names: &[&str], value: T) -> Self {
+        for name in names {
+            self.literals.insert(name.to_string(), value.clone());
+        }
+        self
+    }
+
     pub fn unmapped_literal(mut self, parse: impl Fn(&str) -> T + 'static) -> Self {
         self.unmapped_literal = Some(Rc::new(parse));
         self
@@ -55,17 +65,57 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
         self
     }
 
+    pub fn action1(mut self, rule: &str, action: impl Fn(T) -> T + 'static) -> Self {
+        self.actions.insert(rule.to_string(), Rc::new(move |mut v| action(v.remove(0))));
+        self
+    }
+
+    pub fn action2(mut self, rule: &str, action: impl Fn(T, T) -> T + 'static) -> Self {
+        self.actions.insert(rule.to_string(), Rc::new(move |mut v| {
+            let a2 = v.remove(1);
+            let a1 = v.remove(0);
+            action(a1, a2)
+        }));
+        self
+    }
+
+    pub fn action3(mut self, rule: &str, action: impl Fn(T, T, T) -> T + 'static) -> Self {
+        self.actions.insert(rule.to_string(), Rc::new(move |mut v| {
+            let a3 = v.remove(2);
+            let a2 = v.remove(1);
+            let a1 = v.remove(0);
+            action(a1, a2, a3)
+        }));
+        self
+    }
+
+    pub fn action4(mut self, rule: &str, action: impl Fn(T, T, T, T) -> T + 'static) -> Self {
+        self.actions.insert(rule.to_string(), Rc::new(move |mut v| {
+            let a4 = v.remove(3);
+            let a3 = v.remove(2);
+            let a2 = v.remove(1);
+            let a1 = v.remove(0);
+            action(a1, a2, a3, a4)
+        }));
+        self
+    }
+
     pub fn default_action(mut self, action: impl Fn(&str, Vec<T>) -> T + 'static) -> Self {
         self.default_action = Some(Rc::new(action));
         self
     }
 
-    pub fn empty_action(mut self, action: impl Fn() -> T + 'static) -> Self {
-        self.empty_action = Some(Rc::new(action));
+    pub fn optional_empty(mut self, action: impl Fn() -> T + 'static) -> Self {
+        self.optional_empty = Some(Rc::new(action));
         self
     }
 
-    pub fn list_action(mut self, action: impl Fn(T, T) -> T + 'static) -> Self {
+    pub fn list_empty(mut self, action: impl Fn() -> T + 'static) -> Self {
+        self.list_empty = Some(Rc::new(action));
+        self
+    }
+
+    pub fn list_action(mut self, action: impl Fn(T, Vec<T>) -> T + 'static) -> Self {
         self.list_action = Some(Rc::new(action));
         self
     }
@@ -118,37 +168,41 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
                 forest.action(&rule_str, move |v| action(v));
                 continue;
             }
-            // Fallback to 'empty_action' if the rule is an epsilon production.
-            if rule.spec.is_empty() {
-                if let Some(empty_a) = self.empty_action.take() {
-                    forest.action(&rule_str, move |_| empty_a());
-                    continue;
-                } else {
-                    return Err(format!("Missing action for empty rule: {}", rule_str));
-                }
+            // Auto pass-through for length-1 rules.
+            if rule.spec.len() == 1 {
+                forest.action(&rule_str, |mut v| v.swap_remove(0));
+                continue;
             }
-            // Repetition like {x} generates 2 auxiliary rules: {x} -> x {x} and {x} -> [].
+            // Fallback to empty actions if the rule is an epsilon production.
+            if rule.spec.is_empty() {
+                if rule.head.starts_with('{') {
+                    if let Some(ref list_empty) = self.list_empty {
+                        let list_empty = list_empty.clone();
+                        forest.action(&rule_str, move |_| list_empty());
+                        continue;
+                    }
+                } else if rule.head.starts_with('[') {
+                    if let Some(ref optional_empty) = self.optional_empty {
+                        let optional_empty = optional_empty.clone();
+                        forest.action(&rule_str, move |_| optional_empty());
+                        continue;
+                    }
+                }
+                return Err(format!("Missing action for empty rule: {}", rule_str));
+            }
+            // Repetition generates auxiliary rules. Eg: x -> { a | b c } ;
+            // {a|bc} -> {a|bc} a | {a|bc} b c | [] ;
             // The user can provide a 'list_action' to combine multiple items into a list.
             if rule.head.starts_with('{') && rule.spec.len() >= 2 {
                 #[allow(clippy::collapsible_if)]
-                if let Some(list_a) = self.list_action.take() {
-                    forest.action(&rule_str, move |mut v| {
-                        let list = v.pop().unwrap();
-                        let item = v.remove(0); // If there are middle elements, this only takes the first and last
-                        list_a(item, list)
+                if let Some(ref list_action) = self.list_action {
+                    let list_action = list_action.clone();
+                    forest.action(&rule_str, move |mut arglist| {
+                        let list = arglist.remove(0);
+                        list_action(list, arglist)
                     });
                     continue;
                 }
-            }
-            // Rules like [x] generates aux rules [x] -> x and [x] -> [].
-            // The length-1 case can be defaulted, but the epsilon case needs
-            // to be handled by 'empty_action' because some representation of
-            // "nothing" is needed. Eg: TimeValue::Empty, Sexpr::List(vec![])...
-            if (rule.head.starts_with('[') 
-                || rule.head.starts_with('(') 
-                || rule.head.starts_with('{')) && rule.spec.len() == 1 {
-                forest.action(&rule_str, |mut v| v.remove(0));
-                continue;
             }
             // Allow catching generic sequences, eg: "A -> B C D".
             // For example for putting all items into a list or struct
@@ -158,7 +212,7 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
                 forest.action(&rule_str, move |v| a(&head, v));
                 continue;
             }
-            // Provide a specific error for EBNF repetition rules
+            // If no default action, provide a better error for missing list_action
             if rule.head.starts_with('{') && rule.spec.len() >= 2 {
                 return Err(format!(
                     "EBNF repetition rule '{}' has no action. \
@@ -174,6 +228,28 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
             earley_parser: EarleyParser::new(grammar),
             forest,
         })
+    }
+}
+
+impl<'a> ParserBuilder<'a, Sexpr> {
+    pub fn for_sexpr(grammar_str: &str, start_rule: &str) -> Self {
+        Self::new(grammar_str, start_rule)
+            .unmapped_literal(|tok| Sexpr::Atom(tok.to_string()))
+            .optional_empty(|| Sexpr::List(vec![]))
+            .list_empty(|| Sexpr::List(vec![]))
+            .list_action(|mut list, items| {
+                if let Sexpr::List(ref mut v) = list {
+                    v.extend(items);
+                }
+                list
+            })
+            .default_action(|_, mut nodes| {
+                if nodes.len() == 1 {
+                    nodes.swap_remove(0)
+                } else {
+                    Sexpr::List(nodes)
+                }
+            })
     }
 }
 
@@ -203,5 +279,27 @@ impl<'a, T: Clone + 'a> Parser<'a, T> {
     {
         let trees = self.earley_parser.parse(tokenizer)?;
         self.forest.eval_all(&trees)
+    }
+
+    pub fn parse_sexpr<I, S>(&self, tokenizer: I) -> Result<Vec<Sexpr>, String>
+    where
+        I: Iterator<Item = S>,
+        S: AsRef<str> + std::fmt::Debug,
+    {
+        let trees = self.earley_parser.parse(tokenizer)?;
+        let mut sexpr_forest = EarleyForest::<Sexpr>::new(|_sym, tok| {
+            Sexpr::Atom(tok.to_string())
+        });
+        for rule in &self.earley_parser.grammar.rules {
+            let rule_str = rule.to_string();
+            sexpr_forest.action(&rule_str, |mut nodes| {
+                if nodes.len() == 1 {
+                    nodes.swap_remove(0)
+                } else {
+                    Sexpr::List(nodes)
+                }
+            });
+        }
+        sexpr_forest.eval_all(&trees)
     }
 }

@@ -29,18 +29,11 @@ fn main() -> Result<(), String> {
 
     let input = std::env::args().skip(1).collect::<Vec<String>>().join(" ");
 
-    use std::str::FromStr;
-    let parser = earlgrey::ParserBuilder::<earlgrey::Sexpr>::new(grammar, "expr")
-        .terminal("num", |n| f64::from_str(n).ok().map(|_| earlgrey::Sexpr::Atom(n.to_string())))
-        .unmapped_literal(|tok| earlgrey::Sexpr::Atom(tok.to_string()))
-        // the Sexpr parsing rules (sexpr_parser logic)
-        .default_action(|_, mut nodes| match nodes.len() {
-            1 => nodes.swap_remove(0),
-            _ => earlgrey::Sexpr::List(nodes),
-        })
+    let parser = earlgrey::ParserBuilder::for_sexpr(grammar, "expr")
+        .terminal("num", |n| Some(earlgrey::Sexpr::Atom(n.to_string())))
         .build()?;
 
-    for tree in parser.parse_all(tokenizer(input.chars()))? {
+    for tree in parser.parse_sexpr(tokenizer(input.chars()))? {
         println!("{}", tree.print());
     }
 

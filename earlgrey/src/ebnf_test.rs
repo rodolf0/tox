@@ -96,17 +96,7 @@ fn repetition() {
     let trees = parser("1 , 0 , 1".split_whitespace()).unwrap();
     check_trees(
         &trees,
-        vec![concat!(
-            r#"Node("arg -> b {,b}", ["#,
-            r#"Node("b -> 1", [Leaf("1", "1")]), "#,
-            r#"Node("{,b} -> , b {,b}", ["#,
-            r#"Leaf(",", ","), "#,
-            r#"Node("b -> 0", [Leaf("0", "0")]), "#,
-            r#"Node("{,b} -> , b {,b}", ["#,
-            r#"Leaf(",", ","), "#,
-            r#"Node("b -> 1", [Leaf("1", "1")]), "#,
-            r#"Node("{,b} -> ", [])])])])"#
-        )],
+        vec![r#"Node("arg -> b {,b}", [Node("b -> 1", [Leaf("1", "1")]), Node("{,b} -> {,b} , b", [Node("{,b} -> {,b} , b", [Node("{,b} -> ", []), Leaf(",", ","), Node("b -> 0", [Leaf("0", "0")])]), Leaf(",", ","), Node("b -> 1", [Leaf("1", "1")])])])"#]
     );
 }
 
@@ -122,17 +112,7 @@ fn repetition_tagged() {
     let trees = parser("1 , 0 , 1".split_whitespace()).unwrap();
     check_trees(
         &trees,
-        vec![concat!(
-            r#"Node("arg -> b @x", ["#,
-            r#"Node("b -> 1", [Leaf("1", "1")]), "#,
-            r#"Node("@x -> , b @x", ["#,
-            r#"Leaf(",", ","), "#,
-            r#"Node("b -> 0", [Leaf("0", "0")]), "#,
-            r#"Node("@x -> , b @x", ["#,
-            r#"Leaf(",", ","), "#,
-            r#"Node("b -> 1", [Leaf("1", "1")]), "#,
-            r#"Node("@x -> ", [])])])])"#
-        )],
+        vec![r#"Node("arg -> b @x", [Node("b -> 1", [Leaf("1", "1")]), Node("@x -> @x , b", [Node("@x -> @x , b", [Node("@x -> ", []), Leaf(",", ","), Node("b -> 0", [Leaf("0", "0")])]), Leaf(",", ","), Node("b -> 1", [Leaf("1", "1")])])])"#]
     );
 }
 

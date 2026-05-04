@@ -1,6 +1,5 @@
 #![deny(warnings)]
 
-use crate::builder::ParserBuilder;
 use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
@@ -39,23 +38,4 @@ impl Sexpr {
             }
         }
     }
-}
-
-pub fn sexpr_parser<I, S>(
-    grammar: &str,
-    start: &str,
-) -> Result<impl Fn(I) -> Result<Vec<Sexpr>, String>, String>
-where
-    I: Iterator<Item = S>,
-    S: AsRef<str> + std::fmt::Debug,
-{
-    let parser = ParserBuilder::<Sexpr>::new(grammar, start)
-        .unmapped_literal(|tok| Sexpr::Atom(tok.to_string()))
-        .default_action(|_, mut nodes| match nodes.len() {
-            1 => nodes.swap_remove(0),
-            _ => Sexpr::List(nodes),
-        })
-        .build()?;
-    
-    Ok(move |tokenizer| parser.parse_all(tokenizer))
 }

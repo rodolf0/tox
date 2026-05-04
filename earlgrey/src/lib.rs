@@ -6,7 +6,7 @@ mod ebnf;
 mod ebnf_tokenizer;
 
 mod sexpr;
-pub use sexpr::{sexpr_parser, Sexpr};
+pub use sexpr::Sexpr;
 
 mod builder;
 pub use builder::{Parser, ParserBuilder};

@@ -26,11 +26,29 @@ fn tree_evaler<'a>(g: Grammar) -> EarleyForest<'a, Tree> {
 fn check_trees<T: fmt::Debug>(trees: &Vec<T>, expected: Vec<&str>) {
     use std::collections::HashSet;
     assert_eq!(trees.len(), expected.len());
-    let mut expect = HashSet::<&str>::from_iter(expected);
+
+    let strip_ws = |s: &str| -> String {
+        let mut in_string = false;
+        let mut escaped = false;
+        s.chars().filter(|&c| {
+            let is_quote = c == '"' && !escaped;
+            if is_quote { in_string = !in_string; }
+            escaped = c == '\\' && !escaped;
+            in_string || is_quote || !c.is_whitespace()
+        }).collect()
+    };
+
+    let mut expect: HashSet<String> = expected.into_iter().map(strip_ws).collect();
     for t in trees {
         let debug_string = format!("{:?}", t);
-        eprintln!("Removing {}", debug_string);
-        assert!(expect.remove(debug_string.as_str()));
+        let stripped = strip_ws(&debug_string);
+        if !expect.contains(&stripped) {
+            eprintln!("Trying to remove {}", debug_string);
+            for items in expect.iter() {
+                eprintln!("  possible item: {}", items);
+            }
+        }
+        assert!(expect.remove(&stripped), "Missing from expected: {}", debug_string);
     }
     assert_eq!(0, expect.len());
 }
@@ -171,20 +189,20 @@ fn grammar_ambiguous() {
     let pout = p.parse("a c b".split_whitespace()).unwrap();
 
     let expected_trees = vec![
-        concat!(
-            r#"Node("S -> A B", ["#,
-            r#"Node("A -> A c", ["#,
-            r#"Node("A -> a", [Leaf("a", "a")]), "#,
-            r#"Leaf("c", "c")]), "#,
-            r#"Node("B -> b", [Leaf("b", "b")])])"#
-        ),
-        concat!(
-            r#"Node("S -> A B", ["#,
-            r#"Node("A -> a", [Leaf("a", "a")]), "#,
-            r#"Node("B -> c B", ["#,
-            r#"Leaf("c", "c"), "#,
-            r#"Node("B -> b", [Leaf("b", "b")])])])"#
-        ),
+        r#"
+            Node("S -> A B", [
+                Node("A -> A c", [
+                    Node("A -> a", [Leaf("a", "a")]), 
+                    Leaf("c", "c")]), 
+                Node("B -> b", [Leaf("b", "b")])])
+        "#,
+        r#"
+            Node("S -> A B", [
+                Node("A -> a", [Leaf("a", "a")]), 
+                Node("B -> c B", [
+                    Leaf("c", "c"), 
+                    Node("B -> b", [Leaf("b", "b")])])])
+        "#,
     ];
 
     let evaler = tree_evaler(grammar);
@@ -213,20 +231,20 @@ fn earley_corner_case() {
     let pout = p.parse("b b b".split_whitespace()).unwrap();
 
     let expected_trees = vec![
-        concat!(
-            r#"Node("S -> S S", ["#,
-            r#"Node("S -> S S", ["#,
-            r#"Node("S -> b", [Leaf("b", "b")]), "#,
-            r#"Node("S -> b", [Leaf("b", "b")])]), "#,
-            r#"Node("S -> b", [Leaf("b", "b")])])"#
-        ),
-        concat!(
-            r#"Node("S -> S S", ["#,
-            r#"Node("S -> b", [Leaf("b", "b")]), "#,
-            r#"Node("S -> S S", ["#,
-            r#"Node("S -> b", [Leaf("b", "b")]), "#,
-            r#"Node("S -> b", [Leaf("b", "b")])])])"#
-        ),
+        r#"
+            Node("S -> S S", [
+                Node("S -> S S", [
+                    Node("S -> b", [Leaf("b", "b")]), 
+                    Node("S -> b", [Leaf("b", "b")])]), 
+                Node("S -> b", [Leaf("b", "b")])])
+        "#,
+        r#"
+            Node("S -> S S", [
+                Node("S -> b", [Leaf("b", "b")]), 
+                Node("S -> S S", [
+                    Node("S -> b", [Leaf("b", "b")]), 
+                    Node("S -> b", [Leaf("b", "b")])])])
+        "#,
     ];
 
     let evaler = tree_evaler(grammar);
@@ -252,7 +270,11 @@ fn earley_bottomless() {
     let p = EarleyParser::new(grammar.clone());
     let pout = p.parse("n".split_whitespace()).unwrap();
 
-    let expected_trees = vec![r#"Node("E -> A", [Node("A -> n", [Leaf("n", "n")])])"#];
+    let expected_trees = vec![r#"
+        Node("E -> A", [
+            Node("A -> n", [
+                Leaf("n", "n")])])
+    "#];
     let evaler = tree_evaler(grammar);
     check_trees(
         &evaler.eval_all_recursive(&pout).unwrap(),
@@ -278,24 +300,24 @@ fn grammar_ambiguous_epsilon() {
     let pout = p.parse("b b b".split_whitespace()).unwrap();
 
     let expected_trees = vec![
-        concat!(
-            r#"Node("S -> S S X", ["#,
-            r#"Node("S -> S S X", ["#,
-            r#"Node("S -> b", [Leaf("b", "b")]), "#,
-            r#"Node("S -> b", [Leaf("b", "b")]), "#,
-            r#"Node("X -> ", [])]), "#,
-            r#"Node("S -> b", [Leaf("b", "b")]), "#,
-            r#"Node("X -> ", [])])"#
-        ),
-        concat!(
-            r#"Node("S -> S S X", ["#,
-            r#"Node("S -> b", [Leaf("b", "b")]), "#,
-            r#"Node("S -> S S X", ["#,
-            r#"Node("S -> b", [Leaf("b", "b")]), "#,
-            r#"Node("S -> b", [Leaf("b", "b")]), "#,
-            r#"Node("X -> ", [])]), "#,
-            r#"Node("X -> ", [])])"#
-        ),
+        r#"
+            Node("S -> S S X", [
+                Node("S -> S S X", [
+                    Node("S -> b", [Leaf("b", "b")]), 
+                    Node("S -> b", [Leaf("b", "b")]), 
+                    Node("X -> ", [])]), 
+                Node("S -> b", [Leaf("b", "b")]), 
+                Node("X -> ", [])])
+        "#,
+        r#"
+            Node("S -> S S X", [
+                Node("S -> b", [Leaf("b", "b")]), 
+                Node("S -> S S X", [
+                    Node("S -> b", [Leaf("b", "b")]), 
+                    Node("S -> b", [Leaf("b", "b")]), 
+                    Node("X -> ", [])]), 
+                Node("X -> ", [])])
+        "#,
     ];
 
     let evaler = tree_evaler(grammar);
@@ -322,13 +344,13 @@ fn left_recurse() {
         .expect("Bad grammar");
     let p = EarleyParser::new(grammar.clone());
     let pout = p.parse("1 + 2".split_whitespace()).unwrap();
-    let expected_tree = concat!(
-        r#"Node("S -> S [+] N", ["#,
-        r#"Node("S -> N", ["#,
-        r#"Node("N -> [0-9]", [Leaf("[0-9]", "1")])]), "#,
-        r#"Leaf("[+]", "+"), "#,
-        r#"Node("N -> [0-9]", [Leaf("[0-9]", "2")])])"#
-    );
+    let expected_tree = r#"
+        Node("S -> S [+] N", [
+            Node("S -> N", [
+                Node("N -> [0-9]", [Leaf("[0-9]", "1")])]), 
+            Leaf("[+]", "+"), 
+            Node("N -> [0-9]", [Leaf("[0-9]", "2")])])
+    "#;
 
     let evaler = tree_evaler(grammar);
     check_trees(&vec![evaler.eval(&pout).unwrap()], vec![expected_tree]);
@@ -359,13 +381,13 @@ fn right_recurse() {
         .expect("Bad grammar");
     let p = EarleyParser::new(grammar.clone());
     let pout = p.parse("1 ^ 2".split_whitespace()).unwrap();
-    let expected_tree = concat!(
-        r#"Node("P -> N [^] P", ["#,
-        r#"Node("N -> [0-9]", [Leaf("[0-9]", "1")]), "#,
-        r#"Leaf("[^]", "^"), "#,
-        r#"Node("P -> N", ["#,
-        r#"Node("N -> [0-9]", [Leaf("[0-9]", "2")])])])"#
-    );
+    let expected_tree = r#"
+            Node("P -> N [^] P", [
+                Node("N -> [0-9]", [Leaf("[0-9]", "1")]), 
+                Leaf("[^]", "^"), 
+                Node("P -> N", [
+                    Node("N -> [0-9]", [Leaf("[0-9]", "2")])])])
+        "#;
 
     let evaler = tree_evaler(grammar);
     check_trees(&vec![evaler.eval(&pout).unwrap()], vec![expected_tree]);
@@ -526,15 +548,36 @@ mod small_math {
         check_trees(
             &ev.eval_all_recursive(&output).unwrap(),
             vec![
-                r#"List([List([Atom("3"), Atom("+"), Atom("4")]), Atom("*"), Atom("2")])"#,
-                r#"List([Atom("3"), Atom("+"), List([Atom("4"), Atom("*"), Atom("2")])])"#,
+                r#"
+                    List([
+                        List([Atom("3"), Atom("+"), Atom("4")]),
+                        Atom("*"),
+                        Atom("2")
+                    ])
+                "#,
+                r#"
+                    List([Atom("3"),
+                          Atom("+"), 
+                          List([Atom("4"), Atom("*"), Atom("2")])
+                    ])
+                "#,
             ],
         );
         check_trees(
             &ev.eval_all(&output).unwrap(),
             vec![
-                r#"List([List([Atom("3"), Atom("+"), Atom("4")]), Atom("*"), Atom("2")])"#,
-                r#"List([Atom("3"), Atom("+"), List([Atom("4"), Atom("*"), Atom("2")])])"#,
+                r#"
+                    List([
+                        List([Atom("3"), Atom("+"), Atom("4")]),
+                        Atom("*"),
+                        Atom("2")])
+                "#,
+                r#"
+                    List([
+                        Atom("3"),
+                        Atom("+"),
+                        List([Atom("4"), Atom("*"), Atom("2")])])
+                "#,
             ],
         );
     }

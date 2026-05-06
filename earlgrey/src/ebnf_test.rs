@@ -22,8 +22,9 @@ where
     let mut tree_builder =
         EarleyForest::new(|sym, tok| Tree::Leaf(sym.to_string(), tok.to_string()));
 
-    for rule in grammar.rules.iter().map(|r| r.to_string()) {
-        tree_builder.action(&rule.clone(), move |nodes| Tree::Node(rule.clone(), nodes));
+    for rule in &grammar.rules {
+        let rule_id = rule.id.clone();
+        tree_builder.action(&rule.id, move |nodes| Tree::Node(rule_id.clone(), nodes));
     }
 
     let parser = EarleyParser::new(grammar);

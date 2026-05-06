@@ -16,8 +16,9 @@ enum Tree {
 fn tree_evaler<'a>(g: Grammar) -> EarleyForest<'a, Tree> {
     let mut evaler = EarleyForest::new(|sym, tok| Tree::Leaf(sym.to_string(), tok.to_string()));
     for rule in g.rules {
-        evaler.action(&rule.to_string(), move |nodes| {
-            Tree::Node(rule.to_string(), nodes)
+        let rule_id = rule.id.clone();
+        evaler.action(&rule.id, move |nodes| {
+            Tree::Node(rule_id.clone(), nodes)
         });
     }
     evaler

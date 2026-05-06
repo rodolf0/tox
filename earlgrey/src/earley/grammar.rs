@@ -71,36 +71,31 @@ impl fmt::Debug for Symbol {
 pub struct Rule {
     pub head: String,
     pub spec: Vec<Rc<Symbol>>,
+    pub id: String,
 }
 
 impl Rule {
+    fn build_id(head: &str, spec: &[Rc<Symbol>]) -> String {
+        format!(
+            "{} -> {}",
+            head,
+            spec.iter().map(|s| s.name()).collect::<Vec<_>>().join(" ")
+        )
+    }
+
     #[cfg(test)]
     pub fn new(head: &str, spec: &[Rc<Symbol>]) -> Self {
         Rule {
             head: head.to_string(),
             spec: spec.iter().cloned().collect(),
+            id: Self::build_id(head, spec),
         }
-    }
-}
-
-impl fmt::Display for Rule {
-    fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{} -> {}",
-            self.head,
-            self.spec
-                .iter()
-                .map(|s| s.name())
-                .collect::<Vec<_>>()
-                .join(" ")
-        )
     }
 }
 
 impl fmt::Debug for Rule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{}", self.id)
     }
 }
 
@@ -128,7 +123,7 @@ impl fmt::Debug for Grammar {
         for head in group_order {
             writeln!(f)?;
             for rule in rule_groups.get(head).unwrap() {
-                writeln!(f, "{}", rule)?;
+                writeln!(f, "{}", rule.id)?;
             }
         }
         Ok(())
@@ -205,13 +200,16 @@ impl GrammarBuilder {
             return Some(format!("Missing Symbol: {}", head));
         }
         // Build the rule
+        let spec: Vec<Rc<Symbol>> = spec.iter().map(|&s| self.symbols[s].clone()).collect();
+        let id = Rule::build_id(head, &spec);
         let rule = Rc::new(Rule {
             head: head.to_string(),
-            spec: spec.iter().map(|&s| self.symbols[s].clone()).collect(),
+            spec,
+            id,
         });
         // Check this rule is only added once. NOTE: `Rc`s equal on inner value
         if self.rules.contains(&rule) {
-            return Some(format!("Duplicate Rule: {}", rule));
+            return Some(format!("Duplicate Rule: {}", rule.id));
         }
         self.rules.push(rule);
         None

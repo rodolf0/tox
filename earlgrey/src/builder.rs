@@ -172,7 +172,7 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
         }
         // Validate explicitly registered actions match a real rule
         for k in self.actions.keys() {
-            if !grammar.rules.iter().any(|r| &r.to_string() == k) {
+            if !grammar.rules.iter().any(|r| &r.id == k) {
                 return Err(format!("Action registered for unknown rule: {}", k));
             }
         }
@@ -192,15 +192,14 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
             }
         });
         for rule in &grammar.rules {
-            let rule_str = rule.to_string();
             // map semantic action for each rule in the grammar.
-            if let Some(action) = self.actions.remove(&rule_str) {
-                forest.action(&rule_str, move |v| action(v));
+            if let Some(action) = self.actions.remove(&rule.id) {
+                forest.action(&rule.id, move |v| action(v));
                 continue;
             }
             // Auto pass-through for length-1 rules.
             if rule.spec.len() == 1 {
-                forest.action(&rule_str, |mut v| v.swap_remove(0));
+                forest.action(&rule.id, |mut v| v.swap_remove(0));
                 continue;
             }
             // Fallback to empty actions if the rule is an epsilon production.
@@ -208,17 +207,17 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
                 if rule.head.starts_with('{') {
                     if let Some(ref list_empty) = self.list_empty {
                         let list_empty = list_empty.clone();
-                        forest.action(&rule_str, move |_| list_empty());
+                        forest.action(&rule.id, move |_| list_empty());
                         continue;
                     }
                 } else if rule.head.starts_with('[') {
                     if let Some(ref optional_empty) = self.optional_empty {
                         let optional_empty = optional_empty.clone();
-                        forest.action(&rule_str, move |_| optional_empty());
+                        forest.action(&rule.id, move |_| optional_empty());
                         continue;
                     }
                 }
-                return Err(format!("Missing action for empty rule: {}", rule_str));
+                return Err(format!("Missing action for empty rule: {}", rule.id));
             }
             // Repetition generates auxiliary rules. Eg: x -> { a | b c } ;
             // {a|bc} -> {a|bc} a | {a|bc} b c | [] ;
@@ -227,7 +226,7 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
                 #[allow(clippy::collapsible_if)]
                 if let Some(ref list_action) = self.list_action {
                     let list_action = list_action.clone();
-                    forest.action(&rule_str, move |mut arglist| {
+                    forest.action(&rule.id, move |mut arglist| {
                         let list = arglist.remove(0);
                         list_action(list, arglist)
                     });
@@ -239,7 +238,7 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
             if let Some(ref default_a) = self.default_action {
                 let a = default_a.clone();
                 let head = rule.head.clone();
-                forest.action(&rule_str, move |v| a(&head, v));
+                forest.action(&rule.id, move |v| a(&head, v));
                 continue;
             }
             // If no default action, provide a better error for missing list_action
@@ -248,10 +247,10 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
                     "EBNF repetition rule '{}' has no action. \
                      When using {{...}} repetition in your grammar, you must provide \
                      either `list_action` or `default_action` to combine repeated items.",
-                    rule_str
+                    rule.id
                 ));
             }
-            return Err(format!("Missing action for rule: {}", rule_str));
+            return Err(format!("Missing action for rule: {}", rule.id));
         }
 
         Ok(Parser {
@@ -321,8 +320,7 @@ impl<'a, T: Clone + 'a> Parser<'a, T> {
         let trees = self.earley_parser.parse(tokenizer)?;
         let mut sexpr_forest = EarleyForest::<Sexpr>::new(|_sym, tok| Sexpr::Atom(tok.to_string()));
         for rule in &self.earley_parser.grammar.rules {
-            let rule_str = rule.to_string();
-            sexpr_forest.action(&rule_str, |mut nodes| {
+            sexpr_forest.action(&rule.id, |mut nodes| {
                 if nodes.len() == 1 {
                     nodes.swap_remove(0)
                 } else {

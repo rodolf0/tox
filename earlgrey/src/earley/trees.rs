@@ -38,12 +38,11 @@ impl<ASTNode: Clone> EarleyForest<'_, ASTNode> {
             return Ok(args);
         }
         // Lookup semantic action to apply based on rule name
-        let rulename = root.rule.to_string();
-        match self.actions.get(&rulename) {
-            None => Err(format!("Missing Action: {}", rulename)),
+        match self.actions.get(&root.rule.id) {
+            None => Err(format!("Missing Action: {}", root.rule.id)),
             Some(action) => {
                 if cfg!(feature = "debug") {
-                    eprintln!("Reduction: {}", rulename);
+                    eprintln!("Reduction: {}", root.rule.id);
                 }
                 Ok(vec![action(args)])
             }
@@ -228,11 +227,10 @@ impl<ASTNode: Clone> EarleyForest<'_, ASTNode> {
                     .rev()
                     .collect();
                 // Apply the reduction.
-                let rulename = completed_rule.to_string();
                 let action = self
                     .actions
-                    .get(&rulename)
-                    .ok_or(format!("Missing Action: {}", rulename))?;
+                    .get(&completed_rule.id)
+                    .ok_or(format!("Missing Action: {}", completed_rule.id))?;
                 args.push(action(rule_args));
             } else {
                 let span_source_idx = selector(&cursor);

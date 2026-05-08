@@ -112,8 +112,16 @@ pub fn parse_clock_time(s: &str) -> Option<(u8, u8, u8, kronos::Grain)> {
     }
     // Parse hour, minute, second
     let mut hour = u8::from_str(parts[0]).ok()?;
-    let minute = if parts.len() >= 2 { u8::from_str(parts[1]).ok()? } else { 0 };
-    let second = if parts.len() == 3 { u8::from_str(parts[2]).ok()? } else { 0 };
+    let minute = if parts.len() >= 2 {
+        u8::from_str(parts[1]).ok()?
+    } else {
+        0
+    };
+    let second = if parts.len() == 3 {
+        u8::from_str(parts[2]).ok()?
+    } else {
+        0
+    };
     let grain = match parts.len() {
         3 => kronos::Grain::Second,
         2 => kronos::Grain::Minute,
@@ -121,7 +129,9 @@ pub fn parse_clock_time(s: &str) -> Option<(u8, u8, u8, kronos::Grain)> {
     };
     // Adjust hour based on am/pm
     if let Some(ap) = ampm {
-        if hour > 12 { return None; }
+        if hour > 12 {
+            return None;
+        }
         if ap == "am" && hour == 12 {
             hour = 0;
         } else if ap == "pm" && hour < 12 {
@@ -173,6 +183,93 @@ pub fn parse_date(s: &str) -> Option<(i32, u8, u8)> {
     } else {
         None
     }
+}
+
+pub fn tokenize(time: &str) -> impl Iterator<Item = String> {
+    let words: Vec<&str> = time
+        .split(&[' ', ','][..])
+        .filter(|w| !w.is_empty())
+        .collect();
+    let mut tokens = Vec::new();
+    let mut i = 0;
+    while i < words.len() {
+        let w1 = words[i].to_lowercase();
+        // Multi-word phrase merging
+        if i + 2 < words.len() {
+            let w2 = words[i + 1].to_lowercase();
+            let w3 = words[i + 2].to_lowercase();
+            if w1 == "new" && (w2 == "year's" || w2 == "years") && w3 == "eve" {
+                tokens.push("new_years_eve".to_string());
+                i += 3;
+                continue;
+            }
+            if w1 == "new" && (w2 == "year's" || w2 == "years") && w3 == "day" {
+                tokens.push("new_years_day".to_string());
+                i += 3;
+                continue;
+            }
+            if w1 == "end" && w2 == "of" {
+                if w3 == "day" {
+                    tokens.push("eod".to_string());
+                    i += 3;
+                    continue;
+                }
+                if w3 == "month" {
+                    tokens.push("eom".to_string());
+                    i += 3;
+                    continue;
+                }
+                if w3 == "year" {
+                    tokens.push("eoy".to_string());
+                    i += 3;
+                    continue;
+                }
+            }
+        }
+        if i + 1 < words.len() {
+            let w2 = words[i + 1].to_lowercase();
+            if w1 == "new" && w2 == "year" {
+                tokens.push("new_years_day".to_string());
+                i += 2;
+                continue;
+            }
+            if (w1 == "valentine's" || w1 == "valentines") && w2 == "day" {
+                tokens.push("valentines_day".to_string());
+                i += 2;
+                continue;
+            }
+            if (w1 == "memorial"
+                || w1 == "labor"
+                || w1 == "father's"
+                || w1 == "fathers"
+                || w1 == "mother's"
+                || w1 == "mothers")
+                && w2 == "day"
+            {
+                tokens.push(format!("{}_{}", w1.replace("'", ""), w2));
+                i += 2;
+                continue;
+            }
+            if w1 == "christmas" && w2 == "eve" {
+                tokens.push("christmas_eve".to_string());
+                i += 2;
+                continue;
+            }
+            if w1 == "christmas" && w2 == "day" {
+                tokens.push("christmas".to_string());
+                i += 2;
+                continue;
+            }
+            if w1 == "week" && w2.chars().all(|c| c.is_numeric()) {
+                tokens.push(format!("week_{}", w2));
+                i += 2;
+                continue;
+            }
+        }
+        tokens.push(w1);
+        i += 1;
+    }
+    tokens.into_iter()
 }
 
 #[cfg(test)]

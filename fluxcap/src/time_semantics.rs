@@ -399,6 +399,201 @@ impl TimeMachine {
                             0,
                         )
                     })
+                })
+                .terminal("iso_quarter", |lexeme| {
+                    if lexeme.len() == 2 && lexeme.starts_with('q') {
+                        let q = lexeme.as_bytes()[1];
+                        if (b'1'..=b'4').contains(&q) {
+                            let nth = (q - b'0') as isize;
+                            return Some(TimeValue::Seq(
+                                Some(lexeme.to_string()),
+                                TimeSeqSpec::month_group(3)
+                                    .within(TimeSeqSpec::years(), nth)
+                                    .unwrap(),
+                            ));
+                        }
+                    }
+                    None
+                })
+                .terminal("iso_half", |lexeme| {
+                    if lexeme.len() == 2 && lexeme.starts_with('h') {
+                        let h = lexeme.as_bytes()[1];
+                        if (b'1'..=b'2').contains(&h) {
+                            let nth = (h - b'0') as isize;
+                            return Some(TimeValue::Seq(
+                                Some(lexeme.to_string()),
+                                TimeSeqSpec::month_group(6)
+                                    .within(TimeSeqSpec::years(), nth)
+                                    .unwrap(),
+                            ));
+                        }
+                    }
+                    None
+                })
+                .terminal("iso_week", |lexeme| {
+                    if let Some(num_str) = lexeme.strip_prefix("week_") {
+                        if let Ok(n) = num_str.parse::<u32>() {
+                            return Some(TimeValue::Seq(
+                                Some(lexeme.to_string()),
+                                TimeSeqSpec::weeks()
+                                    .within(TimeSeqSpec::years(), n as isize)
+                                    .unwrap(),
+                            ));
+                        }
+                    }
+                    None
+                })
+                .terminal("holiday", |lexeme| match lexeme {
+                    "christmas" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::monthday(25).intersection(TimeSeqSpec::months(Some(12))),
+                    )),
+                    "christmas_eve" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::monthday(24).intersection(TimeSeqSpec::months(Some(12))),
+                    )),
+                    "halloween" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::monthday(31).intersection(TimeSeqSpec::months(Some(10))),
+                    )),
+                    "thanksgiving" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::weekday(4)
+                            .within(TimeSeqSpec::months(Some(11)), 4)
+                            .unwrap(),
+                    )),
+                    "valentines_day" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::monthday(14).intersection(TimeSeqSpec::months(Some(2))),
+                    )),
+                    "new_years_eve" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::monthday(31).intersection(TimeSeqSpec::months(Some(12))),
+                    )),
+                    "new_years_day" | "new_year" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::monthday(1).intersection(TimeSeqSpec::months(Some(1))),
+                    )),
+                    "memorial_day" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::weekday(1)
+                            .within(TimeSeqSpec::months(Some(5)), -1)
+                            .unwrap(),
+                    )),
+                    "labor_day" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::weekday(1)
+                            .within(TimeSeqSpec::months(Some(9)), 1)
+                            .unwrap(),
+                    )),
+                    "fathers_day" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::weekday(0)
+                            .within(TimeSeqSpec::months(Some(6)), 3)
+                            .unwrap(),
+                    )),
+                    "mothers_day" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::weekday(0)
+                            .within(TimeSeqSpec::months(Some(5)), 2)
+                            .unwrap(),
+                    )),
+                    _ => None,
+                })
+                .terminal("season", |lexeme| match lexeme {
+                    "spring" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::days()
+                            .within(TimeSeqSpec::months(Some(3)), 21)
+                            .unwrap()
+                            .to(
+                                TimeSeqSpec::days()
+                                    .within(TimeSeqSpec::months(Some(6)), 20)
+                                    .unwrap(),
+                                true,
+                            ),
+                    )),
+                    "summer" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::days()
+                            .within(TimeSeqSpec::months(Some(6)), 21)
+                            .unwrap()
+                            .to(
+                                TimeSeqSpec::days()
+                                    .within(TimeSeqSpec::months(Some(9)), 20)
+                                    .unwrap(),
+                                true,
+                            ),
+                    )),
+                    "fall" | "autumn" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::days()
+                            .within(TimeSeqSpec::months(Some(9)), 21)
+                            .unwrap()
+                            .to(
+                                TimeSeqSpec::days()
+                                    .within(TimeSeqSpec::months(Some(12)), 20)
+                                    .unwrap(),
+                                true,
+                            ),
+                    )),
+                    "winter" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::days()
+                            .within(TimeSeqSpec::months(Some(12)), 21)
+                            .unwrap()
+                            .to(
+                                TimeSeqSpec::days()
+                                    .within(TimeSeqSpec::months(Some(3)), 20)
+                                    .unwrap(),
+                                true,
+                            ),
+                    )),
+                    _ => None,
+                })
+                .terminal("part_of_day", |lexeme| match lexeme {
+                    "morning" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::hours(Some(8)).to(TimeSeqSpec::hours(Some(12)), false),
+                    )),
+                    "afternoon" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::hours(Some(12)).to(TimeSeqSpec::hours(Some(17)), false),
+                    )),
+                    "evening" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::hours(Some(17)).to(TimeSeqSpec::hours(Some(21)), false),
+                    )),
+                    "night" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::hours(Some(21)).to(TimeSeqSpec::hours(Some(5)), false),
+                    )),
+                    "lunch" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::hours(Some(12)).to(TimeSeqSpec::hours(Some(13)), false),
+                    )),
+                    _ => None,
+                })
+                .terminal("shorthand", |lexeme| match lexeme {
+                    "eom" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::days()
+                            .within(TimeSeqSpec::months(None), -1)
+                            .unwrap(),
+                    )),
+                    "eoy" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::days()
+                            .within(TimeSeqSpec::years(), -1)
+                            .unwrap(),
+                    )),
+                    "eod" => Some(TimeValue::Seq(
+                        Some(lexeme.to_string()),
+                        TimeSeqSpec::hours(Some(17))
+                            .within(TimeSeqSpec::days(), -1)
+                            .unwrap(),
+                    )),
+                    _ => None,
                 });
 
         // === Literals (keywords) ===
@@ -570,6 +765,13 @@ impl TimeMachine {
             .action1("named_sequence -> monthname", |t| t)
             .action1("named_sequence -> weekday", |t| t)
             .action1("named_sequence -> clock_time", |t| t)
+            .action1("named_sequence -> iso_week", |t| t)
+            .action1("named_sequence -> iso_quarter", |t| t)
+            .action1("named_sequence -> iso_half", |t| t)
+            .action1("named_sequence -> holiday", |t| t)
+            .action1("named_sequence -> season", |t| t)
+            .action1("named_sequence -> part_of_day", |t| t)
+            .action1("named_sequence -> shorthand", |t| t)
             .action2(
                 "named_sequence -> monthname ordinal",
                 |month_val, ordinal_val| {
@@ -835,12 +1037,12 @@ impl TimeMachine {
     }
 
     pub fn parse_sexpr(&self, time: &str) -> Result<Vec<earlgrey::Sexpr>, String> {
-        let tokenizer = time.split(&[' ', ','][..]).filter(|w| !w.is_empty());
-        self.parser.parse_sexpr(tokenizer)
+        let mut tokenizer = crate::constants::tokenize(time);
+        self.parser.parse_sexpr(&mut tokenizer)
     }
 
     pub fn eval(&self, time: &str, reftime: Option<DateTime>) -> Result<Vec<TimeResult>, String> {
-        let mut tokenizer = time.split(&[' ', ','][..]).filter(|w| !w.is_empty());
+        let mut tokenizer = crate::constants::tokenize(time);
         let results = self
             .parser
             .parse_all(&mut tokenizer)

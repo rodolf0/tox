@@ -31,6 +31,13 @@ pub fn time_grammar() -> &'static str {
               | ['the'] ordinal_qualifier sequence 'of' ['the'] sequence
               | ['the'] ordinal
               | weekday ['the'] ordinal
+              | iso_week
+              | iso_quarter
+              | iso_half
+              | holiday
+              | season
+              | part_of_day
+              | shorthand
               ;
 
     # These yield a single span

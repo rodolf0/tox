@@ -195,13 +195,11 @@ impl TimeValue {
                                 .take_while(move |s| s.end > bounds.start),
                         ),
                         TimeDir::StrictFuture => Box::new(
-                            seq.future(bounds.start)
-                                .filter(move |s| s.start > bounds.start)
+                            seq.strict_future(bounds.start)
                                 .take_while(move |s| s.start < bounds.end),
                         ),
                         TimeDir::StrictPast => Box::new(
                             seq.past(bounds.end)
-                                .filter(move |s| s.end <= bounds.end)
                                 .take_while(move |s| s.end > bounds.start),
                         ),
                     };
@@ -213,10 +211,8 @@ impl TimeValue {
                     match dir {
                         TimeDir::Future => seq.future(t0).nth(skip),
                         TimeDir::Past => seq.past(t0).nth(skip),
-                        TimeDir::StrictFuture => {
-                            seq.future(t0).filter(move |s| s.start > t0).nth(skip)
-                        }
-                        TimeDir::StrictPast => seq.past(t0).filter(move |s| s.end <= t0).nth(skip),
+                        TimeDir::StrictFuture => seq.strict_future(t0).nth(skip),
+                        TimeDir::StrictPast => seq.past(t0).nth(skip),
                     }
                 }
                 _ => {
@@ -228,10 +224,8 @@ impl TimeValue {
                     match dir {
                         TimeDir::Future => seq.future(t0).nth(skip),
                         TimeDir::Past => seq.past(t0).nth(skip),
-                        TimeDir::StrictFuture => {
-                            seq.future(t0).filter(move |s| s.start > t0).nth(skip)
-                        }
-                        TimeDir::StrictPast => seq.past(t0).filter(move |s| s.end <= t0).nth(skip),
+                        TimeDir::StrictFuture => seq.strict_future(t0).nth(skip),
+                        TimeDir::StrictPast => seq.past(t0).nth(skip),
                     }
                 }
             },

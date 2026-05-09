@@ -778,11 +778,27 @@ impl TimeSeqSpec {
         )
     }
 
+    pub fn strict_future(self, t0: DateTime) -> TimeSequence {
+        Box::new(
+            self.0
+                .seq(t0, TimeDir::Future)
+                .skip_while(move |t| t.start <= t0),
+        )
+    }
+
     pub fn past(self, t0: DateTime) -> TimeSequence {
         Box::new(
             self.0
                 .seq(t0, TimeDir::Past)
                 .skip_while(move |t| t.end > t0),
+        )
+    }
+
+    pub fn inclusive_past(self, t0: DateTime) -> TimeSequence {
+        Box::new(
+            self.0
+                .seq(t0, TimeDir::Past)
+                .skip_while(move |t| t.start > t0),
         )
     }
 }

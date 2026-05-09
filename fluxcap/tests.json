@@ -909,5 +909,145 @@
     "description": "Numeric Date: Invalid date 2013-04-31",
     "input": "2013-04-31",
     "reftime": "2026-04-15T15:30:45Z"
+  },
+  {
+    "description": "Boundaries: next spring (said during spring)",
+    "input": "next spring",
+    "reftime": "2026-05-15T12:00:00Z",
+    "expected": {
+      "start": "2027-03-21T00:00:00Z",
+      "end": "2027-06-21T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Boundaries: next spring (said during winter)",
+    "input": "next spring",
+    "reftime": "2026-01-15T12:00:00Z",
+    "expected": {
+      "start": "2026-03-21T00:00:00Z",
+      "end": "2026-06-21T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Boundaries: last spring (said during spring)",
+    "input": "last spring",
+    "reftime": "2026-05-15T12:00:00Z",
+    "expected": {
+      "start": "2025-03-21T00:00:00Z",
+      "end": "2025-06-21T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Boundaries: next monday (said on monday)",
+    "input": "next monday",
+    "reftime": "2026-05-11T12:00:00Z",
+    "expected": {
+      "start": "2026-05-18T00:00:00Z",
+      "end": "2026-05-19T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Boundaries: next monday (said on wednesday)",
+    "input": "next monday",
+    "reftime": "2026-05-13T12:00:00Z",
+    "expected": {
+      "start": "2026-05-18T00:00:00Z",
+      "end": "2026-05-19T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Holidays: christmas",
+    "input": "christmas",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-12-25T00:00:00Z",
+      "end": "2026-12-26T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Holidays: new year's eve",
+    "input": "new year's eve",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-12-31T00:00:00Z",
+      "end": "2027-01-01T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Holidays: thanksgiving",
+    "input": "thanksgiving",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-11-26T00:00:00Z",
+      "end": "2026-11-27T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Parts of Day: morning",
+    "input": "morning",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-16T08:00:00Z",
+      "end": "2026-04-16T12:00:00Z",
+      "grain": "Hour"
+    }
+  },
+  {
+    "description": "Parts of Day: eod",
+    "input": "eod",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-15T17:00:00Z",
+      "end": "2026-04-15T18:00:00Z",
+      "grain": "Hour"
+    }
+  },
+  {
+    "description": "Parts of Day: eom",
+    "input": "eom",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-30T00:00:00Z",
+      "end": "2026-05-01T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "ISO Shorthand: q1",
+    "input": "q1",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2027-01-01T00:00:00Z",
+      "end": "2027-04-01T00:00:00Z",
+      "grain": "Month"
+    }
+  },
+  {
+    "description": "ISO Shorthand: h2",
+    "input": "h2",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-07-01T00:00:00Z",
+      "end": "2027-01-01T00:00:00Z",
+      "grain": "Month"
+    }
+  },
+  {
+    "description": "ISO Shorthand: week 12",
+    "input": "week 12",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2027-03-14T00:00:00Z",
+      "end": "2027-03-21T00:00:00Z",
+      "grain": "Day"
+    }
   }
 ]

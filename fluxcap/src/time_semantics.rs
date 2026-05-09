@@ -9,6 +9,8 @@ use kronos::{Grain, TimeSeqSpec, TimeSpan};
 pub enum TimeDir {
     Future,
     Past,
+    StrictFuture,
+    StrictPast,
 }
 
 #[derive(Clone, Debug)]
@@ -192,6 +194,16 @@ impl TimeValue {
                             seq.past(bounds.end)
                                 .take_while(move |s| s.end > bounds.start),
                         ),
+                        TimeDir::StrictFuture => Box::new(
+                            seq.future(bounds.start)
+                                .filter(move |s| s.start > bounds.start)
+                                .take_while(move |s| s.start < bounds.end),
+                        ),
+                        TimeDir::StrictPast => Box::new(
+                            seq.past(bounds.end)
+                                .filter(move |s| s.end <= bounds.end)
+                                .take_while(move |s| s.end > bounds.start),
+                        ),
                     };
                     iter.nth(skip)
                 }
@@ -201,6 +213,10 @@ impl TimeValue {
                     match dir {
                         TimeDir::Future => seq.future(t0).nth(skip),
                         TimeDir::Past => seq.past(t0).nth(skip),
+                        TimeDir::StrictFuture => {
+                            seq.future(t0).filter(move |s| s.start > t0).nth(skip)
+                        }
+                        TimeDir::StrictPast => seq.past(t0).filter(move |s| s.end <= t0).nth(skip),
                     }
                 }
                 _ => {
@@ -212,6 +228,10 @@ impl TimeValue {
                     match dir {
                         TimeDir::Future => seq.future(t0).nth(skip),
                         TimeDir::Past => seq.past(t0).nth(skip),
+                        TimeDir::StrictFuture => {
+                            seq.future(t0).filter(move |s| s.start > t0).nth(skip)
+                        }
+                        TimeDir::StrictPast => seq.past(t0).filter(move |s| s.end <= t0).nth(skip),
                     }
                 }
             },
@@ -258,8 +278,8 @@ impl TimeValue {
 
                 for (g, amt) in shifts {
                     let shift_amt = match dir {
-                        TimeDir::Future => amt,
-                        TimeDir::Past => -amt,
+                        TimeDir::Future | TimeDir::StrictFuture => amt,
+                        TimeDir::Past | TimeDir::StrictPast => -amt,
                     };
                     span = span.shift(g, shift_amt);
                 }
@@ -695,20 +715,10 @@ impl TimeMachine {
                 TimeValue::now_span(seq.into_seq(), TimeDir::Future, 0)
             })
             .action2("explicit_span -> next sequence", |_, seq| {
-                let skip = match &seq {
-                    TimeValue::QuantitySeq(..) => 1,
-                    TimeValue::Seq(..) => 0, // Named sequence split!
-                    _ => 1,
-                };
-                TimeValue::now_span(seq.into_seq(), TimeDir::Future, skip)
+                TimeValue::now_span(seq.into_seq(), TimeDir::StrictFuture, 0)
             })
             .action2("explicit_span -> last sequence", |_, seq| {
-                let skip = match &seq {
-                    TimeValue::QuantitySeq(..) => 0,
-                    TimeValue::Seq(..) => 0,
-                    _ => 1,
-                };
-                TimeValue::now_span(seq.into_seq(), TimeDir::Past, skip)
+                TimeValue::now_span(seq.into_seq(), TimeDir::StrictPast, 0)
             });
 
         // explicit_span (anchored to year)

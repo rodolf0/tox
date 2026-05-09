@@ -87,6 +87,16 @@ mod test_grains {
                 grain: Grain::Day,
             }
         );
+        // Verify truncation for non-midnight reference time
+        let mut f2 = s.clone().future(datetime!(2025-07-01 15:30));
+        assert_eq!(
+            f2.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2025-07-31 0:00),
+                end: datetime!(2025-08-01 0:00),
+                grain: Grain::Day,
+            }
+        );
     }
 
     #[test]

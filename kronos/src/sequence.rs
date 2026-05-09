@@ -558,7 +558,7 @@ impl SeqSpecInternal {
                 Box::new(grain_iterator(t0, (Grain::Day, 1), step_by))
             }
             SeqSpecInternal::Monthdays(n) => {
-                let mut t0_end = t0;
+                let mut t0_end = truncate(t0, Grain::Day);
                 Box::new(std::iter::from_fn(move || {
                     while t0_end.day() != n {
                         t0_end += match direction {

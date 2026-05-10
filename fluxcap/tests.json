@@ -760,8 +760,8 @@
     "input": "last lustrum",
     "reftime": "2026-04-15T15:30:45Z",
     "expected": {
-      "start": "2021-01-01T00:00:00Z",
-      "end": "2026-01-01T00:00:00Z",
+      "start": "2022-01-01T00:00:00Z",
+      "end": "2027-01-01T00:00:00Z",
       "grain": "Year"
     }
   },
@@ -1047,6 +1047,16 @@
     "expected": {
       "start": "2027-03-14T00:00:00Z",
       "end": "2027-03-21T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Multi-week past: last 3 weeks",
+    "input": "last 3 weeks",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-03-29T00:00:00Z",
+      "end": "2026-04-19T00:00:00Z",
       "grain": "Day"
     }
   }

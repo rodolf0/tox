@@ -191,7 +191,7 @@ impl TimeValue {
                                 .take_while(move |s| s.start < bounds.end),
                         ),
                         TimeDir::Past => Box::new(
-                            seq.past(bounds.end)
+                            seq.inclusive_past(bounds.end)
                                 .take_while(move |s| s.end > bounds.start),
                         ),
                         TimeDir::StrictFuture => Box::new(
@@ -210,7 +210,7 @@ impl TimeValue {
                     let t0 = if use_end { bounds.end } else { bounds.start };
                     match dir {
                         TimeDir::Future => seq.future(t0).nth(skip),
-                        TimeDir::Past => seq.past(t0).nth(skip),
+                        TimeDir::Past => seq.inclusive_past(t0).nth(skip),
                         TimeDir::StrictFuture => seq.strict_future(t0).nth(skip),
                         TimeDir::StrictPast => seq.past(t0).nth(skip),
                     }
@@ -223,7 +223,7 @@ impl TimeValue {
                     };
                     match dir {
                         TimeDir::Future => seq.future(t0).nth(skip),
-                        TimeDir::Past => seq.past(t0).nth(skip),
+                        TimeDir::Past => seq.inclusive_past(t0).nth(skip),
                         TimeDir::StrictFuture => seq.strict_future(t0).nth(skip),
                         TimeDir::StrictPast => seq.past(t0).nth(skip),
                     }
@@ -696,7 +696,7 @@ impl TimeMachine {
                 TimeValue::now_span(TimeSeqSpec::grain(Grain::Day), TimeDir::Future, 0)
             })
             .action1("explicit_span -> yesterday", |_| {
-                TimeValue::now_span(TimeSeqSpec::grain(Grain::Day), TimeDir::Past, 0)
+                TimeValue::now_span(TimeSeqSpec::grain(Grain::Day), TimeDir::StrictPast, 0)
             })
             .action1("explicit_span -> tomorrow", |_| {
                 TimeValue::now_span(TimeSeqSpec::grain(Grain::Day), TimeDir::Future, 1)
@@ -712,7 +712,11 @@ impl TimeMachine {
                 TimeValue::now_span(seq.into_seq(), TimeDir::StrictFuture, 0)
             })
             .action2("explicit_span -> last sequence", |_, seq| {
-                TimeValue::now_span(seq.into_seq(), TimeDir::StrictPast, 0)
+                let dir = match &seq {
+                    TimeValue::QuantitySeq(..) => TimeDir::Past,
+                    _ => TimeDir::StrictPast,
+                };
+                TimeValue::now_span(seq.into_seq(), dir, 0)
             });
 
         // explicit_span (anchored to year)
@@ -742,24 +746,36 @@ impl TimeMachine {
             .action1("sequence -> named_sequence", |seq| seq)
             .action1("sequence -> time_quantity", |q| match q {
                 TimeValue::Quantity(_, Grain::Day, 7) => {
-                    TimeValue::QuantitySeq(q.to_label(), TimeSeqSpec::weeks())
+                    TimeValue::Seq(q.to_label(), TimeSeqSpec::weeks())
                 }
                 TimeValue::Quantity(_, g, 1) => {
-                    TimeValue::QuantitySeq(q.to_label(), TimeSeqSpec::grain(g))
+                    TimeValue::Seq(q.to_label(), TimeSeqSpec::grain(g))
                 }
                 TimeValue::Quantity(_, Grain::Month, m) => {
-                    TimeValue::QuantitySeq(q.to_label(), TimeSeqSpec::month_group(m as u32))
+                    TimeValue::Seq(q.to_label(), TimeSeqSpec::month_group(m as u32))
                 }
                 TimeValue::Quantity(_, Grain::Year, 5) => {
                     TimeValue::QuantitySeq(q.to_label(), TimeSeqSpec::grain(Grain::Year).merge(5))
                 }
                 TimeValue::Quantity(_, Grain::Year, m) => {
-                    TimeValue::QuantitySeq(q.to_label(), TimeSeqSpec::year_group(m as u32))
+                    TimeValue::Seq(q.to_label(), TimeSeqSpec::year_group(m as u32))
                 }
                 TimeValue::Quantity(_, g, m) => {
                     TimeValue::QuantitySeq(q.to_label(), TimeSeqSpec::grain(g).merge(m as u16))
                 }
                 _ => panic!("Unexpected time_quantity"),
+            })
+            .action2("sequence -> small_int time_quantity", |amt_val, q| {
+                let amt = amt_val.into_int() as u16;
+                match q {
+                    TimeValue::Quantity(_, Grain::Day, 7) => {
+                        TimeValue::QuantitySeq(None, TimeSeqSpec::weeks().merge(amt))
+                    }
+                    TimeValue::Quantity(_, g, m) => {
+                        TimeValue::QuantitySeq(None, TimeSeqSpec::grain(g).merge(amt * (m as u16)))
+                    }
+                    _ => panic!("Unexpected time_quantity"),
+                }
             });
 
         // === named_sequence actions ===
@@ -886,7 +902,7 @@ impl TimeMachine {
                     let (dir, use_end, skip) = if nth > 0 {
                         (TimeDir::Future, false, (nth - 1) as usize)
                     } else {
-                        (TimeDir::Past, true, (-nth - 1) as usize)
+                        (TimeDir::StrictPast, true, (-nth - 1) as usize)
                     };
 
                     TimeValue::with_anchor(seq, Anchor::Within(Box::new(span), use_end), dir, skip)
@@ -977,7 +993,7 @@ impl TimeMachine {
                 |count, q, _, _| {
                     TimeValue::now_span(
                         TimeValue::quantity_to_seq(q),
-                        TimeDir::Past,
+                        TimeDir::StrictPast,
                         count.into_int() as usize,
                     )
                 },

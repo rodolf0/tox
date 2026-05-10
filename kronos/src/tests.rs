@@ -259,12 +259,31 @@ mod test_grains {
                 grain: Grain::Day,
             }
         );
+        let mut f = s.clone().strict_future(datetime!(2015-02-28 0:00));
+        assert_eq!(
+            f.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-03-02 0:00),
+                end: datetime!(2015-03-04 0:00),
+                grain: Grain::Day,
+            }
+        );
+        // Merge will act after setting the direciton of the underlying seq
         let mut p = s.clone().past(datetime!(2015-02-28 0:00));
         assert_eq!(
             p.next().unwrap(),
             TimeSpan {
-                start: datetime!(2015-02-26 0:00),
-                end: datetime!(2015-02-28 0:00),
+                start: datetime!(2015-02-25 0:00),
+                end: datetime!(2015-02-27 0:00),
+                grain: Grain::Day,
+            }
+        );
+        let mut p = s.clone().inclusive_past(datetime!(2015-02-28 0:00));
+        assert_eq!(
+            p.next().unwrap(),
+            TimeSpan {
+                start: datetime!(2015-02-27 0:00),
+                end: datetime!(2015-03-01 0:00),
                 grain: Grain::Day,
             }
         );

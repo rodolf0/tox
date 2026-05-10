@@ -16,6 +16,7 @@ pub fn time_grammar() -> &'static str {
 
     # A sequence yields a series of time spans of which some are selected
     sequence := time_quantity
+              | small_int time_quantity
               | named_sequence
               ;
 

@@ -626,10 +626,7 @@ impl SeqSpecInternal {
                 )
             }
             SeqSpecInternal::Merge(s, n) => {
-                let mut _s = match direction {
-                    TimeDir::Future => s.seq(t0, direction).skip(0),
-                    TimeDir::Past => s.seq(t0, direction).skip(1),
-                };
+                let mut _s = s.seq(t0, direction);
                 Box::new(std::iter::from_fn(move || {
                     let _s2 = _s.by_ref();
                     let spans: Vec<_> = _s2.take(n as usize).collect();

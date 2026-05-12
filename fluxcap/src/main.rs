@@ -16,12 +16,28 @@ fn main() -> Result<(), String> {
     };
 
     let tm = fluxcap::TimeMachine::new();
+    let verbose = std::env::args().any(|arg| arg == "-v");
 
     for r in tm.eval(&input, None)? {
-        println!("{:?}", r);
+        if verbose {
+            println!("{:?}", r);
+        } else {
+            match r {
+                fluxcap::TimeResult::Count(c) => {
+                    let total = if c.total.fract() == 0.0 {
+                        format!("{:.0}", c.total)
+                    } else {
+                        format!("{:.2}", c.total)
+                    };
+                    println!("{} {}", total, c.unit);
+                }
+                fluxcap::TimeResult::Span(s) => {
+                    println!("({:?}) {} -> {}", s.grain, s.start, s.end);
+                }
+            }
+        }
     }
 
-    let verbose = std::env::args().any(|arg| arg == "-v");
     if verbose {
         match tm.parse_sexpr(&input) {
             Err(error) => eprintln!("{}", error),

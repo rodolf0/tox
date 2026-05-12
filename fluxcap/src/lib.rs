@@ -5,7 +5,7 @@ mod constants;
 mod time_grammar;
 
 mod time_semantics;
-pub use time_semantics::TimeMachine;
+pub use time_semantics::{TimeMachine, TimeResult};
 
 #[cfg(test)]
 mod tests;

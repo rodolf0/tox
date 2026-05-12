@@ -648,7 +648,7 @@ impl TimeMachine {
 
         // sequence counting
         builder = builder
-            .action3("time_expr -> sequence since time_span", |seq, _, span| {
+            .action3("time_expr -> sequence since explicit_span", |seq, _, span| {
                 let label = seq.to_label().unwrap_or_else(|| "units".to_string());
                 let interval = TimeValue::interval(
                     span,
@@ -656,8 +656,26 @@ impl TimeMachine {
                 );
                 TimeValue::Count(label, seq.into_seq(), Box::new(interval))
             })
-            .action3("time_expr -> sequence until time_span", |seq, _, span| {
+            .action3("time_expr -> sequence since sequence", |seq, _, span_seq| {
                 let label = seq.to_label().unwrap_or_else(|| "units".to_string());
+                let span = TimeValue::now_span(span_seq.into_seq(), TimeDir::Past, 0);
+                let interval = TimeValue::interval(
+                    span,
+                    TimeValue::now_span(TimeSeqSpec::grain(Grain::Second), TimeDir::Future, 0),
+                );
+                TimeValue::Count(label, seq.into_seq(), Box::new(interval))
+            })
+            .action3("time_expr -> sequence until explicit_span", |seq, _, span| {
+                let label = seq.to_label().unwrap_or_else(|| "units".to_string());
+                let interval = TimeValue::interval(
+                    TimeValue::now_span(TimeSeqSpec::grain(Grain::Second), TimeDir::Future, 0),
+                    span,
+                );
+                TimeValue::Count(label, seq.into_seq(), Box::new(interval))
+            })
+            .action3("time_expr -> sequence until sequence", |seq, _, span_seq| {
+                let label = seq.to_label().unwrap_or_else(|| "units".to_string());
+                let span = TimeValue::now_span(span_seq.into_seq(), TimeDir::Future, 0);
                 let interval = TimeValue::interval(
                     TimeValue::now_span(TimeSeqSpec::grain(Grain::Second), TimeDir::Future, 0),
                     span,
@@ -768,9 +786,6 @@ impl TimeMachine {
             .action2("sequence -> small_int time_quantity", |amt_val, q| {
                 let amt = amt_val.into_int() as u16;
                 match q {
-                    TimeValue::Quantity(_, Grain::Day, 7) => {
-                        TimeValue::QuantitySeq(None, TimeSeqSpec::weeks().merge(amt))
-                    }
                     TimeValue::Quantity(_, g, m) => {
                         TimeValue::QuantitySeq(None, TimeSeqSpec::grain(g).merge(amt * (m as u16)))
                     }
@@ -1009,12 +1024,24 @@ impl TimeMachine {
                 },
             )
             // interval actions (since/until/between)
-            .action2("explicit_span -> since time_span", |_, start| {
+            .action2("explicit_span -> since explicit_span", |_, start| {
                 let end =
                     TimeValue::now_span(TimeSeqSpec::grain(Grain::Second), TimeDir::Future, 0);
                 TimeValue::interval(start, end)
             })
-            .action2("explicit_span -> until time_span", |_, end| {
+            .action2("explicit_span -> since sequence", |_, start_seq| {
+                let start = TimeValue::now_span(start_seq.into_seq(), TimeDir::Past, 0);
+                let end =
+                    TimeValue::now_span(TimeSeqSpec::grain(Grain::Second), TimeDir::Future, 0);
+                TimeValue::interval(start, end)
+            })
+            .action2("explicit_span -> until explicit_span", |_, end| {
+                let start =
+                    TimeValue::now_span(TimeSeqSpec::grain(Grain::Second), TimeDir::Future, 0);
+                TimeValue::interval(start, end)
+            })
+            .action2("explicit_span -> until sequence", |_, end_seq| {
+                let end = TimeValue::now_span(end_seq.into_seq(), TimeDir::Future, 0);
                 let start =
                     TimeValue::now_span(TimeSeqSpec::grain(Grain::Second), TimeDir::Future, 0);
                 TimeValue::interval(start, end)

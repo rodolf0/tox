@@ -4,8 +4,10 @@ pub fn time_grammar() -> &'static str {
     r#"
     time_expr := time_span
                | 'on' time_span
-               | sequence 'since' time_span
-               | sequence 'until' time_span
+               | sequence 'since' explicit_span
+               | sequence 'since' sequence
+               | sequence 'until' explicit_span
+               | sequence 'until' sequence
                | sequence 'between' time_span 'and' time_span
                | sequence 'in' time_span
                ;
@@ -56,8 +58,10 @@ pub fn time_grammar() -> &'static str {
                | yearnumber
                | ['the'] ordinal_qualifier sequence 'of' ['the'] explicit_span
                | sequence 'on' explicit_span
-               | 'since' time_span
-               | 'until' time_span
+               | 'since' explicit_span
+               | 'since' sequence
+               | 'until' explicit_span
+               | 'until' sequence
                | 'between' time_span 'and' time_span
                | duration shift_anchor
                | 'in' duration

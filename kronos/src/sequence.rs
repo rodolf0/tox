@@ -512,7 +512,7 @@ pub(crate) enum TimeDir {
 pub type TimeSequence = Box<dyn Iterator<Item = TimeSpan>>;
 
 impl SeqSpecInternal {
-    pub(crate) fn seq(self, t0: DateTime, direction: TimeDir) -> TimeSequence {
+    pub(crate) fn seq(self, t0: DateTime, direction: TimeDir, strict: bool) -> TimeSequence {
         match self {
             SeqSpecInternal::Grain {
                 window_span,
@@ -597,13 +597,13 @@ impl SeqSpecInternal {
             SeqSpecInternal::Within { nth, window, frame } => {
                 Box::new(
                     frame
-                        .seq(t0, direction)
+                        .seq(t0, direction, strict)
                         .take(INFINITE_FUSE)
                         .filter_map(move |f| {
                             let window = window.clone();
                             if nth > 0 {
                                 window
-                                    .seq(f.start, TimeDir::Future)
+                                    .seq(f.start, TimeDir::Future, strict)
                                     // Each window has to start within frame's boundary
                                     .take_while(|w| w.start < f.end)
                                     .nth((nth - 1) as usize)
@@ -612,7 +612,7 @@ impl SeqSpecInternal {
                                 let mut deque = VecDeque::with_capacity(nth);
                                 // Consume the whole iterator and keep the tail.
                                 for w in window
-                                    .seq(f.start, TimeDir::Future)
+                                    .seq(f.start, TimeDir::Future, strict)
                                     // Each window has to start within frame's boundary
                                     .take_while(|w| w.start < f.end)
                                 {
@@ -626,7 +626,8 @@ impl SeqSpecInternal {
                 )
             }
             SeqSpecInternal::Merge(s, n) => {
-                let mut _s = s.seq(t0, direction);
+                let skip_amt = if strict { 1 } else { 0 };
+                let mut _s = s.seq(t0, direction, strict).skip(skip_amt);
                 Box::new(std::iter::from_fn(move || {
                     let _s2 = _s.by_ref();
                     let spans: Vec<_> = _s2.take(n as usize).collect();
@@ -645,8 +646,8 @@ impl SeqSpecInternal {
                 }))
             }
             SeqSpecInternal::Union(s1, s2) => {
-                let mut s1 = s1.seq(t0, direction).peekable();
-                let mut s2 = s2.seq(t0, direction).peekable();
+                let mut s1 = s1.seq(t0, direction, strict).peekable();
+                let mut s2 = s2.seq(t0, direction, strict).peekable();
                 let starts_first = match direction {
                     TimeDir::Future => |n1: &TimeSpan, n2: &TimeSpan| n1.start <= n2.start,
                     TimeDir::Past => |n1: &TimeSpan, n2: &TimeSpan| n1.start > n2.start,
@@ -668,8 +669,8 @@ impl SeqSpecInternal {
                 }))
             }
             SeqSpecInternal::Intersection(s1, s2) => {
-                let mut s1 = s1.seq(t0, direction).peekable();
-                let mut s2 = s2.seq(t0, direction).peekable();
+                let mut s1 = s1.seq(t0, direction, strict).peekable();
+                let mut s2 = s2.seq(t0, direction, strict).peekable();
                 let ends_first = match direction {
                     TimeDir::Future => |n1: &TimeSpan, n2: &TimeSpan| n1.end <= n2.end,
                     TimeDir::Past => |n1: &TimeSpan, n2: &TimeSpan| n1.start >= n2.start,
@@ -697,8 +698,8 @@ impl SeqSpecInternal {
                 }))
             }
             SeqSpecInternal::Except(s, except) => {
-                let s = s.seq(t0, direction);
-                let mut except = except.seq(t0, direction);
+                let s = s.seq(t0, direction, strict);
+                let mut except = except.seq(t0, direction, strict);
                 let mut ex = except.next();
                 let except_lagging_seq = match direction {
                     TimeDir::Future => |s1: &TimeSpan, ex: &TimeSpan| ex.end < s1.start,
@@ -716,7 +717,7 @@ impl SeqSpecInternal {
                 }))
             }
             SeqSpecInternal::Shift(s, grain, n) => {
-                Box::new(s.seq(t0, direction).map(move |s| s.shift(grain, n)))
+                Box::new(s.seq(t0, direction, strict).map(move |s| s.shift(grain, n)))
             }
             SeqSpecInternal::Interval {
                 from,
@@ -726,7 +727,7 @@ impl SeqSpecInternal {
                 // The first emitted item (future or past) should contain t0.
                 // Item needs to be strictly less than (contained by) 'to''s item.
                 // So adjust t0 to 1) be inside the interval, 2) truncate it to start.
-                let t0 = to.clone().seq(t0, direction).next().map(|s| {
+                let t0 = to.clone().seq(t0, direction, strict).next().map(|s| {
                     if inclusive {
                         s.end
                     } else {
@@ -739,7 +740,7 @@ impl SeqSpecInternal {
                     .and_then(|t0| {
                         // find interval starting point
                         from.clone()
-                            .seq(t0, TimeDir::Past)
+                            .seq(t0, TimeDir::Past, strict)
                             .find(|t| t.end <= t0) // 1st seq Past item contains t0
                     })
                     .map(|s| s.start);
@@ -751,10 +752,10 @@ impl SeqSpecInternal {
                 // Grain will be the smallest resolution of either grain
                 let grain = std::cmp::min(from.grain(), to.grain());
                 Box::new(
-                    from.seq(t0, direction)
+                    from.seq(t0, direction, strict)
                         .take(INFINITE_FUSE)
                         .filter_map(move |f| {
-                            to.clone().seq(f.start, TimeDir::Future).next().map(|t| TimeSpan {
+                            to.clone().seq(f.start, TimeDir::Future, strict).next().map(|t| TimeSpan {
                                 start: f.start,
                                 end: if inclusive { t.end } else { t.start },
                                 grain,
@@ -766,11 +767,18 @@ impl SeqSpecInternal {
     }
 }
 
+// The public API of TimeSeqSpec.
+// - past and future complement each other.
+//   - the first element of 'future' includes t0 if possible.
+//   - the first element of 'past' doesn't include t0.
+// - inclusive_past and strict_future complement each other.
+//  - the first element of 'inclusive_past' includes t0 if possible.
+//  - the first element of 'strict_future' doesn't include t0.
 impl TimeSeqSpec {
     pub fn future(self, t0: DateTime) -> TimeSequence {
         Box::new(
             self.0
-                .seq(t0, TimeDir::Future)
+                .seq(t0, TimeDir::Future, false)
                 .skip_while(move |t| t.end <= t0),
         )
     }
@@ -778,7 +786,7 @@ impl TimeSeqSpec {
     pub fn strict_future(self, t0: DateTime) -> TimeSequence {
         Box::new(
             self.0
-                .seq(t0, TimeDir::Future)
+                .seq(t0, TimeDir::Future, true)
                 .skip_while(move |t| t.start <= t0),
         )
     }
@@ -786,7 +794,7 @@ impl TimeSeqSpec {
     pub fn past(self, t0: DateTime) -> TimeSequence {
         Box::new(
             self.0
-                .seq(t0, TimeDir::Past)
+                .seq(t0, TimeDir::Past, true)
                 .skip_while(move |t| t.end > t0),
         )
     }
@@ -794,7 +802,7 @@ impl TimeSeqSpec {
     pub fn inclusive_past(self, t0: DateTime) -> TimeSequence {
         Box::new(
             self.0
-                .seq(t0, TimeDir::Past)
+                .seq(t0, TimeDir::Past, false)
                 .skip_while(move |t| t.start > t0),
         )
     }

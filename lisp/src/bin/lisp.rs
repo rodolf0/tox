@@ -3,9 +3,9 @@ fn main() {
     use std::rc::Rc;
     use lisp::{LispContext, Parser};
     let cx = Rc::new(LispContext::new());
-    let mut rl = rustyline::Editor::<()>::new();
+    let mut rl = rustyline::DefaultEditor::new().unwrap();
     while let Ok(input) = rl.readline("~> ") {
-        rl.add_history_entry(&input);
+        let _ = rl.add_history_entry(&input);
         match Parser::parse_str(&input[..]) {
             Err(e) => println!("Parse error: {:?}", e),
             Ok(exp) => match LispContext::eval(&exp, &cx) {

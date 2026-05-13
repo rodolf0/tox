@@ -9,9 +9,9 @@ pub trait RandomVariable {
     fn eval(&self) -> f64;
 }
 
-impl<D: rand::distributions::Distribution<f64>> RandomVariable for D {
+impl<D: rand::distr::Distribution<f64>> RandomVariable for D {
     fn eval(&self) -> f64 {
-        self.sample(&mut rand::thread_rng())
+        self.sample(&mut rand::rng())
     }
 }
 
@@ -78,7 +78,7 @@ impl MathContext {
         for token in &rpn.0 {
             match token {
                 MathToken::Number(num) => operands.push(*num),
-                MathToken::Variable(ref v) => operands.push(
+                MathToken::Variable(v) => operands.push(
                     match self.0.borrow().get(v) {
                         Some(mathop) => mathop.eval(),
                         None => return Err(format!("Unknown Variable: {}", v)),
@@ -221,7 +221,7 @@ fn build_rv(dname: &str, args: &[f64]) -> Result<Rc<dyn RandomVariable>, String>
     use rand_distr::*;
     Ok(match dname {
         "normal" if args.len() == 2 => Rc::new(Normal::new(args[0], args[1]).unwrap()),
-        "uniform" if args.len() == 2 => Rc::new(Uniform::new(args[0], args[1])),
+        "uniform" if args.len() == 2 => Rc::new(Uniform::new(args[0], args[1]).unwrap()),
         "lognormal" if args.len() == 2 => Rc::new(LogNormal::new(args[0], args[1]).unwrap()),
         _ => return Err(format!("Unknown distribution: {} with {} args", dname, args.len()))
     })

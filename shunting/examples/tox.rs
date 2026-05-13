@@ -48,12 +48,12 @@ fn main() {
         use shunting::MathContext;
         let cx = MathContext::new();
         let histpath = home::home_dir().map(|h| h.join(".tox_history")).unwrap();
-        let mut rl = rustyline::Editor::<()>::new();
+        let mut rl = rustyline::DefaultEditor::new().unwrap();
         if rl.load_history(&histpath).is_err() {
             println!("No history yet");
         }
         while let Ok(input) = rl.readline(">> ") {
-            rl.add_history_entry(input.as_str());
+            let _ = rl.add_history_entry(input.as_str());
             repl::parse_statement(&cx, &input[..]);
         }
         rl.save_history(&histpath).unwrap();

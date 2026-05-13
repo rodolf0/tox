@@ -1,11 +1,11 @@
 [package]
 name = "toxtools"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 
 [dependencies]
-rustyline = { version = "14.0.0" }
-numerica = { version = "0.1", path = "../numerica" }
+rustyline = { workspace = true }
+numerica = { workspace = true }
 
 # [[bin]]
 # name = "numerica"

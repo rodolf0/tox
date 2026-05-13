@@ -14,3 +14,20 @@ members = [
 ]
 
 resolver = "2"
+
+[workspace.dependencies]
+rand = "0.10"
+rand_distr = "0.6"
+libm = "0.2"
+chrono = "0.4"
+rustyline = "18.0"
+time = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+home = "0.5"
+
+earlgrey = { version = "0.5", path = "earlgrey" }
+fluxcap = { version = "0.2", path = "fluxcap" }
+kronos = { version = "0.3", path = "kronos" }
+lexers = { version = "0.1", path = "lexers" }
+numerica = { version = "0.1", path = "numerica" }

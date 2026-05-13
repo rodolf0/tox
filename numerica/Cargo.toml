@@ -1,16 +1,14 @@
 [package]
 name = "numerica"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 
 [dependencies]
-earlgrey = { version = "0.4", path = "../earlgrey" }
-rand_distr = "0.5"
-rand = "0.9"
-libm = { version = "0.2", optional = true }
-# Allow time expressions
-fluxcap = { version = "0.1", path = "../fluxcap" }
-chrono = "0.4"
+earlgrey = { workspace = true }
+rand_distr = { workspace = true }
+rand = { workspace = true }
+libm = { workspace = true, optional = true }
+fluxcap = { workspace = true }
 
 
 [features]

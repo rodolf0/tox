@@ -1,6 +1,6 @@
 [package]
 name = "fluxcap"
-version = "0.1.5"
+version = "0.2.0"
 edition = "2024"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "time expression parsing inspired on duckling"
@@ -8,8 +8,8 @@ license = "MIT"
 repository = "https://github.com/rodolf0/tox"
 
 [dependencies]
-earlgrey = { version = "0.4", path = "../earlgrey" }
-kronos = { version = "0.2", path = "../kronos" }
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
-time = { version = "0.3", features = ["macros", "local-offset", "parsing", "formatting"] }
+earlgrey = { workspace = true }
+kronos = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+time = { workspace = true, features = ["macros", "local-offset", "parsing", "formatting"] }

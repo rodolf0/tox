@@ -1,6 +1,6 @@
 [package]
 name = "kronos"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 license = "MIT"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
@@ -13,4 +13,4 @@ categories = ["date-and-time"]
 [dependencies]
 # NOTE macros only used for tests but can't easily 
 # toggle them off. So we keep thm for release builds too.
-time = { version = "0.3", features = ["macros"] }
+time = { workspace = true, features = ["macros"] }

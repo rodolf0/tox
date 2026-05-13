@@ -1,6 +1,6 @@
 [package]
 name = "earlgrey"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2024"
 license = "MIT"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
@@ -12,8 +12,7 @@ categories = ["parsing", "text-processing"]
 
 # The library crate has no dependencies. Optionals are for tools
 [dev-dependencies]
-lexers = { version = "0.1", path = "../lexers" }
-rustyline = { version = "14.0.0" }
+lexers = { workspace = true }
 
 [features]
 # Allow building with 'debug' feature to de verbose printing of internal parsing state.

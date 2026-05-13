@@ -5,5 +5,5 @@ edition = "2021"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 
 [dependencies]
-lexers = { version = "0.1", path = "../lexers" }
-time = "0.3"
+lexers = { workspace = true }
+time = { workspace = true }

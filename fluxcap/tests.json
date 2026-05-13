@@ -1059,5 +1059,55 @@
       "end": "2026-04-16T00:00:00Z",
       "grain": "Day"
     }
+  },
+  {
+    "description": "Composition: next monday at 3pm",
+    "input": "next monday at 3pm",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-20T15:00:00Z",
+      "end": "2026-04-20T16:00:00Z",
+      "grain": "Hour"
+    }
+  },
+  {
+    "description": "Composition: tomorrow morning",
+    "input": "tomorrow morning",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-16T08:00:00Z",
+      "end": "2026-04-16T12:00:00Z",
+      "grain": "Hour"
+    }
+  },
+  {
+    "description": "Composition: Tuesday at 9am",
+    "input": "Tuesday at 9am",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-21T09:00:00Z",
+      "end": "2026-04-21T10:00:00Z",
+      "grain": "Hour"
+    }
+  },
+  {
+    "description": "Composition: last friday at 5pm",
+    "input": "last friday at 5pm",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-10T17:00:00Z",
+      "end": "2026-04-10T18:00:00Z",
+      "grain": "Hour"
+    }
+  },
+  {
+    "description": "Composition: friday at 5pm after next",
+    "input": "friday after next at 5pm",
+    "reftime": "2026-04-15T15:30:45Z",
+    "expected": {
+      "start": "2026-04-24T17:00:00Z",
+      "end": "2026-04-24T18:00:00Z",
+      "grain": "Hour"
+    }
   }
 ]

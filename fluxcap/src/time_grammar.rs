@@ -20,6 +20,8 @@ pub fn time_grammar() -> &'static str {
     sequence := time_quantity
               | small_int time_quantity
               | named_sequence
+              | sequence 'at' clock_time
+              | sequence part_of_day
               ;
 
     named_sequence := 'weekend'
@@ -56,6 +58,11 @@ pub fn time_grammar() -> &'static str {
                | 'in' ('a' | 'an' | small_int) named_sequence
                | sequence yearnumber
                | yearnumber
+               | explicit_span part_of_day
+               | explicit_span clock_time
+               | explicit_span 'at' clock_time
+               | clock_time explicit_span
+               | part_of_day explicit_span
                | ['the'] ordinal_qualifier sequence 'of' ['the'] explicit_span
                | sequence 'on' explicit_span
                | 'since' explicit_span

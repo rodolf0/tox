@@ -636,6 +636,7 @@ impl TimeMachine {
                     "since",
                     "until",
                     "between",
+                    "at",
                 ],
                 TimeValue::Keyword,
             )
@@ -757,6 +758,26 @@ impl TimeMachine {
                     TimeDir::Future,
                     0,
                 )
+            })
+            .action2("explicit_span -> explicit_span part_of_day", |span, pod| {
+                let anchor = Anchor::Within(Box::new(span), false);
+                TimeValue::with_anchor(pod.into_seq(), anchor, TimeDir::Future, 0)
+            })
+            .action2("explicit_span -> explicit_span clock_time", |span, clock| {
+                let anchor = Anchor::Within(Box::new(span), false);
+                TimeValue::with_anchor(clock.into_seq(), anchor, TimeDir::Future, 0)
+            })
+            .action3("explicit_span -> explicit_span at clock_time", |span, _, clock| {
+                let anchor = Anchor::Within(Box::new(span), false);
+                TimeValue::with_anchor(clock.into_seq(), anchor, TimeDir::Future, 0)
+            })
+            .action2("explicit_span -> clock_time explicit_span", |clock, span| {
+                let anchor = Anchor::Within(Box::new(span), false);
+                TimeValue::with_anchor(clock.into_seq(), anchor, TimeDir::Future, 0)
+            })
+            .action2("explicit_span -> part_of_day explicit_span", |pod, span| {
+                let anchor = Anchor::Within(Box::new(span), false);
+                TimeValue::with_anchor(pod.into_seq(), anchor, TimeDir::Future, 0)
             });
 
         // === sequence actions ===
@@ -791,7 +812,23 @@ impl TimeMachine {
                     }
                     _ => panic!("Unexpected time_quantity"),
                 }
-            });
+            })
+            .action3(
+                "sequence -> sequence at clock_time",
+                |seq, _, clock_time| {
+                    let s_label = seq.to_label().unwrap_or_else(|| "date".to_string());
+                    let c_label = clock_time.to_label().unwrap_or_else(|| "time".to_string());
+                    TimeValue::Seq(Some(format!("{} at {}", s_label, c_label)), seq.into_seq().intersection(clock_time.into_seq()))
+                },
+            )
+            .action2(
+                "sequence -> sequence part_of_day",
+                |seq, pod| {
+                    let s_label = seq.to_label().unwrap_or_else(|| "date".to_string());
+                    let p_label = pod.to_label().unwrap_or_else(|| "time".to_string());
+                    TimeValue::Seq(Some(format!("{} {}", s_label, p_label)), seq.into_seq().intersection(pod.into_seq()))
+                },
+            );
 
         // === named_sequence actions ===
 
@@ -848,7 +885,9 @@ impl TimeMachine {
             .action2(
                 "named_sequence -> weekday clock_time",
                 |weekday, clock_time| {
-                    TimeValue::Seq(None, clock_time.into_seq().intersection(weekday.into_seq()))
+                    let w_label = weekday.to_label().unwrap_or_else(|| "weekday".to_string());
+                    let c_label = clock_time.to_label().unwrap_or_else(|| "time".to_string());
+                    TimeValue::Seq(Some(format!("{} {}", w_label, c_label)), clock_time.into_seq().intersection(weekday.into_seq()))
                 },
             );
 

@@ -344,6 +344,83 @@ impl Quantity {
             .map(|x| x.1.to_string())
             .or_else(|| self.dimension.names().map(|x| x.1.to_string()))
     }
+
+    /// Absolute value.
+    pub fn abs(&self) -> Quantity {
+        Quantity {
+            value: self.value.abs(),
+            dimension: self.dimension,
+            display_name: self.display_name,
+        }
+    }
+
+    /// Raise to an integer power. Dimension exponents are multiplied by `n`.
+    ///
+    /// # Panics
+    ///
+    /// Panics in debug mode if any dimension exponent overflows `i8`.
+    pub fn powi(&self, n: i32) -> Quantity {
+        Quantity {
+            value: self.value.powi(n),
+            dimension: Dimension {
+                s: self.dimension.s * n as i8,
+                m: self.dimension.m * n as i8,
+                kg: self.dimension.kg * n as i8,
+                A: self.dimension.A * n as i8,
+                K: self.dimension.K * n as i8,
+                mol: self.dimension.mol * n as i8,
+                cd: self.dimension.cd * n as i8,
+            },
+            display_name: None,
+        }
+    }
+
+    /// Square root. All dimension exponents must be even.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any dimension exponent is not divisible by 2.
+    pub fn sqrt(&self) -> Quantity {
+        assert!(self.dimension.s % 2 == 0);
+        assert!(self.dimension.m % 2 == 0);
+        assert!(self.dimension.kg % 2 == 0);
+        assert!(self.dimension.A % 2 == 0);
+        assert!(self.dimension.K % 2 == 0);
+        assert!(self.dimension.mol % 2 == 0);
+        assert!(self.dimension.cd % 2 == 0);
+        Quantity {
+            value: self.value.sqrt(),
+            dimension: Dimension {
+                s: self.dimension.s / 2,
+                m: self.dimension.m / 2,
+                kg: self.dimension.kg / 2,
+                A: self.dimension.A / 2,
+                K: self.dimension.K / 2,
+                mol: self.dimension.mol / 2,
+                cd: self.dimension.cd / 2,
+            },
+            display_name: None,
+        }
+    }
+
+    /// Convert this quantity to a given unit, returning the numeric value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `unit` has a different dimension.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use unidades::units::*;
+    /// let dist = 500.0 * m;
+    /// let km = 1000.0 * m;
+    /// assert_eq!(dist.in_unit(km), 0.5);
+    /// ```
+    pub fn in_unit(&self, unit: Quantity) -> f64 {
+        assert_eq!(self.dimension, unit.dimension);
+        self.value / unit.value
+    }
 }
 
 /// Helper to format a floating-point value respecting the formatter's width and precision.
@@ -553,5 +630,65 @@ mod tests {
     fn kat_dimension() {
         use super::units::*;
         assert_eq!(kat.dimension.to_string(), "mol·s⁻¹");
+    }
+
+    #[test]
+    fn abs_quantity() {
+        use super::units::*;
+        let v = -5.0 * m / s;
+        assert_eq!(v.abs().to_string(), "5 m·s⁻¹");
+        assert_eq!((-3.0 * kg).abs().to_string(), "3 kg");
+    }
+
+    #[test]
+    fn powi_quantity() {
+        use super::units::*;
+        let area = (2.0 * m).powi(2);
+        assert_eq!(area.value(), 4.0);
+        assert_eq!(area.dimension.to_string(), "m²");
+
+        let freq = (2.0 * s).powi(-1);
+        assert_eq!(freq.value(), 0.5);
+        assert_eq!(freq.dimension.to_string(), "s⁻¹");
+    }
+
+    #[test]
+    fn sqrt_quantity() {
+        use super::units::*;
+        let area = 4.0 * m * m;
+        let side = area.sqrt();
+        assert_eq!(side.value(), 2.0);
+        assert_eq!(side.dimension.to_string(), "m");
+    }
+
+    #[test]
+    #[should_panic]
+    fn sqrt_odd_dimension_panics() {
+        use super::units::*;
+        let _ = (2.0 * m).sqrt();
+    }
+
+    #[test]
+    fn in_unit_conversion() {
+        use super::units::*;
+        let dist = 500.0 * m;
+        let km = 1000.0 * m;
+        assert_eq!(dist.in_unit(km), 0.5);
+        assert_eq!(dist.in_unit(m), 500.0);
+
+        let mass = 0.1 * kg;
+        let g = 0.001 * kg;
+        assert_eq!(mass.in_unit(g), 100.0);
+
+        let time = 3600.0 * s;
+        let hour = 3600.0 * s;
+        assert_eq!(time.in_unit(hour), 1.0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn in_unit_mismatched_dimension_panics() {
+        use super::units::*;
+        let _ = (5.0 * m).in_unit(1.0 * s);
     }
 }

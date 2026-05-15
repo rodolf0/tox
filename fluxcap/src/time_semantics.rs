@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 use time::UtcDateTime as DateTime;
 

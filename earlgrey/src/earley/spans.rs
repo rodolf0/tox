@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 use super::grammar::{Rule, Symbol};
 use std::rc::Rc;

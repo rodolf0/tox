@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 mod grammar;
 pub(crate) use grammar::{Grammar, GrammarBuilder};

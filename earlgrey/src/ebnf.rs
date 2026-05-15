@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 use super::ebnf_tokenizer::EbnfTokenizer;
 use crate::earley::{EarleyForest, EarleyParser, Grammar, GrammarBuilder};

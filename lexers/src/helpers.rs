@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 use crate::scanner::Scanner;
 

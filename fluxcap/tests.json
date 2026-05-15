@@ -1109,5 +1109,415 @@
       "end": "2026-04-24T18:00:00Z",
       "grain": "Hour"
     }
+  },
+  {
+    "description": "Ported: next monday (reftime 2016-09-05)",
+    "input": "next monday",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected": {
+      "start": "2016-09-12T00:00:00Z",
+      "end": "2016-09-13T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: this monday (reftime 2016-09-05)",
+    "input": "this monday",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected": {
+      "start": "2016-09-05T00:00:00Z",
+      "end": "2016-09-06T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: next march (reftime 2016-09-05)",
+    "input": "next march",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected": {
+      "start": "2017-03-01T00:00:00Z",
+      "end": "2017-04-01T00:00:00Z",
+      "grain": "Month"
+    }
+  },
+  {
+    "description": "Ported: this march (reftime 2016-09-05)",
+    "input": "this march",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected": {
+      "start": "2017-03-01T00:00:00Z",
+      "end": "2017-04-01T00:00:00Z",
+      "grain": "Month"
+    }
+  },
+  {
+    "description": "Ported: next month (reftime 2016-09-05)",
+    "input": "next month",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected": {
+      "start": "2016-10-01T00:00:00Z",
+      "end": "2016-11-01T00:00:00Z",
+      "grain": "Month"
+    }
+  },
+  {
+    "description": "Ported: tue after next (reftime 2016-09-05)",
+    "input": "tue after next",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected": {
+      "start": "2016-09-13T00:00:00Z",
+      "end": "2016-09-14T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: this march (reftime 2016-03-05)",
+    "input": "this march",
+    "reftime": "2016-03-05T00:00:00Z",
+    "expected": {
+      "start": "2016-03-01T00:00:00Z",
+      "end": "2016-04-01T00:00:00Z",
+      "grain": "Month"
+    }
+  },
+  {
+    "description": "Ported: next year (reftime 2016-03-05)",
+    "input": "next year",
+    "reftime": "2016-03-05T00:00:00Z",
+    "expected": {
+      "start": "2017-01-01T00:00:00Z",
+      "end": "2018-01-01T00:00:00Z",
+      "grain": "Year"
+    }
+  },
+  {
+    "description": "Ported: next week (reftime 2016-03-05)",
+    "input": "next week",
+    "reftime": "2016-03-05T00:00:00Z",
+    "expected": {
+      "start": "2016-03-06T00:00:00Z",
+      "end": "2016-03-13T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: explicit year 2002 (reftime 2016-09-05)",
+    "input": "2002",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected": {
+      "start": "2002-01-01T00:00:00Z",
+      "end": "2003-01-01T00:00:00Z",
+      "grain": "Year"
+    }
+  },
+  {
+    "description": "Ported: the 12th (reftime 2016-09-05)",
+    "input": "the 12th",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected": {
+      "start": "2016-09-12T00:00:00Z",
+      "end": "2016-09-13T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: monday (reftime 2016-10-26)",
+    "input": "monday",
+    "reftime": "2016-10-26T00:00:00Z",
+    "expected": {
+      "start": "2016-10-31T00:00:00Z",
+      "end": "2016-11-01T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: today (reftime 2016-10-26)",
+    "input": "today",
+    "reftime": "2016-10-26T00:00:00Z",
+    "expected": {
+      "start": "2016-10-26T00:00:00Z",
+      "end": "2016-10-27T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: tomorrow (reftime 2016-10-26)",
+    "input": "tomorrow",
+    "reftime": "2016-10-26T00:00:00Z",
+    "expected": {
+      "start": "2016-10-27T00:00:00Z",
+      "end": "2016-10-28T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: the 12th (reftime 2016-09-12)",
+    "input": "the 12th",
+    "reftime": "2016-09-12T00:00:00Z",
+    "expected": {
+      "start": "2016-09-12T00:00:00Z",
+      "end": "2016-09-13T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: the 3rd mon of june (reftime 2016-09-05)",
+    "input": "the 3rd mon of june",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected": {
+      "start": "2017-06-19T00:00:00Z",
+      "end": "2017-06-20T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: the 3rd day of the month (reftime 2016-09-05)",
+    "input": "the 3rd day of the month",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected": {
+      "start": "2016-10-03T00:00:00Z",
+      "end": "2016-10-04T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: the 2nd week of august (reftime 2016-09-05)",
+    "input": "the 2nd week of august",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected": {
+      "start": "2017-08-06T00:00:00Z",
+      "end": "2017-08-13T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+    {
+    "description": "Ported: 2nd week of june after next (reftime 2016-09-05)",
+    "input": "2nd week of june after next",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected": {
+      "start": "2018-06-03T00:00:00Z",
+      "end": "2018-06-10T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: third tuesday of the month after next (reftime 2016-09-05)",
+    "input": "third tuesday of the month after next",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected": {
+      "start": "2016-10-18T00:00:00Z",
+      "end": "2016-10-19T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: the 8th fri of the year (reftime 2017-01-01)",
+    "input": "the 8th fri of the year",
+    "reftime": "2017-01-01T00:00:00Z",
+    "expected": {
+      "start": "2017-02-24T00:00:00Z",
+      "end": "2017-02-25T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: the last day of feb leap year (reftime 2020-01-01)",
+    "input": "the last day of feb",
+    "reftime": "2020-01-01T00:00:00Z",
+    "expected": {
+      "start": "2020-02-29T00:00:00Z",
+      "end": "2020-03-01T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: feb 27th 1984 (reftime 2016-09-05)",
+    "input": "feb 27th 1984",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected": {
+      "start": "1984-02-27T00:00:00Z",
+      "end": "1984-02-28T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: mon feb 28th (reftime 2016-09-05)",
+    "input": "mon feb 28th",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected": {
+      "start": "2022-02-28T00:00:00Z",
+      "end": "2022-03-01T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: friday 18th (reftime 2016-10-24)",
+    "input": "friday 18th",
+    "reftime": "2016-10-24T00:00:00Z",
+    "expected": {
+      "start": "2016-11-18T00:00:00Z",
+      "end": "2016-11-19T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: 18th of june (reftime 2016-10-24)",
+    "input": "18th of june",
+    "reftime": "2016-10-24T00:00:00Z",
+    "expected": {
+      "start": "2017-06-18T00:00:00Z",
+      "end": "2017-06-19T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: feb 27th (reftime 2016-10-24)",
+    "input": "feb 27th",
+    "reftime": "2016-10-24T00:00:00Z",
+    "expected": {
+      "start": "2017-02-27T00:00:00Z",
+      "end": "2017-02-28T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: the 10th week of 1984 (reftime 2016-09-05)",
+    "input": "the 10th week of 1984",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected": {
+      "start": "1984-03-04T00:00:00Z",
+      "end": "1984-03-11T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+    {
+    "description": "Ported: 2 weeks ago (reftime 2016-10-26)",
+    "input": "2 weeks ago",
+    "reftime": "2016-10-26T00:00:00Z",
+    "expected": {
+      "start": "2016-10-12T00:00:00Z",
+      "end": "2016-10-13T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: a week after feb 14th (reftime 2016-10-26)",
+    "input": "a week after feb 14th",
+    "reftime": "2016-10-26T00:00:00Z",
+    "expected": {
+      "start": "2017-02-22T00:00:00Z",
+      "end": "2017-02-23T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: a week before feb 28th (reftime 2016-10-26)",
+    "input": "a week before feb 28th",
+    "reftime": "2016-10-26T00:00:00Z",
+    "expected": {
+      "start": "2017-02-21T00:00:00Z",
+      "end": "2017-02-22T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: in a year (reftime 2016-10-26)",
+    "input": "in a year",
+    "reftime": "2016-10-26T00:00:00Z",
+    "expected": {
+      "start": "2017-10-26T00:00:00Z",
+      "end": "2017-10-27T00:00:00Z",
+      "grain": "Day"
+    }
+  },
+  {
+    "description": "Ported: days until tomorrow (reftime 2016-09-05)",
+    "input": "days until tomorrow",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected_count": {
+      "unit": "days",
+      "total": 1.0,
+      "full_spans": 1
+    }
+  },
+  {
+    "description": "Ported: months until 2018 (reftime 2016-09-05)",
+    "input": "months until 2018",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected_count": {
+      "unit": "months",
+      "total": 15.866666666666667,
+      "full_spans": 15
+    }
+  },
+  {
+    "description": "Ported: weeks until dec (reftime 2016-09-05)",
+    "input": "weeks until dec",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected_count": {
+      "unit": "weeks",
+      "total": 12.428571428571429,
+      "full_spans": 11
+    }
+  },
+  {
+    "description": "Ported: feb 29th since 2000 (reftime 2016-09-05)",
+    "input": "feb 29th since 2000",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected_count": {
+      "unit": "units",
+      "total": 5.0,
+      "full_spans": 5
+    }
+  },
+  {
+    "description": "Ported: years since 2000 (reftime 2016-09-05)",
+    "input": "years since 2000",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected_count": {
+      "unit": "years",
+      "total": 16.6775956284153,
+      "full_spans": 16
+    }
+  },
+  {
+    "description": "Ported: days since sep (reftime 2016-09-05)",
+    "input": "days since sep",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected_count": {
+      "unit": "days",
+      "total": 4.0,
+      "full_spans": 4
+    }
+  },
+  {
+    "description": "Ported: days between mar and apr (reftime 2016-09-05)",
+    "input": "days between mar and apr",
+    "reftime": "2016-09-05T00:00:00Z",
+    "expected_count": {
+      "unit": "days",
+      "total": 31.0,
+      "full_spans": 31
+    }
+  },
+  {
+    "description": "Ported: mon until nov 14th (reftime 2016-10-25)",
+    "input": "mon until nov 14th",
+    "reftime": "2016-10-25T00:00:00Z",
+    "expected_count": {
+      "unit": "mon",
+      "total": 2.0,
+      "full_spans": 2
+    }
+  },
+  {
+    "description": "Ported: years since mar 13th 2005 (reftime 2023-03-13)",
+    "input": "years since mar 13th 2005",
+    "reftime": "2023-03-13T00:00:00Z",
+    "expected_count": {
+      "unit": "years",
+      "total": 18.0,
+      "full_spans": 17
+    }
   }
 ]

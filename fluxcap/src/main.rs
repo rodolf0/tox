@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 // TODO: remove this and put it in tools
 use std::io;
 

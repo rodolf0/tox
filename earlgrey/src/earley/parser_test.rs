@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 use super::grammar::{Grammar, GrammarBuilder};
 use super::parser::EarleyParser;

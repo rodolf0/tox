@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 use lexers::Scanner;
 use crate::lox_scanner::{Token, TT};

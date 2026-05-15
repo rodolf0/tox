@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 pub struct Scanner<I: Iterator>
 where

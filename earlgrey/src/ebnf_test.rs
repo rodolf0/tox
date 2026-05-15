@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 use crate::ebnf::EbnfGrammarParser;
 use crate::earley::{EarleyForest, EarleyParser, Grammar};

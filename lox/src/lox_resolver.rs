@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 use crate::lox_interpreter::LoxInterpreter;
 use crate::lox_parser::{Expr, Stmt};

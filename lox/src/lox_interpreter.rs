@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 use crate::lox_scanner::{TT, Token};
 use crate::lox_parser::{Expr, Stmt};

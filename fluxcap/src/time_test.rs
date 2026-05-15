@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 type DateTime = chrono::NaiveDateTime;
 

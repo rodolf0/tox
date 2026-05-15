@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 use super::parser::ParseTrees;
 use super::spans::{Span, SpanSource};

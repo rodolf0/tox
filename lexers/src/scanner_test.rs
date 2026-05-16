@@ -1,4 +1,4 @@
-use crate::scanner::Scanner;
+use crate::scanner::{Scan, Scanner};
 
 #[test]
 fn extremes() {
@@ -18,13 +18,20 @@ fn extremes() {
 }
 
 #[test]
-fn extract() {
+fn scanning_trait() {
+    let mut s = "hello".chars().scanner();
+    assert_eq!(s.next(), Some('h'));
+    assert_eq!(s.next(), Some('e'));
+}
+
+#[test]
+fn lift() {
     let mut s = Scanner::new("just a test buffer@".chars());
-    assert_eq!(s.extract(), Vec::new());
+    assert_eq!(s.lift(), Vec::new());
     for _ in 0..4 {
         assert!(s.next().is_some());
     }
-    assert_eq!(s.extract().into_iter().collect::<String>(), "just");
+    assert_eq!(s.lift().into_iter().collect::<String>(), "just");
     assert_eq!(s.peek(), Some(' '));
     assert_eq!(s.prev(), None);
     assert_eq!(s.next(), Some(' '));
@@ -39,7 +46,7 @@ fn extract() {
     }
     assert_eq!(s.extract_string(), " buffer@");
     s.next();
-    assert_eq!(s.extract(), Vec::new());
+    assert_eq!(s.lift(), Vec::new());
 }
 
 #[test]
@@ -69,7 +76,7 @@ fn accept_all() {
     assert!(s.accept_all("12.3".chars()));
     assert_eq!(s.current(), Some('3'));
     assert_eq!(s.next(), Some(' '));
-    s.extract();
+    s.lift();
     assert!(!s.accept_all("hXa".chars()));
     assert!(s.accept_all("hPa".chars()));
     assert_eq!(s.current(), Some('a'));

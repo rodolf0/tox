@@ -7,6 +7,21 @@ where
     matched_len: usize,
 }
 
+pub trait Scan: Iterator + Sized {
+    fn scanner(self) -> Scanner<Self>
+    where
+        Self::Item: Clone;
+}
+
+impl<I: Iterator> Scan for I
+where
+    I::Item: Clone,
+{
+    fn scanner(self) -> Scanner<Self> {
+        Scanner::new(self)
+    }
+}
+
 // Scanners are Iterators
 impl<I> Iterator for Scanner<I>
 where
@@ -28,6 +43,9 @@ where
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct Checkpoint(usize);
+
 impl<I> Scanner<I>
 where
     I: Iterator,
@@ -41,19 +59,21 @@ where
         }
     }
 
-    // Allows getting current buffer position to backtrack
-    pub fn buffer_pos(&self) -> usize {
-        self.matched_len
+    // Save a checkpoint for backtracking
+    pub fn checkpoint(&self) -> Checkpoint {
+        Checkpoint(self.matched_len)
     }
 
-    // Reset buffer position, normally used for backtracking
-    // If position is out of bounds set_buffer_pos returns false
-    pub fn set_buffer_pos(&mut self, pos: usize) -> bool {
-        if pos > self.buf.len() + 1 {
-            return false;
-        }
-        self.matched_len = pos;
-        true
+    // Restore scanner state from a checkpoint.
+    // Panics if the checkpoint is out of bounds for this scanner's buffer.
+    pub fn restore(&mut self, checkpoint: Checkpoint) {
+        assert!(
+            checkpoint.0 <= self.buf.len() + 1,
+            "Checkpoint out of bounds: {} > {}",
+            checkpoint.0,
+            self.buf.len() + 1
+        );
+        self.matched_len = checkpoint.0;
     }
 
     // Returns the current token on which the scanner is positioned
@@ -95,14 +115,8 @@ where
         }
     }
 
-    // Returns a view of the current underlying buffer
-    pub fn view(&self) -> &[I::Item] {
-        let n = std::cmp::min(self.matched_len, self.buf.len());
-        &self.buf[..n]
-    }
-
-    // Consumes the buffer into a new token (which can be ignored)
-    pub fn extract(&mut self) -> Vec<I::Item> {
+    // Removes and returns all consumed items from the buffer, resetting the cursor
+    pub fn lift(&mut self) -> Vec<I::Item> {
         let end = std::cmp::min(self.matched_len, self.buf.len());
         self.matched_len = 0;
         self.buf.drain(..end).collect()
@@ -145,31 +159,31 @@ where
     I: Iterator,
     I::Item: Clone + PartialEq,
 {
-    // Advance the scanner only if the next char is the expected one
-    // self.current() will return the matched char if accept matched
+    // Advance the scanner only if the next item matches
+    // self.current() will return the matched item if accept matched
     pub fn accept(&mut self, mut matcher: impl TokenMatcher<I::Item>) -> Option<I::Item> {
-        let backtrack = self.buffer_pos();
+        let backtrack = self.checkpoint();
         if let Some(next) = self.next() {
             if matcher.matches(&next) {
                 return Some(next);
             }
         }
-        self.set_buffer_pos(backtrack);
+        self.restore(backtrack);
         None
     }
 
-    // Advance the scanner only if a full match for items form 'what'.
+    // Advance the scanner only if a full match for items from 'what' is found.
     // self.current() will return the last item from 'what'
     pub fn accept_all(&mut self, what: impl Iterator<Item = I::Item>) -> bool {
-        let backtrack = self.buffer_pos();
+        let backtrack = self.checkpoint();
         for item in what {
             if let Some(next) = self.next() {
                 if next != item {
-                    self.set_buffer_pos(backtrack);
+                    self.restore(backtrack);
                     return false;
                 }
             } else {
-                self.set_buffer_pos(backtrack);
+                self.restore(backtrack);
                 return false;
             }
         }
@@ -177,7 +191,7 @@ where
     }
 
     // Skip over the matching elements, result is if the scanner was advanced,
-    // self.current() will return the last matching char
+    // self.current() will return the last matching item
     pub fn ignore(&mut self, mut matcher: impl TokenMatcher<I::Item>) -> bool {
         let mut advanced = false;
         while let Some(next) = self.peek() {
@@ -192,7 +206,7 @@ where
     }
 
     // Find an element that matches or EOF, return if the scanner advanced,
-    // self.current() returns the last non-matching char
+    // self.current() returns the last non-matching item
     pub fn until(&mut self, mut matcher: impl TokenMatcher<I::Item>) -> bool {
         let mut advanced = false;
         while let Some(next) = self.peek() {

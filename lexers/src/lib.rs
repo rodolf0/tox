@@ -3,7 +3,7 @@
 mod helpers;
 
 mod scanner;
-pub use crate::scanner::Scanner;
+pub use crate::scanner::{Checkpoint, Scan, Scanner};
 
 mod ebnf_tokenizer;
 pub use crate::ebnf_tokenizer::EbnfTokenizer;

@@ -6,7 +6,7 @@ The `lexers` crate (and related tokenizers across the workspace) has grown organ
 
 ---
 
-## Milestone 1: Refactor `Scanner` into an Idiomatic Iterator Adapter
+## Milestone 1: Refactor `Scanner` into an Idiomatic Iterator Adapter *(COMPLETED)*
 
 ### Current Problems
 
@@ -18,35 +18,38 @@ The `lexers` crate (and related tokenizers across the workspace) has grown organ
 ### Goals
 
 1. **Make `Scanner` an iterator adapter** (like `std::iter::Peekable`)
-   - Add an extension trait `Scanning` on `Iterator` so users can write:
+   - Add an extension trait `Scan` on `Iterator` so users can write:
      ```rust
-     let scanner = "hello".chars().scanning();
+     let scanner = "hello".chars().scanner();
      ```
    - Keep `Scanner::new(iter)` as a fallback constructor.
+   - **Status: COMPLETED.**
 
-2. **Replace `extract()` with `drain()`**
-   - Rename `extract()` → `drain()` to follow `Vec::drain` naming.
-   - Semantics: drain all consumed items from the internal buffer and reset the cursor.
+2. **Replace `extract()` with `lift()`**
+   - Rename `extract()` → `lift()`. (`drain` was considered but collides semantically with `Vec::drain`; `take` collides with `Iterator::take`.)
+   - Semantics: remove and return all consumed items from the internal buffer, resetting the cursor.
+   - **Status: COMPLETED.**
 
 3. **Replace `buffer_pos()` / `set_buffer_pos()` with a `Checkpoint` type**
-   - Introduce a lightweight `Checkpoint` struct (or just a type alias wrapper around `usize`) to make save/restore explicit and type-safe.
+   - Introduce a lightweight `Checkpoint` unit struct wrapping `usize` to make save/restore explicit and type-safe.
    - API:
      ```rust
      let checkpoint = scanner.checkpoint();
      // ... try parsing ...
-     scanner.restore(checkpoint);
+     scanner.restore(checkpoint); // panics on out-of-bounds (programming error)
      ```
    - Remove `buffer_pos()` and `set_buffer_pos()` from the public API.
+   - **Status: COMPLETED.**
 
 4. **Keep the minimal surface**
-   - The following methods are the *only* ones needed on `Scanner`:
+   - The following methods are the *only* ones on `Scanner`:
      - `next()`, `prev()`, `current()`
      - `peek()`, `peek_prev()`
-     - `drain()`
+     - `lift()`
      - `checkpoint()`, `restore()`
      - `accept()`, `ignore()`, `until()` (with `TokenMatcher`)
-     - `view()` (for debugging)
-   - Remove anything that is not used by existing tokenizers.
+   - `view()` was removed (dead weight).
+   - **Status: COMPLETED.**
 
 ### Non-Goals
 
@@ -159,9 +162,9 @@ This single tokenizer would replace the duplicated ad-hoc wrappers in `earlgrey`
 
 ## Success Criteria
 
-- `Scanner` feels like a native Rust iterator adapter (`iter.scanning()`).
+- `Scanner` feels like a native Rust iterator adapter (`iter.scanner()`).
 - No raw `usize` indices in the public API (`Checkpoint` + `restore` instead).
-- `extract` is gone, replaced by `drain`.
+- `extract` is gone, replaced by `lift`.
 - `SymbolTokenizer` exists and covers `earlgrey`'s math-expression use case.
 - Duplicate tokenizers in `earlgrey` are deleted.
 - All workspace tests pass.
@@ -174,3 +177,33 @@ This single tokenizer would replace the duplicated ad-hoc wrappers in `earlgrey`
 - Do not commit changes until Milestone 1 is fully complete and tested.
 - Each milestone should be its own focused PR (or set of commits).
 - This plan may be updated as ambiguities are resolved during implementation.
+
+---
+
+## Additional Open Items to Consider During Modernization
+
+These were identified during the review but deferred to keep the initial focus on `Scanner` ergonomics. They should be revisited as the plan unfolds.
+
+### 1. Error Reporting in Tokenizers
+All tokenizers currently return `Option<Token>`, which makes it impossible for a parser to distinguish "end of valid input" from "syntax error encountered." For example, unmatched quotes or EOF during an escape sequence simply return `None` (acting as if the string never started). Consider introducing `Result<Token, LexError>` or at least `Unknown(String)` variants for the other tokenizers (like `MathTokenizer` already has).
+
+### 2. `EbnfTokenizer` Lookahead Bloat
+`lexers::EbnfTokenizer` uses a heap-allocated `Vec<String>` to queue at most 2 items (for the quote-splitting logic: opening quote, content, closing quote). Replace this with a lightweight fixed-size buffer like `[Option<String>; 2]` or `std::collections::VecDeque` to eliminate unnecessary heap allocations.
+
+### 3. `earlgrey` Has Its Own `EbnfTokenizer`
+`earlgrey/src/ebnf_tokenizer.rs` is a custom `Peekable<I>` implementation that is 95% identical to `lexers::EbnfTokenizer` but adds `Result`-based error reporting. This duplicate must be unified as part of Milestone 3. Decide which crate owns EBNF tokenization.
+
+### 4. `numerica` Tokenizer Reinvention
+`numerica/src/tokenizer.rs` is a 250-line custom tokenizer with math/algebra-specific rules (`->`, `/.`, comments, strings, negative numbers). It was built from scratch instead of reusing `lexers` building blocks. Evaluate whether `SymbolTokenizer` + configuration can cover its needs, or if it is too specialized.
+
+### 5. `scan_whitespace` Still Allocates *(PARTIALLY RESOLVED)*
+`scan_whitespace()` returns `Option<String>` of skipped whitespace, but internal callers discard the return value. We added `skip_whitespace()` as a zero-allocation alternative and migrated all internal tokenizers to use it. `scan_whitespace()` remains in the public API solely for backward compatibility with `earlgrey`'s inline math tokenizer. Once that is replaced with `SymbolTokenizer` (Milestone 3), `scan_whitespace()` can be removed entirely.
+
+### 6. `view()` Method on `Scanner` *(RESOLVED)*
+`Scanner::view()` returned `&[I::Item]` of the consumed buffer. It was unused outside of `scanner.rs` itself. **Removed in Milestone 1.**
+
+### 7. `scan_number` Accepts `'i'` for Imaginary Numbers
+`scan_number` greedily consumes `'i'` at the end, producing strings like `"3i"` that `f64::from_str` cannot parse. We fixed the panic by falling back to `MathToken::Unknown(num)`, but the scanner helper itself still accepts syntactically invalid numbers. Should `scan_number` be stricter and leave `'i'` for a higher-level tokenizer to handle?
+
+### 8. The `Tokenizer::scanner()` Wrapping Pattern
+`LispTokenizer::scanner()` and `MathTokenizer::scanner()` return `Scanner<Tokenizer>` so a parser can peek at the token stream. Verify this pattern still works cleanly after the `Scanner` refactor (e.g., does `Checkpoint` work correctly across the `Scanner<Tokenizer>` boundary?).

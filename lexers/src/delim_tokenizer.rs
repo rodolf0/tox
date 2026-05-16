@@ -8,6 +8,12 @@ pub struct DelimTokenizer<I: Iterator<Item = char>> {
     remove: bool, // drop the delimiters ?
 }
 
+impl<'a> DelimTokenizer<std::str::Chars<'a>> {
+    pub fn from_str(s: &'a str, delims: &str, remove: bool) -> Self {
+        Self::new(s.chars(), delims, remove)
+    }
+}
+
 impl<I: Iterator<Item = char>> DelimTokenizer<I> {
     pub fn new(src: I, delims: &str, remove: bool) -> Self {
         DelimTokenizer {
@@ -21,17 +27,17 @@ impl<I: Iterator<Item = char>> DelimTokenizer<I> {
 impl<I: Iterator<Item = char>> Iterator for DelimTokenizer<I> {
     type Item = String;
     fn next(&mut self) -> Option<Self::Item> {
-        if self.src.until_any(&self.delims) {
-            Some(self.src.extract_string())
-        } else if let Some(c) = self.src.accept_any(&self.delims) {
-            self.src.extract(); // ignore
-            if self.remove {
-                self.next()
+        loop {
+            if self.src.until(&self.delims[..]) {
+                return Some(self.src.extract_string());
             } else {
-                Some(c.to_string())
+                let c = self.src.accept(&self.delims[..])?;
+                self.src.extract(); // commit delimiter, reset buffer
+                if !self.remove {
+                    return Some(c.to_string());
+                }
+                // If we remove, just continue the loop
             }
-        } else {
-            None
         }
     }
 }

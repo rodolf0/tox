@@ -7,7 +7,7 @@ pub enum MathToken {
     Number(f64),
     Quantity(f64, String, String),
     Variable(String),
-    Function(String, usize), // arity
+    Function(String),
     UOp(String),
     BOp(String),
     OParen,
@@ -15,9 +15,23 @@ pub enum MathToken {
     Comma,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum PrevTokenCategory {
+    Number,
+    Variable,
+    CParen,
+    Other,
+}
+
 pub struct MathTokenizer<I: Iterator<Item = char>> {
     src: Scanner<I>,
-    prev: Option<MathToken>,
+    prev: Option<PrevTokenCategory>,
+}
+
+impl<'a> From<&'a str> for MathTokenizer<std::str::Chars<'a>> {
+    fn from(s: &'a str) -> Self {
+        Self::new(s.chars())
+    }
 }
 
 impl<I: Iterator<Item = char>> MathTokenizer<I> {
@@ -33,15 +47,15 @@ impl<I: Iterator<Item = char>> MathTokenizer<I> {
     }
 
     // when would a minus be unary? we need to know the prev token
-    fn makes_unary(prev: &Option<MathToken>) -> bool {
+    fn makes_unary(prev: &Option<PrevTokenCategory>) -> bool {
         !matches!(*prev,
-            Some(MathToken::Number(_)) |
-            Some(MathToken::Variable(_)) |
-            Some(MathToken::CParen))
+            Some(PrevTokenCategory::Number) |
+            Some(PrevTokenCategory::Variable) |
+            Some(PrevTokenCategory::CParen))
     }
 
     fn get_token(&mut self) -> Option<MathToken> {
-        self.src.scan_whitespace(); // discard whatever came before + and spaces
+        self.src.skip_whitespace();
         if let Some(op) = self.src.scan_math_op() {
             return match op.as_ref() {
                 "(" => Some(MathToken::OParen),
@@ -54,14 +68,17 @@ impl<I: Iterator<Item = char>> MathTokenizer<I> {
         }
         if let Some(id) = self.src.scan_identifier() {
             return match self.src.peek() {
-                Some('(') => Some(MathToken::Function(id, 0)),
+                Some('(') => Some(MathToken::Function(id)),
                 _ => Some(MathToken::Variable(id)),
             };
         }
         if let Some(num) = self.src.scan_number() {
-            self.src.scan_whitespace(); // discard whatever came before + and spaces
+        self.src.skip_whitespace();
             use std::str::FromStr;
-            let value = f64::from_str(&num).unwrap();
+            let value = match f64::from_str(&num) {
+                Ok(v) => v,
+                Err(_) => return Some(MathToken::Unknown(num)),
+            };
             if let Some((prefix, unit)) = self.src.scan_unit() {
                 return Some(MathToken::Quantity(value, prefix, unit));
             }
@@ -78,7 +95,12 @@ impl<I: Iterator<Item = char>> Iterator for MathTokenizer<I> {
     type Item = MathToken;
     fn next(&mut self) -> Option<Self::Item> {
         let token = self.get_token();
-        self.prev = token.clone();
+        self.prev = token.as_ref().map(|t| match t {
+            MathToken::Number(_) | MathToken::Quantity(_, _, _) => PrevTokenCategory::Number,
+            MathToken::Variable(_) => PrevTokenCategory::Variable,
+            MathToken::CParen => PrevTokenCategory::CParen,
+            _ => PrevTokenCategory::Other,
+        });
         token
     }
 }
@@ -137,7 +159,7 @@ mod tests {
         let expect = [
             Number(3.4e-2),
             BOp("*".to_string()),
-            Function("sin".to_string(), 0),
+            Function("sin".to_string()),
             OParen,
             Variable("x".to_string()),
             CParen,
@@ -150,7 +172,7 @@ mod tests {
             Number(4.0),
             CParen,
             BOp("*".to_string()),
-            Function("max".to_string(), 0),
+            Function("max".to_string()),
             OParen,
             Number(2.0),
             Comma,

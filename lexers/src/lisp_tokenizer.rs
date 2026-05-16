@@ -1,4 +1,3 @@
-
 use crate::scanner::Scanner;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -18,6 +17,12 @@ pub enum LispToken {
 
 pub struct LispTokenizer<I: Iterator<Item = char>>(Scanner<I>);
 
+impl<'a> From<&'a str> for LispTokenizer<std::str::Chars<'a>> {
+    fn from(s: &'a str) -> Self {
+        Self::new(s.chars())
+    }
+}
+
 impl<I: Iterator<Item = char>> LispTokenizer<I> {
     pub fn new(source: I) -> Self {
         LispTokenizer(Scanner::new(source))
@@ -31,18 +36,18 @@ impl<I: Iterator<Item = char>> LispTokenizer<I> {
 impl<I: Iterator<Item = char>> Iterator for LispTokenizer<I> {
     type Item = LispToken;
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.scan_whitespace();
+        self.0.skip_whitespace();
         if let Some(s) = self.0.scan_quoted_string('"') {
-            return Some(LispToken::String(s));
+            return Some(LispToken::String(s[1..s.len() - 1].to_string()));
         }
-        if let Some(lexeme) = self.0.accept_any(&[')', '(', '\'', '`', ',']) {
+        if let Some(lexeme) = self.0.accept(&[')', '(', '\'', '`', ',']) {
             let token = match lexeme {
                 '(' => LispToken::OParen,
                 ')' => LispToken::CParen,
                 '\'' => LispToken::Quote,
                 '`' => LispToken::QuasiQuote,
                 ',' => {
-                    if self.0.accept(&'@').is_some() {
+                    if self.0.accept('@').is_some() {
                         LispToken::UnQSplice
                     } else {
                         LispToken::UnQuote
@@ -50,10 +55,10 @@ impl<I: Iterator<Item = char>> Iterator for LispTokenizer<I> {
                 }
                 _ => unreachable!(),
             };
-            self.0.extract(); // ignore
+            self.0.extract(); // commit token, reset buffer
             return Some(token);
         }
-        if self.0.until_any(&[')', ' ', '\n', '\r', '\t']) {
+        if self.0.until(&[')', ' ', '\n', '\r', '\t']) {
             use std::str::FromStr;
             let lexeme = self.0.extract_string();
             return match &lexeme[..] {
@@ -93,7 +98,7 @@ mod tests {
                 Symbol(format!("max")),
                 Quote,
                 Symbol(format!("a")),
-                String(format!("\"hello\"")),
+                String(format!("hello")),
                 CParen,
             ],
         ];

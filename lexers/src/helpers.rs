@@ -1,31 +1,18 @@
 
 use crate::scanner::Scanner;
 
-static WHITE: &[char] = &[' ', '\n', '\r', '\t'];
-static DIGITS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-static HEXDIGITS: &[char] = &[
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C',
-    'D', 'E', 'F',
-];
-static ALPHA: &[char] = &[
-    '_', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r',
-    's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
-    'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-];
-static ALNUM: &[char] = &[
-    '_', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
-    'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'A',
-    'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
-    'U', 'V', 'W', 'X', 'Y', 'Z',
-];
-
 impl<I: Iterator<Item = char>> Scanner<I> {
     pub fn extract_string(&mut self) -> String {
         self.extract().into_iter().collect()
     }
 
+    pub fn skip_whitespace(&mut self) {
+        self.ignore(|c: &char| c.is_ascii_whitespace());
+        self.extract();
+    }
+
     pub fn scan_whitespace(&mut self) -> Option<String> {
-        self.skip_all(WHITE);
+        self.ignore(|c: &char| c.is_ascii_whitespace());
         Some(self.extract_string())
     }
 
@@ -33,45 +20,45 @@ impl<I: Iterator<Item = char>> Scanner<I> {
     pub fn scan_number(&mut self) -> Option<String> {
         let backtrack = self.buffer_pos();
         // optional sign
-        self.accept_any(&['+', '-']);
+        self.accept(&['+', '-']);
         // require integer part
-        if !self.skip_all(DIGITS) {
+        if !self.ignore(|c: &char| c.is_ascii_digit()) {
             self.set_buffer_pos(backtrack);
             return None;
         }
         // check for fractional part, else it's just an integer
         let backtrack = self.buffer_pos();
-        if self.accept(&'.').is_some() && !self.skip_all(DIGITS) {
+        if self.accept('.').is_some() && !self.ignore(|c: &char| c.is_ascii_digit()) {
             self.set_buffer_pos(backtrack);
             return Some(self.extract_string()); // integer
         }
         // check for exponent part
         let backtrack = self.buffer_pos();
-        if self.accept_any(&['e', 'E']).is_some() {
-            self.accept_any(&['+', '-']); // exponent sign is optional
-            if !self.skip_all(DIGITS) {
+        if self.accept(&['e', 'E']).is_some() {
+            self.accept(&['+', '-']); // exponent sign is optional
+            if !self.ignore(|c: &char| c.is_ascii_digit()) {
                 self.set_buffer_pos(backtrack);
                 return Some(self.extract_string()); //float
             }
         }
-        self.accept(&'i'); // accept imaginary numbers
+        self.accept('i'); // accept imaginary numbers
         Some(self.extract_string())
     }
 
     pub fn scan_math_op(&mut self) -> Option<String> {
         const OPS: &[char] = &['+', '-', '*', '/', '%', '^', '!', '(', ')', ','];
-        if self.accept_any(&['>', '=', '<']).is_some() {
+        if self.accept(&['>', '=', '<']).is_some() {
             // accept '<', '>', '=', '<=', '>=', '=='
-            self.accept(&'=');
+            self.accept('=');
             Some(self.extract_string())
-        } else if self.accept(&':').is_some() && self.accept(&'=').is_some() {
+        } else if self.accept(':').is_some() && self.accept('=').is_some() {
             // accept ':='. Set delayed to avoid immediate eval of rhs.
             Some(self.extract_string())
-        } else if self.accept(&'*').is_some() {
+        } else if self.accept('*').is_some() {
             // accept '*', '**'
-            self.accept(&'*');
+            self.accept('*');
             Some(self.extract_string())
-        } else if self.accept_any(OPS).is_some() {
+        } else if self.accept(OPS).is_some() {
             Some(self.extract_string())
         } else {
             None
@@ -81,11 +68,11 @@ impl<I: Iterator<Item = char>> Scanner<I> {
     // scan integers like 0x34 0b10101 0o657
     pub fn scan_integer(&mut self) -> Option<String> {
         let backtrack = self.buffer_pos();
-        if self.accept(&'0').is_some()
-            && match self.accept_any(&['x', 'o', 'b']) {
-                Some('x') => self.skip_all(HEXDIGITS),
-                Some('o') => self.skip_all(&HEXDIGITS[..8]),
-                Some('b') => self.skip_all(&HEXDIGITS[..2]),
+        if self.accept('0').is_some()
+            && match self.accept(&['x', 'o', 'b']) {
+                Some('x') => self.ignore(|c: &char| c.is_ascii_hexdigit()),
+                Some('o') => self.ignore(|c: &char| matches!(c, '0'..='7')),
+                Some('b') => self.ignore(|c: &char| matches!(c, '0'..='1')),
                 _ => false,
             }
         {
@@ -98,7 +85,7 @@ impl<I: Iterator<Item = char>> Scanner<I> {
     // scan a quoted string like "this is \"an\" example"
     pub fn scan_quoted_string(&mut self, q: char) -> Option<String> {
         let backtrack = self.buffer_pos();
-        self.accept(&q)?;
+        self.accept(q)?;
         while let Some(n) = self.next() {
             if n == '\\' {
                 self.next();
@@ -114,8 +101,8 @@ impl<I: Iterator<Item = char>> Scanner<I> {
 
     // scan [a-zA-Z_][a-zA-Z0-9_]+
     pub fn scan_identifier(&mut self) -> Option<String> {
-        self.accept_any(ALPHA)?;
-        self.skip_all(ALNUM);
+        self.accept(|c: &char| c.is_alphabetic() || *c == '_')?;
+        self.ignore(|c: &char| c.is_alphanumeric() || *c == '_');
         Some(self.extract_string())
     }
 
@@ -140,7 +127,7 @@ impl<I: Iterator<Item = char>> Scanner<I> {
             if self.accept_all(prefix.chars()) {
                 for unit in BARE_UNITS {
                     if self.accept_all(unit.chars()) {
-                        self.extract_string(); // ignore
+                        self.extract_string(); // commit token, reset buffer
                         return Some((prefix.to_string(), unit.to_string()))
                     }
                 }

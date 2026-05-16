@@ -6,6 +6,12 @@ pub struct EbnfTokenizer<I: Iterator<Item = char>> {
     lookahead: Vec<String>,
 }
 
+impl<'a> From<&'a str> for EbnfTokenizer<std::str::Chars<'a>> {
+    fn from(s: &'a str) -> Self {
+        Self::new(s.chars())
+    }
+}
+
 impl<I: Iterator<Item = char>> EbnfTokenizer<I> {
     pub fn new(source: I) -> Self {
         EbnfTokenizer {
@@ -27,31 +33,31 @@ impl<I: Iterator<Item = char>> Iterator for EbnfTokenizer<I> {
             return self.lookahead.pop();
         }
         let s = &mut self.input;
-        s.scan_whitespace();
+        s.skip_whitespace();
         // discard comments starting with '#' until new-line
-        if s.accept(&'#').is_some() {
+        if s.accept('#').is_some() {
             while let Some(nl) = s.next() {
                 if nl == '\n' {
-                    s.extract(); // ignore comment
+                    s.extract(); // commit comment, reset buffer
                                  // discard comment and allow more by restarting
                     return self.next();
                 }
             }
         }
-        if s.accept_any(&['[', ']', '{', '}', '(', ')', '|', ';'])
+        if s.accept(&['[', ']', '{', '}', '(', ')', '|', ';'])
             .is_some()
         {
             return Some(s.extract_string());
         }
-        let backtrack = s.buffer_pos();
-        if s.accept(&':').is_some() {
-            if s.accept(&'=').is_some() {
+        if s.accept(':').is_some() {
+            if s.accept('=').is_some() {
                 return Some(s.extract_string());
             }
-            s.set_buffer_pos(backtrack);
+            s.extract_string();
+            return Some(":".to_string());
         }
         let backtrack = s.buffer_pos();
-        if let Some(q) = s.accept_any(&['"', '\'']) {
+        if let Some(q) = s.accept(&['"', '\'']) {
             while let Some(n) = s.next() {
                 if n == q {
                     // store closing quote
@@ -66,7 +72,7 @@ impl<I: Iterator<Item = char>> Iterator for EbnfTokenizer<I> {
             s.set_buffer_pos(backtrack);
         }
         let backtrack = s.buffer_pos();
-        s.accept(&'@');
+        s.accept('@');
         // NOTE: scan_identifier limits the valid options
         if let Some(id) = s.scan_identifier() {
             return Some(id);

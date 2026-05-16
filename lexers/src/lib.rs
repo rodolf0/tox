@@ -1,6 +1,7 @@
 #![deny(warnings)]
 
 mod helpers;
+
 mod scanner;
 pub use crate::scanner::Scanner;
 

@@ -222,6 +222,24 @@ where
         self.matched_len = lookahead;
         true
     }
+
+    pub fn peek_seq(&mut self, what: impl Iterator<Item = I::Item>) -> bool {
+        let mut lookahead = self.matched_len;
+        for item in what {
+            if lookahead >= self.buf.len() {
+                if let Some(next_item) = self.src.next() {
+                    self.buf.push(next_item);
+                } else {
+                    return false;
+                }
+            }
+            if self.buf[lookahead] != item {
+                return false;
+            }
+            lookahead += 1;
+        }
+        true
+    }
 }
 
 #[cfg(test)]
@@ -335,5 +353,16 @@ mod tests {
         assert_eq!(s.accept_seq("dex".chars()), false);
         assert_eq!(s.accept_seq("def".chars()), true);
         assert_eq!(s.accept_seq("ghi".chars()), true);
+    }
+
+    #[test]
+    fn peek_sequence() {
+        let mut s = "abcdef".chars().scanner();
+        assert_eq!(s.peek_seq("abc".chars()), true);
+        assert_eq!(s.accept_seq("abc".chars()), true);
+        assert_eq!(s.peek_seq("def".chars()), true);
+        assert_eq!(s.peek_seq("dex".chars()), false);
+        assert_eq!(s.accept_seq("def".chars()), true);
+        assert_eq!(s.peek_seq("".chars()), true);
     }
 }

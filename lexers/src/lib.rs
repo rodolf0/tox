@@ -3,6 +3,9 @@
 mod scanner;
 pub use crate::scanner::{Checkpoint, Scan, Scanner};
 
+mod string_tokenizer;
+pub use crate::string_tokenizer::StringTokenizer;
+
 // mod helpers;
 // #[cfg(test)]
 // mod helpers_test;
@@ -13,8 +16,6 @@ pub use crate::scanner::{Checkpoint, Scan, Scanner};
 // mod math_tokenizer;
 // pub use crate::math_tokenizer::{MathToken, MathTokenizer};
 
-// mod string_tokenizer;
-// pub use crate::string_tokenizer::StringTokenizer;
 
 // mod lisp_tokenizer;
 // pub use crate::lisp_tokenizer::{LispToken, LispTokenizer};

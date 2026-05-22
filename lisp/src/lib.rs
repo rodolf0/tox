@@ -1,12 +1,13 @@
-mod eval;
-mod procedure;
-mod builtin;
-
-pub use crate::parser::{Parser, LispExpr, ParseError};
-pub use crate::eval::{LispContext, EvalErr};
-pub use crate::procedure::Procedure;
-pub use crate::builtin::builtins;
+#![deny(warnings)]
 
 mod parser;
-#[cfg(test)]
-mod parser_test;
+pub use crate::parser::{Expr, ParseError, parse};
+
+mod eval;
+pub use crate::eval::{EvalErr, LispContext};
+
+mod procedure;
+pub use crate::procedure::Procedure;
+
+mod builtin;
+pub use crate::builtin::builtins;

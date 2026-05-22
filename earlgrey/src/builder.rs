@@ -38,26 +38,30 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
 
     pub fn terminal(mut self, name: &str, parse: impl Fn(&str) -> Option<T> + 'static) -> Self {
         let p = Rc::new(parse);
-        self.terminals
-            .insert(name.to_string(), p.clone())
-            .map(|_| panic!("Duplicate terminal registered: {}", name));
+        if self.terminals.insert(name.to_string(), p.clone()).is_some() {
+            panic!("Duplicate terminal registered: {}", name);
+        }
         self.terminal_preds
             .insert(name.to_string(), Rc::new(move |s| p(s).is_some()));
         self
     }
 
     pub fn literal(mut self, name: &str, value: T) -> Self {
-        self.literals
-            .insert(name.to_string(), value)
-            .map(|_| panic!("Duplicate literal registered: {}", name));
+        if self.literals.insert(name.to_string(), value).is_some() {
+            panic!("Duplicate literal registered: {}", name);
+        }
         self
     }
 
     pub fn literals(mut self, names: &[&str], value: T) -> Self {
         for name in names {
-            self.literals
+            if self
+                .literals
                 .insert(name.to_string(), value.clone())
-                .map(|_| panic!("Duplicate literal registered: {}", name));
+                .is_some()
+            {
+                panic!("Duplicate literal registered: {}", name);
+            }
         }
         self
     }
@@ -68,21 +72,30 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
     }
 
     pub fn action(mut self, rule: &str, action: impl Fn(Vec<T>) -> T + 'static) -> Self {
-        self.actions
+        if self
+            .actions
             .insert(rule.to_string(), Rc::new(action))
-            .map(|_| panic!("Duplicate action registered for rule: {}", rule));
+            .is_some()
+        {
+            panic!("Duplicate action registered for rule: {}", rule);
+        }
         self
     }
 
     pub fn action1(mut self, rule: &str, action: impl Fn(T) -> T + 'static) -> Self {
-        self.actions
+        if self
+            .actions
             .insert(rule.to_string(), Rc::new(move |mut v| action(v.remove(0))))
-            .map(|_| panic!("Duplicate action registered for rule: {}", rule));
+            .is_some()
+        {
+            panic!("Duplicate action registered for rule: {}", rule);
+        }
         self
     }
 
     pub fn action2(mut self, rule: &str, action: impl Fn(T, T) -> T + 'static) -> Self {
-        self.actions
+        if self
+            .actions
             .insert(
                 rule.to_string(),
                 Rc::new(move |mut v| {
@@ -91,12 +104,16 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
                     action(a1, a2)
                 }),
             )
-            .map(|_| panic!("Duplicate action registered for rule: {}", rule));
+            .is_some()
+        {
+            panic!("Duplicate action registered for rule: {}", rule);
+        }
         self
     }
 
     pub fn action3(mut self, rule: &str, action: impl Fn(T, T, T) -> T + 'static) -> Self {
-        self.actions
+        if self
+            .actions
             .insert(
                 rule.to_string(),
                 Rc::new(move |mut v| {
@@ -106,12 +123,16 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
                     action(a1, a2, a3)
                 }),
             )
-            .map(|_| panic!("Duplicate action registered for rule: {}", rule));
+            .is_some()
+        {
+            panic!("Duplicate action registered for rule: {}", rule);
+        }
         self
     }
 
     pub fn action4(mut self, rule: &str, action: impl Fn(T, T, T, T) -> T + 'static) -> Self {
-        self.actions
+        if self
+            .actions
             .insert(
                 rule.to_string(),
                 Rc::new(move |mut v| {
@@ -122,7 +143,10 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
                     action(a1, a2, a3, a4)
                 }),
             )
-            .map(|_| panic!("Duplicate action registered for rule: {}", rule));
+            .is_some()
+        {
+            panic!("Duplicate action registered for rule: {}", rule);
+        }
         self
     }
 
@@ -154,7 +178,7 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
         }
         for name in self.literals.keys() {
             let n = name.clone();
-            ebnf_parser = ebnf_parser.plug_terminal(&name, move |s| s == n);
+            ebnf_parser = ebnf_parser.plug_terminal(name, move |s| s == n);
         }
         let grammar = ebnf_parser.into_grammar()?;
 
@@ -211,6 +235,7 @@ impl<'a, T: Clone + 'a> ParserBuilder<'a, T> {
                         continue;
                     }
                 } else if rule.head.starts_with('[') {
+                    #[allow(clippy::collapsible_if)]
                     if let Some(ref optional_empty) = self.optional_empty {
                         let optional_empty = optional_empty.clone();
                         forest.action(&rule.id, move |_| optional_empty());

@@ -7,6 +7,7 @@ where
     matched_len: usize,
 }
 
+// A convinince trait to create scanners from any iterator
 pub trait Scan: Iterator + Sized {
     fn scanner(self) -> Scanner<Self>
     where
@@ -118,6 +119,13 @@ where
         } else {
             Some(&self.buf[self.matched_len - 2])
         }
+    }
+
+    // Removes and returns the first `n` consumed items from the buffer, sliding the rest left.
+    pub fn lift_first(&mut self, n: usize) -> impl Iterator<Item = I::Item> + '_ {
+        let n = std::cmp::min(n, self.matched_len);
+        self.matched_len -= n;
+        self.buf.drain(..n)
     }
 
     // Removes and returns all consumed items from the buffer, resetting the cursor

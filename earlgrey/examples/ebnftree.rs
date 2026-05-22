@@ -1,22 +1,5 @@
 #![deny(warnings)]
 
-struct Tokenizer<I: Iterator<Item = char>>(lexers::Scanner<I>);
-
-impl<I: Iterator<Item = char>> Iterator for Tokenizer<I> {
-    type Item = String;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.scan_whitespace();
-        self.0
-            .scan_math_op()
-            .or_else(|| self.0.scan_number())
-            .or_else(|| self.0.scan_identifier())
-    }
-}
-
-fn tokenizer<I: Iterator<Item = char>>(input: I) -> Tokenizer<I> {
-    Tokenizer(lexers::Scanner::new(input))
-}
-
 fn main() -> Result<(), String> {
     let grammar = r#"
         expr   := expr ('+'|'-') term | term ;
@@ -33,7 +16,10 @@ fn main() -> Result<(), String> {
         .terminal("num", |n| Some(earlgrey::Sexpr::Atom(n.to_string())))
         .build()?;
 
-    for tree in parser.parse_sexpr(tokenizer(input.chars()))? {
+    for tree in parser.parse_sexpr(
+        lexers::StringTokenizer::from(input.as_str())
+            .symbols(["+", "-", "*", "/", "%", "^", "!", "(", ")"]),
+    )? {
         println!("{}", tree.print());
     }
 

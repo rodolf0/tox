@@ -68,7 +68,7 @@ where
             if let Some(item) = self.src.next() {
                 self.buf.push(item);
             } else {
-                self.matched_len = std::cmp::min(self.matched_len + 1, self.buf.len() + 1);
+                self.matched_len = self.buf.len() + 1; // EOF
                 return None;
             }
         }
@@ -119,6 +119,15 @@ where
         } else {
             Some(&self.buf[self.matched_len - 2])
         }
+    }
+
+    // Returns a view of the current underlying buffer
+    pub fn view(&self) -> &[I::Item] {
+        &self.buf[..self.matched_len()]
+    }
+
+    pub fn matched_len(&self) -> usize {
+        std::cmp::min(self.matched_len, self.buf.len())
     }
 
     // Removes and returns the first `n` consumed items from the buffer, sliding the rest left.
@@ -191,14 +200,15 @@ where
 
     // Advance the scanner as long as matcher keeps matching
     pub fn accept_while(&mut self, mut matcher: impl TokenMatcher<I::Item>) -> &[I::Item] {
-        let start = self.matched_len;
-        let mut lookahead = self.matched_len;
+        let start = self.matched_len();
+        let mut lookahead = start;
         loop {
             if lookahead >= self.buf.len() {
                 if let Some(item) = self.src.next() {
                     self.buf.push(item);
                 } else {
-                    break;
+                    self.matched_len = self.buf.len() + 1; // EOF
+                    return &self.buf[start..self.buf.len()];
                 }
             }
             if !matcher.matches(&self.buf[lookahead]) {
@@ -213,12 +223,13 @@ where
     // Advance the scanner only if the full sequence is found.
     // On a partial match the scanner is reset to its original position.
     pub fn accept_seq(&mut self, what: impl Iterator<Item = I::Item>) -> bool {
-        let mut lookahead = self.matched_len;
+        let mut lookahead = self.matched_len();
         for item in what {
             if lookahead >= self.buf.len() {
                 if let Some(next_item) = self.src.next() {
                     self.buf.push(next_item);
                 } else {
+                    self.matched_len = self.buf.len() + 1; // EOF
                     return false;
                 }
             }
@@ -232,12 +243,13 @@ where
     }
 
     pub fn peek_seq(&mut self, what: impl Iterator<Item = I::Item>) -> bool {
-        let mut lookahead = self.matched_len;
+        let mut lookahead = self.matched_len();
         for item in what {
             if lookahead >= self.buf.len() {
                 if let Some(next_item) = self.src.next() {
                     self.buf.push(next_item);
                 } else {
+                    self.matched_len = self.buf.len() + 1; // EOF
                     return false;
                 }
             }
@@ -352,6 +364,16 @@ mod tests {
         assert_eq!(s.accept_while(|c: &char| "bcde".contains(*c)), &['d', 'e']);
         assert_eq!(s.accept_while(vec!['x', 'f'].as_slice()), &['f']);
         assert_eq!(s.accept_while(&['a', 'b', 'c', 'd', 'e', 'f', 'g']), &[]);
+    }
+
+    #[test]
+    fn eof() {
+        let mut s = "a".chars().scanner();
+        assert_eq!(s.advance(), Some(&'a'));
+        assert_eq!(s.advance(), None);
+        assert_eq!(s.accept_while(&['a']), &[]);
+        assert_eq!(s.accept_seq("a".chars()), false);
+        assert_eq!(s.peek_seq("a".chars()), false);
     }
 
     #[test]

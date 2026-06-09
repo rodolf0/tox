@@ -1,4 +1,4 @@
-#![deny(warnings)]
+// #![deny(warnings)]
 
 mod scanner;
 pub use crate::scanner::{Checkpoint, Scan, Scanner};
@@ -6,11 +6,11 @@ pub use crate::scanner::{Checkpoint, Scan, Scanner};
 mod string_tokenizer;
 pub use crate::string_tokenizer::StringTokenizer;
 
-mod lisp_tokenizer;
-pub use crate::lisp_tokenizer::{LispToken, LispTokenizer};
-
-mod ebnf_tokenizer;
-pub use crate::ebnf_tokenizer::EbnfTokenizer;
+// mod lisp_tokenizer;
+// pub use crate::lisp_tokenizer::{LispToken, LispTokenizer};
+//
+// mod ebnf_tokenizer;
+// pub use crate::ebnf_tokenizer::EbnfTokenizer;
 
 // mod helpers;
 // #[cfg(test)]

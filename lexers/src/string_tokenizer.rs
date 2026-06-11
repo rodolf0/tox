@@ -32,39 +32,6 @@ impl<I: Iterator<Item = char>> Extractor<I> for &str {
     }
 }
 
-// TODO: move this to extractors.rs
-pub fn quoted<'a, I: Iterator<Item = char>>(
-    s: &'a mut Scanner<I>,
-    start: &str,
-    end: &str,
-    escape: Option<char>,
-) -> Option<&'a [char]> {
-    let cp = s.checkpoint();
-    if s.accept_seq(start.chars()).is_some() {
-        // consume all escaped content until end delimiter.
-        while let Some(c) = s.peek() {
-            if Some(*c) == escape {
-                s.advance(); // consume escape char
-            } else if s.accept_seq(end.chars()).is_some() {
-                return Some(s.view_from(cp));
-            }
-            s.advance();
-        }
-    }
-    s.restore(cp);
-    None
-}
-
-pub fn quoted_no_delims<'a, I: Iterator<Item = char>>(
-    s: &'a mut Scanner<I>,
-    start: &str,
-    end: &str,
-    escape: Option<char>,
-) -> Option<&'a [char]> {
-    let extract = quoted(s, start, end, escape)?;
-    Some(&extract[start.len()..extract.len() - end.len()])
-}
-
 struct ExtractorConfig<'a, I: Iterator<Item = char>> {
     e: Box<dyn Extractor<I> + 'a>,
     discard: bool,
@@ -127,7 +94,7 @@ impl<'a, I: Iterator<Item = char>> Iterator for StringTokenizer<'a, I> {
             let pre_matched = self.src.matched_len();
 
             // Skip any chars we don't care about (eg: whitespace)
-            if !self.src.accept_while(self.trimmer).is_empty() {
+            if self.src.accept_while(self.trimmer).is_some() {
                 let matched = self.src.lift();
                 if pre_matched > 0 {
                     return Some(matched.take(pre_matched).collect());
@@ -152,7 +119,7 @@ impl<'a, I: Iterator<Item = char>> Iterator for StringTokenizer<'a, I> {
                     if let Some(token) = queued {
                         return Some(token);
                     }
-                    // extractor matched, discarded so nothing to return 
+                    // extractor matched, discarded so nothing to return
                     // (nor queued). Restart the loop to avoid eating a char below.
                     continue 'outer;
                 }
@@ -172,7 +139,7 @@ impl<'a, I: Iterator<Item = char>> Iterator for StringTokenizer<'a, I> {
 #[cfg(test)]
 mod tests {
     use super::StringTokenizer;
-    use crate::string_tokenizer::*;
+    use crate::extractors::{quoted, quoted_no_delims};
 
     #[test]
     fn split_on_trimmer() {

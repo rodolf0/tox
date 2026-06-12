@@ -18,7 +18,7 @@ fn main() -> Result<(), String> {
 
     for tree in parser.parse_sexpr(
         lexers::StringTokenizer::from(input.as_str())
-            .symbols(["+", "-", "*", "/", "%", "^", "!", "(", ")"]),
+            .split_on(["+", "-", "*", "/", "%", "^", "!", "(", ")"], false),
     )? {
         println!("{}", tree.print());
     }

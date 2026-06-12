@@ -125,12 +125,12 @@ mod arith_test {
         let symbols = ["+", "-", "*", "/", "%", "^", "!", "(", ")"];
 
         let state = parser
-            .parse(lexers::StringTokenizer::from("1 + 2 * 3").symbols(symbols))
+            .parse(lexers::StringTokenizer::from("1 + 2 * 3").split_on(symbols, false))
             .unwrap();
         assert_eq!(ev.eval(&state).unwrap(), 7.0);
 
         let state = parser
-            .parse(lexers::StringTokenizer::from("( 1 + 2 ) * 3").symbols(symbols))
+            .parse(lexers::StringTokenizer::from("( 1 + 2 ) * 3").split_on(symbols, false))
             .unwrap();
         assert_eq!(ev.eval(&state).unwrap(), 9.0);
     }

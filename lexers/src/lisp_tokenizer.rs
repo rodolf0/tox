@@ -1,4 +1,5 @@
-use crate::string_tokenizer::{EscapePair, StringTokenizer};
+use crate::extractors::quoted;
+use crate::string_tokenizer::StringTokenizer;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum LispToken {
@@ -15,24 +16,24 @@ pub enum LispToken {
     String(String),
 }
 
-pub struct LispTokenizer<I: Iterator<Item = char>>(StringTokenizer<I>);
+pub struct LispTokenizer<'a, I: Iterator<Item = char>>(StringTokenizer<'a, I>);
 
-impl<'a> From<&'a str> for LispTokenizer<std::str::Chars<'a>> {
+impl<'a> From<&'a str> for LispTokenizer<'a, std::str::Chars<'a>> {
     fn from(s: &'a str) -> Self {
         Self::new(s.chars())
     }
 }
 
-impl<I: Iterator<Item = char>> LispTokenizer<I> {
+impl<'a, I: Iterator<Item = char>> LispTokenizer<'a, I> {
     pub fn new(source: I) -> Self {
         let tokenizer = StringTokenizer::new(source)
-            .symbols(["(", ")", "'", "`", ",@", ","])
-            .escape_pairs([EscapePair::new("\"", "\"")]);
+            .split_on(["(", ")", "'", "`", ",@", ","], false)
+            .split_by(|s| quoted(s, "\"", "\"", Some('\\')), false);
         LispTokenizer(tokenizer)
     }
 }
 
-impl<I: Iterator<Item = char>> Iterator for LispTokenizer<I> {
+impl<'a, I: Iterator<Item = char>> Iterator for LispTokenizer<'a, I> {
     type Item = LispToken;
     fn next(&mut self) -> Option<Self::Item> {
         let token_str = self.0.next()?;

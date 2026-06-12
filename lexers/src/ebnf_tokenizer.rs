@@ -1,36 +1,28 @@
-use crate::string_tokenizer::{EscapePair, StringTokenizer};
+use crate::extractors::{quoted, quoted_no_delims};
+use crate::string_tokenizer::StringTokenizer;
 
-pub struct EbnfTokenizer<I: Iterator<Item = char>>(StringTokenizer<I>);
+pub struct EbnfTokenizer<'a, I: Iterator<Item = char>>(StringTokenizer<'a, I>);
 
-impl<'a> From<&'a str> for EbnfTokenizer<std::str::Chars<'a>> {
+impl<'a> From<&'a str> for EbnfTokenizer<'a, std::str::Chars<'a>> {
     fn from(s: &'a str) -> Self {
         Self::new(s.chars())
     }
 }
 
-impl<I: Iterator<Item = char>> EbnfTokenizer<I> {
+impl<'a, I: Iterator<Item = char>> EbnfTokenizer<'a, I> {
     pub fn new(source: I) -> Self {
         let tokenizer = StringTokenizer::new(source)
-            .symbols(["[", "]", "{", "}", "(", ")", "|", ";", ":=", ":"])
-            .escape_pairs([
-                EscapePair::new("'", "'"),
-                EscapePair::new("\"", "\""),
-                // We keep the comment string in the Tokenizer, but we will skip it below in `next()`
-                EscapePair::new("#", "\n").drop_delimiters(),
-            ]);
+            .split_on(["[", "]", "{", "}", "(", ")", "|", ";", ":=", ":"], false)
+            .split_by(|s| quoted(s, "\"", "\"", Some('\\')), false)
+            .split_by(|s| quoted(s, "'", "'", Some('\\')), false)
+            .split_by(|s| quoted_no_delims(s, "#", "\n", Some('\\')), true);
         EbnfTokenizer(tokenizer)
     }
 }
 
-impl<I: Iterator<Item = char>> Iterator for EbnfTokenizer<I> {
+impl<'a, I: Iterator<Item = char>> Iterator for EbnfTokenizer<'a, I> {
     type Item = String;
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let token = self.0.next()?;
-            if token.starts_with('#') {
-                continue; // drop comments
-            }
-            return Some(token);
-        }
+        self.0.next()
     }
 }

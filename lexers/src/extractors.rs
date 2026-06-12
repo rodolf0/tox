@@ -33,31 +33,58 @@ pub fn quoted_no_delims<'a, I: Iterator<Item = char>>(
 }
 
 // scan numbers like -?[0-9]+(\.[0-9]+)?([eE][+-][0-9]+)?
-// pub fn number<'a, I: Iterator<Item = char>>(s: &'a mut Scanner<I>) -> Option<&'a [char]> {
-//     let backtrack = s.checkpoint();
-//
-//     let integer_part = s.accept_while(char::is_ascii_digit);
-//
-//     // require integer part
-//     if !s.ignore(|c: &char| c.is_ascii_digit()) {
-//         s.restore(backtrack);
-//         return None;
-//     }
-//     // check for fractional part, else it's just an integer
-//     let backtrack = s.checkpoint();
-//     if s.accept('.').is_some() && !s.ignore(|c: &char| c.is_ascii_digit()) {
-//         s.restore(backtrack);
-//         return Some(s.extract_string()); // integer
-//     }
-//     // check for exponent part
-//     let backtrack = s.checkpoint();
-//     if s.accept(&['e', 'E']).is_some() {
-//         s.accept(&['+', '-']); // exponent sign is optional
-//         if !s.ignore(|c: &char| c.is_ascii_digit()) {
-//             s.restore(backtrack);
-//             return Some(s.extract_string()); //float
-//         }
-//     }
-//     s.accept('i'); // accept imaginary numbers
-//     Some(s.extract_string())
-// }
+pub fn number<'a, I>(s: &'a mut Scanner<I>) -> Option<&'a [char]>
+where
+    I: Iterator<Item = char>,
+{
+    let cp = s.checkpoint();
+    // if it doesn't start with digits it's not a number.
+    s.accept_while(char::is_ascii_digit)?;
+    // maybe accept a fractional part.
+    let bt = s.checkpoint();
+    if s.accept('.').is_some() && s.accept_while(char::is_ascii_digit).is_none() {
+        s.restore(bt); // revert leading '.'
+    }
+    // maybe take exponentpart.
+    let bt = s.checkpoint();
+    if s.accept(['e', 'E']).is_some() {
+        s.accept(['+', '-']); // optional exponent sign
+        if s.accept_while(char::is_ascii_digit).is_none() {
+            s.restore(bt); // wasn't an exponent
+        }
+    }
+    // maybe take imaginary numbers
+    s.accept('i');
+    Some(s.view_from(cp))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scan_number() {
+        let tests = vec![
+            "987",
+            "41.98",
+            "54E+2",
+            "435i",
+            "28e3",
+            "54e-33",
+            "43e0i",
+            "3E8i",
+            "85.365e3",
+            "54.234E+2",
+            "54.849e-33",
+            "1.4e+2i",
+            "3.14e-5i",
+            "53.845e+5",
+            "65.987E-4",
+        ];
+        for t in tests {
+            let s = &mut Scanner::new(t.chars());
+            let n: Option<String> = number(s).map(|c| c.iter().collect());
+            assert_eq!(n.as_deref(), Some(t));
+        }
+    }
+}

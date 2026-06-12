@@ -161,7 +161,7 @@ impl<Item: PartialEq> TokenMatcher<Item> for &[Item] {
     }
 }
 
-impl<Item: PartialEq, const N: usize> TokenMatcher<Item> for &[Item; N] {
+impl<Item: PartialEq, const N: usize> TokenMatcher<Item> for [Item; N] {
     fn matches(&mut self, item: &Item) -> bool {
         self.contains(item)
     }
@@ -351,8 +351,8 @@ mod tests {
         let mut s = "abcdef".chars().scanner();
         assert_eq!(s.accept(|c: &char| *c == 'a'), Some(&'a'));
         assert_eq!(s.accept('b'), Some(&'b'));
-        assert_eq!(s.accept(&['x', 'c']), Some(&'c'));
-        assert_eq!(s.accept(&['x', 'c']), None); // Fails, doesn't advance
+        assert_eq!(s.accept(['x', 'c']), Some(&'c'));
+        assert_eq!(s.accept(['x', 'c']), None); // Fails, doesn't advance
         assert_eq!(s.accept(|c: &char| *c == 'd'), Some(&'d'));
         assert_eq!(s.accept('e'), Some(&'e'));
         assert_eq!(s.accept(vec!['x', 'f'].as_slice()), Some(&'f'));
@@ -361,14 +361,14 @@ mod tests {
     #[test]
     fn accept_while() {
         let mut s = "abcdef".chars().scanner();
-        assert_eq!(s.accept_while(&['c', 'a', 'b']), Some(&['a', 'b', 'c'][..]));
+        assert_eq!(s.accept_while(['c', 'a', 'b']), Some(&['a', 'b', 'c'][..]));
         assert_eq!(s.accept_while('x'), None); // Fails, doesn't advance
         assert_eq!(
             s.accept_while(|c: &char| "bcde".contains(*c)),
             Some(&['d', 'e'][..])
         );
         assert_eq!(s.accept_while(vec!['x', 'f'].as_slice()), Some(&['f'][..]));
-        assert_eq!(s.accept_while(&['a', 'b', 'c', 'd', 'e', 'f', 'g']), None); // None at EOF
+        assert_eq!(s.accept_while(['a', 'b', 'c', 'd', 'e', 'f', 'g']), None); // None at EOF
     }
 
     #[test]
@@ -376,7 +376,7 @@ mod tests {
         let mut s = "a".chars().scanner();
         assert_eq!(s.advance(), Some(&'a'));
         assert_eq!(s.advance(), None);
-        assert_eq!(s.accept_while(&['a']), None);
+        assert_eq!(s.accept_while('a'), None);
         assert_eq!(s.accept_seq("a".chars()), None);
         assert_eq!(s.peek_seq("a".chars()), None);
     }
@@ -457,8 +457,6 @@ mod tests {
         // Peek for a sequence longer than what's remaining.
         // This will hit EOF inside _peek_seq.
         assert_eq!(s.peek_seq("bc".chars()), None);
-        // BUG: Since it was just a peek, the current token should still be 'a'.
-        // But the current implementation overwrites matched_len with EOF.
         assert_eq!(s.current(), Some(&'a'));
     }
 
@@ -469,8 +467,6 @@ mod tests {
         // Try to accept "bc". It will match 'b' (forcing a read),
         // then hit EOF looking for 'c'.
         assert_eq!(s.accept_seq("bc".chars()), None);
-        // BUG: accept_seq should cleanly revert on a partial match.
-        // It matched 'b' but failed on 'c'. The position should still be 'a'.
         assert_eq!(s.current(), Some(&'a'));
     }
 

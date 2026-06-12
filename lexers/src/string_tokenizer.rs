@@ -139,7 +139,6 @@ impl<'a, I: Iterator<Item = char>> Iterator for StringTokenizer<'a, I> {
 #[cfg(test)]
 mod tests {
     use super::StringTokenizer;
-    use crate::extractors::{quoted, quoted_no_delims};
 
     #[test]
     fn split_on_trimmer() {
@@ -194,6 +193,7 @@ mod tests {
 
     #[test]
     fn escape_pairs() {
+        use crate::extractors::{quoted, quoted_no_delims};
         // Keep quotes
         let lx = StringTokenizer::from(r#"hello "escaped \" string" world"#)
             .split_by(|s| quoted(s, "\"", "\"", Some('\\')), false);
@@ -222,5 +222,26 @@ mod tests {
         let lx = StringTokenizer::from(r#"start "unterminated"#)
             .split_by(|s| quoted(s, "\"", "\"", Some('\\')), false);
         assert_eq!(lx.collect::<Vec<_>>(), ["start", r#""unterminated"#]);
+    }
+
+    #[test]
+    fn split_on_numbers() {
+        use crate::extractors::number;
+        // The number extractor is added first, so it has higher priority than the symbols.
+        let lx: Vec<_> = StringTokenizer::from("10+20e-3--5.5+4e2i-3")
+            .split_by(number, false)
+            .split_on(["+", "-"], false)
+            .collect();
+        assert_eq!(
+            lx,
+            ["10", "+", "20e-3", "-", "-", "5.5", "+", "4e2i", "-", "3"]
+        );
+
+        // Without spaces, testing proper extraction of minus signs vs subtraction
+        let lx: Vec<_> = StringTokenizer::from("-1.5e-4-2.5e+2")
+            .split_by(number, false)
+            .split_on(["+", "-"], false)
+            .collect();
+        assert_eq!(lx, ["-", "1.5e-4", "-", "2.5e+2"]);
     }
 }

@@ -32,7 +32,8 @@ pub fn quoted_no_delims<'a, I: Iterator<Item = char>>(
     Some(&extract[start.len()..extract.len() - end.len()])
 }
 
-// scan numbers like -?[0-9]+(\.[0-9]+)?([eE][+-][0-9]+)?
+// scan numbers like [0-9]+(\.[0-9]+)?([eE][+-][0-9]+)?
+// NOTE: leading minus is left to the parser instead of lexers.
 pub fn number<'a, I>(s: &'a mut Scanner<I>) -> Option<&'a [char]>
 where
     I: Iterator<Item = char>,
@@ -85,6 +86,41 @@ mod tests {
             let s = &mut Scanner::new(t.chars());
             let n: Option<String> = number(s).map(|c| c.iter().collect());
             assert_eq!(n.as_deref(), Some(t));
+        }
+    }
+
+    #[test]
+    fn scan_quoted() {
+        #[rustfmt::skip]
+        let tests = vec![
+            (r#""hello""#, "\"", "\"", Some('\\'), Some(r#""hello""#)),
+            (r#""he\"llo""#, "\"", "\"", Some('\\'), Some(r#""he\"llo""#)),
+            (r#"'single'"#, "'", "'", Some('\\'), Some(r#"'single'"#)),
+            (r#"[[bracketed]]"#, "[[", "]]", None, Some(r#"[[bracketed]]"#)),
+            (r#""unterminated"#, "\"", "\"", Some('\\'), None),
+        ];
+        for (t, start, end, esc, expected) in tests {
+            let s = &mut Scanner::new(t.chars());
+            let q: Option<String> = quoted(s, start, end, esc).map(|c| c.iter().collect());
+            assert_eq!(q.as_deref(), expected);
+        }
+    }
+
+    #[test]
+    fn scan_quoted_no_delims() {
+        #[rustfmt::skip]
+        let tests = vec![
+            (r#""hello""#, "\"", "\"", Some('\\'), Some(r#"hello"#)),
+            (r#""he\"llo""#, "\"", "\"", Some('\\'), Some(r#"he\"llo"#)),
+            (r#"'single'"#, "'", "'", Some('\\'), Some(r#"single"#)),
+            (r#"[[bracketed]]"#, "[[", "]]", None, Some(r#"bracketed"#)),
+            (r#""unterminated"#, "\"", "\"", Some('\\'), None),
+        ];
+        for (t, start, end, esc, expected) in tests {
+            let s = &mut Scanner::new(t.chars());
+            let q: Option<String> =
+                quoted_no_delims(s, start, end, esc).map(|c| c.iter().collect());
+            assert_eq!(q.as_deref(), expected);
         }
     }
 }

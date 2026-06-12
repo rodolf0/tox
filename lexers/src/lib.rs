@@ -7,7 +7,7 @@ mod string_tokenizer;
 pub use crate::string_tokenizer::StringTokenizer;
 
 mod extractors;
-pub use crate::extractors::{quoted, quoted_no_delims};
+pub use crate::extractors::{quoted, quoted_no_delims, number};
 
 // mod lisp_tokenizer;
 // pub use crate::lisp_tokenizer::{LispToken, LispTokenizer};

@@ -1,4 +1,4 @@
-// #![deny(warnings)]
+#![deny(warnings)]
 
 mod scanner;
 pub use crate::scanner::{Checkpoint, Scan, Scanner};
@@ -7,7 +7,7 @@ mod string_tokenizer;
 pub use crate::string_tokenizer::StringTokenizer;
 
 mod extractors;
-pub use crate::extractors::{quoted, quoted_no_delims, number};
+pub use crate::extractors::{quoted, quoted_no_delims, number, math_op, integer, identifier, unit};
 
 mod ebnf_tokenizer;
 pub use crate::ebnf_tokenizer::EbnfTokenizer;

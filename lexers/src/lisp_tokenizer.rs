@@ -49,10 +49,7 @@ impl<'a, I: Iterator<Item = char>> Iterator for LispTokenizer<'a, I> {
             "#t" => LispToken::True,
             "#f" => LispToken::False,
             s if s.starts_with('"') => {
-                let mut inner = s;
-                inner = inner.strip_prefix('"').unwrap_or(inner);
-                inner = inner.strip_suffix('"').unwrap_or(inner);
-                LispToken::String(inner.to_string())
+                LispToken::String(s[1..s.len()-1].to_string())
             }
             num => match f64::from_str(num) {
                 Ok(n) => LispToken::Number(n),

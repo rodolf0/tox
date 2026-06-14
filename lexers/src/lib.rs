@@ -15,5 +15,8 @@ pub use crate::ebnf_tokenizer::EbnfTokenizer;
 mod lisp_tokenizer;
 pub use crate::lisp_tokenizer::{LispToken, LispTokenizer};
 
-// mod math_tokenizer;
-// pub use crate::math_tokenizer::{MathToken, MathTokenizer};
+mod math_tokenizer;
+pub use crate::math_tokenizer::{MathToken, MathTokenizer};
+
+pub mod typed_tokenizer;
+pub use crate::typed_tokenizer::TypedTokenizer;

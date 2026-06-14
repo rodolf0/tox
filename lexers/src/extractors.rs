@@ -133,7 +133,7 @@ static BARE_UNITS: &[&str] = &[
     "F", "g", "H", "J", "K", "m", "N", "s", "S", "T", "V", "W", "Ω",
 ];
 
-pub fn unit<I>(s: &mut Scanner<I>) -> Option<(&str, &str)>
+pub fn unit<I>(s: &mut Scanner<I>) -> Option<(&'static str, &'static str)>
 where
     I: Iterator<Item = char>,
 {

@@ -1,5 +1,5 @@
 mod repl {
-    use lexers::{MathToken, MathTokenizer};
+    use lexers::{MathToken, MathTokenizer, Scan};
     use shunting::{MathContext, ShuntingParser, MathOp};
 
     pub fn evalexpr(input: &str) {
@@ -13,8 +13,8 @@ mod repl {
     }
 
     pub fn parse_statement(cx: &MathContext, input: &str) {
-        let mut ml = MathTokenizer::scanner(input.chars());
-        let backtrack = ml.buffer_pos();
+        let mut ml = MathTokenizer::from(input).scanner();
+        let backtrack = ml.checkpoint();
         if let (Some(MathToken::Variable(var)), Some(op)) = (ml.next(), ml.next()) {
             if op == MathToken::BOp(":=".to_string()) {
                 match ShuntingParser::parse(&mut ml) {
@@ -28,7 +28,7 @@ mod repl {
             }
         }
         // wasn't assignment... try evaluating expression
-        ml.set_buffer_pos(backtrack);
+        ml.restore(backtrack);
         match ShuntingParser::parse(&mut ml) {
             Err(e) => println!("Parse error: {:?}", e),
             Ok(expr) => match cx.compile(&expr) {

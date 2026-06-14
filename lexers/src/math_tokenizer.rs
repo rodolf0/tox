@@ -1,5 +1,6 @@
-
 use crate::scanner::Scanner;
+use crate::typed_tokenizer::TypedTokenizer;
+use std::str::FromStr;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum MathToken {
@@ -7,7 +8,7 @@ pub enum MathToken {
     Number(f64),
     Quantity(f64, String, String),
     Variable(String),
-    Function(String),
+    Function(String, usize),
     UOp(String),
     BOp(String),
     OParen,
@@ -15,97 +16,105 @@ pub enum MathToken {
     Comma,
 }
 
-#[derive(Clone, Copy, PartialEq)]
-enum PrevTokenCategory {
-    Number,
-    Variable,
-    CParen,
-    Other,
+pub struct MathTokenizer<'a, I: Iterator<Item = char> + 'a> {
+    tokenizer: TypedTokenizer<'a, I, MathToken>,
+    queued: Option<MathToken>,
+    prev_makes_unary: bool,
 }
 
-pub struct MathTokenizer<I: Iterator<Item = char>> {
-    src: Scanner<I>,
-    prev: Option<PrevTokenCategory>,
-}
-
-impl<'a> From<&'a str> for MathTokenizer<std::str::Chars<'a>> {
+impl<'a> From<&'a str> for MathTokenizer<'a, std::str::Chars<'a>> {
     fn from(s: &'a str) -> Self {
         Self::new(s.chars())
     }
 }
 
-impl<I: Iterator<Item = char>> MathTokenizer<I> {
+fn makes_unary(prev: Option<&MathToken>) -> bool {
+    !matches!(
+        prev,
+        Some(MathToken::Number(_))
+            | Some(MathToken::Quantity(_, _, _))
+            | Some(MathToken::Variable(_))
+            | Some(MathToken::CParen)
+    )
+}
+
+impl<'a, I: Iterator<Item = char> + 'a> MathTokenizer<'a, I> {
     pub fn new(source: I) -> Self {
-        MathTokenizer {
-            src: Scanner::new(source),
-            prev: None,
-        }
-    }
+        use MathToken::*;
 
-    pub fn scanner(source: I) -> Scanner<Self> {
-        Scanner::new(Self::new(source))
-    }
-
-    // when would a minus be unary? we need to know the prev token
-    fn makes_unary(prev: &Option<PrevTokenCategory>) -> bool {
-        !matches!(*prev,
-            Some(PrevTokenCategory::Number) |
-            Some(PrevTokenCategory::Variable) |
-            Some(PrevTokenCategory::CParen))
-    }
-
-    fn get_token(&mut self) -> Option<MathToken> {
-        self.src.skip_whitespace();
-        if let Some(op) = self.src.scan_math_op() {
-            return match op.as_ref() {
-                "(" => Some(MathToken::OParen),
-                ")" => Some(MathToken::CParen),
-                "," => Some(MathToken::Comma),
-                "!" => Some(MathToken::UOp(op)),
-                "-" if Self::makes_unary(&self.prev) => Some(MathToken::UOp(op)),
-                _ => Some(MathToken::BOp(op)),
-            };
-        }
-        if let Some(id) = self.src.scan_identifier() {
-            return match self.src.peek() {
-                Some('(') => Some(MathToken::Function(id)),
-                _ => Some(MathToken::Variable(id)),
-            };
-        }
-        if let Some(num) = self.src.scan_number() {
-        self.src.skip_whitespace();
-            use std::str::FromStr;
-            let value = match f64::from_str(&num) {
-                Ok(v) => v,
-                Err(_) => return Some(MathToken::Unknown(num)),
-            };
-            if let Some((prefix, unit)) = self.src.scan_unit() {
-                return Some(MathToken::Quantity(value, prefix, unit));
+        let tokenizer = TypedTokenizer::new(source, |chars| {
+            let s: String = chars.iter().collect();
+            let mut sc = Scanner::new(s.chars());
+            if let Some(id) = crate::extractors::identifier(&mut sc) {
+                if id.len() == s.len() {
+                    return Some(Variable(s));
+                }
             }
-            return Some(MathToken::Number(value));
-        }
-        if self.src.next().is_some() {
-            return Some(MathToken::Unknown(self.src.extract_string()));
-        }
-        None
-    }
-}
-
-impl<I: Iterator<Item = char>> Iterator for MathTokenizer<I> {
-    type Item = MathToken;
-    fn next(&mut self) -> Option<Self::Item> {
-        let token = self.get_token();
-        self.prev = token.as_ref().map(|t| match t {
-            MathToken::Number(_) | MathToken::Quantity(_, _, _) => PrevTokenCategory::Number,
-            MathToken::Variable(_) => PrevTokenCategory::Variable,
-            MathToken::CParen => PrevTokenCategory::CParen,
-            _ => PrevTokenCategory::Other,
+            Some(Unknown(s))
+        })
+        // NOTE: order matters to avoid matching shortest first !
+        .split_on(["<=", ">=", "==", "<", ">", "!="], |s| {
+            Some(BOp(s.iter().collect()))
+        })
+        .split_on([":=", "="], |s| Some(BOp(s.iter().collect())))
+        .split_on(["**", "^", "*", "/", "%", "+", "-"], |s| {
+            Some(BOp(s.iter().collect()))
+        })
+        .split_on("(", |_| Some(OParen))
+        .split_on(")", |_| Some(CParen))
+        .split_on(",", |_| Some(Comma))
+        .split_on("!", |_| Some(UOp("!".to_string())))
+        .split_by(crate::extractors::number, |chars| {
+            let s: String = chars.iter().collect();
+            if let Ok(val) = f64::from_str(&s) {
+                Some(Number(val))
+            } else {
+                Some(Unknown(s))
+            }
         });
-        token
+        MathTokenizer {
+            tokenizer: tokenizer,
+            queued: None,
+            prev_makes_unary: makes_unary(None),
+        }
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////
+impl<'a, I: Iterator<Item = char> + 'a> Iterator for MathTokenizer<'a, I> {
+    type Item = MathToken;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        use MathToken::*;
+        // Get the queued token, or next, or EOF.
+        let token = self.queued.take().or_else(|| self.tokenizer.next())?;
+        // Fill the queue. Some classifications depend on the next token.
+        self.queued = self.tokenizer.next();
+        // Check if the token needs to be re-classified
+        let token = match token {
+            BOp(op) if op == "-" && self.prev_makes_unary => UOp(op),
+            Variable(v) if self.queued == Some(OParen) => Function(v, 0),
+            Number(n) => {
+                match self.queued {
+                    Some(Variable(ref v)) => {
+                        let unit_scanner = &mut Scanner::new(v.chars());
+                        let unit = crate::extractors::unit(unit_scanner);
+                        if unit_scanner.next().is_none() && let Some((p, u)) = unit {
+                            self.queued = None;
+                            Quantity(n, p.to_owned(), u.to_owned())
+                        } else {
+                            Number(n)
+                        }
+                    },
+                    _ => Number(n)
+                }
+            }
+            other => other,
+        };
+        // Remember if the token will affect unary ops later
+        self.prev_makes_unary = makes_unary(Some(&token));
+        Some(token)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -159,7 +168,7 @@ mod tests {
         let expect = [
             Number(3.4e-2),
             BOp("*".to_string()),
-            Function("sin".to_string()),
+            Function("sin".to_string(), 0),
             OParen,
             Variable("x".to_string()),
             CParen,
@@ -172,7 +181,7 @@ mod tests {
             Number(4.0),
             CParen,
             BOp("*".to_string()),
-            Function("max".to_string()),
+            Function("max".to_string(), 0),
             OParen,
             Number(2.0),
             Comma,
@@ -217,6 +226,17 @@ mod tests {
             BOp("*".to_string()),
             Quantity(3.0, "G".to_string(), "Hz".to_string()),
         ];
+        for exp_token in expect.iter() {
+            let token = lx.next().unwrap();
+            assert_eq!(*exp_token, token);
+        }
+        assert_eq!(lx.next(), None);
+    }
+
+    #[test]
+    fn non_quantity() {
+        let mut lx = MathTokenizer::new("30kms".chars());
+        let expect = [Number(30.0), Variable("kms".to_string())];
         for exp_token in expect.iter() {
             let token = lx.next().unwrap();
             assert_eq!(*exp_token, token);

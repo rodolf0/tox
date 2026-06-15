@@ -1,0 +1,6 @@
+for (var i = 0; i < 3; i = i + 1) {
+  for (var j = 0; j < 3; j = j + 1) {
+    if (i == 1 and j == 1) break 2;
+    print i + " " + j;
+  }
+}

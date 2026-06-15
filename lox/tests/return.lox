@@ -1,0 +1,11 @@
+fun add(a, b) {
+  return a + b;
+}
+print add(1, 2);
+
+fun early() {
+  print "before";
+  return;
+  print "after";
+}
+early();

@@ -1,0 +1,6 @@
+print nil;
+print true;
+print false;
+print 123;
+print -45.67;
+print "hello";

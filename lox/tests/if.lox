@@ -1,0 +1,5 @@
+if (true) print "yes";
+if (false) print "no"; else print "yes";
+if (0) print "truthy"; else print "falsey";
+if (nil) print "truthy"; else print "falsey";
+if ("") print "truthy"; else print "falsey";

@@ -1,0 +1,4 @@
+var a = clock();
+var b = clock();
+print b >= a;
+print clock;

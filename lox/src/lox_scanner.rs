@@ -1,5 +1,9 @@
-use lexers::Scanner;
+use lexers::TypedTokenizer;
+use lexers::{identifier, number};
+use std::cell::Cell;
+use std::rc::Rc;
 
+#[rustfmt::skip]
 #[derive(Clone,Debug,PartialEq)]
 pub enum TT {
     // single char tokens
@@ -10,170 +14,156 @@ pub enum TT {
     Id(String), Str(String), Num(f64),
     // keywords
     AND, CLASS, ELSE, FALSE, FUN, FOR, IF, NIL, OR, BREAK,
-    PRINT, RETURN, SUPER, THIS, TRUE, VAR, WHILE, EOF,
+    PRINT, RETURN, SUPER, THIS, TRUE, VAR, WHILE,
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct Token {
     pub line: usize,
     pub token: TT,
     pub lexeme: String,
 }
 
-pub struct LoxScanner<I: Iterator<Item=char>> {
-    src: Scanner<I>,
-    line: usize,
-    errors: bool,
-}
+pub fn scanner<'a, I: Iterator<Item = char> + 'a>(source: I) -> impl Iterator<Item = Token> + 'a {
+    let line = Rc::new(Cell::new(1));
 
-
-impl<I: Iterator<Item=char>> LoxScanner<I> {
-    pub fn scanner(source: I) -> Scanner<Self> {
-        Scanner::new(
-            LoxScanner{
-                src: Scanner::new(source),
-                line: 1,
-                errors: false})
-    }
-
-    fn tokenize(&mut self, literal: TT) -> Option<Token> {
-        let lexeme = match literal {
-            TT::EOF => String::new(),
-            _ => self.src.extract_string()
+    let id_or_keyword = move |lexeme: String, line: usize| -> Token {
+        let token = match lexeme.as_str() {
+            "and" => TT::AND,
+            "class" => TT::CLASS,
+            "else" => TT::ELSE,
+            "false" => TT::FALSE,
+            "fun" => TT::FUN,
+            "for" => TT::FOR,
+            "if" => TT::IF,
+            "nil" => TT::NIL,
+            "or" => TT::OR,
+            "break" => TT::BREAK,
+            "print" => TT::PRINT,
+            "return" => TT::RETURN,
+            "super" => TT::SUPER,
+            "this" => TT::THIS,
+            "true" => TT::TRUE,
+            "var" => TT::VAR,
+            "while" => TT::WHILE,
+            _ => TT::Id(lexeme.clone()),
         };
-        let literal = match literal {
-            TT::Str(_) => TT::Str(lexeme.trim_matches('"').to_string()),
-            other => other
-        };
-        Some(Token{line: self.line, token: literal, lexeme})
-    }
-
-    fn error<T: AsRef<str>>(&mut self, err: T) {
-        eprintln!("LoxScanner error: {}", err.as_ref());
-        self.errors = true;
-    }
-
-    fn scan_restof_string(&mut self, q: char) -> bool {
-        let backtrack = self.src.buffer_pos();
-        let orig_line = self.line;
-        while let Some(n) = self.src.next() {
-            if n == '\n' { self.line += 1; }
-            if n == '\\' { self.src.next(); continue; }
-            if n == q { return true; }
+        Token {
+            line,
+            token,
+            lexeme,
         }
-        self.src.set_buffer_pos(backtrack);
-        self.line = orig_line;
-        false
-    }
+    };
 
-    fn id_or_keyword(&mut self, keyword: String) -> Option<Token> {
-        let key2 = keyword.clone();
-        let tok = |literal: TT| -> Option<Token> {
-            Some(Token{line: self.line, token: literal, lexeme: key2})
-        };
-        match keyword.as_ref() {
-            "and" => tok(TT::AND),
-            "class" => tok(TT::CLASS),
-            "else" => tok(TT::ELSE),
-            "false" => tok(TT::FALSE),
-            "fun" => tok(TT::FUN),
-            "for" => tok(TT::FOR),
-            "if" => tok(TT::IF),
-            "nil" => tok(TT::NIL),
-            "or" => tok(TT::OR),
-            "break" => tok(TT::BREAK),
-            "print" => tok(TT::PRINT),
-            "return" => tok(TT::RETURN),
-            "super" => tok(TT::SUPER),
-            "this" => tok(TT::THIS),
-            "true" => tok(TT::TRUE),
-            "var" => tok(TT::VAR),
-            "while" => tok(TT::WHILE),
-            _ => Some(Token{line: self.line,
-                      token: TT::Id(keyword.clone()), lexeme: keyword})
-        }
-    }
-
-    fn scan_token(&mut self) -> Option<Token> {
-        let token = match self.src.next() {
-            Some('(') => self.tokenize(TT::OPAREN),
-            Some(')') => self.tokenize(TT::CPAREN),
-            Some('{') => self.tokenize(TT::OBRACE),
-            Some('}') => self.tokenize(TT::CBRACE),
-            Some(',') => self.tokenize(TT::COMMA),
-            Some('.') => self.tokenize(TT::DOT),
-            Some('-') => self.tokenize(TT::MINUS),
-            Some('+') => self.tokenize(TT::PLUS),
-            Some(';') => self.tokenize(TT::SEMICOLON),
-            Some('*') => self.tokenize(TT::STAR),
-            Some('$') => self.tokenize(TT::DOLLAR),
-            Some('!') => if self.src.accept(&'=').is_some() {
-                self.tokenize(TT::NE)
+    TypedTokenizer::new(source, {
+        let line = line.clone();
+        move |chars| {
+            let lexeme: String = chars.iter().collect();
+            if lexeme == "\"" {
+                eprintln!("LoxScanner error: unterminated string");
             } else {
-                self.tokenize(TT::BANG)
-            },
-            Some('=') => if self.src.accept(&'=').is_some() {
-                self.tokenize(TT::EQ)
-            } else {
-                self.tokenize(TT::ASSIGN)
-            },
-            Some('<') => if self.src.accept(&'=').is_some() {
-                self.tokenize(TT::LE)
-            } else {
-                self.tokenize(TT::LT)
-            },
-            Some('>') => if self.src.accept(&'=').is_some() {
-                self.tokenize(TT::GE)
-            } else {
-                self.tokenize(TT::GT)
-            },
-            Some('/') => if self.src.accept(&'/').is_some() {
-                // skip comment
-                self.src.until_any(&['\n']);
-                None
-            } else {
-                self.tokenize(TT::SLASH)
-            },
-            Some(' ') | Some('\t') | Some('\r') => None,
-            Some('\n') => { self.line += 1; None }, // track current line
-            Some('"') => match self.scan_restof_string('"') {
-                true => self.tokenize(TT::Str(String::new())),
-                false => { self.error("unterminated string"); None }
-            },
-            Some(d) if d.is_digit(10) => {
-                self.src.prev(); // hacky but works
-                let num = self.src.scan_number().unwrap();
-                use std::str::FromStr;
-                Some(Token{line: self.line,
-                     token: TT::Num(f64::from_str(&num).unwrap()), lexeme: num})
-            },
-            Some(a) if a.is_alphabetic() => {
-                self.src.prev(); // hacky but works
-                let id = self.src.scan_identifier().unwrap();
-                self.id_or_keyword(id)
-            },
-            Some(c) => {
-                let err = format!("bad char '{}' at line {}", c, self.line);
-                self.error(err);
-                None
-            },
-            None => self.tokenize(TT::EOF)
-        };
-        self.src.extract(); // ignore what we didn't harvest
-        token
-    }
-}
-
-impl<I: Iterator<Item=char>> Iterator for LoxScanner<I> {
-    type Item = Token;
-    fn next(&mut self) -> Option<Self::Item> {
-        loop { // consume all white space and errors
-            if let Some(token) = self.scan_token() {
-                match token.token {
-                    TT::EOF => return None,
-                    _ => return Some(token)
-                }
+                eprintln!(
+                    "LoxScanner error: bad char '{}' at line {}",
+                    lexeme,
+                    line.get()
+                );
             }
+            None
         }
-    }
+    })
+    .trimmer(|c| *c == ' ' || *c == '\t' || *c == '\r')
+    .split_on("\n", {
+        let line = line.clone();
+        move |_| {
+            line.set(line.get() + 1);
+            None
+        }
+    })
+    .split_by(
+        |s| {
+            let cp = s.checkpoint();
+            if s.accept_seq("//".chars()).is_some() {
+                s.accept_while(|c: &char| *c != '\n');
+                Some(s.view_from(cp))
+            } else {
+                None
+            }
+        },
+        move |_| None,
+    )
+    .split_by(|s| lexers::quoted(s, "\"", "\"", Some('\\')), {
+        let line = line.clone();
+        move |chars| {
+            let s: String = chars.iter().collect();
+            let newlines = s.chars().filter(|&c| c == '\n').count();
+            let current_line = line.get();
+            line.set(current_line + newlines);
+            let inner: String = chars[1..chars.len() - 1].iter().collect();
+            Some(Token {
+                line: current_line,
+                token: TT::Str(inner),
+                lexeme: s,
+            })
+        }
+    })
+    .split_on(identifier, {
+        let line = line.clone();
+        move |chars| {
+            let lexeme: String = chars.iter().collect();
+            Some(id_or_keyword(lexeme, line.get()))
+        }
+    })
+    .split_on(number, {
+        let line = line.clone();
+        move |chars| {
+            let lexeme: String = chars.iter().collect();
+            use std::str::FromStr;
+            let val = f64::from_str(&lexeme).unwrap();
+            Some(Token {
+                line: line.get(),
+                token: TT::Num(val),
+                lexeme,
+            })
+        }
+    })
+    .split_on(
+        [
+            "!=", "==", "<=", ">=", "(", ")", "{", "}", ",", ".", "-", "+", ";", "*", "$", "!",
+            "=", "<", ">", "/",
+        ],
+        {
+            let line = line.clone();
+            move |chars| {
+                let lexeme: String = chars.iter().collect();
+                let tok = match lexeme.as_str() {
+                    "(" => TT::OPAREN,
+                    ")" => TT::CPAREN,
+                    "{" => TT::OBRACE,
+                    "}" => TT::CBRACE,
+                    "," => TT::COMMA,
+                    "." => TT::DOT,
+                    "-" => TT::MINUS,
+                    "+" => TT::PLUS,
+                    ";" => TT::SEMICOLON,
+                    "*" => TT::STAR,
+                    "$" => TT::DOLLAR,
+                    "!" => TT::BANG,
+                    "=" => TT::ASSIGN,
+                    "!=" => TT::NE,
+                    "==" => TT::EQ,
+                    ">" => TT::GT,
+                    ">=" => TT::GE,
+                    "<" => TT::LT,
+                    "<=" => TT::LE,
+                    "/" => TT::SLASH,
+                    _ => return None,
+                };
+                Some(Token {
+                    line: line.get(),
+                    token: tok,
+                    lexeme,
+                })
+            }
+        },
+    )
 }

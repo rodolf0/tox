@@ -1,10 +1,9 @@
-
 use lexers::Scanner;
 use crate::lox_scanner::{Token, TT};
 use std::rc::Rc;
 
 
-// NOTE: do _NOT_ derive Clone, or modify id so its constant across Expr life
+// NOTE: do _NOT_ derive Clone, or modify id so it's constant across Expr life
 #[derive(Debug)]
 pub enum Expr {
     Logical(Box<Expr>, Token, Box<Expr>),
@@ -51,27 +50,27 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
         LoxParser{scanner: Scanner::new(source), errors: false}
     }
 
-    fn accept(&mut self, token_types: Vec<TT>) -> bool {
-        let backtrack = self.scanner.buffer_pos();
-        if let Some(token) = self.scanner.next() {
+    fn accept<const N: usize>(&mut self, token_types: [TT; N]) -> Option<Token> {
+        let backtrack = self.scanner.checkpoint();
+        if let Some(token) = self.scanner.advance() {
             let found = token_types.iter().any(|ttype| match &token.token {
                 TT::Str(_) => matches!(ttype, TT::Str(_)),
                 TT::Id(_) => matches!(ttype, TT::Id(_)),
                 TT::Num(_) => matches!(ttype, TT::Num(_)),
                 other => other == ttype
             });
-            if found { return true; }
+            if found { return Some(self.scanner.lift().last().unwrap()); }
         }
-        self.scanner.set_buffer_pos(backtrack);
-        false
+        self.scanner.restore(backtrack);
+        None
     }
 
-    fn consume<S: AsRef<str>>(&mut self, token_types: Vec<TT>,
+    fn consume<S: AsRef<str>, const N: usize>(&mut self, token_types: [TT; N],
                               err: S) -> Result<Token, String> {
         match self.accept(token_types) {
-            true => Ok(self.scanner.extract().swap_remove(0)),
-            false => {
-                let bad_token = self.scanner.peek();
+            Some(token) => Ok(token),
+            None => {
+                let bad_token = self.scanner.peek().cloned();
                 Err(self.error(bad_token, err))
             }
         }
@@ -91,7 +90,7 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
             // if we hit a semicolon we're probably about to start a statement
             // we maybe inside a `for` clause, too bad, we're already panic'ing
             if token.token == TT::SEMICOLON {
-                self.scanner.extract();
+                let _ = self.scanner.lift();
                 return;
             }
             // alternatively if we've found a keyword we might be starting a
@@ -164,8 +163,8 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
 impl<I: Iterator<Item=Token>> LoxParser<I> {
     fn assignment(&mut self) -> ExprResult {
         let expr = self.logic_or()?;
-        if self.accept(vec![TT::ASSIGN]) {
-            let maybe_bad = Some(self.scanner.extract().swap_remove(0));
+        if let Some(token) = self.accept([TT::ASSIGN]) {
+            let maybe_bad = Some(token);
             // recursively parse right-hand-side
             let value = self.assignment()?;
             return match expr {
@@ -183,8 +182,7 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
 
     fn logic_and(&mut self) -> ExprResult {
         let mut expr = self.equality()?;
-        while self.accept(vec![TT::AND]) {
-            let op = self.scanner.extract().swap_remove(0);
+        while let Some(op) = self.accept([TT::AND]) {
             let rhs = self.equality()?;
             expr = Expr::Logical(Box::new(expr), op, Box::new(rhs));
         }
@@ -193,8 +191,7 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
 
     fn logic_or(&mut self) -> ExprResult {
         let mut expr = self.logic_and()?;
-        while self.accept(vec![TT::OR]) {
-            let op = self.scanner.extract().swap_remove(0);
+        while let Some(op) = self.accept([TT::OR]) {
             let rhs = self.logic_and()?;
             expr = Expr::Logical(Box::new(expr), op, Box::new(rhs));
         }
@@ -203,8 +200,7 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
 
     fn equality(&mut self) -> ExprResult {
         let mut expr = self.comparison()?;
-        while self.accept(vec![TT::EQ, TT::NE]) {
-            let op = self.scanner.extract().swap_remove(0);
+        while let Some(op) = self.accept([TT::EQ, TT::NE]) {
             let rhs = self.comparison()?;
             expr = Expr::Binary(Box::new(expr), op, Box::new(rhs));
         }
@@ -213,8 +209,7 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
 
     fn comparison(&mut self ) -> ExprResult {
         let mut expr = self.addition()?;
-        while self.accept(vec![TT::GT, TT::GE, TT::LT, TT::LE]) {
-            let op = self.scanner.extract().swap_remove(0);
+        while let Some(op) = self.accept([TT::GT, TT::GE, TT::LT, TT::LE]) {
             let rhs = self.addition()?;
             expr = Expr::Binary(Box::new(expr), op, Box::new(rhs));
         }
@@ -223,8 +218,7 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
 
     fn addition(&mut self) -> ExprResult {
         let mut expr = self.multiplication()?;
-        while self.accept(vec![TT::MINUS, TT::PLUS]) {
-            let op = self.scanner.extract().swap_remove(0);
+        while let Some(op) = self.accept([TT::MINUS, TT::PLUS]) {
             let rhs = self.multiplication()?;
             expr = Expr::Binary(Box::new(expr), op, Box::new(rhs));
         }
@@ -233,8 +227,7 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
 
     fn multiplication(&mut self) -> ExprResult {
         let mut expr = self.unary()?;
-        while self.accept(vec![TT::SLASH, TT::STAR]) {
-            let op = self.scanner.extract().swap_remove(0);
+        while let Some(op) = self.accept([TT::SLASH, TT::STAR]) {
             let rhs = self.unary()?;
             expr = Expr::Binary(Box::new(expr), op, Box::new(rhs));
         }
@@ -244,26 +237,22 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
     fn call_expr(&mut self) -> ExprResult {
         let mut primary = self.primary()?;
         // if there's an OPAREN crawl thread the function Call chain
-        while self.accept(vec![TT::OPAREN]) {
-            self.scanner.extract(); // skip oparen
+        while self.accept([TT::OPAREN]).is_some() {
             let mut arguments = Vec::new();
-            if !self.accept(vec![TT::CPAREN]) { // 0-arg case
+            if self.accept([TT::CPAREN]).is_none() { // 0-arg case
                 loop {
                     arguments.push(self.expression()?);
-                    if !self.accept(vec![TT::COMMA]) { break; }
-                    self.scanner.extract(); // skip comma
+                    if self.accept([TT::COMMA]).is_none() { break; }
                 }
-                self.consume(vec![TT::CPAREN], "expect ')' after call args")?;
+                self.consume([TT::CPAREN], "expect ')' after call args")?;
             }
-            self.scanner.extract(); // skip cparen if accepted
             primary = Expr::Call(Box::new(primary), arguments);
         }
         Ok(primary)
     }
 
     fn unary(&mut self) -> ExprResult {
-        if self.accept(vec![TT::BANG, TT::MINUS, TT::DOLLAR]) {
-            let op = self.scanner.extract().swap_remove(0);
+        if let Some(op) = self.accept([TT::BANG, TT::MINUS, TT::DOLLAR]) {
             let rhs = self.unary()?;
             return Ok(Expr::Unary(op, Box::new(rhs)));
         }
@@ -271,50 +260,48 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
     }
 
     fn primary(&mut self) -> ExprResult {
-        if self.accept(vec![TT::FALSE, TT::TRUE]) {
-            return Ok(match self.scanner.extract().swap_remove(0).token {
+        if let Some(token) = self.accept([TT::FALSE, TT::TRUE]) {
+            return Ok(match token.token {
                 TT::TRUE => Expr::Bool(true),
                 _ => Expr::Bool(false),
             });
         }
-        if self.accept(vec![TT::NIL]) {
-            self.scanner.extract();
+        if self.accept([TT::NIL]).is_some() {
             return Ok(Expr::Nil);
         }
-        if self.accept(vec![TT::Num(0.0)]) {
-            return Ok(match self.scanner.extract().swap_remove(0).token {
+        if let Some(token) = self.accept([TT::Num(0.0)]) {
+            return Ok(match token.token {
                 TT::Num(n) => Expr::Num(n),
                 o => panic!("LoxParser Bug! unexpected token: {:?}", o),
             });
         }
-        if self.accept(vec![TT::Str("".to_string())]) {
-            return Ok(match self.scanner.extract().swap_remove(0).token {
+        if let Some(token) = self.accept([TT::Str("".to_string())]) {
+            return Ok(match token.token {
                 TT::Str(s) => Expr::Str(s),
                 o => panic!("LoxParser Bug! unexpected token: {:?}", o),
             });
         }
-        if self.accept(vec![TT::Id("".to_string())]) {
-            return Ok(Expr::Var(self.scanner.extract().swap_remove(0)));
+        if let Some(token) = self.accept([TT::Id("".to_string())]) {
+            return Ok(Expr::Var(token));
         }
-        if self.accept(vec![TT::OPAREN]) {
-            self.scanner.extract(); // skip OPAREN
+        if self.accept([TT::OPAREN]).is_some() {
             let expr = self.expression()?;
-            self.consume(vec![TT::CPAREN], "expect ')' after group grouping")?;
+            self.consume([TT::CPAREN], "expect ')' after group grouping")?;
             return Ok(Expr::Grouping(Box::new(expr)));
         }
-        let bad_token = self.scanner.peek();
+        let bad_token = self.scanner.peek().cloned();
         Err(self.error(bad_token, "expected expression"))
     }
 
     fn print_stmt(&mut self) -> StmtResult {
         let expr = self.expression()?;
-        self.consume(vec![TT::SEMICOLON], "expect ';' after print expr")?;
+        self.consume([TT::SEMICOLON], "expect ';' after print expr")?;
         Ok(Stmt::Print(expr))
     }
 
     fn expr_stmt(&mut self) -> StmtResult {
         let expr = self.expression()?;
-        self.consume(vec![TT::SEMICOLON], "expect ';' after expression")?;
+        self.consume([TT::SEMICOLON], "expect ';' after expression")?;
         Ok(Stmt::Expr(expr))
     }
 
@@ -324,17 +311,16 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
             if maybe_cbrace.token == TT::CBRACE { break; }
             statements.push(self.declaration()?);
         }
-        self.consume(vec![TT::CBRACE], "expect '}' after block")?;
+        self.consume([TT::CBRACE], "expect '}' after block")?;
         Ok(statements)
     }
 
     fn if_stmt(&mut self) -> StmtResult {
-        self.consume(vec![TT::OPAREN], "expect '(' after 'if'")?;
+        self.consume([TT::OPAREN], "expect '(' after 'if'")?;
         let condition = self.expression()?;
-        self.consume(vec![TT::CPAREN], "expect ')' after 'if' condition")?;
+        self.consume([TT::CPAREN], "expect ')' after 'if' condition")?;
         let then_branch = self.statement()?;
-        if self.accept(vec![TT::ELSE]) {
-            self.scanner.extract(); // skip else
+        if self.accept([TT::ELSE]).is_some() {
             let else_branch = Some(Box::new(self.statement()?));
             return Ok(Stmt::If(condition, Box::new(then_branch), else_branch));
         }
@@ -342,20 +328,18 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
     }
 
     fn while_stmt(&mut self) -> StmtResult {
-        self.consume(vec![TT::OPAREN], "expect '(' after 'while'")?;
+        self.consume([TT::OPAREN], "expect '(' after 'while'")?;
         let condition = self.expression()?;
-        self.consume(vec![TT::CPAREN], "expect ')' after 'if' condition")?;
+        self.consume([TT::CPAREN], "expect ')' after 'if' condition")?;
         let body = self.statement()?;
         Ok(Stmt::While(condition, Box::new(body)))
     }
 
     fn for_stmt(&mut self) -> StmtResult {
-        self.consume(vec![TT::OPAREN], "expect '(' after 'for'")?;
-        let init = if self.accept(vec![TT::SEMICOLON]) {
-            self.scanner.extract(); // skip ';'
+        self.consume([TT::OPAREN], "expect '(' after 'for'")?;
+        let init = if self.accept([TT::SEMICOLON]).is_some() {
             None
-        } else if self.accept(vec![TT::VAR]) {
-            self.scanner.extract(); // skip var
+        } else if self.accept([TT::VAR]).is_some() {
             Some(self.var_declaration()?)
         } else {
             Some(self.expr_stmt()?)
@@ -365,13 +349,13 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
             Some(ref t) if t.token != TT::SEMICOLON => self.expression()?,
             _ => Expr::Bool(true)
         };
-        self.consume(vec![TT::SEMICOLON], "expect ';' loop condition")?;
+        self.consume([TT::SEMICOLON], "expect ';' loop condition")?;
         // parse loop increment
         let increment = match self.scanner.peek() {
             Some(ref t) if t.token != TT::CPAREN => Some(self.expression()?),
             _ => None
         };
-        self.consume(vec![TT::CPAREN], "expect ')' after 'for' clause")?;
+        self.consume([TT::CPAREN], "expect ')' after 'for' clause")?;
         // desugar forStmt into WhileStmt
         let body = Stmt::While(condition, Box::new(match increment {
             Some(inc) => Stmt::Block(vec![self.statement()?, Stmt::Expr(inc)]),
@@ -382,13 +366,13 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
 
     fn break_stmt(&mut self) -> StmtResult {
         let mut scopes = 1;
-        if self.accept(vec![TT::Num(0.0)]) {
-            scopes = match self.scanner.extract().swap_remove(0).token {
+        if let Some(token) = self.accept([TT::Num(0.0)]) {
+            scopes = match token.token {
                 TT::Num(n) => n as usize,
                 o => panic!("LoxParser Bug! unexpected token: {:?}", o),
             };
         }
-        self.consume(vec![TT::SEMICOLON], "expect ';' after 'break'")?;
+        self.consume([TT::SEMICOLON], "expect ';' after 'break'")?;
         Ok(Stmt::Break(scopes))
     }
 
@@ -397,37 +381,30 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
             Some(ref t) if t.token != TT::SEMICOLON => self.expression()?,
             _ => Expr::Nil
         };
-        self.consume(vec![TT::SEMICOLON], "expect ';' after return value")?;
+        self.consume([TT::SEMICOLON], "expect ';' after return value")?;
         Ok(Stmt::Return(expr))
     }
 
     fn statement(&mut self) -> StmtResult {
-        if self.accept(vec![TT::PRINT]) {
-            self.scanner.extract(); // skip print
+        if self.accept([TT::PRINT]).is_some() {
             return self.print_stmt();
         }
-        if self.accept(vec![TT::OBRACE]) {
-            self.scanner.extract(); // skip obrace
+        if self.accept([TT::OBRACE]).is_some() {
             return Ok(Stmt::Block(self.block_stmt()?));
         }
-        if self.accept(vec![TT::IF]) {
-            self.scanner.extract(); // skip if
+        if self.accept([TT::IF]).is_some() {
             return self.if_stmt();
         }
-        if self.accept(vec![TT::WHILE]) {
-            self.scanner.extract(); // skip while
+        if self.accept([TT::WHILE]).is_some() {
             return self.while_stmt();
         }
-        if self.accept(vec![TT::FOR]) {
-            self.scanner.extract(); // skip for
+        if self.accept([TT::FOR]).is_some() {
             return self.for_stmt();
         }
-        if self.accept(vec![TT::BREAK]) {
-            self.scanner.extract(); // skip break
+        if self.accept([TT::BREAK]).is_some() {
             return self.break_stmt();
         }
-        if self.accept(vec![TT::RETURN]) {
-            self.scanner.extract(); // skip return
+        if self.accept([TT::RETURN]).is_some() {
             return self.return_stmt();
         }
         self.expr_stmt()
@@ -435,43 +412,39 @@ impl<I: Iterator<Item=Token>> LoxParser<I> {
 
     fn var_declaration(&mut self) -> StmtResult {
         let name = self.consume(
-            vec![TT::Id("".to_string())], "expect variable name")?;
+            [TT::Id("".to_string())], "expect variable name")?;
         let mut init = Expr::Nil;
-        if self.accept(vec![TT::ASSIGN]) {
-            self.scanner.extract(); // skip assign
+        if self.accept([TT::ASSIGN]).is_some() {
             init = self.expression()?;
         }
-        self.consume(vec![TT::SEMICOLON], "expect ';' after variable decl")?;
+        self.consume([TT::SEMICOLON], "expect ';' after variable decl")?;
         Ok(Stmt::Var(name.lexeme, init))
     }
 
     fn fun_declaration(&mut self, kind: &str) -> StmtResult {
         let name = self.consume(
-            vec![TT::Id("".to_string())], format!("expect {} name", kind))?;
-        self.consume(vec![TT::OPAREN], format!("expect '(' after {}", kind))?;
+            [TT::Id("".to_string())], format!("expect {} name", kind))?;
+        self.consume([TT::OPAREN], format!("expect '(' after {}", kind))?;
         let mut params = Vec::new();
-        if !self.accept(vec![TT::CPAREN]) {
+        if self.accept([TT::CPAREN]).is_none() {
             loop {
                 let parameter = self.consume(
-                    vec![TT::Id("".to_string())], "expect parameter name")?;
+                    [TT::Id("".to_string())], "expect parameter name")?;
                 params.push(parameter.lexeme);
-                if !self.accept(vec![TT::COMMA]) { break; }
-                self.scanner.extract(); // skip comma
+                if self.accept([TT::COMMA]).is_none() { break; }
             }
-            self.consume(vec![TT::CPAREN], "expect ')' after parameters")?;
+            self.consume([TT::CPAREN], "expect ')' after parameters")?;
         }
         self.consume(
-            vec![TT::OBRACE], format!("expect '{{' before {} body ", kind))?;
+            [TT::OBRACE], format!("expect '{{' before {} body ", kind))?;
         Ok(Stmt::Function(name.lexeme, params, Rc::new(self.block_stmt()?)))
     }
 
     fn declaration(&mut self) -> StmtResult {
-        if self.accept(vec![TT::VAR]) {
-            self.scanner.extract(); // skip var
+        if self.accept([TT::VAR]).is_some() {
             return self.var_declaration();
         }
-        if self.accept(vec![TT::FUN]) {
-            self.scanner.extract(); // skip fun
+        if self.accept([TT::FUN]).is_some() {
             return self.fun_declaration("function");
         }
         self.statement()

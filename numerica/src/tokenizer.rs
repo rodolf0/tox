@@ -1,161 +1,61 @@
-pub struct Tokenizer<I: Iterator<Item = char>> {
-    input: std::iter::Peekable<I>,
-    buff: Vec<String>,
+pub struct Tokenizer<'a> {
+    inner: lexers::StringTokenizer<'a, std::str::Chars<'a>>,
 }
 
-impl<I: Iterator<Item = char>> Tokenizer<I> {
-    pub fn new(input: I) -> Self {
-        Self {
-            input: input.peekable(),
-            buff: Vec::new(),
-        }
-    }
-
-    fn next_result(&mut self) -> Result<Option<String>, String> {
-        if self.buff.len() > 0 {
-            return Ok(Some(self.buff.remove(0)));
-        }
-        match self.input.next() {
-            // ReplaceAll operator, or Division
-            Some('/') => match self.input.peek() {
-                Some('.') => {
-                    self.input.next();
-                    Ok(Some("/.".into()))
-                }
-                _ => Ok(Some("/".into())),
-            },
-            // Rule operator, or Minus
-            Some('-') => match self.input.peek() {
-                Some('>') => {
-                    self.input.next();
-                    Ok(Some("->".into()))
-                }
-                _ => Ok(Some("-".into())),
-            },
-            // Various single char tokens.
-            Some(x) if "[]{}(),+*^!~;%".contains(x) => Ok(Some(x.into())),
-            // Assignment operator.
-            Some(':') => match self.input.next() {
-                Some('=') => Ok(Some(":=".into())),
-                _ => Err("Incomplete := operator".into()),
-            },
-            Some('=') => Ok(Some("=".into())),
-            // Tokenize Strings checking for escapes.
-            Some(open) if open == '"' || open == '\'' => {
-                self.buff.push(open.into());
-                let mut quoted_string = String::new();
-                let mut escaped = false;
-                while let Some(ch) = self.input.next() {
-                    // Swallow escape char '\' and prevent string closure
-                    if !escaped && ch == '\\' {
-                        escaped = true;
-                        continue;
+impl<'a> Tokenizer<'a> {
+    pub fn new(input: &'a str) -> Self {
+        let inner = lexers::StringTokenizer::new(input.chars())
+            // Discard comments from '#' to end of line
+            .split_by(
+                |s| {
+                    let cp = s.checkpoint();
+                    if s.accept('#').is_some() {
+                        s.accept_while(|c: &char| *c != '\n');
+                        return Some(s.view_from(cp));
                     }
-                    if escaped {
-                        quoted_string.push('\\')
-                    }
-                    // Found close token. Check it wasn't escaped.
-                    if !escaped && open == ch {
-                        self.buff.push(quoted_string);
-                        self.buff.push(ch.into());
-                        return self.next_result();
-                    }
-                    quoted_string.push(ch);
-                    escaped = false;
-                }
-                Err("Unfinished string missing close quote".into())
-            }
-            // Swallow comments until EOL.
-            Some('#') => {
-                while let Some(nl) = self.input.next() {
-                    if nl == '\n' {
-                        return self.next_result();
-                    }
-                }
-                self.next_result() // EOF
-            }
-            // Tokenize variable names
-            Some(x) if x.is_ascii_alphabetic() || x == '_' => {
-                let mut id = x.to_string();
-                while let Some(ch) = self.input.peek() {
-                    if !ch.is_ascii_alphanumeric() && *ch != '_' {
-                        break;
-                    }
-                    id.push(self.input.next().unwrap());
-                }
-                Ok(Some(id))
-            }
-            // Tokenize numbers TODO: unary minus shouldn't be part of this
-            Some(x) if x.is_ascii_digit() || x == '-' => {
-                let mut num = x.to_string();
-                // consume all integer part
-                while let Some(n) = self.input.peek() {
-                    if !n.is_ascii_digit() {
-                        break;
-                    }
-                    num.push(self.input.next().unwrap());
-                }
-                // Maybe fractional part
-                if let Some(dot) = self.input.peek() {
-                    if *dot == '.' {
-                        num.push(self.input.next().unwrap());
-                        // consume fractional part
-                        while let Some(n) = self.input.peek() {
-                            if !n.is_ascii_digit() {
-                                break;
-                            }
-                            num.push(self.input.next().unwrap());
+                    None
+                },
+                true,
+            )
+            // Double-quoted strings
+            .split_by(|s| lexers::quoted(s, "\"", "\"", Some('\\')), false)
+            // Single-quoted strings
+            .split_by(|s| lexers::quoted(s, "'", "'", Some('\\')), false)
+            // Numbers
+            .split_by(lexers::number, false)
+            // Identifiers / symbols
+            .split_by(lexers::identifier, false)
+            // Operators and punctuation
+            .split_by(
+                |s| {
+                    let cp = s.checkpoint();
+                    static MULTI: &[&str] = &["/.", "->", ":="];
+                    for op in MULTI {
+                        if s.accept_seq(op.chars()).is_some() {
+                            return Some(s.view_from(cp));
                         }
+                        s.restore(cp);
                     }
-                }
-                // Maybe exponent
-                if let Some(exp) = self.input.peek() {
-                    if *exp == 'e' || *exp == 'E' {
-                        num.push(self.input.next().unwrap());
-                        // Optional exponent sign
-                        if let Some(sign) = self.input.peek() {
-                            if *sign == '-' || *sign == '+' {
-                                num.push(self.input.next().unwrap());
-                            }
-                        }
-                        // consume exponent digits
-                        while let Some(n) = self.input.peek() {
-                            if !n.is_ascii_digit() {
-                                break;
-                            }
-                            num.push(self.input.next().unwrap());
-                        }
+                    static SINGLE: &[char] = &[
+                        '[', ']', '{', '}', '(', ')', ',', '+', '-', '*', '/', '^', '!', '~', ';',
+                        '%', '=',
+                    ];
+                    if s.accept(SINGLE).is_some() {
+                        return Some(s.view_from(cp));
                     }
-                }
-                Ok(Some(num))
-            }
-            // Swallow whitespace.
-            Some(x) if x.is_whitespace() => {
-                while let Some(ws) = self.input.peek() {
-                    if !ws.is_whitespace() {
-                        break;
-                    }
-                    self.input.next(); // consume whitespace
-                }
-                self.next_result()
-            }
-            Some(ch) => Err(format!("Unexpected char: {}", ch)),
-            None => Ok(None),
-        }
+                    None
+                },
+                false,
+            );
+        Self { inner }
     }
 }
 
-impl<I: Iterator<Item = char>> Iterator for Tokenizer<I> {
+impl<'a> Iterator for Tokenizer<'a> {
     type Item = String;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.next_result() {
-            Err(e) => {
-                eprintln!("Tokenizer error: {}", e);
-                None
-            }
-            Ok(v) => v,
-        }
+        self.inner.next()
     }
 }
 
@@ -165,12 +65,11 @@ mod tests {
 
     #[test]
     fn parse_numbers() {
-        // Full number 123.456e-78
         let input = "1 123e2 123e-3 123e+4 0.23 0.23e2 0.23e-3 0.23e+4";
         let expected = vec![
             "1", "123e2", "123e-3", "123e+4", "0.23", "0.23e2", "0.23e-3", "0.23e+4",
         ];
-        for (idx, token) in Tokenizer::new(input.chars()).enumerate() {
+        for (idx, token) in Tokenizer::new(input).enumerate() {
             assert_eq!(token, expected[idx]);
         }
     }
@@ -184,7 +83,6 @@ mod tests {
         let tokens = vec!["1", "0.23", "0.23e+4", "'str1'", "Symbol2", ""];
         let heads = vec!["", "Sum"];
 
-        // "# comment\n",
         let mut combos = 0;
         for head in &heads {
             for (open, close) in &surrounds {
@@ -216,17 +114,9 @@ mod tests {
                                                         post3
                                                     );
                                                     let mut expect = vec![pfx1, head, open, pfx2];
-                                                    if lhs == "'str1'" {
-                                                        expect.extend([&"'", &"str1", &"'"]);
-                                                    } else {
-                                                        expect.push(&lhs);
-                                                    }
+                                                    expect.push(&lhs);
                                                     expect.extend([post1, op, pfx3]);
-                                                    if rhs == "'str1'" {
-                                                        expect.extend([&"'", &"str1", &"'"]);
-                                                    } else {
-                                                        expect.push(&rhs);
-                                                    }
+                                                    expect.push(&rhs);
                                                     expect.extend([post2, close, post3]);
                                                     let expect: Vec<_> = expect
                                                         .into_iter()
@@ -235,7 +125,7 @@ mod tests {
                                                         .collect();
 
                                                     let tokenized: Vec<_> =
-                                                        Tokenizer::new(expr.chars()).collect();
+                                                        Tokenizer::new(&expr).collect();
                                                     assert_eq!(tokenized, expect);
                                                     combos += 1;
                                                 }

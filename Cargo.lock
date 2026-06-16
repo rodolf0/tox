@@ -286,6 +286,7 @@ version = "0.1.1"
 dependencies = [
  "earlgrey",
  "fluxcap",
+ "lexers",
  "libm",
  "rand",
  "rand_distr",

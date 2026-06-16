@@ -62,9 +62,3 @@ CompoundExpression should be allowed within Module, Function, etc.
 # fluxcap
 
 - probabilistic AST scores to resolve ambiguities. Then make the grammar simpler.
-- add seasons, named periods like holidays, historic eras, etc ?
-- named-dates (eg christmas, easter, etc)
-
-This should span 3 months
-17:58:29 ~/Source/tox 0 $ ./target/debug/fluxcap next 3 months
-Error: "TimeMachine \"Parse Error: No Rule completes\" for 'next 3 months'"

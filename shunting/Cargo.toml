@@ -16,6 +16,4 @@ rand = { workspace = true }
 rand_distr = { workspace = true }
 libm = { workspace = true }
 
-[dev-dependencies]
-home = { workspace = true }
-rustyline = { workspace = true }
+

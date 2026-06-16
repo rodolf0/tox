@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 mod parser;
 mod rpneval;
 mod rpnprint;

@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 fn main() {
     use lisp::LispContext;
     use std::rc::Rc;

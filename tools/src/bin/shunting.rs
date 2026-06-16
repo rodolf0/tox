@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 mod repl {
     use lexers::{MathToken, MathTokenizer, Scan};
     use shunting::{MathContext, ShuntingParser, MathOp};

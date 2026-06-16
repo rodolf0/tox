@@ -30,4 +30,9 @@ earlgrey = { version = "0.5", path = "earlgrey" }
 fluxcap = { version = "0.2", path = "fluxcap" }
 kronos = { version = "0.3", path = "kronos" }
 lexers = { version = "0.1", path = "lexers" }
+lisp = { version = "0.2", path = "lisp" }
+lox = { version = "0.2", path = "lox" }
 numerica = { version = "0.1", path = "numerica" }
+shunting = { version = "0.1", path = "shunting" }
+unidades = { version = "0.1", path = "unidades" }
+tools = { version = "0.1", path = "tools" }

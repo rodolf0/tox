@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 extern crate numerica;
 
 fn main() -> Result<(), String> {

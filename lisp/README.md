@@ -56,7 +56,7 @@ println!("{}", result.to_string());
 The crate ships with a simple REPL:
 
 ```
-$ cargo run -p lisp
+$ cargo run -p toxtools --bin lisp
 ~> (define r 10)
 #t
 ~> (* pi (* r r))

@@ -81,12 +81,12 @@ The `MathOp` enum represents a value in the expression system:
 Binary: `+`, `-`, `*`, `/`, `%`, `^` (or `**`)  
 Unary: `-` (negation), `!` (factorial via gamma)
 
-## The `tox` Binary
+## The `shunting` REPL
 
-The crate ships with a math REPL:
+The math REPL is available via the `toxtools` workspace crate:
 
 ```
-$ tox
+$ cargo run -p toxtools --bin shunting
 >> 4!
 24
 >> a = sin(0.2)^2 + cos(0.2)^2

@@ -75,10 +75,11 @@ for day in mondays.future(reftime).take(3) {
 Most crates ship with a runnable example or binary:
 
 ```bash
-cargo run -p lisp      # Lisp REPL
-cargo run -p lox       # Lox interpreter
-cargo run -p shunting  # Math expression REPL
-cargo run -p fluxcap   # Time expression parser
+cargo run -p toxtools --bin numerica  # Numerica REPL
+cargo run -p toxtools --bin shunting  # Math expression REPL
+cargo run -p toxtools --bin fluxcap   # Time expression parser
+cargo run -p toxtools --bin lisp      # Lisp REPL
+cargo run -p lox                      # Lox interpreter
 ```
 
 See each crate's README for detailed documentation.

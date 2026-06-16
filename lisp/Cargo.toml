@@ -7,4 +7,3 @@ description = "A lisp like thingy"
 
 [dependencies]
 lexers = { workspace = true }
-rustyline = { workspace = true }

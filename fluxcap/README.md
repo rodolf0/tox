@@ -84,11 +84,11 @@ for r in results {
 The crate ships with a command-line tool:
 
 ```
-$ cargo run -p fluxcap -- "next tuesday at 3pm"
+$ cargo run -p toxtools --bin fluxcap -- "next tuesday at 3pm"
 (Day) 2026-06-23T00:00:00Z -> 2026-06-24T00:00:00Z
 (Day) 2026-06-23T00:00:00Z -> 2026-06-24T00:00:00Z
 
-$ cargo run -p fluxcap -- -v "next tuesday"
+$ cargo run -p toxtools --bin fluxcap -- -v "next tuesday"
 (Sexpr output showing the parse tree)
 ```
 

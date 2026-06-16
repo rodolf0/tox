@@ -1,12 +1,26 @@
-#![deny(warnings)]
-
 pub struct Scanner<I: Iterator>
 where
     I::Item: Clone,
 {
     src: I,
     buf: Vec<I::Item>,
-    pos: isize,
+    matched_len: usize,
+}
+
+// A convinince trait to create scanners from any iterator
+pub trait Scan: Iterator + Sized {
+    fn scanner(self) -> Scanner<Self>
+    where
+        Self::Item: Clone;
+}
+
+impl<I: Iterator> Scan for I
+where
+    I::Item: Clone,
+{
+    fn scanner(self) -> Scanner<Self> {
+        Scanner::new(self)
+    }
 }
 
 // Scanners are Iterators
@@ -17,17 +31,12 @@ where
 {
     type Item = I::Item;
     fn next(&mut self) -> Option<Self::Item> {
-        self.pos += 1;
-        // Check if we need to fill the buffer
-        let lacking = self.pos - (self.buf.len() as isize) + 1;
-        if lacking > 0 {
-            self.buf.extend(self.src.by_ref().take(lacking as usize));
-        }
-        // limit the buffer position to the buffer length at most
-        self.pos = std::cmp::min(self.pos, self.buf.len() as isize);
-        self.current()
+        self.advance().cloned()
     }
 }
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct Checkpoint(usize);
 
 impl<I> Scanner<I>
 where
@@ -38,75 +47,129 @@ where
         Scanner {
             src: source,
             buf: Vec::new(),
-            pos: -1,
+            matched_len: 0,
         }
-    }
-
-    // Allows getting current buffer position to backtrack
-    pub fn buffer_pos(&self) -> isize {
-        self.pos
-    }
-
-    // Reset buffer position, normally used for backtracking
-    // If position is out of bounds set_buffer_pos returns false
-    pub fn set_buffer_pos(&mut self, pos: isize) -> bool {
-        if pos < -1 || pos > (self.buf.len() as isize) {
-            return false;
-        }
-        self.pos = pos;
-        true
-    }
-
-    // Returns the current token on which the scanner is positioned
-    pub fn current(&self) -> Option<I::Item> {
-        let pos = self.pos as usize;
-        if self.pos < 0 || pos >= self.buf.len() {
-            return None;
-        }
-        Some(self.buf[pos].clone())
-    }
-
-    // Steps the scanner back and returns the token at that position
-    pub fn prev(&mut self) -> Option<I::Item> {
-        if self.pos >= 0 {
-            self.pos -= 1;
-        }
-        self.current()
     }
 
     // Returns the token ahead without actually advancing the scanner
-    pub fn peek(&mut self) -> Option<I::Item> {
-        let backtrack = self.pos;
-        let peeked = self.next();
-        self.pos = backtrack;
-        peeked
+    pub fn peek(&mut self) -> Option<&I::Item> {
+        if self.matched_len >= self.buf.len() {
+            if let Some(item) = self.src.next() {
+                self.buf.push(item);
+            } else {
+                return None;
+            }
+        }
+        Some(&self.buf[self.matched_len])
+    }
+
+    pub fn advance(&mut self) -> Option<&I::Item> {
+        if self.matched_len >= self.buf.len() {
+            if let Some(item) = self.src.next() {
+                self.buf.push(item);
+            } else {
+                self.matched_len = self.buf.len() + 1; // EOF
+                return None;
+            }
+        }
+        self.matched_len += 1;
+        Some(&self.buf[self.matched_len - 1])
+    }
+
+    // Returns the current token on which the scanner is positioned
+    pub fn current(&self) -> Option<&I::Item> {
+        if self.matched_len == 0 || self.matched_len > self.buf.len() {
+            return None;
+        }
+        Some(&self.buf[self.matched_len - 1])
+    }
+
+    // Save a checkpoint for backtracking
+    pub fn checkpoint(&self) -> Checkpoint {
+        Checkpoint(self.matched_len)
+    }
+
+    // Restore scanner state from a checkpoint.
+    // Panics if the checkpoint is out of bounds for this scanner's buffer.
+    pub fn restore(&mut self, checkpoint: Checkpoint) {
+        assert!(
+            checkpoint.0 <= self.buf.len() + 1,
+            "Checkpoint out of bounds: {} > {}",
+            checkpoint.0,
+            self.buf.len() + 1
+        );
+        self.matched_len = checkpoint.0;
+    }
+
+    // Steps the scanner back and returns the token at that position
+    pub fn prev(&mut self) -> Option<&I::Item> {
+        if self.matched_len > 1 && self.matched_len <= self.buf.len() + 1 {
+            self.matched_len -= 1;
+            Some(&self.buf[self.matched_len - 1])
+        } else {
+            self.matched_len = 0;
+            None
+        }
     }
 
     // Returns the previous token without actually backtracking the scanner
-    pub fn peek_prev(&mut self) -> Option<I::Item> {
-        let backtrack = self.pos;
-        let peeked = self.prev();
-        self.pos = backtrack;
-        peeked
+    pub fn peek_prev(&mut self) -> Option<&I::Item> {
+        if self.matched_len <= 1 {
+            None
+        } else {
+            Some(&self.buf[self.matched_len - 2])
+        }
     }
 
     // Returns a view of the current underlying buffer
     pub fn view(&self) -> &[I::Item] {
-        let n = (self.pos + 1) as usize;
-        &self.buf[..n]
+        &self.buf[..self.matched_len()]
     }
 
-    // Consumes the buffer into a new token (which can be ignored)
-    pub fn extract(&mut self) -> Vec<I::Item> {
-        // Check where to shift buffer
-        let split_point = std::cmp::min(self.pos + 1, self.buf.len() as isize);
-        assert!(split_point >= 0);
-        // Reset buffer cursor
-        self.pos = -1;
-        // Split buffer and keep the remainder
-        let mut remaining = self.buf.split_off(split_point as usize);
-        std::mem::swap(&mut self.buf, &mut remaining);
-        remaining
+    pub fn view_from(&self, cp: Checkpoint) -> &[I::Item] {
+        &self.buf[cp.0..self.matched_len()]
+    }
+
+    pub fn matched_len(&self) -> usize {
+        std::cmp::min(self.matched_len, self.buf.len())
+    }
+
+    // Removes and returns all consumed items from the buffer, resetting the cursor
+    pub fn lift(&mut self) -> impl Iterator<Item = I::Item> + '_ {
+        let end = std::cmp::min(self.matched_len, self.buf.len());
+        self.matched_len = 0;
+        self.buf.drain(..end)
+    }
+}
+
+pub trait TokenMatcher<Item> {
+    fn matches(&mut self, item: &Item) -> bool;
+}
+
+impl<Item, F> TokenMatcher<Item> for F
+where
+    F: FnMut(&Item) -> bool,
+{
+    fn matches(&mut self, item: &Item) -> bool {
+        self(item)
+    }
+}
+
+impl<Item: PartialEq> TokenMatcher<Item> for &[Item] {
+    fn matches(&mut self, item: &Item) -> bool {
+        self.contains(item)
+    }
+}
+
+impl<Item: PartialEq, const N: usize> TokenMatcher<Item> for [Item; N] {
+    fn matches(&mut self, item: &Item) -> bool {
+        self.contains(item)
+    }
+}
+
+impl TokenMatcher<char> for char {
+    fn matches(&mut self, item: &char) -> bool {
+        *self == *item
     }
 }
 
@@ -115,66 +178,364 @@ where
     I: Iterator,
     I::Item: Clone + PartialEq,
 {
-    // Advance the scanner only if the next char is the expected one
-    // self.current() will return the matched char if accept matched
-    pub fn accept(&mut self, what: &I::Item) -> Option<I::Item> {
-        let backtrack = self.buffer_pos();
-        if let Some(next) = self.next() {
-            if &next == what {
-                return Some(next);
+    // Advance the scanner only if the next item matches
+    pub fn accept(&mut self, mut matcher: impl TokenMatcher<I::Item>) -> Option<&I::Item> {
+        if self.matched_len >= self.buf.len() {
+            if let Some(item) = self.src.next() {
+                self.buf.push(item);
+            } else {
+                return None;
             }
         }
-        self.set_buffer_pos(backtrack);
-        None
+        if matcher.matches(&self.buf[self.matched_len]) {
+            self.matched_len += 1;
+            Some(&self.buf[self.matched_len - 1])
+        } else {
+            None
+        }
     }
 
-    // Advance the scanner only if the next char is in the 'any' set,
-    // self.current() will return the matched char if accept matched any
-    pub fn accept_any(&mut self, any: &[I::Item]) -> Option<I::Item> {
-        let backtrack = self.buffer_pos();
-        if let Some(next) = self.next() {
-            if any.contains(&next) {
-                return Some(next);
+    // Advance the scanner as long as matcher keeps matching
+    pub fn accept_while(&mut self, mut matcher: impl TokenMatcher<I::Item>) -> Option<&[I::Item]> {
+        let start = self.matched_len();
+        let mut lookahead = start;
+        loop {
+            if lookahead >= self.buf.len() {
+                if let Some(item) = self.src.next() {
+                    self.buf.push(item);
+                } else {
+                    self.matched_len = self.buf.len() + 1; // mark EOF
+                    if lookahead > start {
+                        return Some(&self.buf[start..lookahead]);
+                    }
+                    return None;
+                }
             }
-        }
-        self.set_buffer_pos(backtrack);
-        None
-    }
-
-    // Advance the scanner only if a full match for items form 'what'.
-    // self.current() will return the last item from 'what'
-    pub fn accept_all(&mut self, what: impl Iterator<Item=I::Item>) -> bool {
-        let backtrack = self.buffer_pos();
-        for item in what {
-            if self.accept(&item).is_none() {
-                self.set_buffer_pos(backtrack);
-                return false;
-            }
-        }
-        true
-    }
-
-    // Skip over the 'over' set, result is if the scanner was advanced,
-    // self.current() will return the last matching char
-    pub fn skip_all(&mut self, over: &[I::Item]) -> bool {
-        let mut advanced = false;
-        while self.accept_any(over).is_some() {
-            advanced = true;
-        }
-        advanced
-    }
-
-    // Find an element in the 'any' set or EOF, return if the scanner advanced,
-    // self.current() returns the last non-matching char
-    pub fn until_any(&mut self, any: &[I::Item]) -> bool {
-        let mut advanced = false;
-        while let Some(next) = self.peek() {
-            if any.contains(&next) {
+            if !matcher.matches(&self.buf[lookahead]) {
                 break;
             }
-            self.next();
-            advanced = true;
+            lookahead += 1;
         }
-        advanced
+        self.matched_len = lookahead;
+        if lookahead > start {
+            return Some(&self.buf[start..lookahead]);
+        }
+        None
+    }
+
+    // Advance the scanner only if the full sequence is found.
+    // On a partial match the scanner is reset to its original position.
+    pub fn accept_seq(&mut self, what: impl Iterator<Item = I::Item>) -> Option<&[I::Item]> {
+        self._peek_seq(what, true)
+    }
+
+    pub fn peek_seq(&mut self, what: impl Iterator<Item = I::Item>) -> Option<&[I::Item]> {
+        self._peek_seq(what, false)
+    }
+
+    fn _peek_seq(
+        &mut self,
+        what: impl Iterator<Item = I::Item>,
+        advance: bool,
+    ) -> Option<&[I::Item]> {
+        let start = self.matched_len();
+        let mut lookahead = start;
+        for item in what {
+            if lookahead >= self.buf.len() {
+                if let Some(next_item) = self.src.next() {
+                    self.buf.push(next_item);
+                } else {
+                    // full seq not matched, shouldn't change matched_len
+                    return None;
+                }
+            }
+            if self.buf[lookahead] != item {
+                return None;
+            }
+            lookahead += 1;
+        }
+        if advance {
+            self.matched_len = lookahead;
+        }
+        if lookahead > start {
+            return Some(&self.buf[start..lookahead]);
+        }
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Scan;
+
+    #[test]
+    fn advance() {
+        let mut s = "ab".chars().scanner();
+        assert_eq!(s.advance(), Some(&'a'));
+        assert_eq!(s.advance(), Some(&'b'));
+        assert_eq!(s.advance(), None); // None at EOF
+    }
+
+    #[test]
+    fn checkpoint() {
+        let mut s = "checkpoint".chars().scanner();
+        assert_eq!(s.next(), Some('c'));
+        let cp = s.checkpoint(); // Save position at 'h'
+        assert_eq!(s.next(), Some('h'));
+        s.restore(cp); // Backtrack to saved position
+        assert_eq!(s.next(), Some('h')); // Verify successful backtrack
+        assert_eq!(s.next(), Some('e'));
+        s.restore(cp);
+        assert_eq!(s.next(), Some('h'));
+    }
+
+    #[test]
+    fn current() {
+        let mut s = "a".chars().scanner();
+        assert_eq!(s.current(), None); // None before first advance
+        assert_eq!(s.next(), Some('a'));
+        assert_eq!(s.current(), Some(&'a')); // Matches last advanced item
+        assert_eq!(s.next(), None);
+        assert_eq!(s.current(), None); // None at EOF
+    }
+
+    #[test]
+    fn prev() {
+        let mut s = "abc".chars().scanner();
+        assert_eq!(s.prev(), None); // Cannot step back initially
+        assert_eq!(s.advance(), Some(&'a'));
+        assert_eq!(s.prev(), None); // Cannot step before start
+        assert_eq!(s.advance(), Some(&'a'));
+        assert_eq!(s.advance(), Some(&'b'));
+        assert_eq!(s.advance(), Some(&'c'));
+        assert_eq!(s.prev(), Some(&'b'));
+        assert_eq!(s.prev(), Some(&'a'));
+        assert_eq!(s.prev(), None); // Reached beginning of stream
+    }
+
+    #[test]
+    fn peek() {
+        let mut s = "a".chars().scanner();
+        assert_eq!(s.peek(), Some(&'a')); // Peek without advancing
+        assert_eq!(s.advance(), Some(&'a'));
+        assert_eq!(s.peek(), None); // None at EOF
+    }
+
+    #[test]
+    fn peek_prev() {
+        let mut s = "ab".chars().scanner();
+        assert_eq!(s.peek_prev(), None); // None before first advance
+        assert_eq!(s.advance(), Some(&'a'));
+        assert_eq!(s.peek_prev(), None); // None if only 1 advanced
+        assert_eq!(s.advance(), Some(&'b'));
+        assert_eq!(s.peek_prev(), Some(&'a'));
+        assert_eq!(s.advance(), None); // Advance to EOF
+        assert_eq!(s.peek_prev(), Some(&'b')); // Last valid item
+    }
+
+    #[test]
+    fn lift_drains_buffer() {
+        let mut s = "abc".chars().scanner();
+        assert_eq!(s.advance(), Some(&'a'));
+        assert_eq!(s.advance(), Some(&'b'));
+        assert_eq!(s.lift().collect::<String>(), "ab");
+        assert_eq!(s.current(), None);
+        assert_eq!(s.advance(), Some(&'c'));
+        let _ = s.lift();
+        assert_eq!(s.current(), None);
+        assert_eq!(s.next(), None);
+    }
+
+    #[test]
+    fn accept() {
+        let mut s = "abcdef".chars().scanner();
+        assert_eq!(s.accept(|c: &char| *c == 'a'), Some(&'a'));
+        assert_eq!(s.accept('b'), Some(&'b'));
+        assert_eq!(s.accept(['x', 'c']), Some(&'c'));
+        assert_eq!(s.accept(['x', 'c']), None); // Fails, doesn't advance
+        assert_eq!(s.accept(|c: &char| *c == 'd'), Some(&'d'));
+        assert_eq!(s.accept('e'), Some(&'e'));
+        assert_eq!(s.accept(vec!['x', 'f'].as_slice()), Some(&'f'));
+    }
+
+    #[test]
+    fn accept_while() {
+        let mut s = "abcdef".chars().scanner();
+        assert_eq!(s.accept_while(['c', 'a', 'b']), Some(&['a', 'b', 'c'][..]));
+        assert_eq!(s.accept_while('x'), None); // Fails, doesn't advance
+        assert_eq!(
+            s.accept_while(|c: &char| "bcde".contains(*c)),
+            Some(&['d', 'e'][..])
+        );
+        assert_eq!(s.accept_while(vec!['x', 'f'].as_slice()), Some(&['f'][..]));
+        assert_eq!(s.accept_while(['a', 'b', 'c', 'd', 'e', 'f', 'g']), None); // None at EOF
+    }
+
+    #[test]
+    fn methods_fail_at_eof() {
+        let mut s = "a".chars().scanner();
+        assert_eq!(s.advance(), Some(&'a'));
+        assert_eq!(s.advance(), None);
+        assert_eq!(s.accept_while('a'), None);
+        assert_eq!(s.accept_seq("a".chars()), None);
+        assert_eq!(s.peek_seq("a".chars()), None);
+    }
+
+    #[test]
+    fn accept_sequence() {
+        let mut s = "abcdefghi".chars().scanner();
+        assert_eq!(s.accept_seq("abc".chars()), Some(&['a', 'b', 'c'][..]));
+        assert_eq!(s.accept_seq("dex".chars()), None); // Fails partial match, reverts
+        assert_eq!(s.accept_seq("def".chars()), Some(&['d', 'e', 'f'][..]));
+        assert_eq!(s.accept_seq("ghi".chars()), Some(&['g', 'h', 'i'][..]));
+    }
+
+    #[test]
+    fn peek_sequence() {
+        let mut s = "abcdef".chars().scanner();
+        assert_eq!(s.peek_seq("abc".chars()), Some(&['a', 'b', 'c'][..])); // Matches, doesn't advance
+        assert_eq!(s.accept_seq("abc".chars()), Some(&['a', 'b', 'c'][..]));
+        assert_eq!(s.peek_seq("def".chars()), Some(&['d', 'e', 'f'][..]));
+        assert_eq!(s.peek_seq("dex".chars()), None);
+        assert_eq!(s.accept_seq("def".chars()), Some(&['d', 'e', 'f'][..]));
+        assert_eq!(s.peek_seq("".chars()), None);
+    }
+
+    #[test]
+    fn accept_while_until_eof() {
+        let mut s = "aaa".chars().scanner();
+        // Match all characters until the stream ends
+        assert_eq!(s.accept_while('a'), Some(&['a', 'a', 'a'][..]));
+        // Next attempt should hit EOF and return None
+        assert_eq!(s.accept_while('a'), None);
+        assert_eq!(s.current(), None);
+    }
+
+    #[test]
+    fn accept_while_across_buffer_boundary() {
+        let mut s = "abcde".chars().scanner();
+        // Force buffer to populate partially
+        assert_eq!(s.advance(), Some(&'a'));
+        assert_eq!(s.advance(), Some(&'b'));
+        // accept_while should read 'c', 'd' from new source, 'e' fails match
+        assert_eq!(
+            s.accept_while(|c: &char| "cd".contains(*c)),
+            Some(&['c', 'd'][..])
+        );
+        assert_eq!(s.current(), Some(&'d'));
+        assert_eq!(s.advance(), Some(&'e'));
+    }
+
+    #[test]
+    fn accept_while_at_eof() {
+        let mut s = "".chars().scanner();
+        // Stream is empty, immediate EOF
+        assert_eq!(s.accept_while('a'), None);
+        assert_eq!(s.current(), None);
+    }
+
+    #[test]
+    fn accept_while_after_eof() {
+        let mut s = "a".chars().scanner();
+        assert_eq!(s.advance(), Some(&'a'));
+        assert_eq!(s.advance(), None); // Hit EOF
+        let cp = s.checkpoint();
+        // Calling accept_while after EOF should return None
+        assert_eq!(s.accept_while('b'), None);
+        // Ensure state wasn't messed up
+        assert_eq!(s.current(), None);
+        assert_eq!(s.advance(), None);
+        // Restore and verify we can't accept_while backwards
+        s.restore(cp);
+        assert_eq!(s.accept_while('a'), None);
+    }
+
+    #[test]
+    fn peek_seq_hitting_eof_does_not_advance() {
+        let mut s = "a".chars().scanner();
+        assert_eq!(s.advance(), Some(&'a'));
+        // Peek for a sequence longer than what's remaining.
+        // This will hit EOF inside _peek_seq.
+        assert_eq!(s.peek_seq("bc".chars()), None);
+        assert_eq!(s.current(), Some(&'a'));
+    }
+
+    #[test]
+    fn accept_seq_partial_match_hitting_eof_does_not_advance() {
+        let mut s = "ab".chars().scanner();
+        assert_eq!(s.advance(), Some(&'a'));
+        // Try to accept "bc". It will match 'b' (forcing a read),
+        // then hit EOF looking for 'c'.
+        assert_eq!(s.accept_seq("bc".chars()), None);
+        assert_eq!(s.current(), Some(&'a'));
+    }
+
+    #[test]
+    fn peek_seq_exact_eof() {
+        let mut s = "ab".chars().scanner();
+        // Peek exact remaining stream.
+        assert_eq!(s.peek_seq("ab".chars()), Some(&['a', 'b'][..]));
+        // Should not have advanced.
+        assert_eq!(s.current(), None);
+        assert_eq!(s.advance(), Some(&'a'));
+    }
+
+    #[test]
+    fn accept_at_eof() {
+        let mut s = "a".chars().scanner();
+        assert_eq!(s.advance(), Some(&'a'));
+        assert_eq!(s.advance(), None);
+        assert_eq!(s.accept('b'), None);
+        assert_eq!(s.current(), None);
+    }
+
+    #[test]
+    fn accept_fails_match() {
+        let mut s = "ab".chars().scanner();
+        assert_eq!(s.advance(), Some(&'a'));
+        assert_eq!(s.accept('c'), None);
+        assert_eq!(s.current(), Some(&'a'));
+    }
+
+    #[test]
+    fn restore_at_eof() {
+        let mut s = "a".chars().scanner();
+        assert_eq!(s.advance(), Some(&'a'));
+        assert_eq!(s.advance(), None);
+        let cp = s.checkpoint();
+        s.restore(cp);
+        assert_eq!(s.current(), None);
+        assert_eq!(s.advance(), None);
+    }
+
+    #[test]
+    fn lift_at_eof() {
+        let mut s = "a".chars().scanner();
+        assert_eq!(s.advance(), Some(&'a'));
+        assert_eq!(s.advance(), None);
+        assert_eq!(s.lift().collect::<String>(), "a");
+        assert_eq!(s.current(), None);
+    }
+
+    #[test]
+    fn lift_empty() {
+        let mut s = "a".chars().scanner();
+        assert_eq!(s.advance(), Some(&'a'));
+        assert_eq!(s.lift().collect::<String>(), "a");
+        assert_eq!(s.lift().collect::<String>(), "");
+        assert_eq!(s.lift().collect::<String>(), "");
+    }
+
+    #[test]
+    fn view_and_view_from() {
+        let mut s = "abc".chars().scanner();
+        assert_eq!(s.advance(), Some(&'a'));
+        let cp = s.checkpoint();
+        assert_eq!(s.advance(), Some(&'b'));
+        assert_eq!(s.view(), &['a', 'b'][..]);
+        assert_eq!(s.view_from(cp), &['b'][..]);
+        assert_eq!(s.advance(), Some(&'c'));
+        assert_eq!(s.view(), &['a', 'b', 'c'][..]);
+        assert_eq!(s.view_from(cp), &['b', 'c'][..]);
     }
 }

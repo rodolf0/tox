@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 use super::grammar::{Grammar, Symbol};
 use super::spans::{Span, SpanSource};

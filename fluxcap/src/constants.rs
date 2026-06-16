@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 pub fn weekday(d: &str) -> Option<u8> {
     match d {

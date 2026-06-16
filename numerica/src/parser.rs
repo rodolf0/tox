@@ -33,7 +33,7 @@ fn grammar_str() -> &'static str {
             | primary '[' [ arglist ] ']'
             ;
 
-    atom := '"' string '"'
+    atom := string
          | symbol
          | number
          | '{' [ arglist ] '}'
@@ -90,7 +90,13 @@ fn math_bin_op(lhs: T, op: T, rhs: T) -> T {
 
 fn build_parser() -> Result<earlgrey::Parser<'static, T>, String> {
     earlgrey::ParserBuilder::<T>::new(grammar_str(), "compound_expr")
-        .terminal("string", |s| Some(T::String(s.into())))
+        .terminal("string", |s| {
+            // This also serves as the predicate for the grammar's "string" terminal.
+            s.strip_prefix('"')
+                .and_then(|s| s.strip_suffix('"'))
+                .or_else(|| s.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')))
+                .map(|content| T::String(content.to_string()))
+        })
         .terminal("symbol", |s| {
             if s.chars().enumerate().all(|(i, c)| {
                 i == 0 && c.is_alphabetic() || i > 0 && (c.is_alphanumeric() || c == '_')
@@ -100,7 +106,7 @@ fn build_parser() -> Result<earlgrey::Parser<'static, T>, String> {
                 None
             }
         })
-        .terminal("number", |n| n.parse::<f64>().ok().map(T::Number))
+        .terminal("number", |s| s.parse::<f64>().ok().map(T::Number))
         .unmapped_literal(|tok| match tok {
             "^" => T::Symbol("Power".into()),
             _ => T::Nop,
@@ -164,10 +170,6 @@ fn build_parser() -> Result<earlgrey::Parser<'static, T>, String> {
         .action4("primary -> primary [ [arglist] ]", |head, _, arglist, _| {
             T::Expr(Box::new(head), pull!(T::Arglist, arglist))
         })
-        .action3("atom -> \" string \"", |_, s, _| {
-            assert!(matches!(s, T::String(_)));
-            s
-        })
         .action3("atom -> { [arglist] }", |_, arglist, _| {
             T::Expr(
                 Box::new(T::Symbol("List".into())),
@@ -184,7 +186,7 @@ fn build_parser() -> Result<earlgrey::Parser<'static, T>, String> {
 
 pub fn expr_tree(input: &str) -> Result<(), String> {
     let parser = build_parser()?;
-    let tokenizer = crate::tokenizer::Tokenizer::new(input.chars());
+    let tokenizer = crate::tokenizer::Tokenizer::new(input);
     for tree in parser.parse_sexpr(tokenizer)? {
         println!("{}", tree.print());
     }
@@ -194,7 +196,7 @@ pub fn expr_tree(input: &str) -> Result<(), String> {
 pub fn parser() -> Result<impl Fn(&str) -> Result<Expr, String>, String> {
     let parser = build_parser()?;
     Ok(move |input: &str| {
-        let tokenizer = crate::tokenizer::Tokenizer::new(input.chars());
+        let tokenizer = crate::tokenizer::Tokenizer::new(input);
         let mut trees = parser.parse_all(tokenizer)?;
         if trees.len() > 1 {
             for t in &trees {

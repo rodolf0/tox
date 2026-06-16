@@ -1,0 +1,7 @@
+fun outer() {
+  fun inner() {
+    print "inner";
+  }
+  inner();
+}
+outer();

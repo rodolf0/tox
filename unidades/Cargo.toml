@@ -1,7 +1,7 @@
 [package]
 name = "unidades"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "MIT"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
 description = "A library for playing with physical units"

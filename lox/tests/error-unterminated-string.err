@@ -1,0 +1,2 @@
+LoxScanner error: unterminated string
+LoxInterpreter error: Environment get - undefined entity 'hello'

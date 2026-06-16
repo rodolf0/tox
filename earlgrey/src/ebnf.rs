@@ -1,7 +1,5 @@
-#![deny(warnings)]
-
-use super::ebnf_tokenizer::EbnfTokenizer;
 use crate::earley::{EarleyForest, EarleyParser, Grammar, GrammarBuilder};
+use lexers::EbnfTokenizer;
 use std::cell::RefCell;
 
 macro_rules! debug {
@@ -34,7 +32,9 @@ fn ebnf_grammar() -> Grammar {
                 i == 0 && c.is_alphabetic() || i > 0 && (c.is_alphanumeric() || c == '_')
             })
         })
-        .terminal("<Chars>", move |s| s.chars().all(|c| !c.is_control()))
+        .terminal("<Chars>", move |s| {
+            s.starts_with('"') || s.starts_with('\'')
+        })
         .terminal("@<Tag>", move |s| {
             s.chars().enumerate().all(|(i, c)| {
                 i == 0 && c == '@'
@@ -51,8 +51,6 @@ fn ebnf_grammar() -> Grammar {
         .terminal("(", |s| s == "(")
         .terminal(")", |s| s == ")")
         .terminal("|", |s| s == "|")
-        .terminal("'", |s| s == "'")
-        .terminal("\"", |s| s == "\"")
         .nonterm("<RuleList>")
         .nonterm("<Rule>")
         .nonterm("<VariantList>")
@@ -66,8 +64,7 @@ fn ebnf_grammar() -> Grammar {
         .rule("<Variant>", &["<Variant>", "<Atom>"])
         .rule("<Variant>", &["<Atom>"])
         .rule("<Atom>", &["<Id>"])
-        .rule("<Atom>", &["'", "<Chars>", "'"])
-        .rule("<Atom>", &["\"", "<Chars>", "\""])
+        .rule("<Atom>", &["<Chars>"])
         .rule("<Atom>", &["[", "<VariantList>", "]"])
         .rule("<Atom>", &["{", "<VariantList>", "}"])
         .rule("<Atom>", &["(", "<VariantList>", ")"])
@@ -98,11 +95,22 @@ fn ebnf_terminal_parser<'a>(
                     user_gb.borrow_mut().silent_nonterm(token);
                 }
                 "<Chars>" => {
-                    debug!("Adding terminal {:?}", token);
-                    let tok = token.to_string();
+                    let stripped = match token.chars().next() {
+                        Some('"') => token
+                            .strip_prefix('"')
+                            .map(|s| s.strip_suffix('"').unwrap_or(s))
+                            .unwrap(),
+                        Some('\'') => token
+                            .strip_prefix('\'')
+                            .map(|s| s.strip_suffix('\'').unwrap_or(s))
+                            .unwrap(),
+                        _ => token,
+                    };
+                    debug!("Adding terminal {:?}", stripped);
+                    let value = stripped.to_string();
                     user_gb
                         .borrow_mut()
-                        .silent_terminal(token, move |s| s == tok);
+                        .silent_terminal(&stripped, move |s| s == value);
                 }
                 _ => (),
             }
@@ -162,10 +170,7 @@ fn ebnf_grouping_action<'a>(ev: &mut EarleyForest<'a, G>, user_gb: &'a RefCell<G
         t_gb.silent_nonterm(&aux);
         for rule in body {
             debug!("Adding rule {:?} -> {:?}", aux, rule);
-            t_gb.silent_rule(
-                &aux,
-                &rule.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
-            );
+            t_gb.silent_rule(&aux, &rule.iter().map(|s| s.as_str()).collect::<Vec<_>>());
         }
         G::Atom(aux)
     });
@@ -177,10 +182,7 @@ fn ebnf_grouping_action<'a>(ev: &mut EarleyForest<'a, G>, user_gb: &'a RefCell<G
         let body = pull!(G::VariantList, n.remove(1));
         for rule in body {
             debug!("Adding rule {:?} -> {:?}", aux, rule);
-            t_gb.silent_rule(
-                &aux,
-                &rule.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
-            );
+            t_gb.silent_rule(&aux, &rule.iter().map(|s| s.as_str()).collect::<Vec<_>>());
         }
         G::Atom(aux)
     });
@@ -204,10 +206,7 @@ fn ebnf_optional_action<'a>(ev: &mut EarleyForest<'a, G>, user_gb: &'a RefCell<G
         t_gb.silent_rule(&aux, &[]);
         for rule in body {
             debug!("Adding rule {:?} -> {:?}", aux, &rule);
-            t_gb.silent_rule(
-                &aux,
-                &rule.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
-            );
+            t_gb.silent_rule(&aux, &rule.iter().map(|s| s.as_str()).collect::<Vec<_>>());
         }
         G::Atom(aux)
     });
@@ -221,10 +220,7 @@ fn ebnf_optional_action<'a>(ev: &mut EarleyForest<'a, G>, user_gb: &'a RefCell<G
         let body = pull!(G::VariantList, n.remove(1));
         for rule in body {
             debug!("Adding rule {:?} -> {:?}", aux, rule);
-            t_gb.silent_rule(
-                &aux,
-                &rule.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
-            );
+            t_gb.silent_rule(&aux, &rule.iter().map(|s| s.as_str()).collect::<Vec<_>>());
         }
         G::Atom(aux)
     });
@@ -323,8 +319,22 @@ impl EbnfGrammarParser {
             ebnf_optional_action(&mut user_semanter, &user_gb);
             ebnf_repeat_action(&mut user_semanter, &user_gb);
             user_semanter.action("<Atom> -> <Id>", |mut n| n.remove(0));
-            user_semanter.action("<Atom> -> ' <Chars> '", |mut n| n.remove(1));
-            user_semanter.action("<Atom> -> \" <Chars> \"", |mut n| n.remove(1));
+            user_semanter.action("<Atom> -> <Chars>", |mut n| {
+                // Remove the start/end quotes since EbnfTokenizer keeps them
+                let token = pull!(G::Atom, n.remove(0));
+                let token = match token.chars().next() {
+                    Some('"') => token
+                        .strip_prefix('"')
+                        .map(|s| s.strip_suffix('"').unwrap_or(s))
+                        .unwrap(),
+                    Some('\'') => token
+                        .strip_prefix('\'')
+                        .map(|s| s.strip_suffix('\'').unwrap_or(s))
+                        .unwrap(),
+                    _ => &token,
+                };
+                G::Atom(token.to_string())
+            });
 
             // Create a parser for EBNF which we'll use to parse input grammar
             let parsed_user_grammar = EarleyParser::new(ebnf_grammar())

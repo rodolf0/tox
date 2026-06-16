@@ -1,79 +1,28 @@
-#![deny(warnings)]
+use crate::extractors::{quoted, quoted_no_delims};
+use crate::string_tokenizer::StringTokenizer;
 
-use crate::scanner::Scanner;
+pub struct EbnfTokenizer<'a, I: Iterator<Item = char>>(StringTokenizer<'a, I>);
 
-pub struct EbnfTokenizer<I: Iterator<Item = char>> {
-    input: Scanner<I>,
-    lookahead: Vec<String>,
+impl<'a> From<&'a str> for EbnfTokenizer<'a, std::str::Chars<'a>> {
+    fn from(s: &'a str) -> Self {
+        Self::new(s.chars())
+    }
 }
 
-impl<I: Iterator<Item = char>> EbnfTokenizer<I> {
+impl<'a, I: Iterator<Item = char>> EbnfTokenizer<'a, I> {
     pub fn new(source: I) -> Self {
-        EbnfTokenizer {
-            input: Scanner::new(source),
-            lookahead: Vec::new(),
-        }
-    }
-
-    pub fn scanner(source: I) -> Scanner<Self> {
-        Scanner::new(Self::new(source))
+        let tokenizer = StringTokenizer::new(source)
+            .split_on(["[", "]", "{", "}", "(", ")", "|", ";", ":=", ":"], false)
+            .split_by(|s| quoted(s, "\"", "\"", Some('\\')), false)
+            .split_by(|s| quoted(s, "'", "'", Some('\\')), false)
+            .split_by(|s| quoted_no_delims(s, "#", "\n", Some('\\')), true);
+        EbnfTokenizer(tokenizer)
     }
 }
 
-impl<I: Iterator<Item = char>> Iterator for EbnfTokenizer<I> {
+impl<'a, I: Iterator<Item = char>> Iterator for EbnfTokenizer<'a, I> {
     type Item = String;
     fn next(&mut self) -> Option<Self::Item> {
-        // used for accumulating string parts
-        if !self.lookahead.is_empty() {
-            return self.lookahead.pop();
-        }
-        let s = &mut self.input;
-        s.scan_whitespace();
-        // discard comments starting with '#' until new-line
-        if s.accept(&'#').is_some() {
-            while let Some(nl) = s.next() {
-                if nl == '\n' {
-                    s.extract(); // ignore comment
-                                 // discard comment and allow more by restarting
-                    return self.next();
-                }
-            }
-        }
-        if s.accept_any(&['[', ']', '{', '}', '(', ')', '|', ';'])
-            .is_some()
-        {
-            return Some(s.extract_string());
-        }
-        let backtrack = s.buffer_pos();
-        if s.accept(&':').is_some() {
-            if s.accept(&'=').is_some() {
-                return Some(s.extract_string());
-            }
-            s.set_buffer_pos(backtrack);
-        }
-        let backtrack = s.buffer_pos();
-        if let Some(q) = s.accept_any(&['"', '\'']) {
-            while let Some(n) = s.next() {
-                if n == q {
-                    // store closing quote
-                    self.lookahead.push(n.to_string());
-                    // store string content
-                    let v = s.extract_string();
-                    self.lookahead.push(v[1..v.len() - 1].to_string());
-                    // return opening quote
-                    return Some(q.to_string());
-                }
-            }
-            s.set_buffer_pos(backtrack);
-        }
-        let backtrack = s.buffer_pos();
-        s.accept(&'@');
-        // NOTE: scan_identifier limits the valid options
-        if let Some(id) = s.scan_identifier() {
-            return Some(id);
-        }
-        // backtrack possible '@'
-        s.set_buffer_pos(backtrack);
-        None
+        self.0.next()
     }
 }

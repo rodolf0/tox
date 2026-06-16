@@ -1,6 +1,6 @@
 [package]
 name = "earlgrey"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2024"
 license = "MIT"
 authors = ["Rodolfo Granata <warlock.cc@gmail.com>"]
@@ -10,8 +10,7 @@ readme = "README.md"
 keywords = ["parser", "earley", "grammar", "ast", "ebnf"]
 categories = ["parsing", "text-processing"]
 
-# The library crate has no dependencies. Optionals are for tools
-[dev-dependencies]
+[dependencies]
 lexers = { workspace = true }
 
 [features]

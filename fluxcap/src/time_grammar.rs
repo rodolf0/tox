@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 pub fn time_grammar() -> &'static str {
     r#"

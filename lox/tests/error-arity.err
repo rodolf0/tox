@@ -1,0 +1,1 @@
+LoxInterpreter error: wrong arity for <fn f(a,b)> expected 2 not 1

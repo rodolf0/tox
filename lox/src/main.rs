@@ -11,7 +11,6 @@ mod lox_environment;
 mod lox_native;
 mod lox_resolver;
 
-use crate::lox_scanner::LoxScanner;
 use crate::lox_parser::LoxParser;
 use crate::lox_interpreter::LoxInterpreter;
 use crate::lox_resolver::Resolver;
@@ -24,7 +23,7 @@ fn main() {
     }
 
     let run = |source: String, interpreter: &mut LoxInterpreter| {
-        let scanner = LoxScanner::scanner(source.chars());
+        let scanner = lox_scanner::scanner(source.chars());
         let mut parser = LoxParser::new(scanner);
         match parser.parse() {
             Ok(stmts) => {

@@ -1,6 +1,5 @@
-#![deny(warnings)]
-
-use crate::scanner::Scanner;
+use crate::extractors::quoted;
+use crate::string_tokenizer::StringTokenizer;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum LispToken {
@@ -17,93 +16,46 @@ pub enum LispToken {
     String(String),
 }
 
-pub struct LispTokenizer<I: Iterator<Item = char>>(Scanner<I>);
+pub struct LispTokenizer<'a, I: Iterator<Item = char>>(StringTokenizer<'a, I>);
 
-impl<I: Iterator<Item = char>> LispTokenizer<I> {
-    pub fn new(source: I) -> Self {
-        LispTokenizer(Scanner::new(source))
-    }
-
-    pub fn scanner(source: I) -> Scanner<Self> {
-        Scanner::new(Self::new(source))
+impl<'a> From<&'a str> for LispTokenizer<'a, std::str::Chars<'a>> {
+    fn from(s: &'a str) -> Self {
+        Self::new(s.chars())
     }
 }
 
-impl<I: Iterator<Item = char>> Iterator for LispTokenizer<I> {
+impl<'a, I: Iterator<Item = char>> LispTokenizer<'a, I> {
+    pub fn new(source: I) -> Self {
+        let tokenizer = StringTokenizer::new(source)
+            .split_on(["(", ")", "'", "`", ",@", ","], false)
+            .split_by(|s| quoted(s, "\"", "\"", Some('\\')), false);
+        LispTokenizer(tokenizer)
+    }
+}
+
+impl<'a, I: Iterator<Item = char>> Iterator for LispTokenizer<'a, I> {
     type Item = LispToken;
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.scan_whitespace();
-        if let Some(s) = self.0.scan_quoted_string('"') {
-            return Some(LispToken::String(s));
-        }
-        if let Some(lexeme) = self.0.accept_any(&[')', '(', '\'', '`', ',']) {
-            let token = match lexeme {
-                '(' => LispToken::OParen,
-                ')' => LispToken::CParen,
-                '\'' => LispToken::Quote,
-                '`' => LispToken::QuasiQuote,
-                ',' => {
-                    if self.0.accept(&'@').is_some() {
-                        LispToken::UnQSplice
-                    } else {
-                        LispToken::UnQuote
-                    }
-                }
-                _ => unreachable!(),
-            };
-            self.0.extract(); // ignore
-            return Some(token);
-        }
-        if self.0.until_any(&[')', ' ', '\n', '\r', '\t']) {
-            use std::str::FromStr;
-            let lexeme = self.0.extract_string();
-            return match &lexeme[..] {
-                "#t" => Some(LispToken::True),
-                "#f" => Some(LispToken::False),
-                num => match f64::from_str(num) {
-                    Ok(n) => Some(LispToken::Number(n)),
-                    _ => Some(LispToken::Symbol(lexeme)),
-                },
-            };
-        }
-        None
-    }
-}
+        let token_str = self.0.next()?;
 
-///////////////////////////////////////////////////////////////////////////////
-
-#[cfg(test)]
-mod tests {
-    use super::{LispToken, LispTokenizer};
-
-    #[test]
-    fn lisp_tokenizer() {
-        use LispToken::*;
-        let inputs = vec!["(+ 3 4 5)", "(max 'a \"hello\")"];
-        let expect = vec![
-            vec![
-                OParen,
-                Symbol(format!("+")),
-                Number(3.0),
-                Number(4.0),
-                Number(5.0),
-                CParen,
-            ],
-            vec![
-                OParen,
-                Symbol(format!("max")),
-                Quote,
-                Symbol(format!("a")),
-                String(format!("\"hello\"")),
-                CParen,
-            ],
-        ];
-        for (input, expected) in inputs.iter().zip(expect.iter()) {
-            let mut lx = LispTokenizer::new(input.chars());
-            for exp in expected.iter() {
-                assert_eq!(*exp, lx.next().unwrap());
+        use std::str::FromStr;
+        let token = match token_str.as_str() {
+            "(" => LispToken::OParen,
+            ")" => LispToken::CParen,
+            "'" => LispToken::Quote,
+            "`" => LispToken::QuasiQuote,
+            ",@" => LispToken::UnQSplice,
+            "," => LispToken::UnQuote,
+            "#t" => LispToken::True,
+            "#f" => LispToken::False,
+            s if s.starts_with('"') => {
+                LispToken::String(s[1..s.len()-1].to_string())
             }
-            assert_eq!(lx.next(), None);
-        }
+            num => match f64::from_str(num) {
+                Ok(n) => LispToken::Number(n),
+                _ => LispToken::Symbol(token_str),
+            },
+        };
+        Some(token)
     }
 }

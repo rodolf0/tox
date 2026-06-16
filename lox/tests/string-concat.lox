@@ -1,0 +1,4 @@
+print "hello" + "world";
+print "count: " + 42;
+print 42 + " items";
+print "a" + "b" + "c";

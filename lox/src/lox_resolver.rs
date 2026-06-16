@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 use crate::lox_interpreter::LoxInterpreter;
 use crate::lox_parser::{Expr, Stmt};
@@ -84,18 +83,18 @@ impl<'a> Resolver<'a> {
 
     fn resolve_expr(&mut self, expr: &Expr) -> ResolveResult {
         match expr {
-            &Expr::Logical(ref left, _, ref right) => {
+            Expr::Logical(left, _, right) => {
                 self.resolve_expr(left)?;
                 self.resolve_expr(right)
             }
-            &Expr::Binary(ref left, _, ref right) => {
+            Expr::Binary(left, _, right) => {
                 self.resolve_expr(left)?;
                 self.resolve_expr(right)
             }
-            &Expr::Unary(_, ref unary) => self.resolve_expr(unary),
-            &Expr::Nil | &Expr::Bool(_) | &Expr::Num(_) | &Expr::Str(_) => Ok(()),
-            &Expr::Grouping(ref gexpr) => self.resolve_expr(gexpr),
-            &Expr::Var(ref token) => {
+            Expr::Unary(_, unary) => self.resolve_expr(unary),
+            Expr::Nil | Expr::Bool(_) | Expr::Num(_) | Expr::Str(_) => Ok(()),
+            Expr::Grouping(gexpr) => self.resolve_expr(gexpr),
+            Expr::Var(token) => {
                 if let Some(scope) = self.scopes.last() {
                     if scope.get(&token.lexeme) == Some(&false) {
                         return Err(format!("Can't read var in initializer {:?}", token));
@@ -103,11 +102,11 @@ impl<'a> Resolver<'a> {
                 }
                 self.resolve_local(expr, &token.lexeme)
             }
-            &Expr::Assign(ref token, ref asigex) => {
+            Expr::Assign(token, asigex) => {
                 self.resolve_expr(asigex)?;
                 self.resolve_local(expr, &token.lexeme)
             }
-            &Expr::Call(ref callee, ref args) => {
+            Expr::Call(callee, args) => {
                 self.resolve_expr(callee)?;
                 args.iter()
                     .map(|arg| self.resolve_expr(arg))
@@ -119,9 +118,9 @@ impl<'a> Resolver<'a> {
 
     fn resolve_stmt(&mut self, stmt: &Stmt) -> ResolveResult {
         match stmt {
-            Stmt::Print(ref expr) => self.resolve_expr(expr),
-            Stmt::Expr(ref expr) => self.resolve_expr(expr),
-            Stmt::Var(ref name, ref init) => {
+            Stmt::Print(expr) => self.resolve_expr(expr),
+            Stmt::Expr(expr) => self.resolve_expr(expr),
+            Stmt::Var(name, init) => {
                 // split binding in declare/define to disallow self reference
                 self.declare(name.clone())?;
                 match init {
@@ -130,31 +129,31 @@ impl<'a> Resolver<'a> {
                 }
                 self.define(name.clone())
             }
-            Stmt::Block(ref stmts) => {
+            Stmt::Block(stmts) => {
                 self.begin_scope();
                 self.resolve(stmts)?;
                 self.end_scope();
                 Ok(())
             }
-            Stmt::If(ref cond, ref then, ref elseb) => {
+            Stmt::If(cond, then, elseb) => {
                 self.resolve_expr(cond)?;
                 self.resolve_stmt(then)?;
-                if let Some(ref elseb) = elseb {
+                if let Some(elseb) = elseb {
                     self.resolve_stmt(elseb)?;
                 }
                 Ok(())
             }
-            Stmt::While(ref cond, ref body) => {
+            Stmt::While(cond, body) => {
                 self.resolve_expr(cond)?;
                 self.resolve_stmt(body)
             }
             Stmt::Break(_) => Ok(()),
-            Stmt::Function(ref name, ref parameters, ref body) => {
+            Stmt::Function(name, parameters, body) => {
                 self.declare(name.clone())?;
                 self.define(name.clone())?;
                 self.resolve_function(parameters, body)
             }
-            Stmt::Return(ref expr) => self.resolve_expr(expr),
+            Stmt::Return(expr) => self.resolve_expr(expr),
         }
     }
 }

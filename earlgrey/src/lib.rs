@@ -3,7 +3,6 @@
 mod earley;
 
 mod ebnf;
-mod ebnf_tokenizer;
 
 mod sexpr;
 pub use sexpr::Sexpr;

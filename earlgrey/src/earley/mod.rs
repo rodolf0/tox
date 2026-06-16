@@ -1,5 +1,3 @@
-#![deny(warnings)]
-
 mod grammar;
 pub(crate) use grammar::{Grammar, GrammarBuilder};
 
@@ -15,7 +13,7 @@ mod parser_test;
 
 #[cfg(test)]
 mod minisum_test {
-    use super::{GrammarBuilder, EarleyParser, EarleyForest};
+    use super::{EarleyForest, EarleyParser, GrammarBuilder};
 
     #[test]
     fn test_minisum() {
@@ -37,7 +35,6 @@ mod minisum_test {
             "[0-9]" => token.parse::<f64>().unwrap(),
             _ => 0.0,
         });
-
         ev.action("S -> S [+] N", |n| n[0] + n[2]);
         ev.action("S -> N", |n| n[0]);
         ev.action("N -> [0-9]", |n| n[0]);
@@ -48,7 +45,7 @@ mod minisum_test {
 
 #[cfg(test)]
 mod arith_test {
-    use super::{GrammarBuilder, EarleyParser, EarleyForest, Grammar};
+    use super::{EarleyForest, EarleyParser, Grammar, GrammarBuilder};
     use std::str::FromStr;
 
     fn build_grammar() -> Grammar {
@@ -90,23 +87,6 @@ mod arith_test {
             .expect("Bad Gramar")
     }
 
-    struct Tokenizer<I: Iterator<Item = char>>(lexers::Scanner<I>);
-
-    impl<I: Iterator<Item = char>> Iterator for Tokenizer<I> {
-        type Item = String;
-        fn next(&mut self) -> Option<Self::Item> {
-            self.0.scan_whitespace();
-            self.0
-                .scan_math_op()
-                .or_else(|| self.0.scan_number())
-                .or_else(|| self.0.scan_identifier())
-        }
-    }
-
-    fn tokenizer<I: Iterator<Item = char>>(input: I) -> Tokenizer<I> {
-        Tokenizer(lexers::Scanner::new(input))
-    }
-
     fn gamma(x: f64) -> f64 {
         #[link(name = "m")]
         unsafe extern "C" {
@@ -140,16 +120,18 @@ mod arith_test {
 
     #[test]
     fn test_arith() {
-        let grammar = build_grammar();
-        let parser = EarleyParser::new(grammar.clone());
-        let evaler = semanter();
+        let parser = EarleyParser::new(build_grammar());
+        let ev = semanter();
+        let symbols = ["+", "-", "*", "/", "%", "^", "!", "(", ")"];
 
-        let input = "1 + 2 * 3".to_string();
-        let state = parser.parse(tokenizer(input.chars())).unwrap();
-        assert_eq!(evaler.eval(&state).unwrap(), 7.0);
+        let state = parser
+            .parse(lexers::StringTokenizer::from("1 + 2 * 3").split_on(symbols, false))
+            .unwrap();
+        assert_eq!(ev.eval(&state).unwrap(), 7.0);
 
-        let input = "( 1 + 2 ) * 3".to_string();
-        let state = parser.parse(tokenizer(input.chars())).unwrap();
-        assert_eq!(evaler.eval(&state).unwrap(), 9.0);
+        let state = parser
+            .parse(lexers::StringTokenizer::from("( 1 + 2 ) * 3").split_on(symbols, false))
+            .unwrap();
+        assert_eq!(ev.eval(&state).unwrap(), 9.0);
     }
 }

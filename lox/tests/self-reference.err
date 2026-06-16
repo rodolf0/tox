@@ -1,0 +1,1 @@
+Resolve error: Can't read var in initializer Token { line: 2, token: Id("x"), lexeme: "x" }

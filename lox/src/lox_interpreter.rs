@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 use crate::lox_scanner::{TT, Token};
 use crate::lox_parser::{Expr, Stmt};
@@ -29,7 +28,7 @@ impl V {
     fn is_truthy(&self) -> bool {
         match self {
             V::Nil => false,
-            V::Bool(ref b) => *b,
+            V::Bool(b) => *b,
             _ => true
         }
     }
@@ -57,10 +56,10 @@ impl fmt::Debug for V {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             V::Nil => write!(f, "nil"),
-            V::Bool(ref b) => write!(f, "{}", b),
-            V::Num(ref n) => write!(f, "{}", n),
-            V::Str(ref s) => write!(f, "\"{}\"", s),
-            V::Callable(ref c) => write!(f, "\"{}\"", c.id()),
+            V::Bool(b) => write!(f, "{}", b),
+            V::Num(n) => write!(f, "{}", n),
+            V::Str(s) => write!(f, "\"{}\"", s),
+            V::Callable(c) => write!(f, "\"{}\"", c.id()),
         }
     }
 }
@@ -162,10 +161,10 @@ impl LoxInterpreter {
         match expr {
             Expr::Nil => Ok(V::Nil),
             Expr::Num(n) => Ok(V::Num(*n)),
-            Expr::Str(ref s) => Ok(V::Str(s.to_string())),
-            Expr::Bool(ref b) => Ok(V::Bool(*b)),
-            Expr::Grouping(ref gexpr) => self.eval(&*gexpr),
-            Expr::Unary(ref op, ref uexpr) => {
+            Expr::Str(s) => Ok(V::Str(s.to_string())),
+            Expr::Bool(b) => Ok(V::Bool(*b)),
+            Expr::Grouping(gexpr) => self.eval(&*gexpr),
+            Expr::Unary(op, uexpr) => {
                 let uexpr = self.eval(uexpr)?;
                 match op.token {
                     TT::MINUS => Ok(V::Num(-uexpr.num()?)),
@@ -174,7 +173,7 @@ impl LoxInterpreter {
                     _ => unreachable!("LoxIntepreter: bad Unary op {:?}", op)
                 }
             },
-            Expr::Binary(ref lhs, ref op, ref rhs) => {
+            Expr::Binary(lhs, op, rhs) => {
                 let lhs = self.eval(lhs)?;
                 let rhs = self.eval(rhs)?;
                 match op.token {
@@ -182,12 +181,12 @@ impl LoxInterpreter {
                     TT::STAR => Ok(V::Num(lhs.num()? * rhs.num()?)),
                     TT::MINUS => Ok(V::Num(lhs.num()? - rhs.num()?)),
                     TT::PLUS => match (&lhs, &rhs) {
-                        (&V::Num(ref l), &V::Num(ref r)) => Ok(V::Num(l + r)),
-                        (&V::Str(ref l), &V::Str(ref r)) =>
+                        (V::Num(l), V::Num(r)) => Ok(V::Num(l + r)),
+                        (V::Str(l), V::Str(r)) =>
                             Ok(V::Str(format!("{}{}", l, r))),
-                        (&V::Str(ref l), ref other) =>
+                        (V::Str(l), other) =>
                             Ok(V::Str(format!("{}{}", l, other))),
-                        (ref other, &V::Str(ref r)) =>
+                        (other, V::Str(r)) =>
                             Ok(V::Str(format!("{}{}", other, r))),
                         _ => Err(format!("can't {:?} + {:?}", lhs, rhs))
                     },
@@ -201,7 +200,7 @@ impl LoxInterpreter {
                                       lhs, op, rhs)
                 }
             },
-            Expr::Logical(ref lhs, ref op, ref rhs) => {
+            Expr::Logical(lhs, op, rhs) => {
                 let lhs = self.eval(lhs)?;
                 match op.token {
                     TT::OR if lhs.is_truthy() => Ok(lhs),
@@ -209,8 +208,8 @@ impl LoxInterpreter {
                     _ => self.eval(rhs)
                 }
             },
-            Expr::Var(ref var) => self.lookup_var(expr, var),
-            Expr::Assign(ref var, ref aexpr) => {
+            Expr::Var(var) => self.lookup_var(expr, var),
+            Expr::Assign(var, aexpr) => {
                 let value = self.eval(aexpr)?;
                 if let Some(depth) = self.locals.get(&expr.id()) {
                     return self.environ.borrow_mut()
@@ -218,7 +217,7 @@ impl LoxInterpreter {
                 }
                 self.globals.borrow_mut().assign(var.lexeme.clone(), value)
             },
-            Expr::Call(ref callee, ref args) => {
+            Expr::Call(callee, args) => {
                 let callee = self.eval(callee)?.call()?;
                 if callee.arity() != args.len() {
                     return Err(format!("wrong arity for {} expected {} not {}",
@@ -252,31 +251,31 @@ impl LoxInterpreter {
 
     fn execute(&mut self, stmt: &Stmt, nesting: Nesting) -> ExecResult {
         match stmt {
-            Stmt::Expr(ref expr) => self.eval(expr),
-            Stmt::Print(ref expr) => {
+            Stmt::Expr(expr) => self.eval(expr),
+            Stmt::Print(expr) => {
                 println!("{}", self.eval(expr)?);
                 Ok(V::Nil)
             }
-            Stmt::Var(ref name, ref init) => {
+            Stmt::Var(name, init) => {
                 let value = self.eval(init)?;
                 self.environ.borrow_mut().define(name.to_string(), value);
                 Ok(V::Nil)
             },
-            Stmt::Block(ref stmts) => {
+            Stmt::Block(stmts) => {
                 let curenv = Environment::new(Some(self.environ.clone()));
                 self.exec_block(stmts, Rc::new(RefCell::new(curenv)), nesting)
             },
-            Stmt::If(ref expr, ref then_branch, ref else_branch) => {
+            Stmt::If(expr, then_branch, else_branch) => {
                 let condition = self.eval(expr)?;
                 match condition.is_truthy() {
                     true => self.execute(then_branch, nesting),
                     _ => match else_branch {
-                        Some(ref else_b) => self.execute(else_b, nesting),
+                        Some(else_b) => self.execute(else_b, nesting),
                         _ => Ok(V::Nil)
                     }
                 }
             },
-            Stmt::While(ref condition, ref body) => {
+            Stmt::While(condition, body) => {
                 loop {
                     // check if we're trying to break out of loops
                     if self.break_loops > 0 {
@@ -299,7 +298,7 @@ impl LoxInterpreter {
                 self.break_loops = *num_breaks;
                 Ok(V::Nil)
             },
-            Stmt::Function(ref name, ref params, ref body) => {
+            Stmt::Function(name, params, body) => {
                 let function = LoxFunction{
                     name: name.to_string(),
                     params: params.clone(),
@@ -310,7 +309,7 @@ impl LoxInterpreter {
                     name.to_string(), V::Callable(Rc::new(function)));
                 Ok(V::Nil)
             },
-            Stmt::Return(ref expr) => {
+            Stmt::Return(expr) => {
                 if !nesting.func {
                     return Err("can't return outside of function".to_string());
                 }

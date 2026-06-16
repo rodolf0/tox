@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 use std::collections::HashMap;
 use crate::lox_interpreter::V;

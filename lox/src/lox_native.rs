@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 use crate::lox_environment::Environment;
 use crate::lox_interpreter::{Callable, LoxInterpreter, V};
